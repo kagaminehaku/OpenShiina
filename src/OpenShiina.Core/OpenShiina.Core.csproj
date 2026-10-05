@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The engine without a user interface: archives, decoders, the SCN interpreter, the story
+       engine with its effect formulas, and the audio mixer. No WPF or Windows API, so every
+       front end (Windows, Android, iOS, macOS, later Linux) uses the same code. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>OpenShiina</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>OpenShiina</Product>
+    <Description>An unofficial, open-source player for visual novels made with the ShiinaRio (椎名里緒) engine.</Description>
+    <Version>0.1.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Authors>kagaminehaku</Authors>
+    <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- Scheme data (keys of each game), copied next to the program that uses the engine -->
+  <ItemGroup>
+    <None Update="Data\Formats.Json" CopyToOutputDirectory="PreserveNewest" TargetPath="Formats.Json" />
+    <None Update="Data\ShiinaImage\*" CopyToOutputDirectory="PreserveNewest" TargetPath="ShiinaImage\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NVorbis" Version="0.10.5" />
+    <!-- The mixer only; each front end plays it on its own sound device -->
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenShiina.Core/OpenShiina.Core.csproj" />
+    <Project Path="src/OpenShiina.Windows/OpenShiina.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenShiina.Harness/OpenShiina.Harness.csproj" />
+  </Folder>
+</Solution>

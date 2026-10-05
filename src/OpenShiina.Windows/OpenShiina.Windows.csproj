@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Windows player (WPF): the stage, message window and pages on top of OpenShiina.Core -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>OpenShiina</AssemblyName>
+    <RootNamespace>OpenShiina.Windows</RootNamespace>
+    <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Windows\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>OpenShiina</Product>
+    <AssemblyTitle>OpenShiina</AssemblyTitle>
+    <Description>An unofficial, open-source player for visual novels made with the ShiinaRio (椎名里緒) engine.</Description>
+    <Version>0.1.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Authors>kagaminehaku</Authors>
+    <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShiina.Core\OpenShiina.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Plays the engine's mixed sound on the Windows sound device -->
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+  </ItemGroup>
+
+</Project>
