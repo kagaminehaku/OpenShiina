@@ -36,10 +36,27 @@ public sealed partial class ScnVm
 
     private void ReleasePicture(int slot)
     {
-        // GlobalFree of the picture the slot's opcode made (pictures of 04B2 belong to their loader)
-        if (m_pictureOwned[slot])
-            Free(Picture(slot));
+        // GlobalFree of the slot's picture: one an opcode made, or a block put there by 04B2
+        // (START loads pictures with its cached loader, 04B2s them and lets 04B1 free them)
+        bool owned = m_pictureOwned[slot];
         m_pictureOwned[slot] = false;
+        if (owned)
+            FreeScriptBlock(Picture(slot));
+    }
+
+    /// <summary>
+    /// GlobalFree of a block the scripts were given: its loaded-file size goes, and slots that
+    /// show it no longer own it (it is not freed twice).
+    /// </summary>
+    private void FreeScriptBlock(int block)
+    {
+        if (block == 0)
+            return;
+        m_fileSizes.Remove(block);
+        for (int s = 0; s < PictureSlots; s++)
+            if (m_pictureOwned[s] && Picture(s) == block)
+                m_pictureOwned[s] = false;
+        Free(block);
     }
 
     /// <summary>FUN_00439DD0: frame offsets and row offsets of a picture in memory become pointers.</summary>
@@ -334,6 +351,8 @@ public sealed partial class ScnVm
             int picture = vm.Value(c, i.Args[1]);
             vm.Write32(vm.PictureAddress(slot), picture);
             vm.RelocatePicture(picture);
+            // A heap block becomes the slot's: 04B1 frees it
+            vm.m_pictureOwned[slot] = vm.IsBlock(picture);
             return 0;
         });
         // 055A slot, width, height, bytes per pixel, frames: a blank picture

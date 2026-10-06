@@ -530,8 +530,10 @@ the functions they call from the decompile. First findings:
   release and then a press.
 - **Heap** (2026-10-07): GlobalAlloc / VirtualAlloc blocks come from ScnVm.Allocate and go back
   with ScnVm.Free: `04B1` and every opcode that puts a new picture into a slot (`04B0`, `055A`,
-  `055C`, `04B2`) free the slot's picture when the VM made it, `02BD` frees a block of `02BC` /
-  `00C9` / `00CE`, `0547` and a surface made again free the surface's bitmap. Free ranges are
+  `055C`, `04B2`) free the slot's picture - also a block `04B2` put there: START loads pictures
+  with its cached loader (callmod 215), `04B2`s them and frees them only with `04B1`, never
+  `02BD` - `02BD` frees a block of `02BC` / `00C9` / `00CE` (slots showing it no longer own it,
+  so it is not freed twice), `0547` and a surface made again free the surface's bitmap. Free ranges are
   merged and used again (best fit) and kept zero (whole 64 KB pages dropped). Before, the heap
   only grew: after a long play it reached the modules' code at 0x40000000 and pictures were
   written over START.SCN (unknown opcodes in START). Running into the code now stops with "Out

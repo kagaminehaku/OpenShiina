@@ -411,6 +411,9 @@ public sealed partial class ScnVm
         return at;
     }
 
+    /// <summary>The address is the start of a block in use.</summary>
+    public bool IsBlock(int address) => m_blocks.ContainsKey(address);
+
     /// <summary>Gives back a block <see cref="Allocate"/> made (GlobalFree); other addresses are ignored.</summary>
     public void Free(int address)
     {

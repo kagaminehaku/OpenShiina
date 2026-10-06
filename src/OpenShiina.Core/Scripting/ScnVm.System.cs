@@ -87,9 +87,7 @@ public sealed partial class ScnVm
         });
         Register(0x02BD, (vm, c, i) =>
         {
-            int block = vm.Value(c, i.Args[0]);
-            vm.m_fileSizes.Remove(block);
-            vm.Free(block);
+            vm.FreeScriptBlock(vm.Value(c, i.Args[0]));
             return 0;
         });
 
