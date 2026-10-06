@@ -1286,8 +1286,6 @@ public sealed partial class ScnVm
             throw new NotSupportedException("Text without antialiasing (TextOutA) is not supported yet");
         if (G(rec, RBkMode) == 2)
             throw new NotSupportedException("Opaque text background (_O) is not supported yet");
-        if (G(rec, RLayer) != -1)
-            throw new NotSupportedException($"Text into layer {G(rec, RLayer)} (_g) is not supported yet");
 
         int code = count == 1 ? (ushort)(sbyte)ch[0] : ch[0] << 8 | ch[1];
         var cache = m_glyphs[G(rec, RIndex) % TextRecords] ??= new Dictionary<int, ScnGlyph>();
@@ -1296,6 +1294,12 @@ public sealed partial class ScnVm
 
         int ascent = fonts.Ascent(font);
         int alpha = G(rec, RAlpha);
+        bool layer = G(rec, RLayer) != -1;
+        if (layer)
+        {
+            x += G(rec, ROffsetX);
+            y += G(rec, ROffsetY);
+        }
         int gx = glyph.OriginX + x;
         int top = ascent - glyph.OriginY + y;
         int right = glyph.BlackBoxX + gx, bottom = glyph.BlackBoxY + top;
@@ -1339,6 +1343,11 @@ public sealed partial class ScnVm
 
         int src = (int)(firstRow * glyph.Pitch + firstCol);
         int row = ct;
+        if (layer && (length & 0x80000000) == 0)
+        {
+            DrawGlyphOnLayer(rec, glyph, src, cl, ct, firstRow, endRow, firstCol, endCol, alpha);
+            return;
+        }
         for (uint gy = firstRow; gy < endRow; gy++, src += glyph.Pitch, row++)
         {
             if (firstCol >= endCol)
@@ -1360,6 +1369,84 @@ public sealed partial class ScnVm
                 for (int dy = -ey; dy <= ey; dy++, corner += pitch)
                     for (int dx = -ex, q = corner; dx <= ex; dx++, q += 3)
                         Blend(q, a);
+            }
+        }
+    }
+
+    // 0xFB403C / 0xFA0F90 (FUN_00408EB0): for destination alpha da and source alpha sa (index
+    // da | sa << 8), the source's share of the result and the result's alpha
+    private static byte[]? s_layerShare, s_layerAlpha;
+
+    private static void MakeLayerTables()
+    {
+        if (s_layerShare != null)
+            return;
+        var share = new byte[0x10000];
+        var alpha = new byte[0x10000];
+        for (int da = 0; da < 256; da++)
+            for (int sa = 0; sa < 256; sa++)
+            {
+                int i = da | sa << 8;
+                int v;
+                if (da == 0)
+                    v = 0xFF;
+                else
+                {
+                    double a = sa * (1.0 / 255.0), b = da * (1.0 / 255.0);
+                    double q = a / b;
+                    v = (int)Math.Truncate(q / (1.0 - a + q) * 255.0);
+                    if (v >= 0x100)
+                        v = 0xFF;
+                }
+                share[i] = (byte)v;
+                alpha[i] = (byte)(0xFF - (0xFF - da) * (0xFF - sa) / 0xFF);
+            }
+        s_layerAlpha = alpha;
+        s_layerShare = share;
+    }
+
+    /// <summary>
+    /// The layer branch of FUN_004325A0 ("_g"): the glyph over a 32-bit picture (alpha, blue,
+    /// green, red) with the tables above; full coverage writes the colour opaque.
+    /// </summary>
+    private void DrawGlyphOnLayer(int rec, ScnGlyph glyph, int src, int left, int top, uint firstRow, uint endRow,
+        uint firstCol, uint endCol, int alpha)
+    {
+        MakeLayerTables();
+        int picture = Picture(G(rec, RLayer));
+        int frameIndex = G(rec, RLayerIndex);
+        if (picture == 0 || (uint)frameIndex > (uint)Read32(picture + 4))
+            return;
+        int f = Read32(picture + 8 + 4 * frameIndex);
+        if (f == 0)
+            return;
+        int height = Read32(f + 4);
+        uint r = (uint)G(rec, RTextR), g = (uint)G(rec, RTextG), b = (uint)G(rec, RTextB);
+        uint opaque = r << 24 | g << 16 | b << 8 | 0xFF;
+        for (uint gy = firstRow; gy < endRow; gy++, src += glyph.Pitch, top++)
+        {
+            if (top < 0 || top >= height || firstCol >= endCol)
+                continue;
+            int p = PicturePixel(picture, frameIndex, left, top, 4);
+            for (uint col = 0; col < endCol - firstCol; col++, p += 4)
+            {
+                byte v = glyph.Bits.Length > src + col ? glyph.Bits[src + (int)col] : (byte)0;
+                if (v == 0)
+                    continue;
+                uint a16 = ((uint)v * 0xFF >> 6) * (uint)alpha & 0xFF00;
+                if (a16 == 0xFF00)
+                {
+                    Write32(p, (int)opaque);
+                    continue;
+                }
+                uint d = (uint)Read32(p);
+                uint index = (d & 0xFF) | a16;
+                uint t = s_layerShare![index];
+                uint rb = (d >> 8) & 0xFF00FF;
+                uint value = unchecked(((((r << 16 | b) - rb) * t >> 8) + rb & 0xFF00FF) * 0x100
+                    + (((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000) & 0xFF0000)
+                    + s_layerAlpha![index]);
+                Write32(p, (int)value);
             }
         }
     }

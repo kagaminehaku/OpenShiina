@@ -99,6 +99,44 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], vm.m_host.Active ? state : 0);
             return 0;
         });
+        // 0456 x, y: where the mouse is (FUN_0040CE90; kept at 0xBCE348 / 0xBCE344)
+        Register(0x0456, (vm, c, i) =>
+        {
+            var (x, y) = vm.m_host.MousePosition;
+            vm.EngineGlobals[0xBCE348] = x;
+            vm.EngineGlobals[0xBCE344] = y;
+            vm.Store(c, i.Args[0], x);
+            vm.Store(c, i.Args[1], y);
+            return 0;
+        });
+        // 0457 x, y: move the mouse there
+        Register(0x0457, (vm, c, i) =>
+        {
+            int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
+            vm.EngineGlobals[0xBCE348] = x;
+            vm.EngineGlobals[0xBCE344] = y;
+            vm.m_host.SetMousePosition(x, y);
+            return 0;
+        });
+        // 0459 v: mouse buttons held (DirectInput: 1 left, 2 right, 4 middle; 0x13B52BC swaps
+        // left and right)
+        Register(0x0459, (vm, c, i) =>
+        {
+            int mouse = vm.m_host.MouseButtons;
+            if (vm.EngineGlobals.GetValueOrDefault(0x13B52BC) != 0)
+                mouse = (mouse & 4) | (mouse & 1) << 1 | (mouse & 2) >> 1;
+            vm.Store(c, i.Args[0], mouse & 7);
+            return 0;
+        });
+        // 0492 x, y: window point -> picture point (x - offset) / scale, both in and out; the
+        // host already gives picture points, so they stay as they are
+        Register(0x0492, (vm, c, i) =>
+        {
+            int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
+            vm.Store(c, i.Args[0], x);
+            vm.Store(c, i.Args[1], y);
+            return 0;
+        });
         // 03E9 v: the buttons held (keyboard, mouse and joystick)
         Register(0x03E9, (vm, c, i) => { vm.Store(c, i.Args[0], vm.Buttons()); return 0; });
         // 03EA v: the buttons with key repeat

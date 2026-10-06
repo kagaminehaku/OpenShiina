@@ -143,10 +143,19 @@ public sealed partial class ScnVm
 
         if ((flags & 0x0C000000) != 0)
             throw new NotSupportedException($"Sprite mode {flags & 0x0C000000:X8} is not supported yet");
-        if ((flags & 0x70000000) != 0)
-            throw new NotSupportedException($"Sprite blend {flags & 0x70000000:X8} (alpha {flags & 0x1FF}) is not supported yet");
+        SpriteBlend? blend = null;
+        switch (flags & 0x70000000)
+        {
+            case 0:
+                break;
+            case 0x40000000:
+                blend = new SpriteBlend(flags & 0x1FF);
+                break;
+            default:
+                throw new NotSupportedException($"Sprite blend {flags & 0x70000000:X8} (alpha {flags & 0x1FF}) is not supported yet");
+        }
         for (; rows > 0; rows--, row += 4, dst += target.Pitch)
-            DrawRowPlain(Read32(row), dst, skip, visible);
+            DrawRowPlain(Read32(row), dst, skip, visible, blend);
     }
 
     /// <summary>A run header at <paramref name="p"/> (2-byte aligned): method, count, data address.</summary>
@@ -179,7 +188,24 @@ public sealed partial class ScnVm
     /// draw up to <paramref name="visible"/>. Blends are d + ((s - d) * a >> 8) (arithmetic shift),
     /// low byte - the MMX blocks give the same bytes; alpha 255 in a per-pixel run copies.
     /// </summary>
-    private void DrawRowPlain(int p, int dst, int skip, int visible)
+    /// <summary>
+    /// Mode 0x40000000 with alpha a (1-255; FUN_0044346A): tables T1 = a / 256 and T2 =
+    /// (256 - a) / 256 stepped like FUN_004396B4 (0x492EC0 / 0x493EC0), MMX weights a and 256 - a.
+    /// </summary>
+    private sealed class SpriteBlend
+    {
+        public readonly int Alpha;
+        public readonly byte[] T1 = new byte[256], T2 = new byte[256];
+
+        public SpriteBlend(int alpha)
+        {
+            Alpha = alpha;
+            StepTable(T1, alpha, 256);
+            StepTable(T2, 256 - alpha, 256);
+        }
+    }
+
+    private void DrawRowPlain(int p, int dst, int skip, int visible, SpriteBlend? blend = null)
     {
         p += 2;
         int remaining = visible;
@@ -203,7 +229,7 @@ public sealed partial class ScnVm
             else
             {
                 int n = Math.Min(part, remaining);
-                DrawRun(method, n, at, dst);
+                DrawRun(method, n, at, dst, blend);
                 dst += n * 3;
                 remaining -= n;
             }
@@ -222,14 +248,19 @@ public sealed partial class ScnVm
                 continue;
             }
             int n = Math.Min(count, remaining);
-            DrawRun(method, n, data, dst);
+            DrawRun(method, n, data, dst, blend);
             dst += n * 3;
             remaining -= n;
         }
     }
 
-    private void DrawRun(int method, int n, int data, int dst)
+    private void DrawRun(int method, int n, int data, int dst, SpriteBlend? blend)
     {
+        if (blend != null)
+        {
+            DrawRunAlpha(method, n, data, dst, blend);
+            return;
+        }
         switch (method)
         {
             case 2:
@@ -279,10 +310,205 @@ public sealed partial class ScnVm
         }
     }
 
+    /// <summary>The runs of mode 0x40000000 (0x440F9C: the MMX + SSE path).</summary>
+    private void DrawRunAlpha(int method, int n, int data, int dst, SpriteBlend blend)
+    {
+        switch (method)
+        {
+            case 2:
+            {
+                // two sources: the run's pixels at a, the picture at 256 - a
+                int bytes = n * 3;
+                byte[] s = ReadBytes(data, bytes), d = ReadBytes(dst, bytes), o = new byte[bytes];
+                int a = blend.Alpha, b = 256 - a;
+                byte Table(int i) => (byte)(blend.T1[s[i]] + blend.T2[d[i]]);
+                byte Block(int i) => (byte)Math.Min(255, (s[i] * a + d[i] * b & 0xFFFF) >> 8);
+                int left = bytes, at = 0, head = -dst & 7;
+                if (head != 0)
+                {
+                    for (int h = head & 3; h > 0 && left > 0; h--, at++, left--)
+                        o[at] = Table(at);
+                    if (left > 0 && left < 4)
+                    {
+                        for (; left > 0; at++, left--)
+                            o[at] = Table(at);
+                    }
+                    else if (left > 0 && (head & 4) != 0)
+                    {
+                        for (int q = 0; q < 4; q++)
+                            o[at + q] = Block(at + q);
+                        at += 4;
+                        left -= 4;
+                    }
+                }
+                for (; left >= 8; at += 8, left -= 8)
+                    for (int q = 0; q < 8; q++)
+                        o[at + q] = Block(at + q);
+                if (left >= 4)
+                {
+                    for (int q = 0; q < 4; q++)
+                        o[at + q] = Block(at + q);
+                    at += 4;
+                    left -= 4;
+                }
+                for (; left > 0; at++, left--)
+                    o[at] = Table(at);
+                WriteBytes(dst, o);
+                return;
+            }
+            case 3:
+            {
+                // one colour scaled by a, the picture by the table / MMX at 256 - a
+                int a = blend.Alpha, b = 256 - a;
+                byte c0 = (byte)(ReadByte(data) * a >> 8), c1 = (byte)(ReadByte(data + 1) * a >> 8), c2 = (byte)(ReadByte(data + 2) * a >> 8);
+                byte[] c = [c0, c1, c2];
+                void TablePixel(int at)
+                {
+                    WriteByte(at, (byte)(blend.T2[ReadByte(at)] + c0));
+                    WriteByte(at + 1, (byte)(blend.T2[ReadByte(at + 1)] + c1));
+                    WriteByte(at + 2, (byte)(blend.T2[ReadByte(at + 2)] + c2));
+                }
+                int left = n;
+                if (left < 15)
+                {
+                    for (; left > 0; left--, dst += 3)
+                        TablePixel(dst);
+                    return;
+                }
+                for (; (dst & 7) != 0; left--, dst += 3)
+                    TablePixel(dst);
+                for (int groups = left >> 3; groups > 0; groups--, dst += 24)
+                {
+                    byte[] d = ReadBytes(dst, 24);
+                    for (int q = 0; q < 24; q++)
+                        d[q] = (byte)(Math.Min(255, d[q] * b >> 8) + c[q % 3]);
+                    WriteBytes(dst, d);
+                }
+                for (left &= 7; left > 0; left--, dst += 3)
+                    TablePixel(dst);
+                return;
+            }
+            case 4:
+                for (int i = 0; i < n; i++, data += 4, dst += 3)
+                {
+                    int alpha = blend.T1[ReadByte(data)];
+                    if (alpha == 0xFF)
+                    {
+                        WriteByte(dst, ReadByte(data + 1));
+                        WriteByte(dst + 1, ReadByte(data + 2));
+                        WriteByte(dst + 2, ReadByte(data + 3));
+                    }
+                    else if (alpha != 0)
+                    {
+                        BlendByte(dst, ReadByte(data + 1), alpha);
+                        BlendByte(dst + 1, ReadByte(data + 2), alpha);
+                        BlendByte(dst + 2, ReadByte(data + 3), alpha);
+                    }
+                }
+                return;
+            default:
+            {
+                int alpha = blend.T1[ReadByte(data)];
+                byte b0 = ReadByte(data + 1), g0 = ReadByte(data + 2), r0 = ReadByte(data + 3);
+                for (int i = 0; i < n; i++, dst += 3)
+                {
+                    BlendByte(dst, b0, alpha);
+                    BlendByte(dst + 1, g0, alpha);
+                    BlendByte(dst + 2, r0, alpha);
+                }
+                return;
+            }
+        }
+    }
+
     private void BlendByte(int at, int source, int alpha)
     {
         int d = ReadByte(at);
         WriteByte(at, (byte)(((source - d) * alpha >> 8) + d));
+    }
+
+    /// <summary>FUN_004116A0: a frame's rectangle (x, y, x + width, y + height), or null.</summary>
+    public (int L, int T, int R, int B)? FrameRect(int slot, int frame)
+    {
+        int picture = Picture(slot);
+        if (picture == 0 || (uint)Read32(picture + 4) <= (uint)frame)
+            return null;
+        int f = Read32(picture + 8 + 4 * frame);
+        if (f == 0)
+            return null;
+        int x = Read32(f + 8), y = Read32(f + 0xC);
+        return (x, y, x + Read32(f), y + Read32(f + 4));
+    }
+
+    /// <summary>
+    /// FUN_004114B0: from the highest priority down (unsigned; shown or not), the first entry
+    /// whose frame has a run of method 1 or more under (x, y) gives <paramref name="hit"/> = its
+    /// word 6. An entry with a missing picture or frame ends the search.
+    /// </summary>
+    public bool HitTest(int sprites, int count, int x, int y, ref int hit)
+    {
+        for (uint current = uint.MaxValue; ;)
+        {
+            uint next = 0;
+            bool more = false;
+            for (int i = count - 1; i >= 0; i--)
+            {
+                int e = sprites + i * SpriteSize;
+                uint priority = (uint)Read32(e + 0xC);
+                if (priority != current)
+                {
+                    if (priority < current && next <= priority)
+                    {
+                        next = priority;
+                        more = true;
+                    }
+                    continue;
+                }
+                int picture = Picture(Read32(e));
+                if (picture == 0)
+                    return false;
+                uint frameIndex = (uint)Read32(e + 4);
+                if ((uint)Read32(picture + 4) <= frameIndex)
+                    return false;
+                int f = Read32(picture + 8 + 4 * (int)frameIndex);
+                if (f == 0)
+                    return false;
+                int width = Read32(f), height = Read32(f + 4);
+                if (width == 0 || height == 0)
+                    continue;
+                int top = Read32(f + 0xC) + Read32(e + 0x14);
+                if (top > y || y >= height + top)
+                    continue;
+                int row = Read32(f + 0x14 + 4 * (y - top));
+                if (row == 0)
+                    continue;
+                int left = Read32(f + 8) + Read32(e + 0x10);
+                if (left > x || x >= width + left)
+                    continue;
+                int p = row + 2, end = left, remaining = width;
+                while (true)
+                {
+                    var (method, n, data) = ReadRun(p);
+                    end += n;
+                    p = RunEnd(method, n, data);
+                    if (x < end)
+                    {
+                        if (method != 0)
+                        {
+                            hit = Read32(e + 0x18);
+                            return true;
+                        }
+                        break;
+                    }
+                    remaining -= n;
+                    if (remaining == 0)
+                        break;
+                }
+            }
+            if (!more)
+                return true;
+            current = next;
+        }
     }
 
     private void RegisterSprites()
@@ -319,6 +545,60 @@ public sealed partial class ScnVm
                 vm.SurfaceField(n, 7), vm.SurfaceField(n, 8), vm.SurfaceField(n, 10), null);
             return 0;
         });
+        // 04C5 n, l, t, r, b: draw the list into surface n, clipped to the rectangle
+        Register(0x04C5, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]);
+            int l = vm.Value(c, i.Args[1]), t = vm.Value(c, i.Args[2]), r = vm.Value(c, i.Args[3]), b = vm.Value(c, i.Args[4]);
+            if (n is < 0 or >= SurfaceCount || vm.SurfaceField(n, 2) == 0)
+                return 0;
+            int list = vm.m_spriteList;
+            vm.Compose(vm.TableAddress(list), vm.m_spriteCounts[list], vm.SurfaceField(n, 2),
+                vm.SurfaceField(n, 7), vm.SurfaceField(n, 8), vm.SurfaceField(n, 10), (l, t, r, b));
+            return 0;
+        });
+        // 04C7 x, y, v: v = word 6 of the list entry with a visible pixel at (x, y), -1 for none
+        Register(0x04C7, (vm, c, i) =>
+        {
+            int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
+            int list = vm.m_spriteList;
+            int hit = -1;
+            vm.HitTest(vm.TableAddress(list), vm.m_spriteCounts[list], x, y, ref hit);
+            vm.Store(c, i.Args[2], hit);
+            return 0;
+        });
+        // 04C8 slot, frame, l, t, r, b: the frame's rectangle (its offset and size); 04CB slot,
+        // frame, w, h: its size (FUN_004116A0; a missing frame is a script error)
+        Register(0x04C8, (vm, c, i) =>
+        {
+            if (vm.FrameRect(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1])) is not { } r)
+                return 2;
+            vm.Store(c, i.Args[2], r.L);
+            vm.Store(c, i.Args[3], r.T);
+            vm.Store(c, i.Args[4], r.R);
+            vm.Store(c, i.Args[5], r.B);
+            return 0;
+        });
+        Register(0x04CB, (vm, c, i) =>
+        {
+            if (vm.FrameRect(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1])) is not { } r)
+                return 2;
+            vm.Store(c, i.Args[2], r.R - r.L);
+            vm.Store(c, i.Args[3], r.B - r.T);
+            return 0;
+        });
+        // 04C9 slot, frame, v: v = 1 when the picture has that frame
+        Register(0x04C9, (vm, c, i) =>
+        {
+            int picture = vm.Picture(vm.Value(c, i.Args[0]));
+            uint frame = (uint)vm.Value(c, i.Args[1]);
+            bool has = picture != 0 && (uint)vm.Read32(picture + 4) > frame && vm.Read32(picture + 8 + 4 * (int)frame) != 0;
+            vm.Store(c, i.Args[2], has ? 1 : 0);
+            return 0;
+        });
+        // 04D3 v / 04D4 v: engine settings 0x4880B0 / 0x4880B4
+        Register(0x04D3, (vm, c, i) => { vm.EngineGlobals[0x4880B0] = vm.Value(c, i.Args[0]); return 0; });
+        Register(0x04D4, (vm, c, i) => { vm.EngineGlobals[0x4880B4] = vm.Value(c, i.Args[0]); return 0; });
         // 04E2 dst, x, y, w, h, src, sx, sy: copy a rectangle between surfaces (FUN_00417900),
         // clipped to the destination only
         Register(0x04E2, (vm, c, i) =>

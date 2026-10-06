@@ -60,6 +60,12 @@ public interface IScnHost
 
     /// <summary>The game window is in front (GetForegroundWindow).</summary>
     bool Active => true;
+
+    /// <summary>Where the mouse is, in pixels of the game's picture (GetCursorPos + ScreenToClient).</summary>
+    (int X, int Y) MousePosition => (0, 0);
+
+    /// <summary>Moves the mouse to a point of the game's picture (SetCursorPos).</summary>
+    void SetMousePosition(int x, int y) { }
 }
 
 /// <summary>An opcode the interpreter does not run yet, or a script error.</summary>
@@ -161,6 +167,8 @@ public sealed partial class ScnVm
         RegisterSprites();
         RegisterInput();
         RegisterMusic();
+        RegisterMisc();
+        RegisterLayers();
     }
 
     public ScnContext Slot(int index) => m_slots[index];
@@ -370,6 +378,7 @@ public sealed partial class ScnVm
         // Decoded code of an older module at this address no longer applies
         foreach (var key in m_decoded.Keys.Where(k => k >= at && k < at + code.Length + 16).ToList())
             m_decoded.Remove(key);
+        m_cpu?.Forget();
         return true;
     }
 

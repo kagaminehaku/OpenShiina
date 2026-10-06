@@ -36,6 +36,8 @@
     <PackageReference Include="NVorbis" Version="0.10.5" />
     <!-- The mixer only; each front end plays it on its own sound device -->
     <PackageReference Include="NAudio.Core" Version="2.2.1" />
+    <!-- Decodes the x86 code embedded in SCN modules (Scripting/X86Cpu) -->
+    <PackageReference Include="Iced" Version="1.21.0" />
   </ItemGroup>
 
 </Project>

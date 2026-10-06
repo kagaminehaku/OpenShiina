@@ -146,6 +146,45 @@ public sealed partial class ScnVm
         return picture;
     }
 
+    /// <summary>Bytes per pixel of a picture's frame: 4 when its first row is ABGR (0x80000000), else 3.</summary>
+    private int FrameBytes(int picture, int frame) =>
+        (uint)frame > (uint)Read32(picture + 4) ? 3 : (Read32(Read32(Read32(picture + 8 + 4 * frame) + 0x14)) < 0 ? 4 : 3);
+
+    /// <summary>
+    /// FUN_004105F0: fills a rectangle of a raw picture's frame. 4 bytes a pixel get the colour
+    /// dword; 3 bytes a pixel get its bytes 2, 3, 1 (as the executable writes them).
+    /// </summary>
+    public void FillPicture(int picture, int frame, int x, int y, int w, int h, int color)
+    {
+        if ((uint)frame > (uint)Read32(picture + 4))
+            return;
+        int f = Read32(picture + 8 + 4 * frame);
+        if (f == 0)
+            return;
+        int bytes = FrameBytes(picture, frame);
+        int dst = Read32(f + 0x14 + 4 * y) + 8 + bytes * x;
+        int line = bytes * w, stride = Read32(f) * bytes + 8;
+        if ((uint)h == 0)
+            return;
+        if (bytes == 4)
+        {
+            var row = new byte[(line >>> 2) * 4];
+            for (int k = 0; k < row.Length; k += 4)
+                BitConverter.TryWriteBytes(row.AsSpan(k), color);
+            for (int r = 0; r < h; r++, dst += stride)
+                WriteBytes(dst, row);
+            return;
+        }
+        byte b0 = (byte)(color >> 16), b1 = (byte)(color >> 24), b2 = (byte)(color >> 8);
+        for (int r = 0; r < h; r++, dst += stride)
+            for (int k = 0; (uint)k < (uint)line; k += 3)
+            {
+                WriteByte(dst + k, b0);
+                WriteByte(dst + k + 1, b1);
+                WriteByte(dst + k + 2, b2);
+            }
+    }
+
     private void RegisterPictures()
     {
         // 04B0 slot, file: load an S25 file into a picture slot
@@ -170,6 +209,95 @@ public sealed partial class ScnVm
             vm.RelocatePicture(picture);
             vm.Write32(picture, 0);
             vm.PredecodePicture(picture);
+            return 0;
+        });
+        // 055B slot, frame, x, y, w, h, colour: fill a rectangle of a raw picture
+        Register(0x055B, (vm, c, i) =>
+        {
+            var v = new int[7];
+            for (int k = 0; k < 7; k++)
+                v[k] = vm.Value(c, i.Args[k]);
+            int picture = vm.Picture(v[0]);
+            if (picture != 0)
+                vm.FillPicture(picture, v[1], v[2], v[3], v[4], v[5], v[6]);
+            return 0;
+        });
+        // 055C slot, surface: a one-frame picture copied from a surface (FUN_00410B70)
+        Register(0x055C, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]), surface = vm.Value(c, i.Args[1]);
+            if ((uint)slot > 0x100 || surface is < 0 or >= SurfaceCount)
+                return 2;
+            if (vm.m_pictureOwned[slot])
+                vm.ReleasePicture(slot);
+            int w = vm.SurfaceField(surface, 7), h = vm.SurfaceField(surface, 8), pitch = vm.SurfaceField(surface, 10);
+            int bytes = vm.SurfaceField(surface, 9) >> 3, pixels = vm.SurfaceField(surface, 2);
+            int picture = vm.CreatePicture(w, h, bytes, 1);
+            int dst = vm.Read32(vm.Read32(picture + 8) + 0x14) + 8;
+            for (int y = 0; y < h; y++, dst += w * bytes + 8, pixels += pitch)
+                vm.CopyMemory(dst, pixels, w * bytes);
+            vm.Write32(vm.PictureAddress(slot), picture);
+            vm.m_pictureOwned[slot] = true;
+            return 0;
+        });
+        // 0FD4 slot, frame, v: bytes of one row of the frame with its 8-byte header (FUN_00410590)
+        Register(0x0FD4, (vm, c, i) =>
+        {
+            int picture = vm.Picture(vm.Value(c, i.Args[0]));
+            int frame = vm.Value(c, i.Args[1]);
+            int bytes = 8;
+            if (picture != 0 && (uint)frame <= (uint)vm.Read32(picture + 4) && vm.Read32(picture + 8 + 4 * frame) is var f and not 0)
+                bytes = vm.Read32(f) * vm.FrameBytes(picture, frame) + 8;
+            vm.Store(c, i.Args[2], bytes);
+            return 0;
+        });
+        // 0560 slot, frame, x, y: the frame's offset; 0561 slot, frame, x, y: read it
+        Register(0x0560, (vm, c, i) =>
+        {
+            int picture = vm.Picture(vm.Value(c, i.Args[0]));
+            int frame = vm.Value(c, i.Args[1]), x = vm.Value(c, i.Args[2]), y = vm.Value(c, i.Args[3]);
+            if (picture != 0 && (uint)frame <= (uint)vm.Read32(picture + 4) && vm.Read32(picture + 8 + 4 * frame) is var f and not 0)
+            {
+                vm.Write32(f + 8, x);
+                vm.Write32(f + 0xC, y);
+            }
+            return 0;
+        });
+        Register(0x0561, (vm, c, i) =>
+        {
+            int picture = vm.Picture(vm.Value(c, i.Args[0]));
+            int frame = vm.Value(c, i.Args[1]);
+            int x = 0, y = 0;
+            if (picture != 0 && (uint)frame <= (uint)vm.Read32(picture + 4) && vm.Read32(picture + 8 + 4 * frame) is var f and not 0)
+            {
+                x = vm.Read32(f + 8);
+                y = vm.Read32(f + 0xC);
+            }
+            vm.Store(c, i.Args[2], x);
+            vm.Store(c, i.Args[3], y);
+            return 0;
+        });
+        // 00C8 file, address: copy the file into memory the scripts allocated
+        Register(0x00C8, (vm, c, i) =>
+        {
+            string file = vm.ReadString(vm.Value(c, i.Args[0]));
+            if (vm.ReadScriptFile(file) is not { } data)
+                return 2;
+            vm.EngineGlobals[0x4C4514] = data.Length;
+            vm.WriteBytes(vm.Value(c, i.Args[1]), data);
+            return 0;
+        });
+        // 04B1 slot: free the slot's picture
+        Register(0x04B1, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]);
+            if ((uint)slot > 0x100)
+                return 2;
+            if (vm.Picture(slot) != 0)
+            {
+                vm.ReleasePicture(slot);
+                vm.Write32(vm.PictureAddress(slot), 0);
+            }
             return 0;
         });
         // 00C9 file, v: v = the file loaded into memory

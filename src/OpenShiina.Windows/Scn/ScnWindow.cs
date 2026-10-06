@@ -209,6 +209,31 @@ public sealed class ScnWindow : Window
 
         public bool Active => window.IsActive;
 
+        public (int X, int Y) MousePosition
+        {
+            get
+            {
+                var image = (Image)window.Content;
+                var p = Mouse.GetPosition(image);
+                double sx = image.ActualWidth > 0 ? window.m_bitmap.PixelWidth / image.ActualWidth : 1;
+                double sy = image.ActualHeight > 0 ? window.m_bitmap.PixelHeight / image.ActualHeight : 1;
+                return ((int)Math.Floor(p.X * sx), (int)Math.Floor(p.Y * sy));
+            }
+        }
+
+        public void SetMousePosition(int x, int y)
+        {
+            var image = (Image)window.Content;
+            if (image.ActualWidth <= 0 || image.ActualHeight <= 0)
+                return;
+            var screen = image.PointToScreen(new Point(x * image.ActualWidth / window.m_bitmap.PixelWidth,
+                y * image.ActualHeight / window.m_bitmap.PixelHeight));
+            SetCursorPos((int)screen.X, (int)screen.Y);
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetCursorPos(int x, int y);
+
         public void Press(KeyEventArgs e, bool down)
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;

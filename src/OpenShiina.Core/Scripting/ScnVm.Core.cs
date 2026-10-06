@@ -505,6 +505,32 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[2], Math.Sign(vm.CompareStrings(a, b, ignoreCase: true)));
             return 0;
         });
+        // 0BCF a, b, n, result: strncmp (the C runtime's: the difference of the first unequal bytes)
+        Register(0x0BCF, (vm, c, i) =>
+        {
+            int a = vm.Value(c, i.Args[0]), b = vm.Value(c, i.Args[1]), n = vm.Value(c, i.Args[2]);
+            int result = 0;
+            for (uint k = 0; k < (uint)n; k++)
+            {
+                byte x = vm.ReadByte(a + (int)k), y = vm.ReadByte(b + (int)k);
+                if (x != y || x == 0)
+                {
+                    result = x - y;
+                    break;
+                }
+            }
+            vm.Store(c, i.Args[3], result);
+            return 0;
+        });
+        // 0BD4 text, part, result: strstr (the address of the first match, or 0)
+        Register(0x0BD4, (vm, c, i) =>
+        {
+            int text = vm.Value(c, i.Args[0]), part = vm.Value(c, i.Args[1]);
+            byte[] t = vm.ReadBytes(text, vm.StringLength(text)), p = vm.ReadBytes(part, vm.StringLength(part));
+            int at = t.AsSpan().IndexOf(p);
+            vm.Store(c, i.Args[2], at < 0 ? 0 : text + at);
+            return 0;
+        });
     }
 
     private int m_caseValue;

@@ -489,6 +489,16 @@ the functions they call from the decompile. First findings:
   0 skips, else d + ((s - d) * a >> 8)), 5+ one ABGR blended the same way (alpha 255 included).
   The MMX blocks give the same bytes as the scalar code. Blend modes (bits 28-30 with alpha
   bits 0-8, table set-up 0x44346A) and modes 0x0C000000 are not done yet.
+- Picture queries and the rest of the list opcodes: `04C9 slot, frame, v` (1 when the frame
+  exists), `04C8 slot, frame, l, t, r, b` / `04CB slot, frame, w, h` (frame offset and size,
+  FUN_004116A0; a missing frame is a script error), `04C5 n, l, t, r, b` (compose with a clip
+  rectangle), `04C6 n, show` (surface 0 = surface n at the last `0500` brightness, always
+  redone), `04C7 x, y, v` (FUN_004114B0: from the highest priority down, shown or not, the
+  first entry with a run of method >= 1 under the point gives its word 6; -1 for none; a missing
+  picture or frame ends the search), `04D3` / `04D4` (0x4880B0 / 0x4880B4).
+- Mouse: `0456 x, y` cursor in client pixels (scaled back in full screen), `0457 x, y` sets it,
+  `0459 v` DirectInput buttons (1 left, 2 right, 4 middle; 0x13B52BC swaps left and right),
+  `0492 x, y` window point -> picture point ((v - offset) / scale, in place).
 - `04E2 dst, x, y, w, h, src, sx, sy`: rectangle copy (clipped to dst only, FUN_00417900);
   `04F6 dst, x, y, A, ax, ay, B, bx, by, w, h, a, b`: dst = A * a / (a + b) + B * b / (a + b)
   (FUN_004396F0; B with bit 31 = a grey level). MMX is used when 0x13B5300 is set (RIO.INI MMX,
@@ -518,4 +528,34 @@ the functions they call from the decompile. First findings:
   scope is left (the start-up fade alone declares thousands in a few seconds).
 - Status: START, TOPMENU's logo, white and caution screens run and are pixel-identical to the
   extractor's pictures (ScnBoot saves the shown surface as PNG; `OpenShiina.exe --scn` shows it).
-  Music streams run too (the title track, 281 s, loops). Next stop: `04C9` at the title.
+  Music streams run too (the title track, 281 s, loops). The title screen with its menu runs;
+  against the 1.5 player's title only 858 pixels on anti-aliased button edges differ by 1-2
+  (ScnVm uses the executable's d + ((s - d) * a >> 8)).
+
+### Into the game (ScnVm, 2026-10-06)
+
+- **Embedded x86** now runs on an interpreter (Scripting/X86Cpu, Iced for decoding) over the VM's
+  flat memory: integer, string and MMX instructions; `cpuid` reports "GenuineIntel" family 6 with
+  FPU, CMOV and MMX only, so Oreimo's CPUID routine gives 0x11 and every script takes its MMX
+  paths (the SSE paths in all 11 games are never run). A survey of the 230 routines of the 11
+  games (57,393 instructions) found about 100 mnemonics; xmm ones only on SSE2 paths.
+- Title menu: the menu engine (START 230, "menu5.asm") selects with the mouse (`04C7` hit test)
+  or the keyboard cursor; decide (0x20) acts only on the item under the cursor.
+- `00C8 file, address` loads a file into script memory; `04B1 n` frees a picture slot; `055B
+  slot, frame, x, y, w, h, colour` fills a rectangle (4 bytes a pixel: the dword; 3 bytes: its
+  bytes 2, 3, 1); `055C slot, surface` copies a surface into a new picture; `0560` / `0561` set /
+  get a frame's offset; `0FD4` row bytes; `0BCF` strncmp, `0BD4` strstr; `02C1` GlobalMemoryStatus;
+  `03EC` DirectInput key with repeat; `00CE`-`00D1` background file loader (done at once here);
+  `0A30` / `0A31` disc check / extra folder.
+- **32-bit pictures** (text and button layers): `0562 picture, frame, x, y, slot, frame` draws a
+  frame over one (FUN_004436F0 / 004437C0, one entry): source alpha 0 skips, 255 or a transparent
+  destination copies, else a = (0xFE01 - (255-sa)(255-da)) * 0x10203 >> 24 (32 bits) and each
+  channel (s sa 255 + (255-sa) da d) * (2^24 / a) >> 32. Text drawn into a layer ("_g n,i" /
+  `00B4`) uses tables made at start-up (FUN_00408EB0): share[da | sa << 8] = trunc(255 * (A/B) /
+  (1 - A + A/B)) with A = sa/255, B = da/255 (255 when da = 0), alpha = 255 - (255-da)(255-sa)/255.
+- Compositor mode 0x40000000 (alpha a): tables T1 = a/256 and T2 = (256-a)/256 stepped as in
+  FUN_004396B4; BGR runs blend two sources ((s a + d (256-a)) >> 8 in MMX blocks, T1[s] + T2[d] at
+  the edges), one-colour runs add (c a >> 8) to T2[d] (MMX (d (256-a) >> 8) in 8-pixel groups
+  from an 8-byte aligned pixel when 15 or more), alpha runs use T1[alpha].
+- Status: clicking Start runs the opening: the first scene with Kirino, the message window,
+  the name icon and the first line ("たまには、俺達もどっか出かけるか") are drawn; it waits for a click.

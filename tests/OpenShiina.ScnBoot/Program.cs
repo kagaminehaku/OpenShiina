@@ -5,6 +5,8 @@
 //   scnboot [game folder] [frames] [picture folder] [every n frames]
 // Time runs at 60 frames a second whatever the speed of the run. SCNBOOT_PRESS="frame:vk[:frames],..."
 // holds virtual keys down (default 3 frames), e.g. "700:0x0D" presses Return at frame 700.
+// SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];..." puts the mouse at (x, y) from that frame on and
+// holds buttons (1 left, 2 right, 4 middle; default none) for some frames (default 3).
 // With a picture folder, the surface the window shows is saved as frame_NNNN.png every n frames
 // (default 10) and when the run ends.
 // The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
@@ -104,6 +106,7 @@ catch (Exception ex)
 
 if (pictures != null)
     SaveScreen(frame);
+Console.WriteLine($"gCPUID = {vm.Read32(vm.GlobalAddress("gCPUID")):X}, x86 instructions run: {vm.Cpu.Executed}");
 Console.WriteLine($"Opcodes run ({vm.OpCounts.Count} kinds): " +
     string.Join(" ", vm.OpCounts.OrderBy(k => k.Key).Select(k => $"{k.Key:X4}x{k.Value}")));
 return 0;
@@ -173,6 +176,31 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
             .ToList();
 
     public bool KeyDown(int virtualKey) => m_presses.Any(p => p.Key == virtualKey && Frame >= p.From && Frame <= p.To);
+
+    // SCNBOOT_MOUSE: (first frame, x, y, buttons, last frame the buttons are held)
+    private readonly List<(int From, int X, int Y, int Buttons, int To)> m_mouse =
+        (Environment.GetEnvironmentVariable("SCNBOOT_MOUSE") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(item => item.Split(':'))
+            .Select(p =>
+            {
+                int from = int.Parse(p[0]);
+                var xy = p[1].Split(',');
+                int buttons = p.Length > 2 ? int.Parse(p[2]) : 0;
+                return (from, int.Parse(xy[0]), int.Parse(xy[1]), buttons, from + (p.Length > 3 ? int.Parse(p[3]) : 3) - 1);
+            })
+            .OrderBy(m => m.Item1)
+            .ToList();
+
+    public (int X, int Y) MousePosition
+    {
+        get
+        {
+            var started = m_mouse.Where(m => m.From <= Frame).ToList();
+            return started.Count > 0 ? (started[^1].X, started[^1].Y) : (0, 0);
+        }
+    }
+
+    public int MouseButtons => m_mouse.Where(m => m.From <= Frame && Frame <= m.To).Select(m => m.Buttons).FirstOrDefault();
 
     public void SetTitle(string title) => Console.WriteLine($"  [title] {title}");
 

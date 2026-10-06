@@ -106,6 +106,20 @@ public sealed partial class ScnVm
         }
     }
 
+    /// <summary>Surface 0 = surface <paramref name="source"/> at a brightness 0-255 (0 black, 255 a copy).</summary>
+    private void ShowAtLevel(int source, int level)
+    {
+        int screen = SurfaceField(0, 2), from = SurfaceField(source, 2);
+        int width = SurfaceField(0, 7), height = SurfaceField(0, 8), pitch = SurfaceField(0, 10);
+        int size = pitch * height;
+        if (level == 0)
+            FillMemory(screen, size, 0);
+        else if (level == 255)
+            CopyMemory(screen, from, size);
+        else
+            BlendRows(screen, from, 0, level, 255 - level, width, height, pitch);
+    }
+
     private void RegisterDraw()
     {
         // 0500 level: surface 0 (the one on screen) = surface 1 at a brightness 0-255
@@ -117,15 +131,29 @@ public sealed partial class ScnVm
             if (level == 0x100 || level == vm.m_screenLevel)
                 return 0;
             vm.m_screenLevel = level;
-            int screen = vm.SurfaceField(0, 2), source = vm.SurfaceField(1, 2);
-            int width = vm.SurfaceField(0, 7), height = vm.SurfaceField(0, 8), pitch = vm.SurfaceField(0, 10);
-            int size = pitch * height;
-            if (level == 0)
-                vm.FillMemory(screen, size, 0);
-            else if (level == 255)
-                vm.CopyMemory(screen, source, size);
-            else
-                vm.BlendRows(screen, source, 0, level, 255 - level, width, height, pitch);
+            vm.ShowAtLevel(1, level);
+            return 0;
+        });
+        // 04C6 n, show: surface 0 = surface n at the brightness of the last 0500 (FUN_004120F0,
+        // always redone); show: InvalidateRect
+        Register(0x04C6, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]);
+            if (n != 0)
+            {
+                int level = vm.EngineGlobals.GetValueOrDefault(0x4880D8, 0x100);
+                vm.m_screenLevel = -1;
+                if (level is not (0x100 or -1))
+                {
+                    vm.m_screenLevel = level;
+                    vm.ShowAtLevel(n, level);
+                }
+            }
+            if (vm.Value(c, i.Args[1]) != 0)
+            {
+                vm.ScreenInvalidated = true;
+                vm.FrameShown = true;
+            }
             return 0;
         });
 
