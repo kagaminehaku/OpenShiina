@@ -24,7 +24,7 @@ public sealed partial class ScnVm
     /// <summary>The x86 interpreter of embedded routines (created on first use).</summary>
     public X86Cpu Cpu => m_cpu ??= new X86Cpu(this);
 
-    /// <summary>With OpTimes: time (Stopwatch ticks) and calls per C# routine.</summary>
+    /// <summary>With OpTimes: time (Stopwatch ticks) and calls per C# routine and per routine run on the interpreter.</summary>
     public Dictionary<string, (long Ticks, int Calls)> NativeTimes { get; } = new();
 
     /// <summary>Adds a routine by the signature <see cref="NativeSignature"/> gives for its code.</summary>
@@ -121,7 +121,15 @@ public sealed partial class ScnVm
                 }
                 return 0;
             }
+            long begun = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             vm.Interpret(c, target, args);
+            if (vm.OpTimes != null)
+            {
+                // Routines left to the interpreter, by their offset in the module
+                string name = $"x86 {target - c.CodeBase:X5}";
+                var (ticks, calls) = vm.NativeTimes.GetValueOrDefault(name);
+                vm.NativeTimes[name] = (ticks + System.Diagnostics.Stopwatch.GetTimestamp() - begun, calls + 1);
+            }
             return 0;
         });
         // (CPUID routines run on the interpreter too: it reports an Intel CPU with MMX and no
