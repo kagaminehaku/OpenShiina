@@ -85,7 +85,13 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], block);
             return 0;
         });
-        Register(0x02BD, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
+        Register(0x02BD, (vm, c, i) =>
+        {
+            int block = vm.Value(c, i.Args[0]);
+            vm.m_fileSizes.Remove(block);
+            vm.Free(block);
+            return 0;
+        });
 
         // 00FA root, key: open a registry key (the copy-protection CRC of the exe is not checked)
         Register(0x00FA, (vm, c, i) =>

@@ -528,6 +528,14 @@ the functions they call from the decompile. First findings:
   (FUN_00413810): a press at once, then after KeyRepeatDelay (300) every KeyRepeatSpeed (50 ms).
   `03E8 vk, v` GetAsyncKeyState, `03E9 v` buttons, `03EA v` with repeat, `03EB mask` waits for a
   release and then a press.
+- **Heap** (2026-10-07): GlobalAlloc / VirtualAlloc blocks come from ScnVm.Allocate and go back
+  with ScnVm.Free: `04B1` and every opcode that puts a new picture into a slot (`04B0`, `055A`,
+  `055C`, `04B2`) free the slot's picture when the VM made it, `02BD` frees a block of `02BC` /
+  `00C9` / `00CE`, `0547` and a surface made again free the surface's bitmap. Free ranges are
+  merged and used again (best fit) and kept zero (whole 64 KB pages dropped). Before, the heap
+  only grew: after a long play it reached the modules' code at 0x40000000 and pictures were
+  written over START.SCN (unknown opcodes in START). Running into the code now stops with "Out
+  of script memory".
 - Named variables (`03CF local`) live in per-slot scopes; their memory is used again when the
   scope is left (the start-up fade alone declares thousands in a few seconds).
 - Status: START, TOPMENU's logo, white and caution screens run and are pixel-identical to the

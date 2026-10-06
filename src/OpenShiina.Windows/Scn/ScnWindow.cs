@@ -158,7 +158,7 @@ public sealed class ScnWindow : Window
             long instructions = m_vm.OpCounts.Values.Sum();
             m_perfLog.WriteLine($"{m_perfRun.Elapsed.TotalSeconds:F0} s: {fps:F0} fps, slowest {m_perfWorst:F1} ms " +
                 $"(engine {m_perfWorstEngine:F1}, picture {m_perfWorstPicture:F1}), up to {m_perfRounds} rounds a frame, " +
-                $"{instructions} instructions, engine total {Ms(ops.Values.Sum()):F0} ms");
+                $"{instructions} instructions, engine total {Ms(ops.Values.Sum()):F0} ms, heap {m_vm.HeapInUse >> 20} MB");
             m_perfLog.WriteLine("  ops: " + string.Join(", ", ops.OrderByDescending(t => t.Value).Take(8)
                 .Select(t => $"{t.Key:X4} {Ms(t.Value):F1} ms x{m_vm.OpCounts.GetValueOrDefault(t.Key)}")));
             if (m_vm.NativeTimes.Count > 0)

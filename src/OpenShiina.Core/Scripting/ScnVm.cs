@@ -363,15 +363,115 @@ public sealed partial class ScnVm
         WriteByte(address + bytes.Length, 0);
     }
 
-    /// <summary>
-    /// Zeroed memory that stays (GlobalAlloc / VirtualAlloc of the engine). The heap only grows,
-    /// so new blocks are on memory never written: already zero.
-    /// </summary>
+    // The heap (GlobalAlloc / VirtualAlloc of the engine): blocks in use by address with their
+    // size, and the free ranges below the top, merged with their neighbours. Free memory is kept
+    // zero - pages wholly inside a free range are dropped, the rest cleared - so a block is zero
+    // when it is handed out, from a free range or from the top.
+    private readonly Dictionary<int, int> m_blocks = new();
+    private readonly SortedList<int, int> m_freeRanges = new();
+
+    /// <summary>Bytes of heap in use (for reports).</summary>
+    public long HeapInUse { get; private set; }
+
+    /// <summary>Zeroed memory (GlobalAlloc / VirtualAlloc); <see cref="Free"/> gives it back.</summary>
     public int Allocate(int bytes)
     {
-        int at = m_heapTop;
-        m_heapTop += (Math.Max(bytes, 4) + 15) & ~15;
+        int size = (Math.Max(bytes, 4) + 15) & ~15;
+        // The smallest free range it fits in
+        int best = -1, bestSize = int.MaxValue;
+        for (int i = 0; i < m_freeRanges.Count; i++)
+        {
+            int length = m_freeRanges.Values[i];
+            if (length >= size && length < bestSize)
+            {
+                best = m_freeRanges.Keys[i];
+                bestSize = length;
+                if (length == size)
+                    break;
+            }
+        }
+        int at;
+        if (best >= 0)
+        {
+            m_freeRanges.Remove(best);
+            if (bestSize > size)
+                m_freeRanges.Add(best + size, bestSize - size);
+            at = best;
+        }
+        else
+        {
+            // The heap must not grow into the code of the modules
+            if ((long)m_heapTop + size > CodeRegion)
+                throw new ScnException($"Out of script memory: {HeapInUse >> 20} MB in use, {size} bytes asked for", -1, 0, 0);
+            at = m_heapTop;
+            m_heapTop += size;
+        }
+        m_blocks[at] = size;
+        HeapInUse += size;
         return at;
+    }
+
+    /// <summary>Gives back a block <see cref="Allocate"/> made (GlobalFree); other addresses are ignored.</summary>
+    public void Free(int address)
+    {
+        if (!m_blocks.Remove(address, out int size))
+            return;
+        HeapInUse -= size;
+        int start = address, end = address + size;
+        ClearRange(start, end);
+        // Merge with the free ranges before and after
+        int index = LowerFreeRange(start);
+        if (index >= 0 && m_freeRanges.Keys[index] + m_freeRanges.Values[index] == start)
+        {
+            start = m_freeRanges.Keys[index];
+            m_freeRanges.RemoveAt(index);
+        }
+        if (m_freeRanges.TryGetValue(end, out int after))
+        {
+            m_freeRanges.Remove(end);
+            end += after;
+        }
+        if (end == m_heapTop)
+            m_heapTop = start;      // the top comes down; it stays zero
+        else
+            m_freeRanges.Add(start, end - start);
+    }
+
+    /// <summary>The index of the last free range starting before <paramref name="address"/>, or -1.</summary>
+    private int LowerFreeRange(int address)
+    {
+        var keys = m_freeRanges.Keys;
+        int lo = 0, hi = keys.Count - 1, found = -1;
+        while (lo <= hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (keys[mid] < address)
+            {
+                found = mid;
+                lo = mid + 1;
+            }
+            else
+                hi = mid - 1;
+        }
+        return found;
+    }
+
+    /// <summary>Zeroes [start, end): pages wholly inside are dropped, the parts of others cleared.</summary>
+    private void ClearRange(int start, int end)
+    {
+        while (start < end)
+        {
+            int page = start >>> PageBits, offset = start & (PageSize - 1);
+            int n = Math.Min(end - start, PageSize - offset);
+            if (m_pages[page] is { } bytes)
+            {
+                if (n == PageSize)
+                    m_pages[page] = null;
+                else
+                    bytes.AsSpan(offset, n).Clear();
+            }
+            start += n;
+        }
     }
 
     public int AllocateCopy(ReadOnlySpan<byte> data)

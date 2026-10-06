@@ -36,7 +36,9 @@ public sealed partial class ScnVm
 
     private void ReleasePicture(int slot)
     {
-        // GlobalFree: the bump heap keeps the memory
+        // GlobalFree of the picture the slot's opcode made (pictures of 04B2 belong to their loader)
+        if (m_pictureOwned[slot])
+            Free(Picture(slot));
         m_pictureOwned[slot] = false;
     }
 

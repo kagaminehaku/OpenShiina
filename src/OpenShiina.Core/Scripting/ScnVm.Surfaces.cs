@@ -27,7 +27,10 @@ public sealed partial class ScnVm
     {
         int d = SurfaceAddress(index);
         int pitch = (bpp >> 3) * width;
-        int pixels = AllocateBlock(pitch * height);
+        // A surface made again lets its old bitmap go
+        if (Read32(d + 8) is var old and not 0)
+            Free(old);
+        int pixels = Allocate(pitch * height);
         for (int f = 0; f < 11; f++)
             Write32(d + 4 * f, 0);
         Write32(d + 0, 0x00020000 + index);     // stand-in handles, never 0
@@ -42,32 +45,13 @@ public sealed partial class ScnVm
 
     private bool m_pagesMade;
 
-    // Pixel memory of freed surfaces, by size, used again (zeroed) by new ones
-    private readonly Dictionary<int, Stack<int>> m_freeBlocks = new();
-
-    private int AllocateBlock(int size)
-    {
-        if (m_freeBlocks.TryGetValue(size, out var free) && free.Count > 0)
-        {
-            int block = free.Pop();
-            FillMemory(block, size, 0);
-            return block;
-        }
-        return Allocate(size);
-    }
-
     /// <summary>FUN_004121C0: a surface's bitmap goes; its size stays in the descriptor.</summary>
     public void FreeSurface(int index)
     {
         int d = SurfaceAddress(index);
         int pixels = Read32(d + 8);
         if (pixels != 0)
-        {
-            int size = Read32(d + 40) * Read32(d + 32);
-            if (!m_freeBlocks.TryGetValue(size, out var free))
-                m_freeBlocks[size] = free = new Stack<int>();
-            free.Push(pixels);
-        }
+            Free(pixels);
         Write32(d + 20, 0);
         Write32(d + 4, 0);
         Write32(d, 0);
