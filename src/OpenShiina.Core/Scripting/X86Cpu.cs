@@ -480,6 +480,15 @@ public sealed class X86Cpu
             case Mnemonic.Cld:
                 m_df = false;
                 break;
+            case Mnemonic.Cmc:
+                m_cf = !m_cf;
+                break;
+            case Mnemonic.Stc:
+                m_cf = true;
+                break;
+            case Mnemonic.Clc:
+                m_cf = false;
+                break;
             case Mnemonic.Std:
                 m_df = true;
                 break;

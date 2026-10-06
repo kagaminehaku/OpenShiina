@@ -80,6 +80,30 @@ public sealed class GdiFonts : IScnFonts, IDisposable
         return new ScnGlyph((int)gm.BlackBoxX, (int)gm.BlackBoxY, gm.OriginX, gm.OriginY, gm.CellIncX, gm.CellIncY, pitch, bits);
     }
 
+    public IReadOnlyList<byte[]> FixedPitchJapaneseFaces()
+    {
+        // EnumFontFamiliesExW and the names in Shift-JIS: the "A" call would give them in the
+        // system's code page, which need not be Japanese
+        var faces = new List<byte[]>();
+        var logFont = new byte[92];
+        logFont[0x17] = ShiftJisCharSet;
+        EnumFontProc found = (lf, tm, type, _) =>
+        {
+            // lfCharSet, tmPitchAndFamily & TMPF_TRUETYPE, lfPitchAndFamily & 3 == FIXED_PITCH, not "@..."
+            string name = Marshal.PtrToStringUni(lf + 0x1C) ?? "";
+            if (Marshal.ReadByte(lf, 0x17) == ShiftJisCharSet && (Marshal.ReadByte(tm, 0x37) & 4) != 0
+                && (Marshal.ReadByte(lf, 0x1B) & 3) == 1 && !name.StartsWith('@'))
+            {
+                var bytes = s_sjis.GetBytes(name);
+                faces.Add(bytes.Length > 31 ? bytes[..31] : bytes);
+            }
+            return 1;
+        };
+        EnumFontFamiliesExW(m_dc, logFont, found, IntPtr.Zero, 0);
+        GC.KeepAlive(found);
+        return faces;
+    }
+
     public void Dispose()
     {
         foreach (var handle in m_fonts.Values)
@@ -89,6 +113,12 @@ public sealed class GdiFonts : IScnFonts, IDisposable
     }
 
     private const int SystemFont = 13;
+    private const byte ShiftJisCharSet = 0x80;
+
+    private delegate int EnumFontProc(IntPtr logFont, IntPtr textMetric, uint fontType, IntPtr parameter);
+
+    [DllImport("gdi32.dll")]
+    private static extern int EnumFontFamiliesExW(IntPtr dc, byte[] logFont, EnumFontProc proc, IntPtr parameter, uint flags);
     private const uint GgoGray8Bitmap = 6;
 
     [StructLayout(LayoutKind.Sequential)]

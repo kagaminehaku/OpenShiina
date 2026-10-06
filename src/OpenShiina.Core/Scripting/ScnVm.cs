@@ -46,6 +46,9 @@ public interface IScnHost
     /// <summary>The font engine text is drawn with, or null to measure and draw nothing.</summary>
     IScnFonts? Fonts => null;
 
+    /// <summary>The shapes GDI calls of the scripts draw (op_01A4), or null for close approximations.</summary>
+    IScnShapes? Shapes => null;
+
     /// <summary>The sound buffers, or null to keep sounds silent.</summary>
     IScnSound? Sound => null;
 
@@ -175,6 +178,8 @@ public sealed partial class ScnVm
         RegisterMisc();
         RegisterLayers();
         RegisterNativeKernels();
+        RegisterEffects();
+        RegisterGdi();
     }
 
     public ScnContext Slot(int index) => m_slots[index];

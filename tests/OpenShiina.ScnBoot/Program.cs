@@ -292,6 +292,7 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     public IScnMusic? Music { get; } = new TestMusic();
 
     public IScnFonts? Fonts { get; } = OperatingSystem.IsWindows() ? new OpenShiina.Platform.GdiFonts() : null;
+    public IScnShapes? Shapes { get; } = OperatingSystem.IsWindows() ? new OpenShiina.Platform.GdiShapes() : null;
 }
 
 // Music that is only decoded, to check what the scripts open: prints the format and length

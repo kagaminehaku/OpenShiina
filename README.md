@@ -33,7 +33,11 @@ The Windows player is written to `bin/Release/OpenShiina.Windows/`, with the sch
 ## Usage
 
 Run `OpenShiina.exe` and choose the game's folder (the one with its `.exe` and `.WAR` files), or
-pass the folder on the command line. The game is recognised by its `.exe`.
+pass the folder on the command line. The game is recognised by its `.exe`. The player runs the
+game's own SCN scripts, so the game looks and behaves as it does in its own engine.
+
+`OpenShiina.exe --story [folder]` starts the older player instead: it plays the story with the
+story engine and its own copies of the game's screens (Oreimo Plus only).
 
 Saves and settings are kept in `%AppData%\OpenShiina`.
 

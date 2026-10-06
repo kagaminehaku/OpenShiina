@@ -23,6 +23,7 @@ public sealed class ScnOpcodes
         [0x0259] = ["SW"],
         [0x0209] = ["CASE"],
         [0x02DB] = ["VARGS"],           // printf-like message
+        [0x01A4] = ["V", "V", "V", "VARGS", "V"],   // DLL call: -, dll, function, arguments, result
         [0x0001] = ["V", "V"],          // loadmod slot, file
         [0x0002] = ["V", "V"],
         [0x0213] = ["b4", "b4"],        // loop: counter, target

@@ -1,7 +1,8 @@
 // Sprite lists and the compositor. A list is a table of op_04B5 (32-byte entries) with a count
 // (0x7DDB90[list]); op_04B8 picks the list the other opcodes work on. An entry is
 //   [0] picture slot  [1] frame  [2] flags  [3] priority  [4] x  [5] y  [6] -  [7] extra (+0x1C)
-// flags: bit 31 shown, bits 26-27 special modes, bits 28-30 the blend mode, bits 0-8 its alpha.
+// flags: bit 31 shown, bits 26-27 special modes, bits 28-30 the blend mode, bits 0-8 its alpha
+// (ScnVm.SpriteModes.cs).
 // op_04C4 draws a list into a surface (FUN_00412040 -> FUN_00439E10): every shown entry in
 // increasing priority (unsigned), each one row by row through its S25 runs (FUN_0043A040 and the
 // path for CPUs with MMX and SSE, 0x4409E0 - the one every current PC takes).
@@ -138,47 +139,57 @@ public sealed partial class ScnVm
             visible = right >= target.Width ? width + target.Width - right - 1 : width;
         }
 
-        if ((flags & 0x0C000000) != 0)
-            throw new NotSupportedException($"Sprite mode {flags & 0x0C000000:X8} is not supported yet");
-        SpriteBlend? blend = null;
-        switch (flags & 0x70000000)
-        {
-            case 0:
-                break;
-            case 0x40000000:
-                blend = new SpriteBlend(flags & 0x1FF);
-                break;
-            case 0x20000000:
-                blend = new SpriteBlend(Math.Min(flags & 0x1FF, 0x100), Read32(entry + 0x1C));
-                break;
-            default:
-                throw new NotSupportedException($"Sprite blend {flags & 0x70000000:X8} (alpha {flags & 0x1FF}) is not supported yet");
-        }
+        // The modes as 0x4409E0 sends them on: bits 26-27 first (0x08000000 before 0x04000000),
+        // then any mode with bit 28 adds, 0x40000000 blends, 0x60000000 paints the tint, and
+        // 0x20000000 tints
+        int alpha = flags & 0x1FF, tint = Read32(entry + 0x1C);
+        SpriteBlend? blend = (flags & 0x0C000000) != 0
+            ? (flags & 0x08000000) != 0 ? SpriteBlend.Opaque : SpriteBlend.Mask
+            : (flags & 0x70000000) switch
+            {
+                0 => null,
+                0x40000000 => new SpriteBlend(BlendKind.Alpha, alpha),
+                0x20000000 => new SpriteBlend(BlendKind.Tint, Math.Min(alpha, 0x100), tint),
+                0x60000000 => new SpriteBlend(BlendKind.Silhouette, Math.Min(alpha, 0x100), tint),
+                0x10000000 => new SpriteBlend(BlendKind.Add, alpha),
+                _ => new SpriteBlend(BlendKind.Add, Math.Min(alpha, 0x100)),
+            };
         for (; rows > 0; rows--, row += 4, dst += target.Pitch)
-            DrawRowPlain(Read32(row), dst, skip, visible, blend);
+        {
+            if (blend?.Kind == BlendKind.Silhouette)
+                DrawRowSilhouette(Read32(row), dst, skip, visible, blend);
+            else
+                DrawRowPlain(Read32(row), dst, skip, visible, blend);
+        }
     }
 
+    private enum BlendKind { Alpha, Tint, Add, Silhouette, Opaque, Mask }
+
     /// <summary>
-    /// Mode 0x40000000 with alpha a (1-255; FUN_0044346A): tables T1 = a / 256 and T2 =
+    /// A blend mode and its tables (FUN_0044346A): for alpha a, T1 = a / 256 and T2 =
     /// (256 - a) / 256 stepped like FUN_004396B4 (0x492EC0 / 0x493EC0), MMX weights a and 256 - a.
+    /// 0x10000000 keeps a up to 0x1FF; the other modes stop at 0x100.
     /// </summary>
     private sealed class SpriteBlend
     {
+        public static readonly SpriteBlend Opaque = new(BlendKind.Opaque), Mask = new(BlendKind.Mask);
+
+        public readonly BlendKind Kind;
         public readonly int Alpha;
         public readonly byte[] T1 = new byte[256], T2 = new byte[256];
-        /// <summary>Mode 0x20000000: the tint colour (entry +0x1C: blue, green, red) and T1 of each.</summary>
-        public readonly int[]? Tint, TintPart;
+        /// <summary>Modes 0x20000000 and 0x60000000: the tint colour (entry +0x1C: blue, green, red) and T1 of each.</summary>
+        public readonly int[] Tint = new int[3], TintPart = new int[3];
 
-        public SpriteBlend(int alpha, int? tint = null)
+        public SpriteBlend(BlendKind kind, int alpha = 0, int tint = 0)
         {
+            Kind = kind;
             Alpha = alpha;
+            if (kind is BlendKind.Opaque or BlendKind.Mask)
+                return;
             StepTable(T1, alpha, 256);
             StepTable(T2, 256 - alpha, 256);
-            if (tint is { } t)
-            {
-                Tint = [t & 0xFF, (t >> 8) & 0xFF, (t >> 16) & 0xFF];
-                TintPart = [T1[Tint[0]], T1[Tint[1]], T1[Tint[2]]];
-            }
+            Tint = [tint & 0xFF, (tint >> 8) & 0xFF, (tint >> 16) & 0xFF];
+            TintPart = [T1[Tint[0]], T1[Tint[1]], T1[Tint[2]]];
         }
     }
 
@@ -191,7 +202,7 @@ public sealed partial class ScnVm
     /// </summary>
     private static void DrawRunTint(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend blend)
     {
-        int[] tint = blend.Tint!, part = blend.TintPart!;
+        int[] tint = blend.Tint, part = blend.TintPart;
         byte[] t2 = blend.T2;
         switch (method)
         {
@@ -406,13 +417,23 @@ public sealed partial class ScnVm
     /// <summary>A run into the row: n pixels from src[s] to row[d] (row[d] is at memory address <paramref name="address"/>).</summary>
     private static void DrawRun(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend? blend)
     {
-        if (blend != null)
+        switch (blend?.Kind)
         {
-            if (blend.Tint != null)
-                DrawRunTint(method, n, src, s, row, d, address, blend);
-            else
-                DrawRunAlpha(method, n, src, s, row, d, address, blend);
-            return;
+            case BlendKind.Alpha:
+                DrawRunAlpha(method, n, src, s, row, d, address, blend!);
+                return;
+            case BlendKind.Tint:
+                DrawRunTint(method, n, src, s, row, d, address, blend!);
+                return;
+            case BlendKind.Add:
+                DrawRunAdd(method, n, src, s, row, d, address, blend!);
+                return;
+            case BlendKind.Opaque:
+                DrawRunOpaque(method, n, src, s, row, d);
+                return;
+            case BlendKind.Mask:
+                DrawRunMask(method, n, src, s, row, d);
+                return;
         }
         switch (method)
         {

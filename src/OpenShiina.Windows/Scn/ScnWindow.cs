@@ -1,5 +1,5 @@
 // Runs a game's own SCN scripts in ScnVm (approach 2) and shows the surface the engine shows,
-// pixel for pixel: OpenShiina.exe --scn [game folder]. Each display frame runs the engine until
+// pixel for pixel (OpenShiina.exe's default). Each display frame runs the engine until
 // the scripts show a picture; the picture is copied into a bitmap the size of the game's window.
 // Text is drawn with GDI as the game does it, sounds and music play through NAudio, the keyboard and
 // mouse are passed on. Save data goes to %AppData%\OpenShiina\scn\<game>, never the game folder.
@@ -195,6 +195,7 @@ public sealed class ScnWindow : Window
         }
 
         public IScnFonts? Fonts => m_fonts;
+        public IScnShapes? Shapes { get; } = new GdiShapes();
 
         public IScnSound? Sound => m_sound;
 

@@ -488,7 +488,8 @@ the functions they call from the decompile. First findings:
   blend mode the runs are: 0-1 transparent, 2 BGR copy, 3 one BGR, 4 ABGR each (255 copies,
   0 skips, else d + ((s - d) * a >> 8)), 5+ one ABGR blended the same way (alpha 255 included).
   The MMX blocks give the same bytes as the scalar code. Blend modes (bits 28-30 with alpha
-  bits 0-8, table set-up 0x44346A) and modes 0x0C000000 are not done yet.
+  bits 0-8, table set-up 0x44346A) and modes 0x0C000000: see "More opcodes and compositor modes"
+  below.
 - Picture queries and the rest of the list opcodes: `04C9 slot, frame, v` (1 when the frame
   exists), `04C8 slot, frame, l, t, r, b` / `04CB slot, frame, w, h` (frame offset and size,
   FUN_004116A0; a missing frame is a script error), `04C5 n, l, t, r, b` (compose with a clip
@@ -527,7 +528,7 @@ the functions they call from the decompile. First findings:
 - Named variables (`03CF local`) live in per-slot scopes; their memory is used again when the
   scope is left (the start-up fade alone declares thousands in a few seconds).
 - Status: START, TOPMENU's logo, white and caution screens run and are pixel-identical to the
-  extractor's pictures (ScnBoot saves the shown surface as PNG; `OpenShiina.exe --scn` shows it).
+  extractor's pictures (ScnBoot saves the shown surface as PNG; `OpenShiina.exe` shows it).
   Music streams run too (the title track, 281 s, loops). The title screen with its menu runs;
   against the 1.5 player's title only 858 pixels on anti-aliased button edges differ by 1-2
   (ScnVm uses the executable's d + ((s - d) * a >> 8)).
@@ -565,6 +566,51 @@ the functions they call from the decompile. First findings:
   of 8 pixels from a 4-byte aligned pixel, after one 4-pixel table block when not 8-byte aligned,
   take MMX: c + ((t - c) a >> 8) in 16-bit words); one-colour runs fill c'; alpha runs blend c'
   with the pixel's own alpha (d + ((c' - d) alpha >> 8)).
+
+### More opcodes and compositor modes (ScnVm, 2026-10-07)
+
+- The compositor's remaining modes (path 0x4409E0), checked byte for byte against the
+  executable's own code on the x86 interpreter (random sprite lists of every run method, clip
+  rectangles, every mode; scratchpad blendtest):
+  - bit 28 set (0x10000000, 0x30000000, 0x50000000, 0x70000000; 0x442930) adds, saturated:
+    BGR runs d + T1[c] (from 5 pixels on, 8-byte groups from an 8-byte aligned byte take MMX:
+    (c a & 0xFFFF) >> 8), one-colour runs d + T1[c], alpha runs d + (T1[c] alpha >> 8).
+    0x10000000 keeps alpha up to 0x1FF, the others stop at 0x100.
+  - 0x60000000 (0x442070) paints the tint colour t (entry +0x1C) through the sprite's shape:
+    alpha runs d + ((t - d) T1[alpha] >> 8); opaque runs (BGR, one colour) are only counted and
+    painted later (0x4424C0: T2[d] + T1[t], dword blocks whose sums carry into the next byte, MMX
+    groups d + ((t - d) a >> 8)) where the next run that is not of method 1-3 starts or at the
+    end of the row. A method 1 run after them moves the painting on - at the end of a row past
+    the row, even past the picture. Executable bug left out: a one-colour alpha run cut by the
+    left edge indexes T1 with its whole dword; OpenShiina uses its alpha byte.
+  - 0x08000000 (0x442E8B) copies the colours without alpha; one-colour alpha runs write blue,
+    green, blue (sic). 0x04000000 (0x4431C0) draws the alpha as grey (colour runs white).
+- `04D8 n, x, y, w, h, r, g, b` FillRect. `04FB` / `04FC dst, x, y, w, h, src, sx, sy, a` add /
+  subtract src * a >> 8 a byte at a time, saturated (3 bytes a pixel, dst's pitch for both; the
+  MMX subtraction's first (3 w mod 8) bytes of each row compute max(0, s a / 256 - d) instead).
+  `0564 dst, x, y, w, h, src, sx, sy, size` mosaic (block colours sampled at size / 2 + k size
+  counted from 0, not from the rectangle; size < 1 copies). `0566 dst, x, y, w, h, src, sx, sy,
+  phase, step, height, flags` turns each row (bit 0: column) round by sin * height >> 16
+  pixels with BitBlt (columns are w pixels high). `056C dst, src, phase, frequency, height`
+  ripples (tables of distance and angle * 128 / pi per pixel of a quarter, made per size;
+  sine tables * 256 of WinMain). `055F` copies a rectangle between pictures' frames (FUN_00410DC0:
+  clipped to the destination frame's size only; 3 -> 4 bytes writes FF B G R for 3/4 of the
+  row; rows forwards a dword at a time). `0574` rotates and zooms a 32-bit frame into another in
+  32.32 fixed point (sin / cos * 2^32, divided by the zoom; outside the source rectangle the
+  pixel keeps its colour with flags bit 0, else gets the colour argument). All checked against
+  the x86 code where it runs without the FPU or GDI (04FB, 04FC, 055F); the rest read from it.
+- `01A4 -, dll, function, arguments..., FF, v` calls a DLL function (FUN_0041DA80). The games
+  call gdi32 CreateSolidBrush, CreatePen, SelectObject, Ellipse, DeleteObject (EFCLIB's circle
+  wipe draws grey discs into a surface's device context, op_0529), user32 GetForegroundWindow,
+  AdjustWindowRect and kernel32 GlobalMemoryStatusEx. Brushes and pens are kept by the VM;
+  shapes go to IScnShapes (GDI itself on Windows: its ellipses are not symmetric, so only GDI
+  gives the same pixels; an approximation elsewhere).
+- `006F -, v` lists the fixed-pitch TrueType SHIFTJIS_CHARSET faces (no "@" faces) in 32-byte
+  entries (IScnFonts.FixedPitchJapaneseFaces). `04E8 mode, a, b, c, v` picks the renderer (0
+  GDI, 2 Direct3D, 3 OpenGL): only GDI is offered (v = 1; 0 for the others, the scripts then
+  fall back). `04EE x, y, w, h` / `04F0 sx, sy` give where and how big the picture is shown
+  (full screen scales it): (0, 0, width, height) and 1.0f, the host does the scaling.
+- The x86 interpreter does cmc / stc / clc.
 
 ### Movies (ScnVm, 2026-10-06)
 

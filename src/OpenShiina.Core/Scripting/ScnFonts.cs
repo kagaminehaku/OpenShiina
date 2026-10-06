@@ -36,4 +36,10 @@ public interface IScnFonts
     /// byte * 256 + trail byte (values above 0xFF with a lead byte of 0xFF come from sign extension).
     /// </summary>
     ScnGlyph Glyph(int font, int code);
+
+    /// <summary>
+    /// The faces op_006F lists (EnumFontFamiliesExA for SHIFTJIS_CHARSET, FUN_00415630): TrueType,
+    /// fixed pitch, not the vertical "@" faces; names in Shift-JIS, at most 31 bytes.
+    /// </summary>
+    IReadOnlyList<byte[]> FixedPitchJapaneseFaces() => [];
 }
