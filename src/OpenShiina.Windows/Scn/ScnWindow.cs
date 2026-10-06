@@ -71,13 +71,7 @@ public sealed class ScnWindow : Window
         };
         CompositionTarget.Rendering += OnRendering;
         Activated += (_, _) => Notify(ScnEvent.Activate);
-        Deactivated += (_, _) =>
-        {
-            m_host.Keys.Clear();
-            Notify(ScnEvent.Deactivate);
-        };
-        KeyDown += (_, e) => m_host.Press(e, true);
-        KeyUp += (_, e) => m_host.Press(e, false);
+        Deactivated += (_, _) => Notify(ScnEvent.Deactivate);
         Closed += (_, _) =>
         {
             CompositionTarget.Rendering -= OnRendering;
@@ -217,7 +211,6 @@ public sealed class ScnWindow : Window
             var mixer = new ScnMixer();
             return (mixer, new ScnSound(mixer), new ScnMusic(mixer));
         }
-        public readonly HashSet<int> Keys = new();
 
         public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
 
@@ -268,12 +261,34 @@ public sealed class ScnWindow : Window
 
         public IScnMusic? Music => m_audio.Music;
 
-        public bool KeyDown(int virtualKey) => Keys.Contains(virtualKey);
+        // Keys and mouse buttons as they are at the moment the scripts ask, like the engine reads
+        // them (GetAsyncKeyState, DirectInput). WPF's own key events and Mouse.LeftButton only
+        // change when the window's input is processed, which waits behind slow frames (the game
+        // runs in CompositionTarget.Rendering, before input): a released Ctrl went on skipping.
+        public bool KeyDown(int virtualKey) => window.IsActive && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
-        public int MouseButtons =>
-            (Mouse.LeftButton == MouseButtonState.Pressed ? 1 : 0) |
-            (Mouse.RightButton == MouseButtonState.Pressed ? 2 : 0) |
-            (Mouse.MiddleButton == MouseButtonState.Pressed ? 4 : 0);
+        public int MouseButtons
+        {
+            get
+            {
+                if (!window.IsActive)
+                    return 0;
+                // GetAsyncKeyState gives the physical buttons; the logical ones follow the system's swap
+                bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+                bool Down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+                return (Down(swapped ? VK_RBUTTON : VK_LBUTTON) ? 1 : 0) |
+                       (Down(swapped ? VK_LBUTTON : VK_RBUTTON) ? 2 : 0) |
+                       (Down(VK_MBUTTON) ? 4 : 0);
+            }
+        }
+
+        private const int VK_LBUTTON = 1, VK_RBUTTON = 2, VK_MBUTTON = 4, SM_SWAPBUTTON = 23;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int virtualKey);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int index);
 
         public bool Active => window.IsActive;
 
@@ -301,24 +316,6 @@ public sealed class ScnWindow : Window
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetCursorPos(int x, int y);
-
-        public void Press(KeyEventArgs e, bool down)
-        {
-            var key = e.Key == Key.System ? e.SystemKey : e.Key;
-            int vk = KeyInterop.VirtualKeyFromKey(key);
-            int general = key switch
-            {
-                Key.LeftCtrl or Key.RightCtrl => 0x11,
-                Key.LeftShift or Key.RightShift => 0x10,
-                Key.LeftAlt or Key.RightAlt => 0x12,
-                _ => 0,
-            };
-            foreach (int k in general != 0 ? [vk, general] : new[] { vk })
-                if (down)
-                    Keys.Add(k);
-                else
-                    Keys.Remove(k);
-        }
 
         public void Dispose()
         {
