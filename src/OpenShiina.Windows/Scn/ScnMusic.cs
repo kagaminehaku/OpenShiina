@@ -1,5 +1,5 @@
 // The engine's music streams (IScnMusic): Ogg Vorbis (and the OGV wrapper) decoded as it plays
-// with NVorbis, PAD and WAVE through a wave reader, each stream on its own NAudio output.
+// with NVorbis, PAD and WAVE through a wave reader, each stream a voice of the shared mixer.
 
 using System.IO;
 using NAudio.Wave;
@@ -8,14 +8,12 @@ using OpenShiina.Scripting;
 
 namespace OpenShiina.Windows.Scn;
 
-public sealed class ScnMusic : IScnMusic, IDisposable
+public sealed class ScnMusic(ScnMixer mixer) : IScnMusic, IDisposable
 {
     private sealed class Stream(byte[] file)
     {
         public readonly byte[] File = file;
-        public WaveOutEvent? Output;
-        public Source? Source;
-        public VolumeSampleProvider? Volume;
+        public ScnVoice? Voice;
         public float Gain = 1;
     }
 
@@ -42,11 +40,8 @@ public sealed class ScnMusic : IScnMusic, IDisposable
         Halt(s);
         try
         {
-            s.Source = new Source(s.File, loop);
-            s.Volume = new VolumeSampleProvider(s.Source) { Volume = s.Gain };
-            s.Output = new WaveOutEvent { DesiredLatency = 150 };
-            s.Output.Init(s.Volume);
-            s.Output.Play();
+            var source = new Source(s.File, loop);
+            s.Voice = mixer.Start(source, s.Gain, source);
         }
         catch (Exception)
         {
@@ -63,14 +58,14 @@ public sealed class ScnMusic : IScnMusic, IDisposable
 
     public void Pause(int stream)
     {
-        if (m_streams.TryGetValue(stream, out var s))
-            s.Output?.Pause();
+        if (m_streams.TryGetValue(stream, out var s) && s.Voice != null)
+            s.Voice.Paused = true;
     }
 
     public void Resume(int stream)
     {
-        if (m_streams.TryGetValue(stream, out var s) && s.Output?.PlaybackState == PlaybackState.Paused)
-            s.Output.Play();
+        if (m_streams.TryGetValue(stream, out var s) && s.Voice != null)
+            s.Voice.Paused = false;
     }
 
     public void SetVolume(int stream, int volume)
@@ -78,21 +73,17 @@ public sealed class ScnMusic : IScnMusic, IDisposable
         if (!m_streams.TryGetValue(stream, out var s))
             return;
         s.Gain = volume <= -10000 ? 0 : (float)Math.Pow(10, Math.Min(volume, 0) / 2000.0);
-        if (s.Volume != null)
-            s.Volume.Volume = s.Gain;
+        if (s.Voice != null)
+            s.Voice.Gain = s.Gain;
     }
 
     public bool IsPlaying(int stream) =>
-        m_streams.TryGetValue(stream, out var s) && s.Output != null && s.Source is { Ended: false };
+        m_streams.TryGetValue(stream, out var s) && s.Voice is { Ended: false };
 
     private static void Halt(Stream s)
     {
-        s.Output?.Stop();
-        s.Output?.Dispose();
-        s.Output = null;
-        s.Source?.Dispose();
-        s.Source = null;
-        s.Volume = null;
+        s.Voice?.Stop();
+        s.Voice = null;
     }
 
     public void Dispose()

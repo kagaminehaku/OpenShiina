@@ -67,6 +67,11 @@ if (!vm.LoadModule(0, start, start: true))
     return 1;
 }
 
+// SCNBOOT_TRACE="from:to": the time and main-loop rounds of every frame in that range
+int traceFrom = int.MaxValue, traceTo = -1;
+if (Environment.GetEnvironmentVariable("SCNBOOT_TRACE") is { } trace && trace.Split(':') is [var tf, var tt])
+    (traceFrom, traceTo) = (int.Parse(tf), int.Parse(tt));
+
 int frame = 0;
 StartWatchdog();
 try
@@ -84,6 +89,8 @@ try
         }
         if (frameTime.ElapsedMilliseconds >= 1000)
             Console.WriteLine($"  [slow] frame {frame}: {frameTime.ElapsedMilliseconds} ms, {vm.FrameRounds} rounds");
+        else if (frame >= traceFrom && frame <= traceTo)
+            Console.WriteLine($"  [frame] {frame}: {frameTime.Elapsed.TotalMilliseconds:F2} ms, {vm.FrameRounds} rounds");
         if (pictures != null && frame % every == 0)
             SaveScreen(frame);
     }

@@ -1,5 +1,5 @@
-// The engine's DirectSound buffers (IScnSound) with NAudio: each buffer plays on its own wave
-// output when the scripts start it. Volumes are DirectSound's hundredths of a decibel.
+// The engine's DirectSound buffers (IScnSound) with NAudio: a buffer the scripts start is a
+// voice of the shared mixer (ScnMixer). Volumes are DirectSound's hundredths of a decibel.
 
 using System.IO;
 using NAudio.Wave;
@@ -8,13 +8,12 @@ using OpenShiina.Scripting;
 
 namespace OpenShiina.Windows.Scn;
 
-public sealed class ScnSound : IScnSound, IDisposable
+public sealed class ScnSound(ScnMixer mixer) : IScnSound, IDisposable
 {
     private sealed class Buffer(byte[] wave)
     {
         public readonly byte[] Wave = wave;
-        public WaveOutEvent? Output;
-        public VolumeSampleProvider? Volume;
+        public ScnVoice? Voice;
         public float Gain = 1;
         public bool Looping;
     }
@@ -46,10 +45,7 @@ public sealed class ScnSound : IScnSound, IDisposable
             b.Looping = (flags & 1) != 0;
             if (b.Looping)
                 reader = new LoopStream(reader);
-            b.Volume = new VolumeSampleProvider(reader.ToSampleProvider()) { Volume = b.Gain };
-            b.Output = new WaveOutEvent { DesiredLatency = 100 };
-            b.Output.Init(b.Volume);
-            b.Output.Play();
+            b.Voice = mixer.Start(reader.ToSampleProvider(), b.Gain, reader);
         }
         catch (Exception)
         {
@@ -69,20 +65,17 @@ public sealed class ScnSound : IScnSound, IDisposable
         if (!m_buffers.TryGetValue(buffer, out var b))
             return;
         b.Gain = volume <= -10000 ? 0 : (float)Math.Pow(10, Math.Min(volume, 0) / 2000.0);
-        if (b.Volume != null)
-            b.Volume.Volume = b.Gain;
+        if (b.Voice != null)
+            b.Voice.Gain = b.Gain;
     }
 
     public int Status(int buffer) =>
-        m_buffers.TryGetValue(buffer, out var b) && b.Output?.PlaybackState == PlaybackState.Playing
-            ? 1 | (b.Looping ? 4 : 0) : 0;
+        m_buffers.TryGetValue(buffer, out var b) && b.Voice is { Ended: false } ? 1 | (b.Looping ? 4 : 0) : 0;
 
     private static void Close(Buffer b)
     {
-        b.Output?.Stop();
-        b.Output?.Dispose();
-        b.Output = null;
-        b.Volume = null;
+        b.Voice?.Stop();
+        b.Voice = null;
     }
 
     public void Dispose()

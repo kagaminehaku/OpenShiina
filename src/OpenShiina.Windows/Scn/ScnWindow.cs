@@ -95,10 +95,17 @@ public sealed class ScnWindow : Window
         }
     }
 
+    // OPENSHIINA_PERF=1: frames a second and the slowest frame (engine + picture) in the title
+    private readonly bool m_perf = Environment.GetEnvironmentVariable("OPENSHIINA_PERF") == "1";
+    private readonly Stopwatch m_perfClock = Stopwatch.StartNew();
+    private double m_perfWorst;
+    private int m_perfFrames;
+
     private void OnRendering(object? sender, EventArgs e)
     {
         if (m_stopped)
             return;
+        long started = m_perf ? Stopwatch.GetTimestamp() : 0;
         try
         {
             if (!m_vm.RunFrame())
@@ -115,6 +122,18 @@ public sealed class ScnWindow : Window
         {
             m_vm.ScreenInvalidated = false;
             Present();
+        }
+        if (m_perf)
+        {
+            m_perfWorst = Math.Max(m_perfWorst, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            m_perfFrames++;
+            if (m_perfClock.ElapsedMilliseconds >= 1000)
+            {
+                Title = $"{m_data.SchemeName} - {m_perfFrames * 1000.0 / m_perfClock.ElapsedMilliseconds:F0} fps, slowest {m_perfWorst:F1} ms";
+                m_perfClock.Restart();
+                m_perfWorst = 0;
+                m_perfFrames = 0;
+            }
         }
     }
 
@@ -148,8 +167,14 @@ public sealed class ScnWindow : Window
     {
         private readonly Stopwatch m_clock = Stopwatch.StartNew();
         private readonly GdiFonts m_fonts = new();
-        private readonly ScnSound m_sound = new();
-        private readonly ScnMusic m_music = new();
+        // One sound output for the buffers and the music streams
+        private readonly (ScnMixer Mixer, ScnSound Sound, ScnMusic Music) m_audio = CreateAudio();
+
+        private static (ScnMixer, ScnSound, ScnMusic) CreateAudio()
+        {
+            var mixer = new ScnMixer();
+            return (mixer, new ScnSound(mixer), new ScnMusic(mixer));
+        }
         public readonly HashSet<int> Keys = new();
 
         public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
@@ -197,9 +222,9 @@ public sealed class ScnWindow : Window
         public IScnFonts? Fonts => m_fonts;
         public IScnShapes? Shapes { get; } = new GdiShapes();
 
-        public IScnSound? Sound => m_sound;
+        public IScnSound? Sound => m_audio.Sound;
 
-        public IScnMusic? Music => m_music;
+        public IScnMusic? Music => m_audio.Music;
 
         public bool KeyDown(int virtualKey) => Keys.Contains(virtualKey);
 
@@ -255,8 +280,9 @@ public sealed class ScnWindow : Window
 
         public void Dispose()
         {
-            m_sound.Dispose();
-            m_music.Dispose();
+            m_audio.Sound.Dispose();
+            m_audio.Music.Dispose();
+            m_audio.Mixer.Dispose();
             m_fonts.Dispose();
         }
     }
