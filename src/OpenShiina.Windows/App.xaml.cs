@@ -1,5 +1,7 @@
 // OpenShiina for Windows: takes a game folder from the command line or asks for one, finds the
 // game by its .exe (Formats.Json), opens its archives and plays the story.
+//   OpenShiina.exe [--scn] [game folder]
+// --scn runs the game's own SCN scripts instead (approach 2, being built: Scn/ScnWindow).
 
 using System.IO;
 using System.Windows;
@@ -16,7 +18,9 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        string? folder = e.Args.Length > 0 ? e.Args[0] : AskFolder();
+        bool scn = e.Args.Contains("--scn", StringComparer.OrdinalIgnoreCase);
+        var rest = e.Args.Where(a => !a.Equals("--scn", StringComparison.OrdinalIgnoreCase)).ToArray();
+        string? folder = rest.Length > 0 ? rest[0] : AskFolder();
         if (folder == null)
         {
             Shutdown();
@@ -26,10 +30,10 @@ public partial class App : Application
         try
         {
             var data = await Task.Run(() => OpenGame(folder));
-            PlayerWindow window;
+            Window window;
             try
             {
-                window = new PlayerWindow(data);
+                window = scn ? new Scn.ScnWindow(data) : new PlayerWindow(data);
             }
             catch
             {

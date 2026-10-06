@@ -27,6 +27,11 @@
     <None Update="Data\ShiinaImage\*" CopyToOutputDirectory="PreserveNewest" TargetPath="ShiinaImage\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- SCN opcode operand layouts per engine version (ScnOpcodes) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\ScnOps\*.tsv" LogicalName="OpenShiina.ScnOps.%(Filename).tsv" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="NVorbis" Version="0.10.5" />
     <!-- The mixer only; each front end plays it on its own sound device -->

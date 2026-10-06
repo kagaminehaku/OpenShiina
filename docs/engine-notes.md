@@ -342,3 +342,180 @@ drawing. The player runs this subset with `ScnMachine`:
   19 / 39 / 26 of 49, speed b[3] = 2 (標準).
 - **Backlog page** (900, semi-transparent): back 910, up / down 950 / 960, knob 901 between TOP and
   END; names in `_c255,240,0` (yellow). 2200 is the "NEW" frame of the newest save slot.
+
+## 10. Running the SCN files themselves (approach 2) - opcode survey, 2026-10-06
+
+Goal: run START.SCN, TOPMENU.SCN and EFCLIB.SCN of each game in the interpreter, as the
+engine does, instead of reimplementing their behaviour by hand (sections 6 and 8). All 66 SCN
+files of the 11 games were disassembled with ScnTools (Oreimo / Azu with the Oreimo table,
+the others with the Sena table):
+
+- **Opcode numbers are shared by every engine version**: the Oreimo table (v2.47, 704
+  opcodes) is a subset of the Sena table (1,658); only 5 opcodes (02DB, 04E7, 05D5, 05D6,
+  0C30) have different operands.
+- **Oreimo's six files use 247 distinct opcodes** (START 237, TOPMENU 60, EFCLIB 50, SRC_MAIN
+  51, PLAUNCH 27, LAUNCH 17). All 11 games together use 273; 234 are used by every game.
+- Beyond Oreimo's set: Homu, Yuru, Nyaru, Sena, Kuroneko 1 opcode each; Rikka 2; ERO-ON and Azu
+  3; Maki Fes! 22 and Re: Rem Plus 21 (engine v2.50). Running Oreimo's files covers almost all
+  of the other games.
+- 56 of Oreimo's opcodes are already run by `ScnMachine` (flow, variables, arithmetic,
+  strings, calls); 29 have names. The list with uses per file is `docs/scn-opcodes.tsv`.
+
+The handlers of opcodes below 0x561 are not in the Ghidra decompile (its jump table has "too
+many branches"): they are read from the x86 at the handler addresses of the opcode table, and
+the functions they call from the decompile. First findings:
+
+- `0002 slot, name`: loads another SCN module into one of the 1,000 script slots
+  (executable memory, like `loadmod`).
+- `000C id, label`: registers a script function (section 8).
+- `0066`, `0078`, `0079`, `0083`, `00A0`, `00B4`, `00B6`: a text-file reader (per-file
+  records at 0x4C7D28, current file in context +0xFF8): START.SCN parses the scenario TXT
+  itself, character by character (Shift-JIS aware).
+- `0032` / `0033`: clear / set a global flag (0x487F28).
+
+### The interpreter as the executable runs it (OpenShiina.Core/Scripting/ScnVm)
+
+- **Slots**: 1,000, each both a module and a task (context records of 0x101C bytes). Boot:
+  RIO.INI `Scn=start.scn` is loaded into slot 0 and started (the built-in default name is
+  autoexec.scn). `0001 slot, file` loads a file into a slot and starts it; `0002` loads without
+  starting; `000C id, label` makes slot `id` run a label of the current module (its parent is
+  the current slot; with bit 31 set the label is an absolute address); `000D slot` starts a
+  slot from its entry; `0009 slot` resets its stack and named variables.
+- **Calls**: per-slot return stack of 1,000 dwords (a push goes down). `0262 label`: push base,
+  push pc, jump. `0267 slot` (gosub): the same, then run the slot's code (base = its module).
+  `026C`: pop pc, pop base. `026D n`: the same, then drop n values. `0283 result, slot, #n, args`
+  (callmod) / `0281 result, label, #n, args`: frame {result address, args (first argument at the
+  top), n} in the context, then like gosub; `0280 #n vars` takes the arguments, `0285 v` stores v
+  into the result address and returns.
+- **Variables** (GETV / SETV / GETADR at 414E30 / 4148E0 / 414CA0): g, b, a arrays and s byte
+  flags are global; f is 1,000 dwords per slot; l is on the slot's stack at the stack top +
+  index (`0316 n` salloc / `0317 n` sfree move the top); named variables live in per-slot scope
+  tables (`03CF local #n names`, `#0` leaves the scope; `03CE global`), `{name}` falls back to a
+  global. Odd operand kinds dereference; flag 0x80 adds the base of the running module; a string
+  operand's value is its address; 0x11 is an expression.
+- **Scheduler**: every frame each running slot (flags bit 0, not 2 or 8) runs until it yields:
+  after `0034` (the frame wait), after every instruction while `0033` is in force (`0032` ends
+  it), after the instruction budget, or when a handler returns 1 (quit) / 2 (script error).
+  `0000 v` ends the task; a non-zero v quits.
+- **Expressions** (rio/Calc.cpp, FUN_00403340): doubles; `+ -` bind loosest, every other binary
+  operator shares one level, left to right; `,` sequences; assignments `= += -= *= /= %= &= |=
+  ^=`; `?:`. Terms: numbers (decimal, 0x, fractions), `_Xnnn` (exactly three digits: D = a, L =
+  f of the slot, M = g, S = b, Z = l) with suffix f / i / o (float bits, signed, plus the slot's
+  module base), `{name}`, the calculator's letter registers (double arrays, `dim(A[n])`) and
+  sin asin cos acos tan atan atan2 sqrt int rnd rand pow fabs abs log ceil floor shl shr sar
+  RGB min max peekb peekw peek dim -( !( ~(. Oreimo uses rnd, sin, RGB, sqrt and - + * / | &.
+- **Core opcodes read so far**: 01F4 / 01FE / 01FF if with unsigned / signed / float compare;
+  0212 offset, n + 0213 counter, target (a counted loop that keeps its counter in the code);
+  0398 xor, 039D rotate left; 0302-030B load / store dword, byte, word, with offsets; 02C6
+  memmove, 02C7 memset; 02D0 strlen, 02D1 strcpy, 02D3 strcat, 02D4 strcmp, 02D6 stricmp;
+  02E4 / 02E5 / 02E8 a per-slot data reader; 03AC rand() % n, 03AE srand (MS C runtime rand);
+  03BD time in ms; 03B7 / 03B8 local date / time; 03D0 leave scopes; 02EE / 02EF save /
+  restore the 0033 flag; 001E / 001F set / clear task flag 4.
+- **Input**: 03E8 key state of a virtual key; 03E9 button mask (keyboard and joypad); 03EA the
+  same with key repeat; 03EB mask waits for buttons.
+- **Embedded x86** (`0276 label`): calls machine code inside the module with a pointer to
+  {b, a, s, f of the slot, the stack top}. Oreimo has 19 such routines (17 in START, 2 in
+  EFCLIB): 75A84 CPUID (bits: 1 Intel, 2 AMD, 10h MMX, 20h SSE, 40h SSE2, 80h SSE3, 100h SSSE3,
+  200h SSE4.1, 400h SSE4.2, 800h SSE4a; stored in gCPUID), 796E5 the MMX blend of rule fades,
+  EFCLIB 1E9E the negative; the others are still to be read. They work on picture buffers in
+  script memory, so they have to be reimplemented one by one.
+
+### Start-up of START.SCN (as ScnBoot runs it, 2026-10-06)
+
+- Checks: engine version `03C0` (247), window size `09F6` (RIO.INI 800 x 600), colour depth
+  `09E2` (GetDeviceCaps BITSPIXEL >= 16), DirectDraw `06C2` / DirectSound `06A4` ready, no other
+  copy running (`07B2` FindWindow), `D382` / `AA82` switches (AA82 enables file writes).
+- Registry (`00FA` key, `00FF` exists, `00FE` string, `00FD` number): HKCU\software\GrandCross\
+  <title>, DataPath (the save folder; START appends `oreimoplus_save.bin`) and InstMode (0 - one
+  install choice in SETUP.INI). OpenShiina emulates it: DataPath is the host's save folder.
+- Settings: `0104 "RIO.INI"` then `0107 section, key, v` = GetPrivateProfileInt (default = v).
+  Keys read: FullScreen, WideMode, SSE2, MovieMode, KeyRepeatDelay / Speed, CacheSize(NA)...
+- System save: `010E` exists, `0154` open (offset, size, packed size, handle), `0156` read,
+  `0155` close, `0158` size, `0123` delete, `00D2 buffer, n, file` write. A file of the wrong
+  size is deleted and START starts from defaults. The file is unpacked by embedded routine 75C3D.
+- Surfaces: `0546 n` makes surface n the window size (descriptor at 0x7DDF90 + n * 0x2C:
+  HBITMAP, HDC, pixels, BITMAPINFO, palette, flags | 2, DirectDraw surface, width, height, bpp,
+  pitch), a top-down DIB of RIO.INI `Bpp` bits (default 24: BGR, pitch 2400). Oreimo makes 2, 3,
+  4, 7, 8, 20, 21; the engine itself makes 0 to RIO.INI `Vram` - 1 (default 2) at start-up:
+  0 is the screen (0x13B43E4 = the shown surface), 1 the composed picture. `04B5 n, count` / `04B6 n`: tables of
+  32-byte entries at 0x7DC938[n].
+- `0500 level`: surface 0 = surface 1 at a brightness (0 black, 255 copy, else FUN_004396F0:
+  with MMX, (v * (level * 256 / 255)) >> 8 per byte in 8- and 4-byte blocks, bytes outside them
+  by the table level * v / 255; 256 or the last level again: nothing).
+- Window events: each runs a slot to its end (FUN_0042BF60): WM_TIMER the slot of `0AF0`
+  (Oreimo 193, every 100 ms from `0AFA id, ms, v`; `0AFB` KillTimer), Alt+Enter `0794`
+  (252), focus lost `076C` (253, pauses), focus back `076D` (254), the end `078A` (255), close
+  request `07E4` (248). `00DD` mounts each WAR archive; `0A8D` detaches the IME.
+- The main loop is not tied to frames: it pumps messages and runs every task once per round
+  (`0033` makes tasks yield after every instruction, `0032` ends that); pictures reach the
+  window only through the drawing opcodes.
+
+### Text, pictures, sound, input (ScnVm, 2026-10-06)
+
+- **Text records** (0x4C7D28, 0x161C bytes, 38 of them; 18-37 are scratch copies for measuring
+  a line): font fields for CreateFontA, colours (text 0x144, edge 0x147, shadow 0x14A, background
+  0x14D), position, pitch, waits, kinsoku lists, the text pointer (+0x160). `0096 n` picks the
+  task's record, `0084 surface, text` lays out and draws at once (-1: control codes only),
+  `0083 surface, text` draws over frames (task flag 8: the main loop runs one text step a round),
+  `00A0 text` / `00A1 slot, v` keep a snapshot and redraw it incrementally, `0066` reads a
+  character, `0078 x, y` / `0079 x, y` position, `00B4` / `00B6` layer and offset.
+- **Control codes** (FUN_00431960): `_F face/ _H height _h width _f weight _I _o _q quality
+  _q+ / _q- antialias _c r,g,b[,a] _ca _E r,g,b,dx,dy (edge) _S r,g,b,dx,dy[,a] (shadow) _b
+  (background) _e effects _X pitch[,spacing] _XZ wide pitch _Y / _R line height _x _y _l right
+  edge _i indent _P kinsoku lists (separated by //) _w ms per character _W ms wait _s skip keys
+  _t / _t/ / _t! callback slots _a align (measures the line in a scratch record) _r new line
+  _g layer _d _p fixed extent _u ruby record _( _) save / restore position _Z _z _A _K _k`;
+  outside them `*n` / `+n text/` macros, `@` katakana, `|` full-width, `$`, `{ruby}`, `~`.
+  Numbers are FUN_004317F0 (decimal, 0x hex, "," "." " " end them, `{name}` reads a variable).
+- **Glyphs**: GetGlyphOutlineA GGO_GRAY8_BITMAP (0-64) of the record's font, cached per record,
+  blended by the engine (FUN_004325A0): a = (v * 255 >> 6) * alpha >> 8, d += (c - d) * a >> 8
+  in unsigned 32-bit arithmetic; edges / shadow are the same glyph drawn first at offsets. Fonts
+  are made lazily; a font handle deleted by the alignment measure stays dead in the record (GDI
+  semantics kept). Half-width characters are made full-width with the table at 0x485504.
+- `02DB dest, format, args` = wsprintfA through the engine's "call a DLL function" path;
+  `02DA dest, format, list` = wvsprintfA.
+- **Pictures**: slots 0xBCF2F0[0..256]. `04B0 n, file` loads an S25 file as it is, turns frame
+  and row offsets into pointers (FUN_00439DD0), clears the magic and delta-decodes rows of
+  frames with flag 0x80000000 in place, once per row reference (FUN_00403430). `00C9 file, v`
+  loads a file into memory, `04B2 n, address` makes it slot n. `055A n, w, h, bytes, frames`:
+  a blank picture of raw rows (code 0x80000000 | (w * 4 + 6), w, pixels). Pixel (x, y) of a
+  frame = row pointer + 8 + x * bytes (FUN_00410520). `04CE n`: surface n black.
+- **Sprite lists**: `04B8 n` current list, `04B9 n, v` its table, `04BA` empty, `04BB n` / `04BC v`
+  count, `04BD slot, frame, flags, priority, x, y, -, extra` add (32-byte entries), `04C4 n`
+  composes the list into surface n (FUN_00439E10): shown entries (flags bit 31) in increasing
+  unsigned priority, each through FUN_0043A040. The executable picks its kernels by its own CPU
+  check (0x494F40: 1 PentiumPro, 2 MMX, 4 SSE = 7 on any current PC, path 0x4409E0); with no
+  blend mode the runs are: 0-1 transparent, 2 BGR copy, 3 one BGR, 4 ABGR each (255 copies,
+  0 skips, else d + ((s - d) * a >> 8)), 5+ one ABGR blended the same way (alpha 255 included).
+  The MMX blocks give the same bytes as the scalar code. Blend modes (bits 28-30 with alpha
+  bits 0-8, table set-up 0x44346A) and modes 0x0C000000 are not done yet.
+- `04E2 dst, x, y, w, h, src, sx, sy`: rectangle copy (clipped to dst only, FUN_00417900);
+  `04F6 dst, x, y, A, ax, ay, B, bx, by, w, h, a, b`: dst = A * a / (a + b) + B * b / (a + b)
+  (FUN_004396F0; B with bit 31 = a grey level). MMX is used when 0x13B5300 is set (RIO.INI MMX,
+  default on): blocks (A * m + B * (256 - m)) >> 8 with m = a * 256 / (a + b), the bytes before
+  an 8-byte aligned destination and the last 1-3 from two tables built by stepping a counter
+  (FUN_004396B4). `07D0 l, t, r, b` = InvalidateRect (the frame is shown); `002A ms` = Sleep.
+- **Sound effects**: DirectSound buffers 0x7DAC20[0..256]; files are made RIFF WAVE first (PAD,
+  OggS and OGV decoded). `06A6 n, file`, `06B1 n, address` make a buffer, `06A7 n, flags` plays
+  from the start (1 loop), `06A8` stops, `06A9 n, cB` volume, `06AF n, v` DSBSTATUS (-1 none),
+  `06B0` releases, `06A5` releases all. Values above 0xFFFF are buffers themselves.
+- **Music streams** ("Synthia PCM", FUN_00453220 / 00454FB0 ...): `06D6 source, flags, v` opens
+  a stream (flag 1: source is a file in memory from `00C9`, else a file name; Oreimo passes 9)
+  into the table at 0xBCDF44; `06D9 s, flags` plays from the start (2 loop, bits 16-23 loop
+  count; the handler adds 0x10 / 0x40 / 0x80 from engine settings), `06DA` stops, `06DB` /
+  `06DC` pause / resume (status bit 4; START does it on losing / getting the focus), `06DF s, v`
+  volume 0-100 through the table at 0x4A15E0 (1000 * log2(v / 100) hundredths of a dB, 0 =
+  -10000), `06E8 s, v` status (1 playing), `06D8` closes, `06EF s, start ms, loop ms, count`
+  (-1 keeps a value; an error on streams that are not compressed). START's music routine
+  (0x202C2) loads `m\*.ogv` with 00C9, opens it with flags 9, sets 06EF and plays.
+- **Input** (FUN_00413630, DirectInput scan codes): 1 up, 2 down, 4 left, 8 right, 0x10 cancel
+  (X, right button), 0x20 decide (Z, space, return, left button), 0x40 Esc / Home / Numpad 0,
+  0x80 End, 0x100 Ctrl, 0x200 Tab, 0x800 middle button, joystick 0 too. Key repeat
+  (FUN_00413810): a press at once, then after KeyRepeatDelay (300) every KeyRepeatSpeed (50 ms).
+  `03E8 vk, v` GetAsyncKeyState, `03E9 v` buttons, `03EA v` with repeat, `03EB mask` waits for a
+  release and then a press.
+- Named variables (`03CF local`) live in per-slot scopes; their memory is used again when the
+  scope is left (the start-up fade alone declares thousands in a few seconds).
+- Status: START, TOPMENU's logo, white and caution screens run and are pixel-identical to the
+  extractor's pictures (ScnBoot saves the shown surface as PNG; `OpenShiina.exe --scn` shows it).
+  Music streams run too (the title track, 281 s, loops). Next stop: `04C9` at the title.

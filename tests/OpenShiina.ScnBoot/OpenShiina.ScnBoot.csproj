@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Runs a game's SCN scripts in ScnVm without a screen until they reach an opcode the
+       interpreter does not run yet: scnboot [game folder] [frames]. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>scnboot</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenShiina.Core\OpenShiina.Core.csproj" />
+  </ItemGroup>
+
+</Project>
