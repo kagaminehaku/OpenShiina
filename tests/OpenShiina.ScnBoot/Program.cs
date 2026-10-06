@@ -57,6 +57,9 @@ var vm = new ScnVm(ScnOpcodes.ForVersion(version), host)
 foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm.ScreenWidth = v), ("WindowHeight", v => vm.ScreenHeight = v) })
     if (System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m)
         set(int.Parse(m.Groups[1].Value));
+vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
+if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1")
+    vm.OpTimes = new();
 if (!vm.LoadModule(0, start, start: true))
 {
     Console.WriteLine($"{start} is missing.");
@@ -107,6 +110,11 @@ catch (Exception ex)
 if (pictures != null)
     SaveScreen(frame);
 Console.WriteLine($"gCPUID = {vm.Read32(vm.GlobalAddress("gCPUID")):X}, x86 instructions run: {vm.Cpu.Executed}");
+if (vm.OpTimes != null)
+    foreach (var (op, ticks) in vm.OpTimes.OrderByDescending(t => t.Value).Take(12))
+        Console.WriteLine($"  op {op:X4}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F0} ms ({vm.OpCounts[op]} runs)");
+foreach (var (entry, p) in vm.Cpu.Profile.OrderByDescending(p => p.Value.Instructions).Take(8))
+    Console.WriteLine($"  x86 {entry:X8}: {p.Calls} calls, {p.Instructions} instructions");
 Console.WriteLine($"Opcodes run ({vm.OpCounts.Count} kinds): " +
     string.Join(" ", vm.OpCounts.OrderBy(k => k.Key).Select(k => $"{k.Key:X4}x{k.Value}")));
 return 0;

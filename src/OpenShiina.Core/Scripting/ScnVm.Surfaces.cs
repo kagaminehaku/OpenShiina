@@ -27,7 +27,7 @@ public sealed partial class ScnVm
     {
         int d = SurfaceAddress(index);
         int pitch = (bpp >> 3) * width;
-        int pixels = Allocate(pitch * height);
+        int pixels = AllocateBlock(pitch * height);
         for (int f = 0; f < 11; f++)
             Write32(d + 4 * f, 0);
         Write32(d + 0, 0x00020000 + index);     // stand-in handles, never 0
@@ -41,6 +41,39 @@ public sealed partial class ScnVm
     }
 
     private bool m_pagesMade;
+
+    // Pixel memory of freed surfaces, by size, used again (zeroed) by new ones
+    private readonly Dictionary<int, Stack<int>> m_freeBlocks = new();
+
+    private int AllocateBlock(int size)
+    {
+        if (m_freeBlocks.TryGetValue(size, out var free) && free.Count > 0)
+        {
+            int block = free.Pop();
+            FillMemory(block, size, 0);
+            return block;
+        }
+        return Allocate(size);
+    }
+
+    /// <summary>FUN_004121C0: a surface's bitmap goes; its size stays in the descriptor.</summary>
+    public void FreeSurface(int index)
+    {
+        int d = SurfaceAddress(index);
+        int pixels = Read32(d + 8);
+        if (pixels != 0)
+        {
+            int size = Read32(d + 40) * Read32(d + 32);
+            if (!m_freeBlocks.TryGetValue(size, out var free))
+                m_freeBlocks[size] = free = new Stack<int>();
+            free.Push(pixels);
+        }
+        Write32(d + 20, 0);
+        Write32(d + 4, 0);
+        Write32(d, 0);
+        Write32(d + 8, 0);
+        Write32(d + 12, 0);
+    }
 
     /// <summary>
     /// The pages the engine makes when it opens its window (WinMain): surfaces 0 to Vram - 1 of
@@ -75,6 +108,27 @@ public sealed partial class ScnVm
             if (index is < 0 or >= SurfaceCount)
                 return 2;
             vm.CreateSurface(index, vm.ScreenWidth, vm.ScreenHeight, vm.Bpp, flags);
+            return 0;
+        });
+        // 0547 n: free surface n (when it was made)
+        Register(0x0547, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]);
+            if (n is >= 0 and < SurfaceCount && (vm.SurfaceField(n, 5) & 2) != 0)
+                vm.FreeSurface(n);
+            return 0;
+        });
+        // 0528 n, v: v = surface n's pixels; 0529 n, v: its device context (-1: the window's)
+        Register(0x0528, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]);
+            vm.Store(c, i.Args[1], n is >= 0 and < SurfaceCount ? vm.SurfaceField(n, 2) : 0);
+            return 0;
+        });
+        Register(0x0529, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]);
+            vm.Store(c, i.Args[1], n == -1 ? 0x00040001 : n is >= 0 and < SurfaceCount ? vm.SurfaceField(n, 1) : 0);
             return 0;
         });
         // 04B5 n, count: table n of count (0 = 1024) 32-byte entries; 04B6 n: free it

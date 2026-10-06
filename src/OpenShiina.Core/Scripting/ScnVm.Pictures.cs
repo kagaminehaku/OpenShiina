@@ -240,6 +240,15 @@ public sealed partial class ScnVm
             vm.m_pictureOwned[slot] = true;
             return 0;
         });
+        // 0FD5 slot, frame, x, y, v: v = the address of pixel (x, y) (FUN_00410520)
+        Register(0x0FD5, (vm, c, i) =>
+        {
+            int picture = vm.Picture(vm.Value(c, i.Args[0]));
+            int frame = vm.Value(c, i.Args[1]), x = vm.Value(c, i.Args[2]), y = vm.Value(c, i.Args[3]);
+            int address = picture == 0 ? 0 : vm.PicturePixel(picture, frame, x, y, vm.FrameBytes(picture, frame));
+            vm.Store(c, i.Args[4], address);
+            return 0;
+        });
         // 0FD4 slot, frame, v: bytes of one row of the frame with its 8-byte header (FUN_00410590)
         Register(0x0FD4, (vm, c, i) =>
         {

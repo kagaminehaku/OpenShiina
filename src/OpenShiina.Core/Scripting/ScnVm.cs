@@ -146,6 +146,9 @@ public sealed partial class ScnVm
     /// <summary>How often each opcode ran, for the boot report.</summary>
     public Dictionary<int, long> OpCounts { get; } = new();
 
+    /// <summary>When set, the time each opcode took in all (Stopwatch ticks), for profiling.</summary>
+    public Dictionary<int, long>? OpTimes { get; set; }
+
     public ScnVm(ScnOpcodes opcodes, IScnHost host)
     {
         m_opcodes = opcodes;
@@ -169,6 +172,7 @@ public sealed partial class ScnVm
         RegisterMusic();
         RegisterMisc();
         RegisterLayers();
+        RegisterNativeKernels();
     }
 
     public ScnContext Slot(int index) => m_slots[index];
@@ -453,7 +457,10 @@ public sealed partial class ScnVm
             c.Current = at;
             c.Pc = at + ins.Length;
             OpCounts[ins.Op] = OpCounts.GetValueOrDefault(ins.Op) + 1;
+            long started = OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             int result = Execute(c, ins);
+            if (OpTimes != null)
+                OpTimes[ins.Op] = OpTimes.GetValueOrDefault(ins.Op) + System.Diagnostics.Stopwatch.GetTimestamp() - started;
             if (result == 2)
                 throw Error(c, $"Script error in opcode {ins.Op:X4}");
             if (result != 0)

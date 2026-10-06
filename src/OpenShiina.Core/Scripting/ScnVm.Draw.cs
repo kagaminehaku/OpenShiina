@@ -120,6 +120,42 @@ public sealed partial class ScnVm
             BlendRows(screen, from, 0, level, 255 - level, width, height, pitch);
     }
 
+    /// <summary>
+    /// FUN_00437B40 with MMX: a rule (mask picture) transition, byte by byte over pixels * 3 / 4
+    /// dwords. r = the rule's byte (inverted with bit 31 of t). Soft: k = clamp(r + t - 255, 0,
+    /// 255), out = A k >> 8 without B, else min(65535, A k + B (256 - k)) >> 8. Hard (bit 30): r >
+    /// 256 - t picks A, else B (or 0).
+    /// </summary>
+    public void RuleBlend(int dst, int a, int b, int rule, int pixels, int t)
+    {
+        int bytes = (int)((uint)(pixels * 3) >> 2) * 4;
+        if (bytes <= 0)
+            return;
+        bool invert = t < 0, hard = (t & 0x40000000) != 0;
+        int value = t & 0x3FFFFFFF;
+        byte[] ra = ReadBytes(rule, bytes), sa = ReadBytes(a, bytes), sb = b != 0 ? ReadBytes(b, bytes) : [];
+        var o = new byte[bytes];
+        short threshold = (short)(0x100 - value);
+        for (int i = 0; i < bytes; i++)
+        {
+            int r = invert ? ra[i] ^ 0xFF : ra[i];
+            if (hard)
+            {
+                bool take = r > threshold;
+                o[i] = take ? sa[i] : b != 0 ? sb[i] : (byte)0;
+                continue;
+            }
+            int sum = r + value;
+            int k = Math.Min(255, Math.Max(0, (sum & 0xFFFF) - 255));
+            if (((uint)sum >> 16) != 0)
+                k = 255;
+            o[i] = b == 0
+                ? (byte)Math.Min(255, sa[i] * k >> 8)
+                : (byte)Math.Min(255, Math.Min(0xFFFF, sa[i] * k + sb[i] * (256 - k)) >> 8);
+        }
+        WriteBytes(dst, o);
+    }
+
     private void RegisterDraw()
     {
         // 0500 level: surface 0 (the one on screen) = surface 1 at a brightness 0-255
@@ -201,6 +237,24 @@ public sealed partial class ScnVm
             int b = (srcB < 0 ? srcB & 0xFF : vm.SurfaceField(srcB & 0xFF, 2)) + offsetB;
             vm.BlendRows(dst, a, b, v[11], v[12], width, rows, pitch);
             if (dstSurface == vm.DisplaySurface)
+            {
+                vm.ScreenInvalidated = true;
+                vm.FrameShown = true;
+            }
+            return 0;
+        });
+        // 0568 dst, A, B (-1: none), rule, t: a rule transition between surfaces (FUN_004182E0)
+        Register(0x0568, (vm, c, i) =>
+        {
+            int dst = vm.Value(c, i.Args[0]), a = vm.Value(c, i.Args[1]), b = vm.Value(c, i.Args[2]);
+            int rule = vm.Value(c, i.Args[3]);
+            uint t = (uint)vm.Value(c, i.Args[4]);
+            if ((t & 0x3FFFFFFF) > 0x200)
+                t = (t & 0x3FFFF000) + 0x200;
+            int pixels = vm.SurfaceField(dst, 8) * vm.SurfaceField(dst, 7);
+            vm.RuleBlend(vm.SurfaceField(dst, 2), vm.SurfaceField(a, 2), b == -1 ? 0 : vm.SurfaceField(b, 2),
+                vm.SurfaceField(rule, 2), pixels, (int)t);
+            if (dst == vm.DisplaySurface)
             {
                 vm.ScreenInvalidated = true;
                 vm.FrameShown = true;

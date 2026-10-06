@@ -33,6 +33,54 @@ public sealed partial class ScnVm
     /// <summary>The l[index] value a routine sees: the dword at the stack top + index.</summary>
     public int NativeArg(ScnNativeArgs args, int index) => Read32(args.Stack + 4 * index);
 
+    // The routine being called (for VerifyNatives)
+    private int m_nativeTarget;
+
+    /// <summary>Runs an embedded routine on the interpreter.</summary>
+    private void Interpret(ScnContext c, int target, ScnNativeArgs args)
+    {
+        Write32(X86Arguments, args.B);
+        Write32(X86Arguments + 4, args.A);
+        Write32(X86Arguments + 8, args.S);
+        Write32(X86Arguments + 12, args.F);
+        Write32(X86Arguments + 16, args.Stack);
+        try
+        {
+            Cpu.Call((uint)target, X86Arguments, X86StackTop);
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or ArithmeticException)
+        {
+            throw Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// With VerifyNatives: runs the routine on the interpreter, keeps what it wrote to
+    /// [start, start + length), puts the old bytes back for the C# version, and afterwards
+    /// compares. Call before the C# version; dispose after it.
+    /// </summary>
+    private IDisposable? VerifyRegion(ScnContext c, ScnNativeArgs args, int start, int length)
+    {
+        if (!VerifyNatives || length <= 0)
+            return null;
+        byte[] before = ReadBytes(start, length);
+        Interpret(c, m_nativeTarget, args);
+        byte[] expected = ReadBytes(start, length);
+        WriteBytes(start, before);
+        return new Check(() =>
+        {
+            byte[] actual = ReadBytes(start, length);
+            int at = actual.AsSpan().CommonPrefixLength(expected);
+            if (at < length)
+                throw Error(c, $"Native routine differs from the x86 code at +{at:X} ({actual[at]:X2} instead of {expected[at]:X2})");
+        });
+    }
+
+    private sealed class Check(Action check) : IDisposable
+    {
+        public void Dispose() => check();
+    }
+
     private void RegisterNativeCall()
     {
         Register(0x0276, (vm, c, i) =>
@@ -40,24 +88,13 @@ public sealed partial class ScnVm
             int target = vm.Value(c, i.Args[0]);
             var args = new ScnNativeArgs(vm.BAddress(0), vm.AAddress(0), vm.SAddress(0), vm.FAddress(c.Slot, 0),
                                          vm.StackAddress(c.Slot, c.Sp));
+            vm.m_nativeTarget = target;
             if (vm.m_natives.Count > 0 && vm.m_natives.TryGetValue(vm.NativeSignature(target), out var routine))
             {
                 routine.Run(vm, c, args);
                 return 0;
             }
-            vm.Write32(X86Arguments, args.B);
-            vm.Write32(X86Arguments + 4, args.A);
-            vm.Write32(X86Arguments + 8, args.S);
-            vm.Write32(X86Arguments + 12, args.F);
-            vm.Write32(X86Arguments + 16, args.Stack);
-            try
-            {
-                vm.Cpu.Call((uint)target, X86Arguments, X86StackTop);
-            }
-            catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or ArithmeticException)
-            {
-                throw vm.Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5}: {ex.Message}");
-            }
+            vm.Interpret(c, target, args);
             return 0;
         });
         // (CPUID routines run on the interpreter too: it reports an Intel CPU with MMX and no

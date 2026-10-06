@@ -26,6 +26,8 @@ public sealed class ScnOpcodes
         [0x0001] = ["V", "V"],          // loadmod slot, file
         [0x0002] = ["V", "V"],
         [0x0213] = ["b4", "b4"],        // loop: counter, target
+        [0x039C] = ["V", "V"],          // rotate right n, v: the handler re-reads v to store it,
+        [0x039D] = ["V", "V"],          // which the table took for a third operand
     };
 
     private ScnOpcodes(string table)

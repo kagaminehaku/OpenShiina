@@ -56,7 +56,24 @@ public sealed class X86Cpu
     /// Calls the routine at <paramref name="entry"/> with one stack argument, the way the engine
     /// does (stdcall), on a stack at <paramref name="stackTop"/>; returns when it returns.
     /// </summary>
+    /// <summary>Instructions run per routine entry point (for profiling).</summary>
+    public Dictionary<uint, (long Calls, long Instructions)> Profile { get; } = new();
+
     public void Call(uint entry, uint argument, uint stackTop, long limit = 2_000_000_000)
+    {
+        long before = Executed;
+        try
+        {
+            CallInner(entry, argument, stackTop, limit);
+        }
+        finally
+        {
+            var p = Profile.GetValueOrDefault(entry);
+            Profile[entry] = (p.Calls + 1, p.Instructions + Executed - before);
+        }
+    }
+
+    private void CallInner(uint entry, uint argument, uint stackTop, long limit)
     {
         const uint Sentinel = 0xFFFFFFF0;
         R[4] = stackTop;

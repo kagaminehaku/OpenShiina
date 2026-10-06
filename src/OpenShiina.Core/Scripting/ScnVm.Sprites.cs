@@ -158,36 +158,6 @@ public sealed partial class ScnVm
             DrawRowPlain(Read32(row), dst, skip, visible, blend);
     }
 
-    /// <summary>A run header at <paramref name="p"/> (2-byte aligned): method, count, data address.</summary>
-    private (int Method, int Count, int Data) ReadRun(int p)
-    {
-        p = p + 1 & ~1;
-        int code = Read16(p);
-        int data = p + 2 + ((code >> 11) & 3);
-        int count = code & 0x7FF;
-        if (count == 0)
-        {
-            count = Read32(data);
-            data += 4;
-        }
-        return (code >> 13, count, data);
-    }
-
-    /// <summary>Where the data of a run ends (methods 0-1 none, 2 BGR each, 3 one BGR, 4 ABGR each, 5+ one ABGR).</summary>
-    private static int RunEnd(int method, int count, int data) => method switch
-    {
-        < 2 => data,
-        2 => data + count * 3,
-        3 => data + 3,
-        4 => data + count * 4,
-        _ => data + 4,
-    };
-
-    /// <summary>
-    /// One row with no blend mode (0x4409F6): skip <paramref name="skip"/> pixels of runs, then
-    /// draw up to <paramref name="visible"/>. Blends are d + ((s - d) * a >> 8) (arithmetic shift),
-    /// low byte - the MMX blocks give the same bytes; alpha 255 in a per-pixel run copies.
-    /// </summary>
     /// <summary>
     /// Mode 0x40000000 with alpha a (1-255; FUN_0044346A): tables T1 = a / 256 and T2 =
     /// (256 - a) / 256 stepped like FUN_004396B4 (0x492EC0 / 0x493EC0), MMX weights a and 256 - a.
@@ -205,15 +175,68 @@ public sealed partial class ScnVm
         }
     }
 
+    /// <summary>A run header at offset <paramref name="o"/> of a row read into <paramref name="row"/>
+    /// from <paramref name="address"/> (headers are 2-byte aligned in memory).</summary>
+    private static (int Method, int Count, int Data) ReadRun(byte[] row, int address, int o)
+    {
+        o = ((address + o + 1) & ~1) - address;
+        int code = row[o] | row[o + 1] << 8;
+        int data = o + 2 + ((code >> 11) & 3);
+        int count = code & 0x7FF;
+        if (count == 0)
+        {
+            count = BitConverter.ToInt32(row, data);
+            data += 4;
+        }
+        return (code >> 13, count, data);
+    }
+
+    /// <summary>A run header at address <paramref name="p"/> (2-byte aligned): method, count, data address.</summary>
+    private (int Method, int Count, int Data) ReadRun(int p)
+    {
+        p = p + 1 & ~1;
+        int code = Read16(p);
+        int data = p + 2 + ((code >> 11) & 3);
+        int count = code & 0x7FF;
+        if (count == 0)
+        {
+            count = Read32(data);
+            data += 4;
+        }
+        return (code >> 13, count, data);
+    }
+
+    /// <summary>The row of a frame from its row pointer: its 16-bit length and the runs after it.</summary>
+    private byte[] ReadRow(int p) => ReadBytes(p, Read16(p) + 16);
+
+    /// <summary>Where the data of a run ends (methods 0-1 none, 2 BGR each, 3 one BGR, 4 ABGR each, 5+ one ABGR).</summary>
+    private static int RunEnd(int method, int count, int data) => method switch
+    {
+        < 2 => data,
+        2 => data + count * 3,
+        3 => data + 3,
+        4 => data + count * 4,
+        _ => data + 4,
+    };
+
+    /// <summary>
+    /// One row (0x4409F6, or 0x440F9C with a blend): skip <paramref name="skip"/> pixels of runs,
+    /// then draw up to <paramref name="visible"/>. The row's runs and the destination are read
+    /// into arrays once; MMX alignment still follows the destination's address.
+    /// </summary>
     private void DrawRowPlain(int p, int dst, int skip, int visible, SpriteBlend? blend = null)
     {
-        p += 2;
+        if (visible <= 0)
+            return;
+        byte[] src = ReadRow(p);
+        byte[] row = ReadBytes(dst, visible * 3);
+        int o = 2, d = 0;
         int remaining = visible;
         // Left clip: whole runs are passed over, a run that crosses the edge is drawn from it
         while (skip > 0)
         {
-            var (method, count, data) = ReadRun(p);
-            p = RunEnd(method, count, data);
+            var (method, count, data) = ReadRun(src, p, o);
+            o = RunEnd(method, count, data);
             skip -= count;
             if (skip > 0)
                 continue;
@@ -223,87 +246,98 @@ public sealed partial class ScnVm
             int at = method switch { 2 => data + start * 3, 4 => data + start * 4, _ => data };
             if (method < 2)
             {
-                dst += part * 3;
+                d += part * 3;
                 remaining -= part;
             }
             else
             {
                 int n = Math.Min(part, remaining);
-                DrawRun(method, n, at, dst, blend);
-                dst += n * 3;
+                DrawRun(method, n, src, at, row, d, dst + d, blend);
+                d += n * 3;
                 remaining -= n;
             }
             if (remaining <= 0)
+            {
+                WriteBytes(dst, row);
                 return;
+            }
             break;
         }
         while (remaining > 0)
         {
-            var (method, count, data) = ReadRun(p);
-            p = RunEnd(method, count, data);
+            var (method, count, data) = ReadRun(src, p, o);
+            o = RunEnd(method, count, data);
             if (method < 2)
             {
-                dst += count * 3;
+                d += count * 3;
                 remaining -= count;
                 continue;
             }
             int n = Math.Min(count, remaining);
-            DrawRun(method, n, data, dst, blend);
-            dst += n * 3;
+            DrawRun(method, n, src, data, row, d, dst + d, blend);
+            d += n * 3;
             remaining -= n;
         }
+        WriteBytes(dst, row);
     }
 
-    private void DrawRun(int method, int n, int data, int dst, SpriteBlend? blend)
+    private static void BlendByte(byte[] row, int at, int source, int alpha)
+    {
+        int d = row[at];
+        row[at] = (byte)(((source - d) * alpha >> 8) + d);
+    }
+
+    /// <summary>A run into the row: n pixels from src[s] to row[d] (row[d] is at memory address <paramref name="address"/>).</summary>
+    private static void DrawRun(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend? blend)
     {
         if (blend != null)
         {
-            DrawRunAlpha(method, n, data, dst, blend);
+            DrawRunAlpha(method, n, src, s, row, d, address, blend);
             return;
         }
         switch (method)
         {
             case 2:
-                CopyMemory(dst, data, n * 3);
+                Array.Copy(src, s, row, d, n * 3);
                 return;
             case 3:
             {
-                byte b = ReadByte(data), g = ReadByte(data + 1), r = ReadByte(data + 2);
-                for (int i = 0; i < n; i++, dst += 3)
+                byte b = src[s], g = src[s + 1], r = src[s + 2];
+                for (int i = 0; i < n; i++, d += 3)
                 {
-                    WriteByte(dst, b);
-                    WriteByte(dst + 1, g);
-                    WriteByte(dst + 2, r);
+                    row[d] = b;
+                    row[d + 1] = g;
+                    row[d + 2] = r;
                 }
                 return;
             }
             case 4:
-                for (int i = 0; i < n; i++, data += 4, dst += 3)
+                for (int i = 0; i < n; i++, s += 4, d += 3)
                 {
-                    int a = ReadByte(data);
+                    int a = src[s];
                     if (a == 0xFF)
                     {
-                        WriteByte(dst, ReadByte(data + 1));
-                        WriteByte(dst + 1, ReadByte(data + 2));
-                        WriteByte(dst + 2, ReadByte(data + 3));
+                        row[d] = src[s + 1];
+                        row[d + 1] = src[s + 2];
+                        row[d + 2] = src[s + 3];
                     }
                     else if (a != 0)
                     {
-                        BlendByte(dst, ReadByte(data + 1), a);
-                        BlendByte(dst + 1, ReadByte(data + 2), a);
-                        BlendByte(dst + 2, ReadByte(data + 3), a);
+                        BlendByte(row, d, src[s + 1], a);
+                        BlendByte(row, d + 1, src[s + 2], a);
+                        BlendByte(row, d + 2, src[s + 3], a);
                     }
                 }
                 return;
             default:
             {
-                int a = ReadByte(data);
-                byte b = ReadByte(data + 1), g = ReadByte(data + 2), r = ReadByte(data + 3);
-                for (int i = 0; i < n; i++, dst += 3)
+                int a = src[s];
+                byte b = src[s + 1], g = src[s + 2], r = src[s + 3];
+                for (int i = 0; i < n; i++, d += 3)
                 {
-                    BlendByte(dst, b, a);
-                    BlendByte(dst + 1, g, a);
-                    BlendByte(dst + 2, r, a);
+                    BlendByte(row, d, b, a);
+                    BlendByte(row, d + 1, g, a);
+                    BlendByte(row, d + 2, r, a);
                 }
                 return;
             }
@@ -311,120 +345,110 @@ public sealed partial class ScnVm
     }
 
     /// <summary>The runs of mode 0x40000000 (0x440F9C: the MMX + SSE path).</summary>
-    private void DrawRunAlpha(int method, int n, int data, int dst, SpriteBlend blend)
+    private static void DrawRunAlpha(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend blend)
     {
         switch (method)
         {
             case 2:
             {
                 // two sources: the run's pixels at a, the picture at 256 - a
-                int bytes = n * 3;
-                byte[] s = ReadBytes(data, bytes), d = ReadBytes(dst, bytes), o = new byte[bytes];
                 int a = blend.Alpha, b = 256 - a;
-                byte Table(int i) => (byte)(blend.T1[s[i]] + blend.T2[d[i]]);
-                byte Block(int i) => (byte)Math.Min(255, (s[i] * a + d[i] * b & 0xFFFF) >> 8);
-                int left = bytes, at = 0, head = -dst & 7;
+                byte Table(int i) => (byte)(blend.T1[src[s + i]] + blend.T2[row[d + i]]);
+                byte Block(int i) => (byte)Math.Min(255, (src[s + i] * a + row[d + i] * b & 0xFFFF) >> 8);
+                int left = n * 3, at = 0, head = -address & 7;
                 if (head != 0)
                 {
                     for (int h = head & 3; h > 0 && left > 0; h--, at++, left--)
-                        o[at] = Table(at);
+                        row[d + at] = Table(at);
                     if (left > 0 && left < 4)
                     {
                         for (; left > 0; at++, left--)
-                            o[at] = Table(at);
+                            row[d + at] = Table(at);
                     }
                     else if (left > 0 && (head & 4) != 0)
                     {
                         for (int q = 0; q < 4; q++)
-                            o[at + q] = Block(at + q);
+                            row[d + at + q] = Block(at + q);
                         at += 4;
                         left -= 4;
                     }
                 }
                 for (; left >= 8; at += 8, left -= 8)
                     for (int q = 0; q < 8; q++)
-                        o[at + q] = Block(at + q);
+                        row[d + at + q] = Block(at + q);
                 if (left >= 4)
                 {
                     for (int q = 0; q < 4; q++)
-                        o[at + q] = Block(at + q);
+                        row[d + at + q] = Block(at + q);
                     at += 4;
                     left -= 4;
                 }
                 for (; left > 0; at++, left--)
-                    o[at] = Table(at);
-                WriteBytes(dst, o);
+                    row[d + at] = Table(at);
                 return;
             }
             case 3:
             {
                 // one colour scaled by a, the picture by the table / MMX at 256 - a
                 int a = blend.Alpha, b = 256 - a;
-                byte c0 = (byte)(ReadByte(data) * a >> 8), c1 = (byte)(ReadByte(data + 1) * a >> 8), c2 = (byte)(ReadByte(data + 2) * a >> 8);
-                byte[] c = [c0, c1, c2];
+                byte c0 = (byte)(src[s] * a >> 8), c1 = (byte)(src[s + 1] * a >> 8), c2 = (byte)(src[s + 2] * a >> 8);
                 void TablePixel(int at)
                 {
-                    WriteByte(at, (byte)(blend.T2[ReadByte(at)] + c0));
-                    WriteByte(at + 1, (byte)(blend.T2[ReadByte(at + 1)] + c1));
-                    WriteByte(at + 2, (byte)(blend.T2[ReadByte(at + 2)] + c2));
+                    row[at] = (byte)(blend.T2[row[at]] + c0);
+                    row[at + 1] = (byte)(blend.T2[row[at + 1]] + c1);
+                    row[at + 2] = (byte)(blend.T2[row[at + 2]] + c2);
                 }
                 int left = n;
                 if (left < 15)
                 {
-                    for (; left > 0; left--, dst += 3)
-                        TablePixel(dst);
+                    for (; left > 0; left--, d += 3)
+                        TablePixel(d);
                     return;
                 }
-                for (; (dst & 7) != 0; left--, dst += 3)
-                    TablePixel(dst);
-                for (int groups = left >> 3; groups > 0; groups--, dst += 24)
-                {
-                    byte[] d = ReadBytes(dst, 24);
+                int abs = address;
+                for (; (abs & 7) != 0; left--, d += 3, abs += 3)
+                    TablePixel(d);
+                for (int groups = left >> 3; groups > 0; groups--, d += 24, abs += 24)
                     for (int q = 0; q < 24; q++)
-                        d[q] = (byte)(Math.Min(255, d[q] * b >> 8) + c[q % 3]);
-                    WriteBytes(dst, d);
-                }
-                for (left &= 7; left > 0; left--, dst += 3)
-                    TablePixel(dst);
+                    {
+                        byte c = (q % 3) switch { 0 => c0, 1 => c1, _ => c2 };
+                        row[d + q] = (byte)(Math.Min(255, row[d + q] * b >> 8) + c);
+                    }
+                for (left &= 7; left > 0; left--, d += 3)
+                    TablePixel(d);
                 return;
             }
             case 4:
-                for (int i = 0; i < n; i++, data += 4, dst += 3)
+                for (int i = 0; i < n; i++, s += 4, d += 3)
                 {
-                    int alpha = blend.T1[ReadByte(data)];
+                    int alpha = blend.T1[src[s]];
                     if (alpha == 0xFF)
                     {
-                        WriteByte(dst, ReadByte(data + 1));
-                        WriteByte(dst + 1, ReadByte(data + 2));
-                        WriteByte(dst + 2, ReadByte(data + 3));
+                        row[d] = src[s + 1];
+                        row[d + 1] = src[s + 2];
+                        row[d + 2] = src[s + 3];
                     }
                     else if (alpha != 0)
                     {
-                        BlendByte(dst, ReadByte(data + 1), alpha);
-                        BlendByte(dst + 1, ReadByte(data + 2), alpha);
-                        BlendByte(dst + 2, ReadByte(data + 3), alpha);
+                        BlendByte(row, d, src[s + 1], alpha);
+                        BlendByte(row, d + 1, src[s + 2], alpha);
+                        BlendByte(row, d + 2, src[s + 3], alpha);
                     }
                 }
                 return;
             default:
             {
-                int alpha = blend.T1[ReadByte(data)];
-                byte b0 = ReadByte(data + 1), g0 = ReadByte(data + 2), r0 = ReadByte(data + 3);
-                for (int i = 0; i < n; i++, dst += 3)
+                int alpha = blend.T1[src[s]];
+                byte b0 = src[s + 1], g0 = src[s + 2], r0 = src[s + 3];
+                for (int i = 0; i < n; i++, d += 3)
                 {
-                    BlendByte(dst, b0, alpha);
-                    BlendByte(dst + 1, g0, alpha);
-                    BlendByte(dst + 2, r0, alpha);
+                    BlendByte(row, d, b0, alpha);
+                    BlendByte(row, d + 1, g0, alpha);
+                    BlendByte(row, d + 2, r0, alpha);
                 }
                 return;
             }
         }
-    }
-
-    private void BlendByte(int at, int source, int alpha)
-    {
-        int d = ReadByte(at);
-        WriteByte(at, (byte)(((source - d) * alpha >> 8) + d));
     }
 
     /// <summary>FUN_004116A0: a frame's rectangle (x, y, x + width, y + height), or null.</summary>
@@ -508,6 +532,90 @@ public sealed partial class ScnVm
             if (!more)
                 return true;
             current = next;
+        }
+    }
+
+    /// <summary>StretchBlt SRCCOPY: a copy when the sizes match, else nearest pixels.</summary>
+    public void StretchCopy(int dst, int x, int y, int w, int h, int src, int sx, int sy, int sw, int sh)
+    {
+        if (w == sw && h == sh)
+        {
+            BitBlt(dst, x, y, w, h, src, sx, sy);
+            return;
+        }
+        if (w == 0 || h == 0 || sw == 0 || sh == 0)
+            return;
+        int dw = SurfaceField(dst, 7), dh = SurfaceField(dst, 8), dp = SurfaceField(dst, 10), d0 = SurfaceField(dst, 2);
+        int swid = SurfaceField(src, 7), shei = SurfaceField(src, 8), spitch = SurfaceField(src, 10), s0 = SurfaceField(src, 2);
+        for (int row = 0; row < Math.Abs(h); row++)
+        {
+            int ty = y + row;
+            int fy = sy + (int)((long)row * sh / h);
+            if (ty < 0 || ty >= dh || fy < 0 || fy >= shei)
+                continue;
+            for (int col = 0; col < Math.Abs(w); col++)
+            {
+                int tx = x + col, fx = sx + (int)((long)col * sw / w);
+                if (tx < 0 || tx >= dw || fx < 0 || fx >= swid)
+                    continue;
+                WriteBytes(d0 + ty * dp + tx * 3, ReadBytes(s0 + fy * spitch + fx * 3, 3));
+            }
+        }
+    }
+
+    /// <summary>
+    /// The engine's stretch (051E with bit 31): 16.16 steps, a table of byte steps per column of
+    /// the destination, rows from the scaled source row (FUN_0041E180, quirks kept).
+    /// </summary>
+    public void SoftStretch(int dst, int dx, int dy, int dw, int dh, int src, int sx, int sy, int sw, int sh)
+    {
+        if (dw == 0 || dh == 0)
+            return;
+        int xstep = (int)(((long)sw << 16) / dw), ystep = (int)(((long)sh << 16) / dh);
+        int width = SurfaceField(dst, 7);
+        var table = new int[Math.Max(width, 0)];
+        int previous = sx * 3;
+        for (int i = 0, acc = 0; i < width; i++, acc += xstep)
+        {
+            int position = ((acc >> 16) + sx) * 3;
+            table[i] = position - previous;
+            previous = position;
+        }
+        int startX, skipX;
+        if (dx < 0)
+        {
+            skipX = -(xstep * dx) >> 16;
+            startX = 0;
+        }
+        else
+        {
+            startX = dx;
+            skipX = 0;
+        }
+        int endX = Math.Min(dx + dw, width);
+        int rowAcc, startY;
+        if (dy < 0)
+        {
+            rowAcc = -(ystep * dy);
+            startY = 0;
+        }
+        else
+        {
+            startY = dy;
+            rowAcc = 0;
+        }
+        int endY = Math.Min(dy + dh, ScreenHeight);
+        int srcPitch = SurfaceField(src, 10), dstPitch = SurfaceField(dst, 10);
+        int srcBase = SurfaceField(src, 2) + skipX * 3 + srcPitch * sy;
+        int dstRow = SurfaceField(dst, 2) + dstPitch * startY + startX * 3;
+        for (int y = startY; y < endY; y++, rowAcc += ystep, dstRow += dstPitch)
+        {
+            int p = (rowAcc >> 16) * srcPitch + srcBase, q = dstRow;
+            for (int x = startX; x < endX; x++, q += 3)
+            {
+                p += table[x];
+                WriteBytes(q, ReadBytes(p, 3));
+            }
         }
     }
 
@@ -599,6 +707,27 @@ public sealed partial class ScnVm
         // 04D3 v / 04D4 v: engine settings 0x4880B0 / 0x4880B4
         Register(0x04D3, (vm, c, i) => { vm.EngineGlobals[0x4880B0] = vm.Value(c, i.Args[0]); return 0; });
         Register(0x04D4, (vm, c, i) => { vm.EngineGlobals[0x4880B4] = vm.Value(c, i.Args[0]); return 0; });
+        // 051E dst, x, y, w, h, src, sx, sy, sw, sh, rop (FUN_0041E180): StretchBlt; with bit 31
+        // of rop the engine's own nearest-pixel stretch
+        Register(0x051E, (vm, c, i) =>
+        {
+            var v = new int[11];
+            for (int k = 0; k < 11; k++)
+                v[k] = vm.Value(c, i.Args[k]);
+            int dst = v[0], src = v[5];
+            if (v[10] < 0)
+                vm.SoftStretch(dst, v[1], v[2], v[3], v[4], src, v[6], v[7], v[8], v[9]);
+            else if (v[10] == 0xCC0020)
+                vm.StretchCopy(dst, v[1], v[2], v[3], v[4], src, v[6], v[7], v[8], v[9]);
+            else
+                return 2;
+            if (dst == vm.DisplaySurface)
+            {
+                vm.ScreenInvalidated = true;
+                vm.FrameShown = true;
+            }
+            return 0;
+        });
         // 04E2 dst, x, y, w, h, src, sx, sy: copy a rectangle between surfaces (FUN_00417900),
         // clipped to the destination only
         Register(0x04E2, (vm, c, i) =>
