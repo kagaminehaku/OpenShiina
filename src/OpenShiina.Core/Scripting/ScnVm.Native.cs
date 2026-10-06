@@ -1,10 +1,15 @@
 // Machine code inside the SCN modules ("op_0276 label"): the engine calls x86 routines with a
 // pointer to {b, a, s, f of the slot, the stack top}; they read their arguments from l[0], l[1]...
-// and work on picture buffers in script memory. They run on X86Cpu, an interpreter working on
-// the VM's flat memory. A routine can also be replaced by a C# version, found by the SHA-1 of its
-// first 64 bytes (docs/engine-notes.md, section 10).
+// and work on picture buffers in script memory. A routine runs, in order of preference:
+//   - as a C# version written by hand (ScnVm.NativeKernels.cs), found by the signature of the
+//     whole routine (X86Routine: every reachable instruction and its offset);
+//   - translated to .NET by X86Jit when it is first called (the translation is made in the
+//     background; the interpreter runs the routine until it is ready);
+//   - on X86Cpu, an interpreter working on the VM's flat memory (routines X86Jit does not take,
+//     and every routine where code cannot be generated at run time).
+// All three write the same bytes (docs/engine-notes.md, section 10).
 
-using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace OpenShiina.Scripting;
 
@@ -30,8 +35,67 @@ public sealed partial class ScnVm
     /// <summary>Adds a routine by the signature <see cref="NativeSignature"/> gives for its code.</summary>
     public void RegisterNative(string signature, string name, NativeRoutine run) => m_natives[signature] = (name, run);
 
-    /// <summary>SHA-1 of the first 64 bytes of a routine, in hex.</summary>
-    public string NativeSignature(int address) => Convert.ToHexString(SHA1.HashData(ReadBytes(address, 64)));
+    /// <summary>The signature of the routine at an address (X86Routine.Signature).</summary>
+    public string NativeSignature(int address) => RoutineAt(address).Code.Signature;
+
+    /// <summary>
+    /// Translate routines to .NET (X86Jit). On by default where code can be generated at run time;
+    /// off, every routine without a C# version runs on the interpreter.
+    /// </summary>
+    public bool JitX86 { get; set; } = RuntimeFeature.IsDynamicCodeCompiled;
+
+    /// <summary>Translate in the background (the interpreter runs a routine until its translation is ready).</summary>
+    public bool JitInBackground { get; set; } = true;
+
+    /// <summary>What is known of the routine at an address: its code, its C# version, its translation.</summary>
+    private sealed class RoutineInfo(X86Routine code)
+    {
+        public readonly X86Routine Code = code;
+        public (string Name, NativeRoutine Run)? Native;
+        public Task<X86Jit.Routine?>? Translation;
+        public string? NotTranslated;
+
+        public X86Jit.Routine? Translated => Translation is { IsCompletedSuccessfully: true } t ? t.Result : null;
+    }
+
+    private readonly Dictionary<int, RoutineInfo> m_routines = new();
+
+    /// <summary>Routines known so far: their address, signature, C# version and translation (for reports).</summary>
+    public IEnumerable<(int Address, string Signature, string? Native, bool Translated, string? NotTranslated)> RoutineReport() =>
+        m_routines.Select(p => (p.Key, p.Value.Code.Signature, p.Value.Native?.Name, p.Value.Translated != null,
+                                p.Value.NotTranslated ?? (p.Value.Translation is { IsFaulted: true } t ? t.Exception!.InnerException!.Message : null)));
+
+    private RoutineInfo RoutineAt(int address)
+    {
+        if (m_routines.TryGetValue(address, out var info))
+            return info;
+        info = new RoutineInfo(new X86Routine(this, (uint)address));
+        if (m_natives.TryGetValue(info.Code.Signature, out var native))
+            info.Native = native;
+        else if (JitX86)
+        {
+            var code = info.Code;
+            info.Translation = JitInBackground
+                ? Task.Run(() => Translate(code, info))
+                : Task.FromResult(Translate(code, info));
+        }
+        m_routines[address] = info;
+        return info;
+
+        static X86Jit.Routine? Translate(X86Routine code, RoutineInfo info)
+        {
+            var routine = X86Jit.Compile(code, out string? reason);
+            info.NotTranslated = reason;
+            return routine;
+        }
+    }
+
+    /// <summary>Code was loaded again: what was known of routines no longer applies.</summary>
+    private void ForgetRoutines()
+    {
+        m_routines.Clear();
+        m_cpu?.Forget();
+    }
 
     /// <summary>The l[index] value a routine sees: the dword at the stack top + index.</summary>
     public int NativeArg(ScnNativeArgs args, int index) => Read32(args.Stack + 4 * index);
@@ -57,8 +121,8 @@ public sealed partial class ScnVm
         }
     }
 
-    /// <summary>Runs a routine translated to C# (Scripting/Generated) the way the interpreter runs it.</summary>
-    private void RunTranslated(ScnContext c, ScnNativeArgs args, Action<ScnVm, uint, uint> routine)
+    /// <summary>Runs a routine translated by X86Jit the way the interpreter runs it.</summary>
+    private void RunTranslated(ScnContext c, int target, ScnNativeArgs args, X86Jit.Routine routine)
     {
         Write32(X86Arguments, args.B);
         Write32(X86Arguments + 4, args.A);
@@ -69,9 +133,9 @@ public sealed partial class ScnVm
         {
             routine(this, X86Arguments, X86StackTop);
         }
-        catch (ArithmeticException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or ArithmeticException)
         {
-            throw Error(c, $"Embedded x86 routine at module offset {m_nativeTarget - c.Base:X5}: {ex.Message}");
+            throw Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5}: {ex.Message}");
         }
     }
 
@@ -110,25 +174,29 @@ public sealed partial class ScnVm
             var args = new ScnNativeArgs(vm.BAddress(0), vm.AAddress(0), vm.SAddress(0), vm.FAddress(c.Slot, 0),
                                          vm.StackAddress(c.Slot, c.Sp));
             vm.m_nativeTarget = target;
-            if (vm.m_natives.Count > 0 && vm.m_natives.TryGetValue(vm.NativeSignature(target), out var routine))
+            var info = vm.RoutineAt(target);
+            long started = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+            string name;
+            if (info.Native is { } native)
             {
-                long started = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
-                routine.Run(vm, c, args);
-                if (vm.OpTimes != null)
-                {
-                    var (ticks, calls) = vm.NativeTimes.GetValueOrDefault(routine.Name);
-                    vm.NativeTimes[routine.Name] = (ticks + System.Diagnostics.Stopwatch.GetTimestamp() - started, calls + 1);
-                }
-                return 0;
+                native.Run(vm, c, args);
+                name = native.Name;
             }
-            long begun = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
-            vm.Interpret(c, target, args);
+            else if (info.Translated is { } translated)
+            {
+                vm.RunTranslated(c, target, args, translated);
+                name = $"jit {target - c.CodeBase:X5}";
+            }
+            else
+            {
+                vm.Interpret(c, target, args);
+                name = $"x86 {target - c.CodeBase:X5}";
+            }
             if (vm.OpTimes != null)
             {
-                // Routines left to the interpreter, by their offset in the module
-                string name = $"x86 {target - c.CodeBase:X5}";
+                // C# versions by name, translated and interpreted routines by their offset in the module
                 var (ticks, calls) = vm.NativeTimes.GetValueOrDefault(name);
-                vm.NativeTimes[name] = (ticks + System.Diagnostics.Stopwatch.GetTimestamp() - begun, calls + 1);
+                vm.NativeTimes[name] = (ticks + System.Diagnostics.Stopwatch.GetTimestamp() - started, calls + 1);
             }
             return 0;
         });

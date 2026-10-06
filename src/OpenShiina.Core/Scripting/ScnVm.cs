@@ -437,7 +437,7 @@ public sealed partial class ScnVm
         // Decoded code of an older module at this address no longer applies
         foreach (var key in m_decoded.Keys.Where(k => k >= at && k < at + code.Length + 16).ToList())
             m_decoded.Remove(key);
-        m_cpu?.Forget();
+        ForgetRoutines();
         return true;
     }
 

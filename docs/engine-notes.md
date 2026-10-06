@@ -658,14 +658,31 @@ the functions they call from the decompile. First findings:
 
 ### Hot embedded x86 in C# (ScnVm, 2026-10-06)
 
-- Routines that run often get a C# version, found by the SHA-1 of their first 64 bytes
+- Routines that run often get a C# version, found by the signature of the whole routine
+  (Scripting/X86Routine: SHA-1 of every instruction reachable from the entry through jumps,
+  branches and calls, with its offset from the entry; until 2026-10-07 it was the SHA-1 of the
+  first 64 bytes, which a routine starting the same way but differing further on would match)
   (ScnVm.NativeKernels.cs). Written by hand: Oreimo START 79366 (blend of two 32-bit layers) and
   796E5 (the alpha of rule fades: the mask's top byte m, or 255 - m, against imin / imax; between
   them ((m - imin') * (0x8080 / (imax - imin + 1)) in signed 16 bits) * alpha >> 15).
 - tools/X86Gen translates a routine mechanically into Scripting/Generated/*.g.cs (one C# method,
   registers as locals, jumps as gotos, flags and MMX through Scripting/X86Ops with the
-  interpreter's semantics; ScnVm.RunTranslated runs it). It served as the first step and the
-  reference for the hot routines below, which are now written out.
+  interpreter's semantics). It served as the first step and the reference for the hot routines
+  below, which are now written out.
+- **X86Jit** (2026-10-07) makes the same translation at run time for any routine of any game:
+  the first call of a routine without a C# version starts its translation in the background
+  (an expression tree compiled to IL: registers and flags as locals, branches as gotos, X86Ops
+  for the operations; movs / stos through helpers, a block copy when a forward rep movs does not
+  overlap itself); the interpreter runs the routine until it is ready. Routines with code it does
+  not take stay on the interpreter: calls (Oreimo's CPUID routine), cpuid, SSE (79A20, never
+  run), parity conditions, idiv, mul / div of bytes and words, cmps, segment overrides. Of
+  Oreimo's 19 routines 17 are translated. Checked against the interpreter on 1,122 runs of 11
+  of them with random pictures and arguments (subpixel, scale, enlarge 77108, blend, rule alpha,
+  copy, negative, sepia, strnicmp, EFCLIB's two): the same bytes, 10 to 60 times faster (sepia of
+  a full screen: 750 ms -> 12 ms). Only differences: pushfd stores parity and adjust as 0, and
+  registers start at 0. Off where .NET cannot generate code at run time (iOS) and with
+  OPENSHIINA_X86JIT=0 (ScnBoot: SCNBOOT_JIT=0, or =sync to translate before the first call);
+  perf.log names translated routines "jit <offset>", interpreted ones "x86 <offset>".
 - START 76388 (copies a rectangle of a 32-bit picture with positions in 1/16 pixels, no
   scaling: smooth scrolling) is written out in ScnVm.Subpixel32.cs: weights D0 = (b - a) mod 16
   and D4 = (a - b) mod 16 across (a / b the distances of the destination / source position to

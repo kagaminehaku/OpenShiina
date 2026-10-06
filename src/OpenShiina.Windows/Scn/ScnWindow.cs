@@ -42,6 +42,9 @@ public sealed class ScnWindow : Window
             ScreenWidth = width,
             ScreenHeight = height,
         };
+        // OPENSHIINA_X86JIT=0: embedded x86 routines without a C# version run on the interpreter
+        if (Environment.GetEnvironmentVariable("OPENSHIINA_X86JIT") == "0")
+            m_vm.JitX86 = false;
         if (!m_vm.LoadModule(0, start, start: true))
             throw new InvalidDataException($"{start} is missing.");
         if (m_perfLogged)

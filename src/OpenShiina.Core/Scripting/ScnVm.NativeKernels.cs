@@ -1,6 +1,7 @@
-// C# versions of embedded x86 routines that run hot (the interpreter runs them too, slowly).
-// Each is found by the SHA-1 of its first 64 bytes and must give the bytes the x86 code gives;
-// VerifyNatives runs the interpreter as well and compares (for tests).
+// C# versions of embedded x86 routines that run hot, written by hand: faster still than their
+// X86Jit translation (Vector128, all cores). Each is found by the signature of the whole routine
+// (X86Routine.Signature) and must give the bytes the x86 code gives; VerifyNatives runs the
+// interpreter as well and compares (for tests).
 
 namespace OpenShiina.Scripting;
 
@@ -14,7 +15,7 @@ public sealed partial class ScnVm
         // Oreimo START 79366 (MMX): dst = A' * w + B' * (257 - w) >> 8 byte by byte over 32-bit
         // pixels, w = rB * 257 / (rA + rB); A' takes B's colour where A's alpha is 0 (and B' A's).
         // l[0] dst, l[1] A, l[2] B, l[3..5] their row strides, l[6] width, l[7] height, l[8] rA, l[9] rB
-        RegisterNative("E3C1DCBBB9F5C465B07D1D4447E5CF1518F50573", "blend32", (vm, c, a) =>
+        RegisterNative("A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "blend32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), sa = vm.NativeArg(a, 4), sb = vm.NativeArg(a, 5);
@@ -52,7 +53,7 @@ public sealed partial class ScnVm
         // the alpha of the edge pixels). Written out in ScnVm.Subpixel32.cs.
         // l[0] dst, l[1] its row stride, l[2] / l[3] dst x / y, l[4] / l[5] width / height,
         // l[6] src, l[7] its stride, l[8] / l[9] src x / y (all 1/16 pixels)
-        RegisterNative("B1A49A583E34DD279BD578F8B04D613E8F135DAC", "subpixel32", (vm, c, a) =>
+        RegisterNative("D39944F06B961BEDC6A0F25C3C4F5A87D184E244", "subpixel32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
@@ -67,7 +68,7 @@ public sealed partial class ScnVm
         // Written out in ScnVm.Scale32.cs. l[0] dst, l[1] its stride, l[2..5]
         // dst left, top, right, bottom, l[6] src, l[7] its stride, l[8..11] src left, top, right,
         // bottom (1/16 pixels), l[12] / l[13] work buffers
-        RegisterNative("5D8E37C88C31B76DCD4DCE44D041BB5DF5E498E0", "scale32", (vm, c, a) =>
+        RegisterNative("3481E54756B5B7C00408FD13CDD6C7A5F211DC97", "scale32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
@@ -84,7 +85,7 @@ public sealed partial class ScnVm
         // * s >> 15 with q = 0x8080 / (imax - imin + 1) and imin' = max(imin - 1, 0) (imin 0: 0).
         // Comparisons are signed 16-bit (pcmpgtw). l[0] dst, l[1] S, l[2] M, l[3..5] their row
         // strides, l[6] width, l[7] height, l[8] imax, l[9] imin, l[10] dir
-        RegisterNative("0DE49F333DF99490CD0F3E13C7B90CFC785620F3", "rulealpha", (vm, c, a) =>
+        RegisterNative("42BE6C919F9A6508C03AAA5B66020C3951CC7C05", "rulealpha", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), ps = vm.NativeArg(a, 1), pm = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), ss = vm.NativeArg(a, 4), sm = vm.NativeArg(a, 5);

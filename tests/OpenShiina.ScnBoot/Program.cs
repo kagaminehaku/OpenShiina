@@ -9,7 +9,9 @@
 // holds buttons (1 left, 2 right, 4 middle; default none) for some frames (default 3).
 // With a picture folder, the surface the window shows is saved as frame_NNNN.png every n frames
 // (default 10) and when the run ends. SCNBOOT_INI="Key=value;..." changes keys of RIO.INI as the
-// scripts read it (the file stays as it is).
+// scripts read it (the file stays as it is). SCNBOOT_JIT=0 runs every embedded x86 routine without
+// a C# version on the interpreter instead of translating it (X86Jit); SCNBOOT_JIT=sync translates
+// a routine before its first call instead of in the background.
 // The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
 
 using System.Text;
@@ -59,6 +61,11 @@ foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm
     if (System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m)
         set(int.Parse(m.Groups[1].Value));
 vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
+if (Environment.GetEnvironmentVariable("SCNBOOT_JIT") is { } jit)
+{
+    vm.JitX86 &= jit != "0";
+    vm.JitInBackground = jit != "sync";
+}
 if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1")
     vm.OpTimes = new();
 if (!vm.LoadModule(0, start, start: true))
@@ -130,6 +137,9 @@ foreach (var (routine, (ticks, calls)) in vm.NativeTimes.OrderByDescending(t => 
     Console.WriteLine($"  C# {routine}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F0} ms ({calls} calls)");
 foreach (var (entry, p) in vm.Cpu.Profile.OrderByDescending(p => p.Value.Instructions).Take(8))
     Console.WriteLine($"  x86 {entry:X8}: {p.Calls} calls, {p.Instructions} instructions");
+foreach (var r in vm.RoutineReport().OrderBy(r => r.Address))
+    Console.WriteLine($"  routine {r.Address:X8} {r.Signature[..12]}: " +
+        (r.Native != null ? $"C# {r.Native}" : r.Translated ? "translated" : $"interpreter{(r.NotTranslated != null ? $" ({r.NotTranslated})" : "")}"));
 Console.WriteLine($"Opcodes run ({vm.OpCounts.Count} kinds): " +
     string.Join(" ", vm.OpCounts.OrderBy(k => k.Key).Select(k => $"{k.Key:X4}x{k.Value}")));
 return 0;
