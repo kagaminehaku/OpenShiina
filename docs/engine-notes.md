@@ -410,7 +410,10 @@ the functions they call from the decompile. First findings:
   memmove, 02C7 memset; 02D0 strlen, 02D1 strcpy, 02D3 strcat, 02D4 strcmp, 02D6 stricmp;
   02E4 / 02E5 / 02E8 a per-slot data reader; 03AC rand() % n, 03AE srand (MS C runtime rand);
   03BD time in ms; 03B7 / 03B8 local date / time; 03D0 leave scopes; 02EE / 02EF save /
-  restore the 0033 flag; 001E / 001F set / clear task flag 4.
+  restore the 0033 flag; 001E / 001F set / clear task flag 4; 03DE "expression", mode,
+  result: mode 0 stores the value as an int (truncated), mode 1 as the bits of a float, which
+  START reads back with `_Xnnnf` (the phase of the A_CHR 1-6 loops, eased slides and pans, the
+  1/16-pixel positions: 86 of its 231 evals).
 - **Input**: 03E8 key state of a virtual key; 03E9 button mask (keyboard and joypad); 03EA the
   same with key repeat; 03EB mask waits for buttons.
 - **Embedded x86** (`0276 label`): calls machine code inside the module with a pointer to

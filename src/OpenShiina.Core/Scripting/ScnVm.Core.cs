@@ -371,11 +371,12 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[2], d == 0 ? 0 : v % d);
             return 0;
         });
-        // 03DE eval "expression", mode, result
+        // 03DE eval "expression", mode, result: mode 0 stores the value as an int, 1 as the bits
+        // of a float (START reads them back with _Xnnnf, e.g. the phase of the A_CHR 1-6 loops)
         Register(0x03DE, (vm, c, i) =>
         {
-            int value = vm.Calculate(c, vm.ReadString(vm.Value(c, i.Args[0])));
-            vm.Store(c, i.Args[1], value);
+            double value = vm.CalculateDouble(c, vm.ReadString(vm.Value(c, i.Args[0])));
+            vm.Store(c, i.Args[1], i.Raw[0] == 1 ? BitConverter.SingleToInt32Bits((float)value) : ToInt(value));
             return 0;
         });
         // 03AC n -> v: rand() % n
