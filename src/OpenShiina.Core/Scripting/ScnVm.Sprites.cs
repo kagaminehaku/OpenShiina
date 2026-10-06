@@ -151,6 +151,9 @@ public sealed partial class ScnVm
             case 0x40000000:
                 blend = new SpriteBlend(flags & 0x1FF);
                 break;
+            case 0x20000000:
+                blend = new SpriteBlend(Math.Min(flags & 0x1FF, 0x100), Read32(entry + 0x1C));
+                break;
             default:
                 throw new NotSupportedException($"Sprite blend {flags & 0x70000000:X8} (alpha {flags & 0x1FF}) is not supported yet");
         }
@@ -166,12 +169,104 @@ public sealed partial class ScnVm
     {
         public readonly int Alpha;
         public readonly byte[] T1 = new byte[256], T2 = new byte[256];
+        /// <summary>Mode 0x20000000: the tint colour (entry +0x1C: blue, green, red) and T1 of each.</summary>
+        public readonly int[]? Tint, TintPart;
 
-        public SpriteBlend(int alpha)
+        public SpriteBlend(int alpha, int? tint = null)
         {
             Alpha = alpha;
             StepTable(T1, alpha, 256);
             StepTable(T2, 256 - alpha, 256);
+            if (tint is { } t)
+            {
+                Tint = [t & 0xFF, (t >> 8) & 0xFF, (t >> 16) & 0xFF];
+                TintPart = [T1[Tint[0]], T1[Tint[1]], T1[Tint[2]]];
+            }
+        }
+    }
+
+    /// <summary>
+    /// The runs of mode 0x20000000 (0x441710): the sprite's colours are mixed with the tint
+    /// colour t, c' = T2[c] + T1[t] (byte tables of (256 - a) / 256 and a / 256), then drawn
+    /// like plain runs. BGR runs of 15 pixels or more take MMX for whole groups of 8 pixels
+    /// from a 4-byte aligned pixel (after one 4-pixel table block when it is not 8-byte
+    /// aligned): c + ((t - c) * a >> 8) in 16-bit words, which can differ from the tables by 1.
+    /// </summary>
+    private static void DrawRunTint(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend blend)
+    {
+        int[] tint = blend.Tint!, part = blend.TintPart!;
+        byte[] t2 = blend.T2;
+        switch (method)
+        {
+            case 2:
+            {
+                void Table(int pixels)
+                {
+                    for (int k = 0; k < pixels * 3; k++, s++, d++, address++)
+                        row[d] = (byte)(t2[src[s]] + part[k % 3]);
+                }
+                if (n < 15)
+                {
+                    Table(n);
+                    return;
+                }
+                int head = address & 3;
+                Table(head);
+                n -= head;
+                if ((address & 4) != 0)
+                {
+                    Table(4);
+                    n -= 4;
+                }
+                int a = blend.Alpha;
+                for (int groups = n >> 3; groups > 0; groups--)
+                {
+                    for (int k = 0; k < 24; k++, s++, d++, address++)
+                    {
+                        int c = src[s];
+                        row[d] = (byte)((((tint[k % 3] - c) * a & 0xFFFF) >> 8) + c);
+                    }
+                }
+                n &= 7;
+                if (n >= 4)
+                {
+                    Table(4);
+                    n -= 4;
+                }
+                Table(n);
+                return;
+            }
+            case 3:
+            {
+                byte b = (byte)(t2[src[s]] + part[0]), g = (byte)(t2[src[s + 1]] + part[1]), r = (byte)(t2[src[s + 2]] + part[2]);
+                for (int i = 0; i < n; i++, d += 3)
+                {
+                    row[d] = b;
+                    row[d + 1] = g;
+                    row[d + 2] = r;
+                }
+                return;
+            }
+            case 4:
+                for (int i = 0; i < n; i++, s += 4, d += 3)
+                {
+                    int alpha = src[s];
+                    for (int k = 0; k < 3; k++)
+                        BlendByte(row, d + k, t2[src[s + 1 + k]] + part[k], alpha);
+                }
+                return;
+            default:
+            {
+                int alpha = src[s];
+                int b = t2[src[s + 1]] + part[0], g = t2[src[s + 2]] + part[1], r = t2[src[s + 3]] + part[2];
+                for (int i = 0; i < n; i++, d += 3)
+                {
+                    BlendByte(row, d, b, alpha);
+                    BlendByte(row, d + 1, g, alpha);
+                    BlendByte(row, d + 2, r, alpha);
+                }
+                return;
+            }
         }
     }
 
@@ -292,7 +387,10 @@ public sealed partial class ScnVm
     {
         if (blend != null)
         {
-            DrawRunAlpha(method, n, src, s, row, d, address, blend);
+            if (blend.Tint != null)
+                DrawRunTint(method, n, src, s, row, d, address, blend);
+            else
+                DrawRunAlpha(method, n, src, s, row, d, address, blend);
             return;
         }
         switch (method)

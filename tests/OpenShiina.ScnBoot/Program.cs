@@ -67,17 +67,22 @@ if (!vm.LoadModule(0, start, start: true))
 }
 
 int frame = 0;
+StartWatchdog();
 try
 {
+    var frameTime = new System.Diagnostics.Stopwatch();
     for (; frame < frames; frame++)
     {
         host.Clock = (uint)(frame * 1000L / 60);
         host.Frame = frame;
+        frameTime.Restart();
         if (!vm.RunFrame())
         {
             Console.WriteLine($"The scripts quit after {frame} frames.");
             break;
         }
+        if (frameTime.ElapsedMilliseconds >= 1000)
+            Console.WriteLine($"  [slow] frame {frame}: {frameTime.ElapsedMilliseconds} ms, {vm.FrameRounds} rounds");
         if (pictures != null && frame % every == 0)
             SaveScreen(frame);
     }
@@ -118,6 +123,74 @@ foreach (var (entry, p) in vm.Cpu.Profile.OrderByDescending(p => p.Value.Instruc
 Console.WriteLine($"Opcodes run ({vm.OpCounts.Count} kinds): " +
     string.Join(" ", vm.OpCounts.OrderBy(k => k.Key).Select(k => $"{k.Key:X4}x{k.Value}")));
 return 0;
+
+// Stall detection: when one frame runs longer than 5 s, counts the instructions run per script
+// address and prints where the time goes every SCNBOOT_STALL_REPORT seconds (default 15); after
+// SCNBOOT_STALL seconds (default 60) on one frame it saves the screen and stops the run.
+void StartWatchdog()
+{
+    int limit = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_STALL"), out var s) ? s : 60;
+    int report = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_STALL_REPORT"), out var r) ? r : 15;
+    var thread = new Thread(() =>
+    {
+        int last = -1;
+        var since = System.Diagnostics.Stopwatch.StartNew();
+        long nextReport = 0;
+        while (true)
+        {
+            Thread.Sleep(500);
+            int current = host.Frame;
+            if (current != last)
+            {
+                last = current;
+                since.Restart();
+                vm.HotSpots = null;
+                nextReport = 5;
+                continue;
+            }
+            double seconds = since.Elapsed.TotalSeconds;
+            if (seconds < nextReport)
+                continue;
+            if (vm.HotSpots == null)
+            {
+                vm.HotSpots = new();
+                nextReport = 5 + report;
+                Console.WriteLine($"  [stall] frame {current} has run {seconds:F0} s ({vm.FrameRounds} rounds); counting where");
+                continue;
+            }
+            nextReport = (long)seconds + report;
+            PrintStall(current, seconds);
+            if (seconds >= limit)
+            {
+                Console.WriteLine($"  [stall] stopping: frame {current} ran over {limit} s (SCNBOOT_STALL)");
+                if (pictures != null)
+                    SaveScreen(current);
+                Console.Out.Flush();
+                Environment.Exit(3);
+            }
+        }
+    }) { IsBackground = true, Name = "stall watchdog" };
+    thread.Start();
+}
+
+void PrintStall(int current, double seconds)
+{
+    var hot = vm.HotSpots;
+    if (hot == null)
+        return;
+    KeyValuePair<(int Slot, int Base, int Offset, int Op), int>[] top;
+    long total;
+    lock (hot)
+    {
+        top = hot.OrderByDescending(h => h.Value).Take(10).ToArray();
+        total = hot.Values.Sum(v => (long)v);
+    }
+    var task = vm.CurrentTask;
+    Console.WriteLine($"  [stall] frame {current}: {seconds:F0} s, {vm.FrameRounds} rounds, {total} instructions counted; " +
+                      $"now slot {task?.Slot} at {(task == null ? 0 : task.Current - task.Base):X5}, x86 run so far {vm.Cpu.Executed}");
+    foreach (var ((slot, codeBase, offset, op), n) in top)
+        Console.WriteLine($"    slot {slot,3} code {codeBase:X8} +{offset:X5}: {n,10} op {op:X4}");
+}
 
 // The surface the window shows, as the player would see it (and the others with SCNBOOT_SURFACES=1,2,..)
 void SaveScreen(int n)

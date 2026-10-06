@@ -54,6 +54,24 @@ public sealed partial class ScnVm
         }
     }
 
+    /// <summary>Runs a routine translated to C# (Scripting/Generated) the way the interpreter runs it.</summary>
+    private void RunTranslated(ScnContext c, ScnNativeArgs args, Action<ScnVm, uint, uint> routine)
+    {
+        Write32(X86Arguments, args.B);
+        Write32(X86Arguments + 4, args.A);
+        Write32(X86Arguments + 8, args.S);
+        Write32(X86Arguments + 12, args.F);
+        Write32(X86Arguments + 16, args.Stack);
+        try
+        {
+            routine(this, X86Arguments, X86StackTop);
+        }
+        catch (ArithmeticException ex)
+        {
+            throw Error(c, $"Embedded x86 routine at module offset {m_nativeTarget - c.Base:X5}: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// With VerifyNatives: runs the routine on the interpreter, keeps what it wrote to
     /// [start, start + length), puts the old bytes back for the C# version, and afterwards

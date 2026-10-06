@@ -559,3 +559,56 @@ the functions they call from the decompile. First findings:
   from an 8-byte aligned pixel when 15 or more), alpha runs use T1[alpha].
 - Status: clicking Start runs the opening: the first scene with Kirino, the message window,
   the name icon and the first line ("たまには、俺達もどっか出かけるか") are drawn; it waits for a click.
+- Compositor mode 0x20000000 (alpha a, clamped to 256; a = 0 draws plainly): the colours of the
+  sprite are mixed with a tint colour (entry +0x1C, blue / green / red) before drawing: c' =
+  T2[c] + T1[t] with the tables of mode 0x40000000. BGR runs write c' (from 15 pixels on, groups
+  of 8 pixels from a 4-byte aligned pixel, after one 4-pixel table block when not 8-byte aligned,
+  take MMX: c + ((t - c) a >> 8) in 16-bit words); one-colour runs fill c'; alpha runs blend c'
+  with the pixel's own alpha (d + ((c' - d) alpha >> 8)).
+
+### Movies (ScnVm, 2026-10-06)
+
+- Every movie of the 11 games is an MPEG-1 system stream (`mv\*.mpg` or `a\*.mpg` in the game
+  folder, 800 x 600 or 1280 x 720 at 30 frames a second; only a few carry MPEG-1 Layer II sound:
+  Oreimo's sepa.mpg, the ending movies ed.mpg of Maki Fes! and Re: Rem Plus). OpenShiina decodes
+  them itself (Formats/MpegVideo.cs: system stream, MPEG-1 video with the tables of ISO/IEC
+  11172-2, BT.601 colours); all 125 files decode without an error.
+- START picks the player from RIO.INI MovieMode (b[9]; 0 and 1 give 1). With 1 the executable
+  uses DirectShow multimedia streams (16 records of 0x158 bytes at 0x4B7BB0): `05B5 n, file,
+  loop, surface` opens the file and plays it into a DirectDraw surface (made by `0546 n |
+  0x80000000`; -1 the screen) at (0, 0) in the movie's size, `05C0 n` (IStreamSample::Update)
+  draws the next frame (at the end: starts again and counts when looping, else stops), `05B6`
+  stop (count -1), `05B7` pause, `05B8` play, `05B9 n, v` status (0x20D stopped, 0x211 paused,
+  0x20E playing), `05BC` loop count, `05BF n, w, h` size, `05C3 n, v` volume 0-100 (the table of
+  the music streams). The script copies the surface with `0514 dst, x, y, w, h, src, sx, sy, rop`
+  (BitBlt; showing it when dst is the shown surface) or into a picture with `055E slot, frame, x,
+  y, w, h, surface, sx, sy` (FUN_00410BF0: the source rectangle clipped to the surface, the
+  destination moving with its left and top edge; 3-byte frames take the bytes, 4-byte frames
+  get FF, B, G, R). MovieMode 2 uses another player (05C9-05D6), not done.
+- In OpenShiina frame n is due n / 30 s after the start and `05C0` draws the latest frame due.
+  Movie sound is not played yet.
+
+### Hot embedded x86 in C# (ScnVm, 2026-10-06)
+
+- Routines that run often get a C# version, found by the SHA-1 of their first 64 bytes
+  (ScnVm.NativeKernels.cs). Written by hand: Oreimo START 79366 (blend of two 32-bit layers) and
+  796E5 (the alpha of rule fades: the mask's top byte m, or 255 - m, against imin / imax; between
+  them ((m - imin') * (0x8080 / (imax - imin + 1)) in signed 16 bits) * alpha >> 15).
+- Larger ones are translated mechanically by tools/X86Gen into Scripting/Generated/*.g.cs: one C#
+  method per routine, registers as locals, jumps as gotos, flags and MMX through Scripting/X86Ops
+  with the interpreter's semantics. START 76388 (899 instructions: copies a rectangle of a 32-bit
+  picture with positions in 1/16 pixels, bilinear weights at the fractions; it even stores
+  unpacked words in two places, which the translation keeps) is done this way.
+- START 78380 (the scaling case of the same copy, only scaling down; 56 million instructions a
+  call in the zoomed and panned pictures) is written out in ScnVm.Scale32.cs: tables per
+  destination row and column (flags 0x80 / 0x40 for partly covered first / last source pixels,
+  the whole pixels between, their weights x * 0x5ADC (rows) or 0x5ADD (columns) / source size by
+  a rounded reciprocal), then per destination pixel the sum of byte * (pmaddwd(wy, wx) >>> 21)
+  in 16 bits, >> 8, and byte 3 = FF when every source pixel has FF. Quirk: past the first pixel
+  of a row the general loop takes the shared first column of partly covered source rows from a
+  register and leaves it out of the FF test. Checked against the x86 code on 500 random
+  rectangles (scratchpad scaletest) and in the game.
+- ScnBoot with SCNBOOT_VERIFY_NATIVE=1 runs the interpreter as well and compares the bytes written.
+- ScnBoot stall detection: frames over 1 s are logged ([slow]); a frame over 5 s counts the
+  instructions per script address and reports the top ones every SCNBOOT_STALL_REPORT seconds
+  ([stall]); over SCNBOOT_STALL seconds (default 60) the run stops with a picture.

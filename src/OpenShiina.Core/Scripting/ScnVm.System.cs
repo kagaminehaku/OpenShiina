@@ -74,8 +74,17 @@ public sealed partial class ScnVm
             return 0;
         });
 
-        // 02BC n, v: GlobalAlloc (zeroed); 02BD p: GlobalFree
-        Register(0x02BC, (vm, c, i) => { vm.Store(c, i.Args[1], vm.Allocate(vm.Value(c, i.Args[0]))); return 0; });
+        // 02BC n, v: GlobalAlloc (zeroed); 02BD p: GlobalFree. The block's size is kept like a
+        // loaded file's (GlobalSize): START copies cached files into such blocks and opens music
+        // streams on them (06D6 flag 1)
+        Register(0x02BC, (vm, c, i) =>
+        {
+            int size = vm.Value(c, i.Args[0]);
+            int block = vm.Allocate(size);
+            vm.m_fileSizes[block] = size;
+            vm.Store(c, i.Args[1], block);
+            return 0;
+        });
         Register(0x02BD, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
 
         // 00FA root, key: open a registry key (the copy-protection CRC of the exe is not checked)

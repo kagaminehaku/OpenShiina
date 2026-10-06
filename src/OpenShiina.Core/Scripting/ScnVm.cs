@@ -123,7 +123,8 @@ public sealed partial class ScnVm
     private const int HeapRegion = 0x10000000, CodeRegion = 0x40000000;
 
     private const int PageBits = 12, PageSize = 1 << PageBits;
-    private readonly Dictionary<int, byte[]> m_pages = new();
+    // Pages of the 32-bit address space, made on first use (a direct table: 1M references)
+    private readonly byte[]?[] m_pages = new byte[]?[1 << (32 - PageBits)];
     private int m_heapTop = HeapRegion, m_codeTop = CodeRegion, m_namedTop = NamedRegion;
 
     private readonly ScnOpcodes m_opcodes;
@@ -170,6 +171,7 @@ public sealed partial class ScnVm
         RegisterSprites();
         RegisterInput();
         RegisterMusic();
+        RegisterMovie();
         RegisterMisc();
         RegisterLayers();
         RegisterNativeKernels();
@@ -182,13 +184,10 @@ public sealed partial class ScnVm
 
     #region Memory
 
-    private byte[] Page(int address)
-    {
-        int page = address >>> PageBits;
-        if (!m_pages.TryGetValue(page, out var bytes))
-            m_pages[page] = bytes = new byte[PageSize];
-        return bytes;
-    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private byte[] Page(int address) => m_pages[address >>> PageBits] ?? NewPage(address);
+
+    private byte[] NewPage(int address) => m_pages[address >>> PageBits] = new byte[PageSize];
 
     public byte ReadByte(int address) => Page(address)[address & (PageSize - 1)];
 
@@ -401,13 +400,27 @@ public sealed partial class ScnVm
     {
         MakePages();
         FrameShown = false;
+        FrameRounds = 0;
         for (int round = 0; round < maxRounds && !FrameShown && !QuitRequested; round++)
         {
+            FrameRounds = round + 1;
             RunRound();
             FireTimers();
         }
         return !QuitRequested;
     }
+
+    /// <summary>For diagnostics: rounds of the main loop run in the current frame so far.</summary>
+    public int FrameRounds { get; private set; }
+
+    /// <summary>For diagnostics: the task being run now.</summary>
+    public ScnContext? CurrentTask { get; private set; }
+
+    /// <summary>
+    /// For diagnostics (set from another thread while a frame is slow): instructions run per
+    /// slot, code base, offset and opcode.
+    /// </summary>
+    public volatile Dictionary<(int Slot, int Base, int Offset, int Op), int>? HotSpots;
 
     /// <summary>One round of the main loop: every running task until it yields.</summary>
     public void RunRound()
@@ -450,12 +463,18 @@ public sealed partial class ScnVm
     /// <summary>Runs a task until it yields; returns the code it yielded with (0 frame end, 1 quit).</summary>
     private int Run(ScnContext c)
     {
+        CurrentTask = c;
         for (int count = 1; ; count++)
         {
             int at = c.Pc;
             var ins = Decode(c, at);
             c.Current = at;
             c.Pc = at + ins.Length;
+            if (HotSpots is { } hot)
+            {
+                lock (hot)
+                    hot[(c.Slot, c.Base, at - c.Base, ins.Op)] = hot.GetValueOrDefault((c.Slot, c.Base, at - c.Base, ins.Op)) + 1;
+            }
             OpCounts[ins.Op] = OpCounts.GetValueOrDefault(ins.Op) + 1;
             long started = OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             int result = Execute(c, ins);
