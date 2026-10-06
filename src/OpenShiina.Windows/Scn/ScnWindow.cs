@@ -95,8 +95,9 @@ public sealed class ScnWindow : Window
         }
     }
 
-    // OPENSHIINA_PERF=1: frames a second and the slowest frame (engine + picture) in the title
-    private readonly bool m_perf = Environment.GetEnvironmentVariable("OPENSHIINA_PERF") == "1";
+    // Frames a second and the slowest frame (engine + picture) in the title; on for now,
+    // OPENSHIINA_PERF=0 turns it off
+    private readonly bool m_perf = Environment.GetEnvironmentVariable("OPENSHIINA_PERF") != "0";
     private readonly Stopwatch m_perfClock = Stopwatch.StartNew();
     private double m_perfWorst;
     private int m_perfFrames;
