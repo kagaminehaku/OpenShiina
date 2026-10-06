@@ -177,6 +177,7 @@ public sealed partial class ScnVm
             var info = vm.RoutineAt(target);
             long started = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             string name;
+            vm.RememberCall(c, target, info.Native?.Name ?? (info.Translated != null ? "jit" : "x86"), args);
             if (info.Native is { } native)
             {
                 native.Run(vm, c, args);

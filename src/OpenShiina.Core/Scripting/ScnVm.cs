@@ -425,6 +425,7 @@ public sealed partial class ScnVm
         int at = m_codeTop;
         m_codeTop += (code.Length + 0xFFF + 16) & ~0xFFF;
         WriteBytes(at, code);
+        RememberModule(at, file, code);
         var c = m_slots[slot];
         c.CodeBase = c.Base = c.Entry = c.Pc = at;
         c.CodeSize = code.Length;
@@ -482,6 +483,7 @@ public sealed partial class ScnVm
     /// <summary>One round of the main loop: every running task until it yields.</summary>
     public void RunRound()
     {
+        m_rounds++;
         int active = ActiveCount();
         for (int i = 0; i < active && !QuitRequested; i++)
         {

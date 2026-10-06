@@ -35,6 +35,7 @@ public sealed class ScnWindow : Window
 
         string saves = PlayerFolders.For("scn", data.SchemeName);
         Directory.CreateDirectory(saves);
+        m_saves = saves;
         m_host = new Host(this, data, saves);
         m_vm = new ScnVm(ScnOpcodes.ForVersion(version), m_host)
         {
@@ -195,9 +196,22 @@ public sealed class ScnWindow : Window
         m_stopped = true;
         Present();
         Title = $"{m_data.SchemeName} - stopped";
-        MessageBox.Show(this, ex is ScnException ? ex.Message : $"{ex.GetType().Name}: {ex.Message}",
+        // What the engine knows about the error, for a bug report
+        string log = Path.Combine(m_saves, "crash.log");
+        try
+        {
+            File.AppendAllText(log, m_vm.CrashReport(ex) + Environment.NewLine);
+        }
+        catch (IOException)
+        {
+            log = "";
+        }
+        string message = ex is ScnException ? ex.Message : $"{ex.GetType().Name}: {ex.Message}";
+        MessageBox.Show(this, log.Length > 0 ? $"{message}\n\nDetails: {log}" : message,
             "OpenShiina (SCN)", MessageBoxButton.OK, MessageBoxImage.Information);
     }
+
+    private readonly string m_saves;
 
     private sealed class Host(ScnWindow window, GameData data, string saveFolder) : IScnHost, IDisposable
     {

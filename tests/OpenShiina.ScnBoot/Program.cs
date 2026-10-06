@@ -123,8 +123,7 @@ catch (ScnException ex)
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Frame {frame}: {ex.GetType().Name}: {ex.Message}");
-    Console.WriteLine(ex.StackTrace);
+    Console.WriteLine($"Frame {frame}: {vm.CrashReport(ex)}");
 }
 
 if (pictures != null)
