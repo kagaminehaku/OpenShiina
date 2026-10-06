@@ -114,7 +114,46 @@ public sealed class ScnContext
 
 public readonly record struct ScnOperand(byte Kind, bool Relative, bool AddressOf, int Value, string? Text);
 
-public sealed record ScnInstruction(int Op, int Address, int Length, ScnOperand[] Args, int[] Raw, int[] Targets, int[] CaseValues);
+public sealed record ScnInstruction(int Op, int Address, int Length, ScnOperand[] Args, int[] Raw, int[] Targets, int[] CaseValues)
+{
+    /// <summary>The opcode's handler, looked up once when the instruction is decoded.</summary>
+    internal ScnVm.OpHandler? Handler;
+}
+
+/// <summary>How often each opcode ran: a counter per opcode number, read like a dictionary of the ones that ran.</summary>
+public sealed class ScnOpCounts : IReadOnlyDictionary<int, long>
+{
+    private readonly long[] m_counts = new long[0x10000];
+
+    internal void Add(int op) => m_counts[op & 0xFFFF]++;
+
+    public void Clear() => Array.Clear(m_counts);
+
+    public long this[int op] => TryGetValue(op, out long n) ? n : throw new KeyNotFoundException($"Opcode {op:X4} did not run");
+
+    public bool TryGetValue(int op, out long count)
+    {
+        count = (uint)op < (uint)m_counts.Length ? m_counts[op] : 0;
+        return count != 0;
+    }
+
+    public bool ContainsKey(int op) => TryGetValue(op, out _);
+
+    public IEnumerable<int> Keys => this.Select(p => p.Key);
+
+    public IEnumerable<long> Values => this.Select(p => p.Value);
+
+    public int Count => m_counts.Count(n => n != 0);
+
+    public IEnumerator<KeyValuePair<int, long>> GetEnumerator()
+    {
+        for (int op = 0; op < m_counts.Length; op++)
+            if (m_counts[op] != 0)
+                yield return new(op, m_counts[op]);
+    }
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
 
 public sealed partial class ScnVm
 {
@@ -148,7 +187,7 @@ public sealed partial class ScnVm
     public bool QuitRequested { get; private set; }
 
     /// <summary>How often each opcode ran, for the boot report.</summary>
-    public Dictionary<int, long> OpCounts { get; } = new();
+    public ScnOpCounts OpCounts { get; } = new();
 
     /// <summary>When set, the time each opcode took in all (Stopwatch ticks), for profiling.</summary>
     public Dictionary<int, long>? OpTimes { get; set; }
@@ -493,7 +532,7 @@ public sealed partial class ScnVm
                 lock (hot)
                     hot[(c.Slot, c.Base, at - c.Base, ins.Op)] = hot.GetValueOrDefault((c.Slot, c.Base, at - c.Base, ins.Op)) + 1;
             }
-            OpCounts[ins.Op] = OpCounts.GetValueOrDefault(ins.Op) + 1;
+            OpCounts.Add(ins.Op);
             long started = OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             int result = Execute(c, ins);
             if (OpTimes != null)
@@ -600,7 +639,10 @@ public sealed partial class ScnVm
                 }
             }
         }
-        var ins = new ScnInstruction(op, at, p - at, args.ToArray(), raw.ToArray(), targets.ToArray(), caseValues.ToArray());
+        var ins = new ScnInstruction(op, at, p - at, args.ToArray(), raw.ToArray(), targets.ToArray(), caseValues.ToArray())
+        {
+            Handler = m_handlers.GetValueOrDefault(op),
+        };
         m_decoded[at] = ins;
         return ins;
     }
@@ -667,7 +709,7 @@ public sealed partial class ScnVm
     #region Operands (GETV / SETV / GETADR of the executable)
 
     /// <summary>Address of a variable operand (FUN_00414CA0).</summary>
-    public int AddressOf(ScnContext c, ScnOperand o)
+    public int AddressOf(ScnContext c, in ScnOperand o)
     {
         return (o.Kind & 0x3E) switch
         {
@@ -684,7 +726,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>Value of an operand (FUN_00414E30).</summary>
-    public int Value(ScnContext c, ScnOperand o)
+    public int Value(ScnContext c, in ScnOperand o)
     {
         if (o.AddressOf)
             return AddressOf(c, o);
@@ -700,12 +742,13 @@ public sealed partial class ScnVm
             case 0x12: return Read32(NamedAddress(c, o.Text!)) + rel;
             case 0x13: return Read32(Read32(NamedAddress(c, o.Text!)) + rel);
         }
-        int value = Read32(AddressOf(c, o with { Kind = (byte)(o.Kind & ~1) }));
+        // AddressOf looks at the kind without its dereference bit
+        int value = Read32(AddressOf(c, o));
         return (o.Kind & 1) == 0 ? value + rel : Read32(value + rel);
     }
 
     /// <summary>Stores a value into an operand (FUN_004148E0).</summary>
-    public void Store(ScnContext c, ScnOperand o, int value)
+    public void Store(ScnContext c, in ScnOperand o, int value)
     {
         int rel = o.Relative ? c.Base : 0;
         switch (o.Kind)
@@ -728,7 +771,7 @@ public sealed partial class ScnVm
                 Write32(Read32(NamedAddress(c, o.Text!)) + rel, value);
                 return;
         }
-        int address = AddressOf(c, o with { Kind = (byte)(o.Kind & ~1), AddressOf = false });
+        int address = AddressOf(c, o);
         if ((o.Kind & 1) == 0)
             Write32(address, value);
         else

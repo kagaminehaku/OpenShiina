@@ -628,7 +628,8 @@ public sealed partial class ScnVm
 
     private int Execute(ScnContext c, ScnInstruction ins)
     {
-        if (!m_handlers.TryGetValue(ins.Op, out var handler))
+        var handler = ins.Handler;
+        if (handler == null && !m_handlers.TryGetValue(ins.Op, out handler))
             throw Error(c, $"Opcode {ins.Op:X4} is not supported yet");
         return handler(this, c, ins);
     }
