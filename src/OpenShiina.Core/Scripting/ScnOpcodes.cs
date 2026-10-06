@@ -12,7 +12,7 @@ public sealed class ScnOpcodes
     private readonly Dictionary<int, string[]> m_layouts = new();
 
     // Variable-length instructions. N2V = u16 count, then that many operands; SW = switch table;
-    // CASE = case entry; VARGS = operands up to an FF byte.
+    // CASE = case entry; VARGS = operands up to an FF byte; M1V = operands up to a constant -1.
     private static readonly Dictionary<int, string[]> s_overrides = new()
     {
         [0x03CF] = ["N2V"],             // local declarations
@@ -24,6 +24,7 @@ public sealed class ScnOpcodes
         [0x0209] = ["CASE"],
         [0x02DB] = ["VARGS"],           // printf-like message
         [0x01A4] = ["V", "V", "V", "VARGS", "V"],   // DLL call: -, dll, function, arguments, result
+        [0x05D2] = ["M1V"],             // movies to play, up to -1
         [0x0001] = ["V", "V"],          // loadmod slot, file
         [0x0002] = ["V", "V"],
         [0x0213] = ["b4", "b4"],        // loop: counter, target

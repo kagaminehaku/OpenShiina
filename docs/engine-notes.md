@@ -630,9 +630,28 @@ the functions they call from the decompile. First findings:
   (BitBlt; showing it when dst is the shown surface) or into a picture with `055E slot, frame, x,
   y, w, h, surface, sx, sy` (FUN_00410BF0: the source rectangle clipped to the surface, the
   destination moving with its left and top edge; 3-byte frames take the bytes, 4-byte frames
-  get FF, B, G, R). MovieMode 2 uses another player (05C9-05D6), not done.
+  get FF, B, G, R).
+- MovieMode 2 (and ERO-ON always) uses a DirectShow filter graph with a sample grabber (16
+  records: 0x1B0 bytes at 0x4B9130 in v2.47, 0x220 at 0x4F14F0 in v2.49; states 0 closed, 1
+  stopped, 2 paused, 3 running): `05C9 n, file, loop` open and play (v2.49: file 0 plays the one
+  there; flags bit 0 loop, bit 31 frames into the surface of bits 16-23), `05D1 n, file, loop`
+  open only (v2.49 ignores loop), `05CA` close (count -1), `05CB` pause, `05CC` play, `05CD n, v`
+  status as 05B9, `05CE n, v` position in ms (-1 when not running or paused), `05CF n, s` go to s
+  seconds, `05D0 n, v` loop count, `05D2 n, ..., -1` play each open one, `05D3 n, w, h` size,
+  `05D4 n, surface, x, y` the latest frame into the surface at (x, y) (SetDIBitsToDevice, after
+  waiting until it is due). At the end (EC_COMPLETE) a looping movie starts again and counts,
+  any other is closed. v2.47: `05D5 n, v` / `05D6 n, v` get / set the volume. v2.49: `05D5 n,
+  surface, x, y` only sets where the grabber draws every new frame from then on, `05D6 n` waits
+  for the frame, `05D7` / `05D8` get / set the volume. In OpenShiina 05D4 / 05D6 end the host
+  frame when no new frame is due (the executable sleeps there), and v2.49's grabber draws once a
+  host frame. Oreimo with MovieMode=2 (ScnBoot SCNBOOT_INI) also plays sepa.mpg, which the other
+  player skips.
 - In OpenShiina frame n is due n / 30 s after the start and `05C0` draws the latest frame due.
-  Movie sound is not played yet.
+- Movie sound: the MPEG-1 Layer II stream is decoded with NLayer (Formats/MpegAudio; the same
+  samples as Windows' own decoder to 16-bit rounding) into a WAVE that plays through the music
+  streams (IScnMusic), started, paused, stopped, looped and moved with the picture; the volume
+  0-100 goes through the music streams' table. Only Maki Fes! and Re: Rem Plus have sound in
+  their movies (ed.mpg, 104 s and 155 s); Oreimo's and Azu's sepa.mpg carry 0.5 s of silence.
 
 ### Hot embedded x86 in C# (ScnVm, 2026-10-06)
 

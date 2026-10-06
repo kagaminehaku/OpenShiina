@@ -4,11 +4,12 @@
 // screen, 055E into a picture). IStreamSample::Update (op 05C0) waits for the next frame and
 // draws it; at the end of the stream it starts again (looping movies) or stops the movie.
 // START uses this path when RIO.INI MovieMode is 0 or 1 (b[9] = 1); MovieMode 2 selects the
-// other player (05C9-05D6), which is not done.
+// other player (05C9-05D8, ScnVm.GraphMovie.cs).
 //
 // Here the movie is decoded by Formats/Mpeg1Video and frame n is due n / rate seconds after the
-// start; 05C0 draws the latest frame that is due. Sound (MPEG-1 Layer II, only in a few movies)
-// is not played yet.
+// start; 05C0 draws the latest frame that is due. The sound (MPEG-1 Layer II, only in a few
+// movies; Formats/MpegAudio) plays through the music streams (IScnMusic), started, paused and
+// stopped with the picture, at the volume of the music streams' table.
 
 namespace OpenShiina.Scripting;
 
@@ -32,6 +33,14 @@ public sealed partial class ScnVm
         public int Decoded;
         public uint Start;
         public uint PausedAt;
+        /// <summary>The other player: where op_05D4 draws (surface, x, y), the latest frame, and v2.49's surface of op_05C9.</summary>
+        public bool Target;
+        public int X, Y;
+        public int DirectSurface = -1;
+        public byte[]? LastRows;
+        /// <summary>The movie's sound as a WAVE (null when it has none) and its music stream while it plays.</summary>
+        public byte[]? Wave;
+        public int Sound;
     }
 
     private const int MovieSlots = 16;
@@ -45,9 +54,13 @@ public sealed partial class ScnVm
         var data = m_host.ReadLooseFile(movie.Name) ?? ReadScriptFile(movie.Name);
         if (data == null)
             return false;
+        MovieSoundStop(movie);
         try
         {
-            movie.Video = new Mpeg1Video(new MpegSystemStream(data).Video);
+            var stream = new MpegSystemStream(data);
+            movie.Video = new Mpeg1Video(stream.Video);
+            if (!m_movieWaves.TryGetValue(movie.Name, out movie.Wave))
+                m_movieWaves[movie.Name] = movie.Wave = Music != null ? MpegAudio.ToWave(stream.Audio) : null;
         }
         catch (InvalidDataException)
         {
@@ -71,13 +84,62 @@ public sealed partial class ScnVm
             movie.Decoded = 0;
             movie.Start = now;
             movie.State = 3;
+            MovieSoundStart(movie);
         }
         else if (movie.State == 2)
         {
             movie.Start += now - movie.PausedAt;
             movie.State = 3;
+            MovieSoundResume(movie);
         }
         return true;
+    }
+
+    // Movie sounds decoded so far, by file
+    private readonly Dictionary<string, byte[]?> m_movieWaves = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The movie's sound from the start (or <paramref name="milliseconds"/> into it).</summary>
+    private void MovieSoundStart(Movie movie, long milliseconds = 0)
+    {
+        MovieSoundStop(movie);
+        if (movie.Wave is not { } wave || Music is not { } music)
+            return;
+        movie.Sound = music.Open(milliseconds > 0 ? MpegAudio.From(wave, milliseconds) : wave);
+        if (movie.Sound == 0)
+            return;
+        music.SetVolume(movie.Sound, s_musicVolumes[Math.Clamp(movie.Volume, 0, 100)]);
+        music.Play(movie.Sound, false);
+    }
+
+    private void MovieSoundStop(Movie movie)
+    {
+        if (movie.Sound == 0)
+            return;
+        Music?.Stop(movie.Sound);
+        Music?.Close(movie.Sound);
+        movie.Sound = 0;
+    }
+
+    private void MovieSoundPause(Movie movie)
+    {
+        if (movie.Sound != 0)
+            Music?.Pause(movie.Sound);
+    }
+
+    /// <summary>On from a pause (a movie paused before it played starts its sound where the picture is).</summary>
+    private void MovieSoundResume(Movie movie)
+    {
+        if (movie.Sound != 0)
+            Music?.Resume(movie.Sound);
+        else
+            MovieSoundStart(movie, m_host.Milliseconds - movie.Start);
+    }
+
+    private void MovieSoundVolume(Movie movie, int volume)
+    {
+        movie.Volume = volume;
+        if (movie.Sound != 0)
+            Music?.SetVolume(movie.Sound, s_musicVolumes[Math.Clamp(volume, 0, 100)]);
     }
 
     /// <summary>IStreamSample::Update: draws the latest frame that is due; handles the end.</summary>
@@ -106,9 +168,13 @@ public sealed partial class ScnVm
                 video.Rewind();
                 movie.Decoded = 0;
                 movie.Start = now;
+                MovieSoundStart(movie);
             }
             else
+            {
                 movie.State = 1;
+                MovieSoundStop(movie);
+            }
         }
     }
 
@@ -164,6 +230,7 @@ public sealed partial class ScnVm
             movie.Surface = surface == -1 ? vm.DisplaySurface : surface;
             if (movie.Surface is < 0 or >= SurfaceCount || vm.SurfaceField(movie.Surface, 2) == 0)
                 return 2;
+            vm.MovieSoundStop(movie);
             movie.Video = null;
             movie.State = 0;
             if (!vm.OpenMovie(movie))
@@ -176,7 +243,10 @@ public sealed partial class ScnVm
             if (vm.MovieSlot(vm.Value(c, i.Args[0])) is not { } movie)
                 return 2;
             if (movie.State is 2 or 3)
+            {
                 movie.State = 1;
+                vm.MovieSoundStop(movie);
+            }
             movie.LoopCount = -1;
             return 0;
         });
@@ -195,6 +265,7 @@ public sealed partial class ScnVm
                 }
                 movie.PausedAt = vm.m_host.Milliseconds;
                 movie.State = 2;
+                vm.MovieSoundPause(movie);
             }
             return 0;
         });
@@ -242,7 +313,7 @@ public sealed partial class ScnVm
         {
             int n = vm.Value(c, i.Args[0]), volume = vm.Value(c, i.Args[1]);
             if (vm.MovieSlot(n) is { } movie)
-                movie.Volume = volume;
+                vm.MovieSoundVolume(movie, volume);
             return 0;
         });
         // 0514 dst, x, y, w, h, src, sx, sy, rop (FUN_0041DC10): BitBlt (src -1: the window);

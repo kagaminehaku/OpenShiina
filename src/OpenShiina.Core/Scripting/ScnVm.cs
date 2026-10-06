@@ -175,6 +175,7 @@ public sealed partial class ScnVm
         RegisterInput();
         RegisterMusic();
         RegisterMovie();
+        RegisterGraphMovie();
         RegisterMisc();
         RegisterLayers();
         RegisterNativeKernels();
@@ -415,6 +416,7 @@ public sealed partial class ScnVm
     public bool RunFrame(int maxRounds = 20000)
     {
         MakePages();
+        PumpGraphMovies();
         FrameShown = false;
         FrameRounds = 0;
         for (int round = 0; round < maxRounds && !FrameShown && !QuitRequested; round++)
@@ -576,6 +578,19 @@ public sealed partial class ScnVm
                         args.Add(ReadOperand(ref p));
                     p++;
                     break;
+                case "M1V":
+                {
+                    // Operands up to the first -1 (the handler reads values until it gets -1;
+                    // the scripts end the list with a constant)
+                    while (true)
+                    {
+                        var o = ReadOperand(ref p);
+                        args.Add(o);
+                        if (o.Kind == 4 && !o.Relative && !o.AddressOf && o.Value == -1 || args.Count >= 0x100)
+                            break;
+                    }
+                    break;
+                }
                 default:
                 {
                     int n = int.Parse(item.AsSpan(1));

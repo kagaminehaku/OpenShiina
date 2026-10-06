@@ -53,6 +53,7 @@ Saves and settings are kept in `%AppData%\OpenShiina`.
 
 - Archive formats and encryption schemes are based on [GARbro](https://github.com/morkt/GARbro) by morkt.
 - Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor).
+- The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
 
 ## License
 

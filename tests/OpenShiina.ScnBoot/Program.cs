@@ -8,7 +8,8 @@
 // SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];..." puts the mouse at (x, y) from that frame on and
 // holds buttons (1 left, 2 right, 4 middle; default none) for some frames (default 3).
 // With a picture folder, the surface the window shows is saved as frame_NNNN.png every n frames
-// (default 10) and when the run ends.
+// (default 10) and when the run ends. SCNBOOT_INI="Key=value;..." changes keys of RIO.INI as the
+// scripts read it (the file stays as it is).
 // The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
 
 using System.Text;
@@ -244,7 +245,24 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
 
     public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
 
-    public byte[]? ReadLooseFile(string name) => data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
+    public byte[]? ReadLooseFile(string name)
+    {
+        var bytes = data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
+        // SCNBOOT_INI="Key=value;...": RIO.INI as the scripts see it, with those keys changed
+        if (bytes != null && name.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase)
+            && Environment.GetEnvironmentVariable("SCNBOOT_INI") is { Length: > 0 } changes)
+        {
+            var sjis = Encoding.GetEncoding(932);
+            string text = sjis.GetString(bytes);
+            foreach (var change in changes.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string key = change.Split('=')[0];
+                text = System.Text.RegularExpressions.Regex.Replace(text, $@"(?im)^{System.Text.RegularExpressions.Regex.Escape(key)}=[^\r\n]*", change);
+            }
+            bytes = sjis.GetBytes(text);
+        }
+        return bytes;
+    }
 
     public uint Milliseconds => Clock;
 

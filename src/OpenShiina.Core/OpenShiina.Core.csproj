@@ -33,6 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="NLayer" Version="3.0.0" />
     <PackageReference Include="NVorbis" Version="0.10.5" />
     <!-- The mixer only; each front end plays it on its own sound device -->
     <PackageReference Include="NAudio.Core" Version="2.2.1" />
