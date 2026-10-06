@@ -122,8 +122,8 @@ public sealed partial class ScnVm
     private const int FRegion = 0x05000000, StackRegion = 0x06000000, NamedRegion = 0x07000000;
     private const int HeapRegion = 0x10000000, CodeRegion = 0x40000000;
 
-    private const int PageBits = 12, PageSize = 1 << PageBits;
-    // Pages of the 32-bit address space, made on first use (a direct table: 1M references)
+    private const int PageBits = 16, PageSize = 1 << PageBits;
+    // Pages of the 32-bit address space (64 KB), made on first use (a direct table)
     private readonly byte[]?[] m_pages = new byte[]?[1 << (32 - PageBits)];
     private int m_heapTop = HeapRegion, m_codeTop = CodeRegion, m_namedTop = NamedRegion;
 
@@ -188,6 +188,17 @@ public sealed partial class ScnVm
     private byte[] Page(int address) => m_pages[address >>> PageBits] ?? NewPage(address);
 
     private byte[] NewPage(int address) => m_pages[address >>> PageBits] = new byte[PageSize];
+
+    /// <summary>
+    /// The page array and offset that hold [address, address + length) when it does not cross
+    /// a page, for code that works on the bytes in place.
+    /// </summary>
+    public bool TryDirect(int address, int length, out byte[] page, out int offset)
+    {
+        offset = address & (PageSize - 1);
+        page = Page(address);
+        return offset + length <= PageSize;
+    }
 
     public byte ReadByte(int address) => Page(address)[address & (PageSize - 1)];
 

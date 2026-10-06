@@ -594,11 +594,20 @@ the functions they call from the decompile. First findings:
   (ScnVm.NativeKernels.cs). Written by hand: Oreimo START 79366 (blend of two 32-bit layers) and
   796E5 (the alpha of rule fades: the mask's top byte m, or 255 - m, against imin / imax; between
   them ((m - imin') * (0x8080 / (imax - imin + 1)) in signed 16 bits) * alpha >> 15).
-- Larger ones are translated mechanically by tools/X86Gen into Scripting/Generated/*.g.cs: one C#
-  method per routine, registers as locals, jumps as gotos, flags and MMX through Scripting/X86Ops
-  with the interpreter's semantics. START 76388 (899 instructions: copies a rectangle of a 32-bit
-  picture with positions in 1/16 pixels, bilinear weights at the fractions; it even stores
-  unpacked words in two places, which the translation keeps) is done this way.
+- tools/X86Gen translates a routine mechanically into Scripting/Generated/*.g.cs (one C# method,
+  registers as locals, jumps as gotos, flags and MMX through Scripting/X86Ops with the
+  interpreter's semantics; ScnVm.RunTranslated runs it). It served as the first step and the
+  reference for the hot routines below, which are now written out.
+- START 76388 (copies a rectangle of a 32-bit picture with positions in 1/16 pixels, no
+  scaling: smooth scrolling) is written out in ScnVm.Subpixel32.cs: weights D0 = (b - a) mod 16
+  and D4 = (a - b) mod 16 across (a / b the distances of the destination / source position to
+  the next whole pixel), D8 / DC down; rows of six kinds (top / whole / bottom, from one source
+  row when the fractions down line up, else two), each with a left edge pixel, the whole pixels
+  and a right edge pixel whose alpha lane is scaled by the covered fraction. The formulas are the
+  MMX ones in 16-bit lanes; quirks kept: on rows from two source rows the edge pixels whose
+  source starts inside a pixel are stored as two unpacked 16-bit lanes, and the left one adds one
+  of its products unshifted. The whole pixels use Vector128 (two pixels at a time) and rows run
+  on all cores. Checked on 700 random rectangles against the x86 code and in the game.
 - START 78380 (the scaling case of the same copy, only scaling down; 56 million instructions a
   call in the zoomed and panned pictures) is written out in ScnVm.Scale32.cs: tables per
   destination row and column (flags 0x80 / 0x40 for partly covered first / last source pixels,
@@ -606,9 +615,15 @@ the functions they call from the decompile. First findings:
   a rounded reciprocal), then per destination pixel the sum of byte * (pmaddwd(wy, wx) >>> 21)
   in 16 bits, >> 8, and byte 3 = FF when every source pixel has FF. Quirk: past the first pixel
   of a row the general loop takes the shared first column of partly covered source rows from a
-  register and leaves it out of the FF test. Checked against the x86 code on 500 random
-  rectangles (scratchpad scaletest) and in the game.
-- ScnBoot with SCNBOOT_VERIFY_NATIVE=1 runs the interpreter as well and compares the bytes written.
+  register and leaves it out of the FF test. Since the sums wrap at 16 bits, the whole source
+  rows are added first (Vector<ushort>) and multiplied once; columns use prefix sums; rows run
+  on all cores. Checked against the x86 code on 500 random rectangles (scratchpad scaletest)
+  and in the game.
+- ScnBoot with SCNBOOT_VERIFY_NATIVE=1 runs the interpreter as well and compares the bytes written;
+  SCNBOOT_PROFILE=1 also times each C# routine.
+- The compositor (04C4) gathers the shown entries once and sorts them by (priority, index), and
+  draws rows straight into the page that holds them; it costs about 1-2 ns a pixel, under 1 ms a
+  frame in the opening. VM memory pages are 64 KB.
 - ScnBoot stall detection: frames over 1 s are logged ([slow]); a frame over 5 s counts the
   instructions per script address and reports the top ones every SCNBOOT_STALL_REPORT seconds
   ([stall]); over SCNBOOT_STALL seconds (default 60) the run stops with a picture.

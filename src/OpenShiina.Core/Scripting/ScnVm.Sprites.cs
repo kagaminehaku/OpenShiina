@@ -37,27 +37,24 @@ public sealed partial class ScnVm
             pixels += t * pitch + l * 3;
         }
         var target = new ComposeTarget(pixels, pitch, originX, originY, clipW, clipH);
-        // In order of priority: everything at the current one, then the next larger one
-        for (uint current = 0; ;)
+        // In order of priority (unsigned), entries of the same priority in list order - the
+        // order of FUN_00439E10's passes (each draws the current priority and finds the next).
+        // Drawing does not change the entries, so they are gathered once and sorted.
+        m_composeOrder.Clear();
+        for (int i = 0; i < count; i++)
         {
-            uint next = uint.MaxValue;
-            for (int i = 0; i < count; i++)
-            {
-                int e = sprites + i * SpriteSize;
-                int flags = Read32(e + 8);
-                if (flags >= 0 || !SpriteDrawable(e, ref flags))
-                    continue;
-                uint priority = (uint)Read32(e + 0xC);
-                if (priority == current)
-                    DrawSprite(e, flags, target);
-                else if (priority > current && priority <= next)
-                    next = priority;
-            }
-            if (next == uint.MaxValue)
-                break;
-            current = next;
+            int e = sprites + i * SpriteSize;
+            int flags = Read32(e + 8);
+            if (flags >= 0 || !SpriteDrawable(e, ref flags))
+                continue;
+            m_composeOrder.Add(((ulong)(uint)Read32(e + 0xC) << 32 | (uint)i, flags));
         }
+        m_composeOrder.Sort((x, y) => x.Key.CompareTo(y.Key));
+        foreach (var (key, flags) in m_composeOrder)
+            DrawSprite(sprites + (int)(uint)key * SpriteSize, flags, target);
     }
+
+    private readonly List<(ulong Key, int Flags)> m_composeOrder = new();
 
     private readonly record struct ComposeTarget(int Pixels, int Pitch, int OriginX, int OriginY, int Width, int Height);
 
@@ -302,7 +299,18 @@ public sealed partial class ScnVm
     }
 
     /// <summary>The row of a frame from its row pointer: its 16-bit length and the runs after it.</summary>
-    private byte[] ReadRow(int p) => ReadBytes(p, Read16(p) + 16);
+    private byte[] ReadRow(int p)
+    {
+        int n = Read16(p) + 16;
+        if (m_rowSource.Length < n)
+            m_rowSource = new byte[n];
+        ReadBytes(p, m_rowSource.AsSpan(0, n));
+        return m_rowSource;
+    }
+
+    // Row buffers of the compositor, used again for every row (the runs of a frame row, and the
+    // destination pixels it is drawn over)
+    private byte[] m_rowSource = new byte[0x4000], m_rowTarget = new byte[0x4000];
 
     /// <summary>Where the data of a run ends (methods 0-1 none, 2 BGR each, 3 one BGR, 4 ABGR each, 5+ one ABGR).</summary>
     private static int RunEnd(int method, int count, int data) => method switch
@@ -324,8 +332,19 @@ public sealed partial class ScnVm
         if (visible <= 0)
             return;
         byte[] src = ReadRow(p);
-        byte[] row = ReadBytes(dst, visible * 3);
-        int o = 2, d = 0;
+        int rowBytes = visible * 3;
+        // Draw straight into the page that holds the destination row, or into a copy of a row
+        // that crosses pages
+        bool direct = TryDirect(dst, rowBytes, out byte[] row, out int d0);
+        if (!direct)
+        {
+            if (m_rowTarget.Length < rowBytes)
+                m_rowTarget = new byte[rowBytes];
+            row = m_rowTarget;
+            d0 = 0;
+            ReadBytes(dst, row.AsSpan(0, rowBytes));
+        }
+        int o = 2, d = d0;
         int remaining = visible;
         // Left clip: whole runs are passed over, a run that crosses the edge is drawn from it
         while (skip > 0)
@@ -347,13 +366,14 @@ public sealed partial class ScnVm
             else
             {
                 int n = Math.Min(part, remaining);
-                DrawRun(method, n, src, at, row, d, dst + d, blend);
+                DrawRun(method, n, src, at, row, d, dst + d - d0, blend);
                 d += n * 3;
                 remaining -= n;
             }
             if (remaining <= 0)
             {
-                WriteBytes(dst, row);
+                if (!direct)
+                    WriteBytes(dst, row.AsSpan(0, rowBytes));
                 return;
             }
             break;
@@ -369,11 +389,12 @@ public sealed partial class ScnVm
                 continue;
             }
             int n = Math.Min(count, remaining);
-            DrawRun(method, n, src, data, row, d, dst + d, blend);
+            DrawRun(method, n, src, data, row, d, dst + d - d0, blend);
             d += n * 3;
             remaining -= n;
         }
-        WriteBytes(dst, row);
+        if (!direct)
+            WriteBytes(dst, row.AsSpan(0, rowBytes));
     }
 
     private static void BlendByte(byte[] row, int at, int source, int alpha)

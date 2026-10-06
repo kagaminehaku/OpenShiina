@@ -24,6 +24,9 @@ public sealed partial class ScnVm
     /// <summary>The x86 interpreter of embedded routines (created on first use).</summary>
     public X86Cpu Cpu => m_cpu ??= new X86Cpu(this);
 
+    /// <summary>With OpTimes: time (Stopwatch ticks) and calls per C# routine.</summary>
+    public Dictionary<string, (long Ticks, int Calls)> NativeTimes { get; } = new();
+
     /// <summary>Adds a routine by the signature <see cref="NativeSignature"/> gives for its code.</summary>
     public void RegisterNative(string signature, string name, NativeRoutine run) => m_natives[signature] = (name, run);
 
@@ -109,7 +112,13 @@ public sealed partial class ScnVm
             vm.m_nativeTarget = target;
             if (vm.m_natives.Count > 0 && vm.m_natives.TryGetValue(vm.NativeSignature(target), out var routine))
             {
+                long started = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 routine.Run(vm, c, args);
+                if (vm.OpTimes != null)
+                {
+                    var (ticks, calls) = vm.NativeTimes.GetValueOrDefault(routine.Name);
+                    vm.NativeTimes[routine.Name] = (ticks + System.Diagnostics.Stopwatch.GetTimestamp() - started, calls + 1);
+                }
                 return 0;
             }
             vm.Interpret(c, target, args);

@@ -118,6 +118,8 @@ Console.WriteLine($"gCPUID = {vm.Read32(vm.GlobalAddress("gCPUID")):X}, x86 inst
 if (vm.OpTimes != null)
     foreach (var (op, ticks) in vm.OpTimes.OrderByDescending(t => t.Value).Take(12))
         Console.WriteLine($"  op {op:X4}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F0} ms ({vm.OpCounts[op]} runs)");
+foreach (var (routine, (ticks, calls)) in vm.NativeTimes.OrderByDescending(t => t.Value.Ticks))
+    Console.WriteLine($"  C# {routine}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F0} ms ({calls} calls)");
 foreach (var (entry, p) in vm.Cpu.Profile.OrderByDescending(p => p.Value.Instructions).Take(8))
     Console.WriteLine($"  x86 {entry:X8}: {p.Calls} calls, {p.Instructions} instructions");
 Console.WriteLine($"Opcodes run ({vm.OpCounts.Count} kinds): " +

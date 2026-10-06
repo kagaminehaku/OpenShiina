@@ -49,7 +49,7 @@ public sealed partial class ScnVm
 
         // Oreimo START 76388 (MMX, 0x16157): copies a rectangle of a 32-bit picture to another
         // with positions in 1/16 pixels (bilinear weights at the fractions, partial coverage in
-        // the alpha of the edge pixels). Translated by tools/X86Gen (Generated/Oreimo_Start_76388.g.cs).
+        // the alpha of the edge pixels). Written out in ScnVm.Subpixel32.cs.
         // l[0] dst, l[1] its row stride, l[2] / l[3] dst x / y, l[4] / l[5] width / height,
         // l[6] src, l[7] its stride, l[8] / l[9] src x / y (all 1/16 pixels)
         RegisterNative("B1A49A583E34DD279BD578F8B04D613E8F135DAC", "subpixel32", (vm, c, a) =>
@@ -58,7 +58,8 @@ public sealed partial class ScnVm
             int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
             int length = x < 0 || y < 0 || w < 0 || h < 0 ? 0 : pitch * ((y + h) >> 4) + (((x + w) >> 4) + 1) * 4;
             using var verify = vm.VerifyRegion(c, a, dst, length);
-            vm.RunTranslated(c, a, Generated.X86Routines.Oreimo_Start_76388);
+            if (!vm.Subpixel32(dst, pitch, x, y, w, h, vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9)))
+                throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
         // Oreimo START 78380 (MMX, 0x1632C): the scaling case of the same copy (source and
