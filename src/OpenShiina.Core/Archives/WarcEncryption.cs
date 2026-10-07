@@ -533,13 +533,42 @@ public class Decoder
         [MarshalAs(UnmanagedType.U2)] public ushort Second;
         [MarshalAs(UnmanagedType.U2)] public ushort Milliseconds;
 
+        /// <summary>
+        /// FileTimeToSystemTime, worked out here so that it runs everywhere (Android has no
+        /// kernel32): 100 ns ticks since 1601-01-01 to the proleptic Gregorian date and time, the
+        /// milliseconds truncated. DateTime stops at 9999; FILETIME goes on to 30827, and the keys
+        /// are made from any 63-bit value.
+        /// </summary>
         public SYSTEMTIME(FILETIME ft)
         {
-            FileTimeToSystemTime(ref ft, out this);
+            ulong ticks = (ulong)ft.DateTimeHigh << 32 | ft.DateTimeLow;
+            if (ticks >= 0x8000000000000000)
+            {
+                this = default;     // FileTimeToSystemTime fails and leaves nothing
+                return;
+            }
+            ulong ms = ticks / 10000;
+            Milliseconds = (ushort)(ms % 1000);
+            ulong seconds = ms / 1000;
+            Second = (ushort)(seconds % 60);
+            Minute = (ushort)(seconds / 60 % 60);
+            Hour = (ushort)(seconds / 3600 % 24);
+            long days = (long)(seconds / 86400);
+            DayOfWeek = (ushort)((days + 1) % 7);      // 1601-01-01 was a Monday
+            // Days since 0000-03-01 in 400-year eras (Howard Hinnant's civil_from_days)
+            long z = days + 584694;                 // 1601-01-01 is day 584694 after 0000-03-01
+            long era = z / 146097;
+            long doe = z - era * 146097;
+            long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+            long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+            long mp = (5 * doy + 2) / 153;
+            long d = doy - (153 * mp + 2) / 5 + 1;
+            long m = mp < 10 ? mp + 3 : mp - 9;
+            long y = yoe + era * 400 + (m <= 2 ? 1 : 0);
+            Year = (ushort)y;
+            Month = (ushort)m;
+            Day = (ushort)d;
         }
-
-        [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
-        private static extern bool FileTimeToSystemTime(ref FILETIME lpFileTime, out SYSTEMTIME lpSystemTime);
     }
 
     private uint NextRand()
