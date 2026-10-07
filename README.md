@@ -45,9 +45,9 @@ dotnet build src/OpenShiina.Android -c Release
 
 The APK is written to `bin/Release/OpenShiina.Android/`. It reads the games from the device's
 storage, so Android 11 and later ask for all files access the first time a game is added. On
-the screen: a tap clicks, holding a finger still (or a two-finger tap, or Back) is a right
-click, dragging holds the left button, two fingers moved up or down turn the wheel (down opens
-the backlog); the bar on the right has Menu, Auto, Skip, Log and Exit.
+the screen: a tap clicks, dragging holds the left button, two fingers moved up or down turn
+the wheel (down opens the backlog); the bar on the right has Menu (a right click, as is Back),
+Auto, Skip, Log and Exit.
 
 ## Usage
 

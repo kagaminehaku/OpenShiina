@@ -6,10 +6,10 @@
 //     together are a double click.
 //   - Moving the finger further than a few pixels presses the left button where it went down and
 //     drags (sliders, scroll bars) until it is lifted.
-//   - Holding the finger still for half a second is a right click (the game's menu, hiding the
-//     message window); so is tapping with two fingers.
 //   - Two fingers moved up or down turn the wheel: down is a turn away (the backlog opens), up a
-//     turn towards.
+//     turn towards. Two fingers that do not move do nothing, and neither does holding a finger
+//     still: the game's menu (a right click) is the bar's Menu button and Back, so that a hand
+//     resting on the screen does not open it.
 //   - Android's Back button is a right click while a game plays; on the home screen it leaves.
 // A bar of buttons on the right, over the black beside the picture when there is room, does what
 // the keyboard does in the games: Menu (right click), Auto ('A', AUTO on / off), Skip (hold to
@@ -30,20 +30,18 @@ namespace OpenShiina.App;
 
 public sealed partial class GameView
 {
-    // How far a finger may wander and still tap (device independent pixels), how long it is held
-    // for a right click, how long a click holds the button, how close two taps make a double
-    // click, and how far two fingers go for a turn of the wheel
+    // How far a finger may wander and still tap (device independent pixels), how long a click
+    // holds the button, how close two taps make a double click, and how far two fingers go for a
+    // turn of the wheel
     private const double TouchSlop = 12, DoubleTapSlop = 24, WheelStep = 48;
-    private static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan ClickTime = TimeSpan.FromMilliseconds(70);
     private const long DoubleTapMilliseconds = 400;
 
     // The finger that leads (and a second one), where it went down, and what it is doing
     private IPointer? m_finger, m_secondFinger;
     private Point m_fingerStart, m_fingerLast;
-    private bool m_dragging, m_held, m_twoFingers, m_scrolled;
+    private bool m_dragging, m_twoFingers;
     private double m_wheelRest;
-    private IDisposable? m_holdTimer;
     private long m_lastTapTime = long.MinValue;
     private Point m_lastTap;
 
@@ -225,20 +223,17 @@ public sealed partial class GameView
             {
                 m_finger = e.Pointer;
                 m_fingerStart = m_fingerLast = p;
-                m_dragging = m_held = m_twoFingers = m_scrolled = false;
+                m_dragging = m_twoFingers = false;
                 m_wheelRest = 0;
                 e.Pointer.Capture(m_image);
                 MoveTo(p);
-                m_holdTimer?.Dispose();
-                m_holdTimer = DispatcherTimer.RunOnce(OnHold, HoldTime);
             }
-            else if (m_secondFinger == null && !m_dragging && !m_held)
+            else if (m_secondFinger == null && !m_dragging)
             {
-                // Two fingers: a right click when they lift, or the wheel when they move
+                // Two fingers: the wheel when they move, nothing (no click either) when they lift
                 m_secondFinger = e.Pointer;
                 m_twoFingers = true;
                 e.Pointer.Capture(m_image);
-                CancelHold();
             }
         }
         else if (e.RoutedEvent == PointerMovedEvent)
@@ -254,15 +249,13 @@ public sealed partial class GameView
                     int turn = m_wheelRest > 0 ? 1 : -1;
                     Wheel(turn);
                     m_wheelRest -= turn * WheelStep;
-                    m_scrolled = true;
                 }
             }
             else if (m_dragging)
                 MoveTo(p);
-            else if (!m_held && Distance(p, m_fingerStart) > TouchSlop)
+            else if (Distance(p, m_fingerStart) > TouchSlop)
             {
                 // A drag: the button goes down where the finger did, then follows it
-                CancelHold();
                 m_dragging = true;
                 int start = MoveTo(m_fingerStart);
                 m_session.Input.Buttons = 1;
@@ -280,19 +273,13 @@ public sealed partial class GameView
             }
             if (e.Pointer != m_finger)
                 return;
-            CancelHold();
-            if (m_twoFingers)
-            {
-                if (!m_scrolled)
-                    RightClick();
-            }
-            else if (m_dragging)
+            if (m_dragging)
             {
                 int point = MoveTo(p);
                 m_session.Input.Buttons = 0;
                 m_session.PostMessage(ScnMessage.LButtonUp, 0, point);
             }
-            else if (!m_held)
+            else if (!m_twoFingers)
                 Tap(m_fingerStart);
             m_finger = null;
             m_dragging = false;
@@ -306,7 +293,6 @@ public sealed partial class GameView
             m_secondFinger = null;
         if (pointer != m_finger)
             return;
-        CancelHold();
         if (m_dragging && m_session != null)
         {
             m_session.Input.Buttons = 0;
@@ -318,25 +304,9 @@ public sealed partial class GameView
 
     private void ResetTouch()
     {
-        CancelHold();
         m_finger = m_secondFinger = null;
-        m_dragging = m_held = m_twoFingers = m_scrolled = false;
+        m_dragging = m_twoFingers = false;
         m_lastTapTime = long.MinValue;
-    }
-
-    private void CancelHold()
-    {
-        m_holdTimer?.Dispose();
-        m_holdTimer = null;
-    }
-
-    private void OnHold()
-    {
-        m_holdTimer = null;
-        if (m_finger == null || m_dragging || m_twoFingers || m_session == null)
-            return;
-        m_held = true;
-        RightClick();
     }
 
     /// <summary>A left click at <paramref name="p"/> (of the image): down now, up a few frames later.</summary>
