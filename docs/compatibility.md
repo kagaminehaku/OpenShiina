@@ -23,9 +23,9 @@ The state of every game OpenShiina aims at. Update a game's row when something c
 | Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-07 |
-| Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | 🟡 Starts | 2026-10-07 |
-| Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ⚪ Not tried | — |
-| Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ⚪ Not tried | — |
+| Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | 🔴 Stops | 2026-10-07 |
+| Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | 🔴 Stops | 2026-10-07 |
 
 ShiinaRio is the engine version START.SCN checks (`03C0`, as in RIO.INI's section name). Games
 of one version share most of their START.SCN; see
@@ -55,12 +55,16 @@ builds of the hot embedded routines got their C# versions (engine-notes.md, sect
 
 **Nyaru Plus** Every route skipped through; nothing was added for it.
 
-**Rikka Plus** Boots to the title; still lacks `0548`, which START uses later (also used by Maki
-Fes! and Re:Rem Plus).
+**Rikka Plus** Every route skipped through. It is the only v2.49 game using `0548` (a surface
+of a given size), in START's function 207, which plays a movie on its own with MovieMode 0 / 1
+and is reached from TOPMENU's `mv\STCODE_T.MPG` and the `MOVIE` command; the scenario never
+uses `MOVIE`, so play never reaches it. `0548` was added afterwards (Maki Fes! and Re:Rem Plus
+make their pages with it).
 
-**Maki Fes!, Re:Rem Plus** Engine v2.50 with 53 scenario commands; START uses opcodes OpenShiina
-lacks (Maki Fes! 19, Re:Rem Plus 18 of them): `0014 00DC 012D 0294 030C 0395 0548 06CC 07E5 07E6
-0898 08AC 08C0 08E8 08F2 08FC 09DD 0A00 0BCC` (Re:Rem Plus all but `00DC`).
+**Maki Fes!, Re:Rem Plus** Engine v2.50 with 53 scenario commands, 1280 x 720. Both stop at the
+first frame on `06CC`; START uses opcodes OpenShiina lacks (Maki Fes! 18, Re:Rem Plus 17 of
+them): `0014 00DC 012D 0294 030C 0395 06CC 07E5 07E6 0898 08AC 08C0 08E8 08F2 08FC 09DD 0A00
+0BCC` (Re:Rem Plus all but `00DC`).
 
 ## Updating
 
