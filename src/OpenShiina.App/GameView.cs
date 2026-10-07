@@ -115,12 +115,9 @@ public sealed class GameView : UserControl, IGameWindow
         if (m_session == null || m_bitmap == null)
             return;
         var point = e.GetCurrentPoint(m_image);
-        // The picture is scaled uniformly into the image's bounds, centred
-        var size = m_image.Bounds.Size;
-        double scale = Math.Min(size.Width / m_session.Width, size.Height / m_session.Height);
+        var (scale, left, top) = Placement(m_session);
         if (scale <= 0)
             return;
-        double left = (size.Width - m_session.Width * scale) / 2, top = (size.Height - m_session.Height * scale) / 2;
         m_session.Input.Position = ((int)Math.Floor((point.Position.X - left) / scale), (int)Math.Floor((point.Position.Y - top) / scale));
         var p = point.Properties;
         bool touch = e.Pointer.Type is PointerType.Touch or PointerType.Pen;
@@ -130,6 +127,14 @@ public sealed class GameView : UserControl, IGameWindow
             m_session.Input.Buttons = 0;
         if (e.RoutedEvent == PointerPressedEvent)
             e.Pointer.Capture(m_image);
+    }
+
+    /// <summary>The picture is scaled uniformly into the image's bounds, centred.</summary>
+    private (double Scale, double Left, double Top) Placement(GameSession session)
+    {
+        var size = m_image.Bounds.Size;
+        double scale = Math.Min(size.Width / session.Width, size.Height / session.Height);
+        return (scale, (size.Width - session.Width * scale) / 2, (size.Height - session.Height * scale) / 2);
     }
 
     /// <summary>Asks for the game's folder, starting from the one played last.</summary>
@@ -237,6 +242,16 @@ public sealed class GameView : UserControl, IGameWindow
     public void SetTitle(string title) => TitleChanged?.Invoke(title);
 
     public void SetFullScreen(bool fullScreen) => FullScreenChanged?.Invoke(fullScreen);
+
+    public void MovePointer(int x, int y)
+    {
+        if (m_session == null || TopLevel.GetTopLevel(this) is not { } top)
+            return;
+        var (scale, left, offset) = Placement(m_session);
+        // The middle of the pixel, so that the pointer's move reads back as (x, y)
+        if (scale > 0 && m_image.TranslatePoint(new Point(left + (x + 0.5) * scale, offset + (y + 0.5) * scale), top) is { } point)
+            PointerWarp.To(top, point);
+    }
 
     public Task<int> ShowMessageAsync(string text, string caption, int type) =>
         MessageDialog.ShowAsync(TopLevel.GetTopLevel(this), text, caption, type);

@@ -183,7 +183,9 @@ game's own. It is split in two projects:
   Linux, macOS): `GameSession` runs the interpreter on a thread of its own, one engine frame per
   frame the window draws (every 1/60 s when it draws none), and hands over the picture as BGRA;
   `GameView` shows it scaled and passes on keys, mouse and touch (`InputState`, Windows virtual
-  keys); sound is the Core mixer (`Audio/ScnMixer.cs`) on SDL3 (`SdlAudioOutput`); text is
+  keys; `0457` moves the system pointer with `PointerWarp`: SetCursorPos, XWarpPointer,
+  CGWarpMouseCursorPosition, none on Wayland and phones, where the scripts see the new position
+  until the pointer moves); sound is the Core mixer (`Audio/ScnMixer.cs`) on SDL3 (`SdlAudioOutput`); text is
   `SkiaFonts`: GDI's font calls on SkiaSharp, with a Japanese stand-in for a missing face,
   measured as MS Gothic (cell = em, ascent 0.859 em, average width half an em).
 - `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` runs the engine on the window's render event;
@@ -544,7 +546,8 @@ the functions they call from the decompile. First findings:
   paths (the SSE paths in all 11 games are never run). A survey of the 230 routines of the 11
   games (57,393 instructions) found about 100 mnemonics; xmm ones only on SSE2 paths.
 - Title menu: the menu engine (START 230, "menu5.asm") selects with the mouse (`04C7` hit test)
-  or the keyboard cursor; decide (0x20) acts only on the item under the cursor.
+  or the keyboard cursor; decide (0x20) acts only on the item under the cursor. Moving with the
+  keyboard puts the mouse on the item's middle (`0457`), so the hit test follows.
 - `00C8 file, address` loads a file into script memory; `04B1 n` frees a picture slot; `055B
   slot, frame, x, y, w, h, colour` fills a rectangle (4 bytes a pixel: the dword; 3 bytes: its
   bytes 2, 3, 1); `055C slot, surface` copies a surface into a new picture; `0560` / `0561` set /

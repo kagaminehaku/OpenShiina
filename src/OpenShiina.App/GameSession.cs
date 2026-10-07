@@ -22,6 +22,9 @@ public interface IGameWindow
     void SetFullScreen(bool fullScreen);
     Task<int> ShowMessageAsync(string text, string caption, int type);
 
+    /// <summary>Moves the system's pointer to (x, y) of the game's picture, where it can.</summary>
+    void MovePointer(int x, int y);
+
     /// <summary>The game stopped: the scripts ended it (error null), or an error with the crash log's path.</summary>
     void Stopped(Exception? error, string? log);
 }
@@ -234,6 +237,13 @@ public sealed class GameSession : IDisposable
         public bool Active => m_session.Input.Active;
 
         public (int X, int Y) MousePosition => m_session.Input.Position;
+
+        /// <summary>The scripts see the new position at once, whether or not the platform can move the pointer.</summary>
+        public void SetMousePosition(int x, int y)
+        {
+            m_session.Input.Position = (x, y);
+            Dispatcher.UIThread.Post(() => m_session.m_window.MovePointer(x, y));
+        }
 
         public void Dispose()
         {
