@@ -17,6 +17,18 @@ public sealed class GameSetup
     /// <summary>Where this game's save data goes: %AppData%\OpenShiina\scn\&lt;game&gt; (made when missing).</summary>
     public string SaveFolder { get; }
 
+    /// <summary>
+    /// Whether the scripts see joystick 0 (ScnVm.Joypad). The games ship with RIO.INI's Joypad=0,
+    /// set by their own setup program, which the players do not have, so the players read the
+    /// joystick unless OPENSHIINA_JOYPAD=0; OPENSHIINA_JOYPAD=ini follows RIO.INI as the engine does.
+    /// </summary>
+    public bool? Joypad { get; } = Environment.GetEnvironmentVariable("OPENSHIINA_JOYPAD") switch
+    {
+        "0" => false,
+        "ini" => null,
+        _ => true,
+    };
+
     private GameSetup(string version, string start, int width, int height, string saves)
     {
         Version = version;
@@ -55,6 +67,7 @@ public sealed class GameSetup
             EngineVersion = (int)Math.Round(double.Parse(Version, System.Globalization.CultureInfo.InvariantCulture) * 100),
             ScreenWidth = Width,
             ScreenHeight = Height,
+            Joypad = Joypad,
         };
         if (Environment.GetEnvironmentVariable("OPENSHIINA_X86JIT") == "0")
             vm.JitX86 = false;

@@ -1,8 +1,8 @@
 // The player's one view, on every platform: first a page to choose the game's folder (or the
 // folder given on the command line), then the game's picture, scaled to the view with its
-// proportions kept, black around it. Keyboard, mouse and touch go to the game's InputState; a
-// touch is the left button. Each frame the view draws, it takes the game's latest picture and
-// lets the interpreter run its next frame.
+// proportions kept, black around it. Keyboard, mouse, touch and joystick go to the game's
+// InputState (a touch is the left button), the wheel to the scripts. Each frame the view draws,
+// it reads the joystick, takes the game's latest picture and lets the interpreter run its next frame.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -26,6 +26,7 @@ public sealed class GameView : UserControl, IGameWindow
     private readonly StackPanel m_start;
     private readonly TextBlock m_message = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White, MaxWidth = 560 };
     private GameSession? m_session;
+    private SdlJoystick? m_joystick;
     private WriteableBitmap? m_bitmap;
     private bool m_animating;
 
@@ -70,6 +71,11 @@ public sealed class GameView : UserControl, IGameWindow
         m_image.PointerPressed += (_, e) => Pointer(e);
         m_image.PointerReleased += (_, e) => Pointer(e);
         m_image.PointerCaptureLost += (_, _) => { if (m_session != null) m_session.Input.Buttons = 0; };
+        m_image.PointerWheelChanged += (_, e) =>
+        {
+            if (m_session != null && e.Delta.Y != 0)
+                m_session.PostWheel(e.Delta.Y > 0 ? 120 : -120);
+        };
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -212,6 +218,8 @@ public sealed class GameView : UserControl, IGameWindow
         m_image.IsVisible = true;
         m_start.IsVisible = false;
         TitleChanged?.Invoke(session.Data.SchemeName);
+        if (session.Setup.Joypad != false)
+            m_joystick = new SdlJoystick();
         session.Start();
         Focus();
         m_animating = true;
@@ -229,6 +237,8 @@ public sealed class GameView : UserControl, IGameWindow
     {
         if (m_session == null || m_bitmap == null)
             return;
+        if (m_joystick != null)
+            m_session.Input.Joystick = m_joystick.Poll();
         using (var buffer = m_bitmap.Lock())
         {
             var target = new Span<byte>((void*)buffer.Address, buffer.RowBytes * m_session.Height);
@@ -275,5 +285,7 @@ public sealed class GameView : UserControl, IGameWindow
         m_animating = false;
         m_session?.Dispose();
         m_session = null;
+        m_joystick?.Dispose();
+        m_joystick = null;
     }
 }

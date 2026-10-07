@@ -1,9 +1,10 @@
-// The keyboard and the mouse as the interpreter asks for them (GetAsyncKeyState, DirectInput):
+// The keyboard, the mouse and the joystick as the interpreter asks for them (GetAsyncKeyState, DirectInput, joyGetPosEx):
 // the window's thread records key and button changes as they come, the interpreter's thread reads
 // the state when the scripts ask. With the interpreter on a thread of its own, the window's
 // events are no longer held up by slow frames, so a released key is seen at once.
 
 using Avalonia.Input;
+using OpenShiina.Scripting;
 
 namespace OpenShiina.App;
 
@@ -38,6 +39,25 @@ public sealed class InputState
     {
         get => (m_x, m_y);
         set => (m_x, m_y) = value;
+    }
+
+    private ScnJoystick? m_joystick;
+
+    /// <summary>Joystick 0 as the window last read it, or null when there is none.</summary>
+    public ScnJoystick? Joystick
+    {
+        get
+        {
+            if (!m_active)
+                return null;
+            lock (m_lock)
+                return m_joystick;
+        }
+        set
+        {
+            lock (m_lock)
+                m_joystick = value;
+        }
     }
 
     public bool IsDown(int virtualKey)

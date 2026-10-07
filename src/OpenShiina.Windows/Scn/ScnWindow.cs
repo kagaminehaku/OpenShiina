@@ -1,14 +1,18 @@
-// Runs a game's own SCN scripts in ScnVm (approach 2) and shows the surface the engine shows,
-// pixel for pixel (OpenShiina.exe's default). Each display frame runs the engine until
-// the scripts show a picture; the picture is copied into a bitmap the size of the game's window.
-// Text is drawn with GDI as the game does it, sounds and music play through NAudio, the keyboard and
-// mouse are passed on. Save data goes to %AppData%\OpenShiina\scn\<game>, never the game folder.
+// Runs a game's own SCN scripts in ScnVm and shows the surface the engine shows, pixel for
+// pixel. The interpreter runs on a thread of its own (Core's GameThread), one frame for each
+// frame WPF renders, so slow frames never hold up the window (its input, moving, resizing); the
+// window takes the latest picture when it renders. Text is drawn with GDI as the game does it,
+// sounds and music play through NAudio; keys, mouse buttons and the joystick are read with the
+// calls the engine makes (GetAsyncKeyState, joyGetPosEx) when the scripts ask. Save data goes to
+// %AppData%\OpenShiina\scn\<game>, never the game folder.
 
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using OpenShiina.Platform;
@@ -19,8 +23,8 @@ namespace OpenShiina.Windows.Scn;
 public sealed class ScnWindow : Window
 {
     private readonly GameData m_data;
-    private readonly ScnVm m_vm;
     private readonly Host m_host;
+    private readonly GameThread m_game;
     private readonly WriteableBitmap m_bitmap;
     private readonly byte[] m_frame;
     private bool m_stopped;
@@ -30,13 +34,13 @@ public sealed class ScnWindow : Window
         m_data = data;
         var setup = GameSetup.Read(data);
         int width = setup.Width, height = setup.Height;
-        string saves = m_saves = setup.SaveFolder;
-        m_host = new Host(this, data, saves);
-        m_vm = setup.CreateVm(m_host);
-        m_perf = PerfMeter.Create(m_vm, data.SchemeName, saves);
+        m_bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
+        m_frame = new byte[width * height * 4];
+        m_host = new Host(this, data, setup.SaveFolder);
+        m_game = new GameThread(setup.CreateVm(m_host), setup, data.SchemeName);
+        m_game.TitleChanged += title => Title = title;
+        m_game.Stopped += Stop;
 
-        m_bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr24, null);
-        m_frame = new byte[width * height * 3];
         Title = data.SchemeName;
         Background = Brushes.Black;
         Content = new Image { Source = m_bitmap, Stretch = Stretch.Uniform };
@@ -51,107 +55,101 @@ public sealed class ScnWindow : Window
             ((Image)Content).Width = double.NaN;
             ((Image)Content).Height = double.NaN;
         };
-        CompositionTarget.Rendering += OnRendering;
-        Activated += (_, _) => Notify(ScnEvent.Activate);
-        Deactivated += (_, _) => Notify(ScnEvent.Deactivate);
+        SourceInitialized += (_, _) =>
+        {
+            m_host.Window = new WindowInteropHelper(this).Handle;
+            m_game.Start();
+            CompositionTarget.Rendering += OnRendering;
+        };
+        Activated += (_, _) => Focus(true);
+        Deactivated += (_, _) => Focus(false);
         Closed += (_, _) =>
         {
             CompositionTarget.Rendering -= OnRendering;
-            m_perf?.Dispose();
+            m_game.Dispose();
             m_host.Dispose();
             m_data.Dispose();
         };
     }
 
-    private void Notify(ScnEvent e)
+    private void Focus(bool active)
     {
-        if (m_stopped)
-            return;
-        try
-        {
-            m_vm.Notify(e);
-        }
-        catch (Exception ex)
-        {
-            Stop(ex);
-        }
+        m_host.Active = active;
+        m_game.Post(active ? ScnEvent.Activate : ScnEvent.Deactivate);
     }
 
-    // Frames a second and the slowest frame in the title, perf.log with OPENSHIINA_PERF=log
-    private readonly PerfMeter? m_perf;
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        // Alt+Enter: the engine's full screen switch
+        if (e.Key == Key.System && e.SystemKey == Key.Enter)
+        {
+            m_game.Post(ScnEvent.ToggleFullScreen);
+            e.Handled = true;
+            return;
+        }
+        base.OnKeyDown(e);
+    }
 
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        if (e.Delta != 0)
+            m_game.PostWheel(e.Delta);
+        base.OnMouseWheel(e);
+    }
+
+    // The time of the frame WPF rendered last: Rendering can be raised more than once a frame
+    private TimeSpan m_renderingTime;
+
+    /// <summary>A frame WPF renders: the game's latest picture, and the interpreter's next frame.</summary>
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (m_stopped)
-            return;
-        long started = Stopwatch.GetTimestamp();
-        try
+        if (e is RenderingEventArgs r)
         {
-            if (!m_vm.RunFrame())
-            {
-                Close();
+            if (r.RenderingTime == m_renderingTime)
                 return;
-            }
+            m_renderingTime = r.RenderingTime;
         }
-        catch (Exception ex)
-        {
-            Stop(ex);
-        }
-        long engine = Stopwatch.GetTimestamp();
-        if (m_vm.ScreenInvalidated)
-        {
-            m_vm.ScreenInvalidated = false;
-            Present();
-        }
-        if (m_perf?.Frame(started, engine, Stopwatch.GetTimestamp()) is { } title)
-            Title = title;
+        Present();
+        if (!m_stopped)
+            m_game.FrameTick();
     }
 
-    /// <summary>Copies the surface the engine shows into the bitmap.</summary>
     private void Present()
     {
-        int surface = m_vm.DisplaySurface;
-        int pixels = m_vm.SurfaceField(surface, 2);
-        int w = Math.Min(m_vm.SurfaceField(surface, 7), m_bitmap.PixelWidth);
-        int h = Math.Min(m_vm.SurfaceField(surface, 8), m_bitmap.PixelHeight);
-        int pitch = m_vm.SurfaceField(surface, 10);
-        if (pixels == 0 || w <= 0 || h <= 0)
-            return;
-        int stride = m_bitmap.PixelWidth * 3;
-        for (int y = 0; y < h; y++)
-            m_vm.ReadBytes(pixels + y * pitch, m_frame.AsSpan(y * stride, w * 3));
-        m_bitmap.WritePixels(new Int32Rect(0, 0, m_bitmap.PixelWidth, m_bitmap.PixelHeight), m_frame, stride, 0);
+        int stride = m_bitmap.PixelWidth * 4;
+        if (m_game.TakeFrame(m_frame, stride))
+            m_bitmap.WritePixels(new Int32Rect(0, 0, m_bitmap.PixelWidth, m_bitmap.PixelHeight), m_frame, stride, 0);
     }
 
-    /// <summary>The scripts reached something the interpreter does not do yet: show it and stop.</summary>
-    private void Stop(Exception ex)
+    /// <summary>The scripts ended the game (the window closes), or reached something the interpreter does not do yet.</summary>
+    private void Stop(Exception? error, string? log)
     {
         m_stopped = true;
         Present();
+        if (error == null)
+        {
+            Close();
+            return;
+        }
         Title = $"{m_data.SchemeName} - stopped";
-        // What the engine knows about the error, for a bug report
-        string log = Path.Combine(m_saves, "crash.log");
-        try
-        {
-            File.AppendAllText(log, m_vm.CrashReport(ex) + Environment.NewLine);
-        }
-        catch (IOException)
-        {
-            log = "";
-        }
-        string message = ex is ScnException ? ex.Message : $"{ex.GetType().Name}: {ex.Message}";
-        MessageBox.Show(this, log.Length > 0 ? $"{message}\n\nDetails: {log}" : message,
+        string message = error is ScnException ? error.Message : $"{error.GetType().Name}: {error.Message}";
+        MessageBox.Show(this, log != null ? $"{message}\n\nDetails: {log}" : message,
             "OpenShiina (SCN)", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    private readonly string m_saves;
-
+    /// <summary>The platform for the interpreter: called on the interpreter's thread.</summary>
     private sealed class Host(ScnWindow window, GameData data, string saveFolder) : IScnHost, IDisposable
     {
         private readonly Stopwatch m_clock = Stopwatch.StartNew();
         private readonly GdiFonts m_fonts = new();
         // One sound output for the buffers and the music streams: the mix on the Windows sound device
         private readonly (ScnMixer Mixer, ScnSound Sound, ScnMusic Music, NAudio.Wave.WaveOutEvent Output) m_audio = CreateAudio();
+        private readonly int m_width = window.m_bitmap.PixelWidth, m_height = window.m_bitmap.PixelHeight;
+
+        /// <summary>The window's handle (set on the window's thread before the interpreter starts).</summary>
+        public volatile IntPtr Window;
+
+        private volatile bool m_active = true;
 
         private static (ScnMixer, ScnSound, ScnMusic, NAudio.Wave.WaveOutEvent) CreateAudio()
         {
@@ -168,13 +166,13 @@ public sealed class ScnWindow : Window
 
         public uint Milliseconds => (uint)m_clock.ElapsedMilliseconds;
 
-        public void SetTitle(string title) => window.Title = title;
+        public void SetTitle(string title) => window.Dispatcher.BeginInvoke(() => window.Title = title);
 
-        public void SetFullScreen(bool fullScreen)
+        public void SetFullScreen(bool fullScreen) => window.Dispatcher.BeginInvoke(() =>
         {
             window.WindowStyle = fullScreen ? WindowStyle.None : WindowStyle.SingleBorderWindow;
             window.WindowState = fullScreen ? WindowState.Maximized : WindowState.Normal;
-        }
+        });
 
         public string SaveFolder => saveFolder;
 
@@ -185,6 +183,7 @@ public sealed class ScnWindow : Window
 
         public void DeleteSaveFile(string name) => File.Delete(Path.Combine(saveFolder, name));
 
+        /// <summary>The scripts wait for the answer, as MessageBoxA waits; the window stays live.</summary>
         public int MessageBox(string text, string caption, int type)
         {
             var buttons = (type & 0xF) switch
@@ -194,7 +193,8 @@ public sealed class ScnWindow : Window
                 4 => MessageBoxButton.YesNo,
                 _ => MessageBoxButton.OK,
             };
-            return System.Windows.MessageBox.Show(window, text, caption, buttons) switch
+            var result = window.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(window, text, caption, buttons));
+            return result switch
             {
                 MessageBoxResult.OK => 1,
                 MessageBoxResult.Cancel => 2,
@@ -212,16 +212,14 @@ public sealed class ScnWindow : Window
         public IScnMusic? Music => m_audio.Music;
 
         // Keys and mouse buttons as they are at the moment the scripts ask, like the engine reads
-        // them (GetAsyncKeyState, DirectInput). WPF's own key events and Mouse.LeftButton only
-        // change when the window's input is processed, which waits behind slow frames (the game
-        // runs in CompositionTarget.Rendering, before input): a released Ctrl went on skipping.
-        public bool KeyDown(int virtualKey) => window.IsActive && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+        // them (GetAsyncKeyState, DirectInput), not from WPF's events.
+        public bool KeyDown(int virtualKey) => m_active && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
         public int MouseButtons
         {
             get
             {
-                if (!window.IsActive)
+                if (!m_active)
                     return 0;
                 // GetAsyncKeyState gives the physical buttons; the logical ones follow the system's swap
                 bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
@@ -232,40 +230,70 @@ public sealed class ScnWindow : Window
             }
         }
 
-        private const int VK_LBUTTON = 1, VK_RBUTTON = 2, VK_MBUTTON = 4, SM_SWAPBUTTON = 23;
+        /// <summary>The window is in front (set on the window's thread).</summary>
+        public bool Active
+        {
+            get => m_active;
+            set => m_active = value;
+        }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState(int virtualKey);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern int GetSystemMetrics(int index);
-
-        public bool Active => window.IsActive;
+        /// <summary>
+        /// The picture is scaled uniformly into the client area and centred (Stretch.Uniform):
+        /// its scale and offset in device pixels.
+        /// </summary>
+        private (double Scale, double Left, double Top) Placement()
+        {
+            if (!GetClientRect(Window, out var client))
+                return (0, 0, 0);
+            int cw = client.Right - client.Left, ch = client.Bottom - client.Top;
+            double scale = Math.Min((double)cw / m_width, (double)ch / m_height);
+            return (scale, (cw - m_width * scale) / 2, (ch - m_height * scale) / 2);
+        }
 
         public (int X, int Y) MousePosition
         {
             get
             {
-                var image = (Image)window.Content;
-                var p = Mouse.GetPosition(image);
-                double sx = image.ActualWidth > 0 ? window.m_bitmap.PixelWidth / image.ActualWidth : 1;
-                double sy = image.ActualHeight > 0 ? window.m_bitmap.PixelHeight / image.ActualHeight : 1;
-                return ((int)Math.Floor(p.X * sx), (int)Math.Floor(p.Y * sy));
+                var (scale, left, top) = Placement();
+                if (scale <= 0 || !GetCursorPos(out var p) || !ScreenToClient(Window, ref p))
+                    return (0, 0);
+                return ((int)Math.Floor((p.X - left) / scale), (int)Math.Floor((p.Y - top) / scale));
             }
         }
 
         public void SetMousePosition(int x, int y)
         {
-            var image = (Image)window.Content;
-            if (image.ActualWidth <= 0 || image.ActualHeight <= 0)
+            var (scale, left, top) = Placement();
+            if (scale <= 0)
                 return;
-            var screen = image.PointToScreen(new Point(x * image.ActualWidth / window.m_bitmap.PixelWidth,
-                y * image.ActualHeight / window.m_bitmap.PixelHeight));
-            SetCursorPos((int)screen.X, (int)screen.Y);
+            // The middle of the pixel, so that the pointer's move reads back as (x, y)
+            var p = new POINT { X = (int)(left + (x + 0.5) * scale), Y = (int)(top + (y + 0.5) * scale) };
+            if (ClientToScreen(Window, ref p))
+                SetCursorPos(p.X, p.Y);
         }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetCursorPos(int x, int y);
+        // joyGetPosEx of joystick 0, as the engine calls it (JOY_RETURNX | JOY_RETURNY | JOY_RETURNBUTTONS).
+        // The scripts ask several times a frame: a reading is kept for 4 ms. Without a joystick the
+        // call is slow, so after a failure it is tried again a second later.
+        private long m_joystickNext;
+        private ScnJoystick? m_joystick;
+
+        public ScnJoystick? Joystick
+        {
+            get
+            {
+                if (!m_active)
+                    return null;
+                long now = Environment.TickCount64;
+                if (now < m_joystickNext)
+                    return m_joystick;
+                var info = new JOYINFOEX { dwSize = Marshal.SizeOf<JOYINFOEX>(), dwFlags = 0x83 };
+                bool read = joyGetPosEx(0, ref info) == 0;
+                m_joystick = read ? new ScnJoystick(info.dwXpos, info.dwYpos, info.dwButtons) : null;
+                m_joystickNext = now + (read ? 4 : 1000);
+                return m_joystick;
+            }
+        }
 
         public void Dispose()
         {
@@ -276,5 +304,50 @@ public sealed class ScnWindow : Window
             m_audio.Mixer.Dispose();
             m_fonts.Dispose();
         }
+
+        private const int VK_LBUTTON = 1, VK_RBUTTON = 2, VK_MBUTTON = 4, SM_SWAPBUTTON = 23;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X, Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOYINFOEX
+        {
+            public int dwSize, dwFlags, dwXpos, dwYpos, dwZpos, dwRpos, dwUpos, dwVpos, dwButtons,
+                dwButtonNumber, dwPOV, dwReserved1, dwReserved2;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int virtualKey);
+
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int index);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT point);
+
+        [DllImport("user32.dll")]
+        private static extern bool ScreenToClient(IntPtr window, ref POINT point);
+
+        [DllImport("user32.dll")]
+        private static extern bool ClientToScreen(IntPtr window, ref POINT point);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClientRect(IntPtr window, out RECT rect);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetCursorPos(int x, int y);
+
+        [DllImport("winmm.dll")]
+        private static extern int joyGetPosEx(int id, ref JOYINFOEX info);
     }
 }

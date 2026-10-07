@@ -69,7 +69,13 @@ public interface IScnHost
 
     /// <summary>Moves the mouse to a point of the game's picture (SetCursorPos).</summary>
     void SetMousePosition(int x, int y) { }
+
+    /// <summary>Joystick 0 as joyGetPosEx gives it, or null when there is none.</summary>
+    ScnJoystick? Joystick => null;
 }
+
+/// <summary>A joystick's position (X and Y from 0 to 65535, 32767 in the middle) and buttons (bit 0 = button 1).</summary>
+public readonly record struct ScnJoystick(int X, int Y, int Buttons);
 
 /// <summary>An opcode the interpreter does not run yet, or a script error.</summary>
 public sealed class ScnException(string message, int slot, int address, int op) : Exception(message)

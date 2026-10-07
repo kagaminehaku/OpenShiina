@@ -1267,8 +1267,8 @@ public sealed partial class ScnVm
             WriteBytes(d, ReadBytes(s, width * 3));
     }
 
-    /// <summary>The buttons that skip text waits ("_s" keys); input is not wired yet.</summary>
-    private int TextSkipButtons() => 0;
+    /// <summary>The buttons that skip text waits ("_s" keys): FUN_00413810(0x100, FUN_00413630()), as op_03EA.</summary>
+    private int TextSkipButtons() => RepeatButtons(0x100, Buttons());
 
     /// <summary>
     /// FUN_004325A0 with antialiasing on ("_q+"): the GGO_GRAY8 glyph blended into the surface,

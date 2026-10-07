@@ -4,6 +4,15 @@
 //   left button)  0x40 Esc / Home / Numpad 0  0x80 End  0x100 Ctrl  0x200 Tab  0x800 middle button
 // FUN_00413810 adds key repeat: a new press at once, then after KeyRepeatDelay (300 ms) every
 // KeyRepeatSpeed (50 ms) of RIO.INI. op_03E8 is GetAsyncKeyState of one virtual key.
+// The joystick is winmm's joystick 0 (joyGetPosEx, X / Y / buttons), read only when RIO.INI's
+// Joypad (or Joystick, which wins) is not 0: X below 0x2000 left, above 0xDFFF right, Y below
+// 0x4000 up, above 0xDFFF down, button 1 decide, button 2 cancel. The eleven GRAND†CROSS games
+// ship with Joypad=0; the players turn it on (Joypad).
+// 0x400 is never in this mask: the window procedure ORs it in with 0x20 on a double click of the
+// left button (WM_LBUTTONDBLCLK) into the masks 0x13B43FC / 0x13B4400, which only the engine's
+// own menus read (FUN_00411770 / FUN_00411B40, opcodes 0B72 / 0B86, used by none of the eleven).
+// The wheel (WM_MOUSEWHEEL) sets 0x13B52B4 to 1 (away from the user) or -1; only text with "_s"
+// key 8 reads it (it ends the text's waits) and op_0083 clears it.
 
 namespace OpenShiina.Scripting;
 
@@ -12,6 +21,13 @@ public sealed partial class ScnVm
     // FUN_00413810 state per caller (0x7DB928: phase, last buttons, start, delay)
     private readonly Dictionary<int, (int Phase, int Last, uint Start, int Delay)> m_repeat = new();
     private int m_repeatDelay = -1, m_repeatSpeed = -1;
+    private int m_joypad = -1;
+
+    /// <summary>
+    /// Reads joystick 0 whatever RIO.INI says (true), never (false), or as RIO.INI's Joypad /
+    /// Joystick says (null, the engine's way).
+    /// </summary>
+    public bool? Joypad { get; set; }
 
     /// <summary>FUN_00413630: the buttons held now (0 when the window is not in front).</summary>
     public int Buttons()
@@ -34,8 +50,37 @@ public sealed partial class ScnVm
         if ((mouse & 1) != 0) b |= 0x20;
         if ((mouse & 2) != 0) b |= 0x10;
         if ((mouse & 4) != 0) b |= 0x800;
+        if (JoypadOn() && m_host.Joystick is { } joy)
+        {
+            int j = 0;
+            if (joy.X < 0x2000) j |= 4;
+            if (joy.X > 0xDFFF) j |= 8;
+            if (joy.Y < 0x4000) j |= 1;
+            if (joy.Y > 0xDFFF) j |= 2;
+            if ((joy.Buttons & 1) != 0) j |= 0x20;
+            if ((joy.Buttons & 2) != 0) j |= 0x10;
+            // The engine notes that the joystick is in use (op_03F2 reads it; the mouse clears it)
+            if (j != 0)
+                EngineGlobals[0x13B4404] = 1;
+            b |= j;
+        }
         return b;
     }
+
+    private bool JoypadOn()
+    {
+        if (Joypad is { } on)
+            return on;
+        if (m_joypad < 0)
+        {
+            string section = RioSection();
+            m_joypad = IniInt("RIO.INI", section, "Joystick", IniInt("RIO.INI", section, "Joypad", 0)) != 0 ? 1 : 0;
+        }
+        return m_joypad != 0;
+    }
+
+    /// <summary>WM_MOUSEWHEEL: a turn of the wheel away from the user (delta > 0) or towards.</summary>
+    public void MouseWheel(int delta) => EngineGlobals[0x13B52B4] = delta >= 0 ? 1 : -1;
 
     /// <summary>FUN_00413810: the buttons with key repeat for one caller.</summary>
     public int RepeatButtons(int caller, int buttons)

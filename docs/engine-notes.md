@@ -179,22 +179,29 @@ game's own. It is split in two projects:
   (`Formats/`), the game folder (`Game/GameData.cs`, `PlayerFolders`), the SCN interpreter with
   its embedded x86 code (`Scripting/`). The platform supplies the window, input, sound and fonts
   through `IScnHost`, `IScnSound`, `IScnMusic`, `IScnFonts`, `IScnShapes`.
+- Both players run the interpreter on a thread of its own (Core `Game/GameThread.cs`), one
+  engine frame per frame the window draws (and at least one every 1/60 s), and take the picture
+  as BGRA; window events (focus, Alt+Enter, the wheel) are queued for that thread, the title and
+  the game's end posted back. Slow frames no longer hold up the window's input, moving or resizing.
 - `OpenShiina.App` (Avalonia, every platform) with the head `OpenShiina.Desktop` (Windows,
-  Linux, macOS): `GameSession` runs the interpreter on a thread of its own, one engine frame per
-  frame the window draws (every 1/60 s when it draws none), and hands over the picture as BGRA;
-  `GameView` shows it scaled and passes on keys, mouse and touch (`InputState`, Windows virtual
-  keys; `0457` moves the system pointer with `PointerWarp`: SetCursorPos, XWarpPointer,
+  Linux, macOS): `GameSession` holds the GameThread and the host;
+  `GameView` shows the picture scaled and passes on keys, mouse, touch, the wheel and joystick 0
+  (`SdlJoystick`: SDL3's first joystick, axes 0 / 1 and buttons 1 / 2, polled each frame the
+  window draws) (`InputState`, Windows virtual keys; `0457` moves the system pointer with `PointerWarp`: SetCursorPos, XWarpPointer,
   CGWarpMouseCursorPosition, none on Wayland and phones, where the scripts see the new position
   until the pointer moves); sound is the Core mixer (`Audio/ScnMixer.cs`) on SDL3
   (`SdlAudioOutput`); text is `SkiaFonts`: GDI's font calls on SkiaSharp, with a Japanese
   stand-in for a missing face, measured as MS Gothic (cell = em, ascent 0.859 em, average width
   half an em); shapes are Core's `Platform/DibShapes.cs` (GDI's Ellipse, worked out from Windows' pixels).
-- `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` runs the engine on the window's render event;
-  sound through the same mixer on NAudio's wave output; text and shapes with GDI (Core
-  `Platform/GdiFonts.cs`, `GdiShapes.cs`, Windows only), pixel for pixel as the games.
-  Keys and mouse buttons are read with GetAsyncKeyState when the scripts ask, as the engine
-  does: WPF's key events and `Mouse.LeftButton` change only after the frame (which runs in the
-  render event), so with slow frames a released Ctrl stayed held and skipping went on.
+- `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` lets the GameThread run a frame on each frame
+  WPF renders (Rendering raised twice for one RenderingTime counts once); sound through the same
+  mixer on NAudio's wave output; text and shapes with GDI (Core `Platform/GdiFonts.cs`,
+  `GdiShapes.cs`, Windows only), pixel for pixel as the games. Keys, mouse buttons and the
+  joystick are read as the engine reads them, when the scripts ask: GetAsyncKeyState,
+  joyGetPosEx(0) (a reading kept 4 ms; after a failure, no joystick for a second), the pointer
+  with GetCursorPos / ScreenToClient against the picture's place in the client area. Alt+Enter
+  and the wheel go to the scripts. (Before the thread, WPF's key events and `Mouse.LeftButton`
+  changed only after the frame, so with slow frames a released Ctrl stayed held.)
 - Both players open one sound output for the whole game (`ScnMixer`, 44.1 kHz stereo; sound
   buffers and music streams are voices of it). Opening a WaveOutEvent per sound took 17-33 ms
   (107 ms the first time) on the window's thread and made every hover sound drop frames.
@@ -221,12 +228,14 @@ Finding problems:
   in the title (on unless `0`); `log` also writes perf.log every second (slowest engine and
   picture times, main-loop rounds, heap in use, the costliest opcodes, C# routines and x86
   routines); timing every opcode halves the interpreter's speed. OPENSHIINA_X86JIT=0 keeps
-  embedded x86 on the interpreter; OPENSHIINA_DATA moves the save folder (tests).
+  embedded x86 on the interpreter; OPENSHIINA_DATA moves the save folder (tests);
+  OPENSHIINA_JOYPAD=0 hides the joystick from the scripts, =ini follows RIO.INI's Joypad.
 - **ScnBoot** (`tests/OpenShiina.ScnBoot`, `scnboot [folder] [frames] [picture folder] [every]`,
   60 frames a second of virtual time): SCNBOOT_PRESS="frame:vk[:frames],...",
   SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];...", SCNBOOT_SURFACES=1,2 (save more surfaces),
   SCNBOOT_INI="Key=value;..." (RIO.INI as the scripts read it, e.g. MovieMode=2),
   SCNBOOT_TRACE="from:to" (time and main-loop rounds of each frame), SCNBOOT_JIT=0|sync,
+  SCNBOOT_JOY="frame:x,y[:buttons[:frames]];..." (joystick 0, 0-65535, read whatever RIO.INI says),
   SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10).
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
@@ -547,6 +556,25 @@ the functions they call from the decompile. First findings:
   (FUN_00413810): a press at once, then after KeyRepeatDelay (300) every KeyRepeatSpeed (50 ms).
   `03E8 vk, v` GetAsyncKeyState, `03E9 v` buttons, `03EA v` with repeat, `03EB mask` waits for a
   release and then a press.
+- **Joystick** (same function, v2.47 and v2.49 alike): only when RIO.INI's Joypad (or Joystick,
+  read after it) is not 0, winmm `joyGetPosEx(0)` with X / Y / buttons: X < 0x2000 left, X >
+  0xDFFF right, Y < 0x4000 up (not 0x2000), Y > 0xDFFF down, button 1 0x20, button 2 0x10; any
+  of them sets 0x13B4404 ("the joystick is in use", read by `03F2` and the engine's own menus;
+  the window procedure clears it on mouse moves and clicks, sets it on keys). All eleven games
+  ship with Joypad=0; the players read the joystick anyway (OPENSHIINA_JOYPAD), ScnBoot as RIO.INI says.
+- **0x400** is never in the mask `03E9` gives, though START's button routine (0x1871D) keeps it
+  with the held bits (`and 1295`). The window procedure (0x435xxx, not in Ghidra's output) ORs
+  0x420 into the masks 0x13B43FC / 0x13B4400 on WM_LBUTTONDBLCLK (0x20 on a left press, 0x10
+  right, 0x800 middle); only the engine's built-in menus read those (FUN_00411770 / FUN_00411B40,
+  opcodes `0B72` / `0B86`, which none of the eleven games uses).
+- **Wheel**: WM_MOUSEWHEEL sets 0x13B52B4 to 1 (away from the user) or -1. Only text reads it:
+  with `_s` key 8 a turn ends the text's waits (FUN_00432F00), and `0083` clears it. START's
+  message window sets `_s13` (decide, Ctrl, wheel), but that only counts when the line is typed
+  by the engine (`0083` at 0x0486B, taken when b[240] & 2 is clear). In normal play b[240] & 2 is
+  set and START shows the line itself, a character at a time fading in (0x0579F: `00A0` /
+  `00A1` into a table of characters, drawn as sprites); it ends that on a click, Return or Ctrl
+  read with `03E9`, which has no wheel. So in Oreimo the wheel does nothing to the dialogue, in
+  the original as here (5,000 frames of the opening: `0083` never ran).
 - **Heap** (2026-10-07): GlobalAlloc / VirtualAlloc blocks come from ScnVm.Allocate and go back
   with ScnVm.Free: `04B1` and every opcode that puts a new picture into a slot (`04B0`, `055A`,
   `055C`, `04B2`) free the slot's picture - also a block `04B2` put there: START loads pictures

@@ -11,7 +11,10 @@
 // (default 10) and when the run ends. SCNBOOT_INI="Key=value;..." changes keys of RIO.INI as the
 // scripts read it (the file stays as it is). SCNBOOT_JIT=0 runs every embedded x86 routine without
 // a C# version on the interpreter instead of translating it (X86Jit); SCNBOOT_JIT=sync translates
-// a routine before its first call instead of in the background.
+// a routine before its first call instead of in the background. SCNBOOT_JOY="frame:x,y[:buttons[:frames]];..."
+// moves joystick 0 (0-65535, 32767 in the middle; buttons 1 and 2) for some frames (default 3)
+// and has the scripts read it whatever RIO.INI's Joypad says. SCNBOOT_WHEEL="frame,..." turns the
+// mouse wheel one notch (away from the user) at those frames.
 // The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
 
 using System.Text;
@@ -61,6 +64,8 @@ foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm
     if (System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m)
         set(int.Parse(m.Groups[1].Value));
 vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
+if (Environment.GetEnvironmentVariable("SCNBOOT_JOY") is { Length: > 0 })
+    vm.Joypad = true;
 if (Environment.GetEnvironmentVariable("SCNBOOT_JIT") is { } jit)
 {
     vm.JitX86 &= jit != "0";
@@ -79,6 +84,8 @@ int traceFrom = int.MaxValue, traceTo = -1;
 if (Environment.GetEnvironmentVariable("SCNBOOT_TRACE") is { } trace && trace.Split(':') is [var tf, var tt])
     (traceFrom, traceTo) = (int.Parse(tf), int.Parse(tt));
 
+var wheel = (Environment.GetEnvironmentVariable("SCNBOOT_WHEEL") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+    .Select(int.Parse).ToHashSet();
 int frame = 0;
 StartWatchdog();
 try
@@ -89,6 +96,8 @@ try
         host.Clock = (uint)(frame * 1000L / 60);
         host.Frame = frame;
         frameTime.Restart();
+        if (wheel.Contains(frame))
+            vm.MouseWheel(120);
         if (!vm.RunFrame())
         {
             Console.WriteLine($"The scripts quit after {frame} frames.");
@@ -318,6 +327,23 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     }
 
     public int MouseButtons => m_mouse.Where(m => m.From <= Frame && Frame <= m.To).Select(m => m.Buttons).FirstOrDefault();
+
+    // SCNBOOT_JOY: (first frame, last frame, the joystick then); in the middle at other times
+    private readonly List<(int From, int To, ScnJoystick Joystick)> m_joystick =
+        (Environment.GetEnvironmentVariable("SCNBOOT_JOY") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(item => item.Split(':'))
+            .Select(p =>
+            {
+                int from = int.Parse(p[0]);
+                var xy = p[1].Split(',');
+                return (from, from + (p.Length > 3 ? int.Parse(p[3]) : 3) - 1,
+                    new ScnJoystick(int.Parse(xy[0]), int.Parse(xy[1]), p.Length > 2 ? int.Parse(p[2]) : 0));
+            })
+            .ToList();
+
+    public ScnJoystick? Joystick =>
+        m_joystick.Count == 0 ? null
+        : m_joystick.Where(j => j.From <= Frame && Frame <= j.To).Select(j => (ScnJoystick?)j.Joystick).FirstOrDefault() ?? new ScnJoystick(32767, 32767, 0);
 
     public void SetTitle(string title) => Console.WriteLine($"  [title] {title}");
 

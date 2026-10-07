@@ -48,6 +48,11 @@ Settings for testing, as environment variables: `OPENSHIINA_PERF=0` hides the fr
 title (`=log` also writes `perf.log` to the save folder), `OPENSHIINA_X86JIT=0` runs embedded x86
 code on the interpreter only, `OPENSHIINA_WAYLAND=1` uses Avalonia's own Wayland backend on Linux.
 
+Game controllers: the first joystick or gamepad works as the engine reads it: the stick (or
+the first two axes) moves, button 1 decides, button 2 cancels. The games turn it off in their
+RIO.INI (Joypad=0) but the players read it anyway; `OPENSHIINA_JOYPAD=0` turns it off,
+`OPENSHIINA_JOYPAD=ini` follows RIO.INI.
+
 Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`); both
 players share them.
 
