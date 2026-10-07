@@ -863,7 +863,6 @@ public sealed partial class ScnVm
                 return 2;
             if (dst == vm.DisplaySurface)
             {
-                vm.ScreenInvalidated = true;
                 vm.FrameShown = true;
             }
             return 0;
@@ -908,7 +907,6 @@ public sealed partial class ScnVm
                 vm.CopyMemory(dst, src, bytes * width);
             if (dstSurface == vm.DisplaySurface)
             {
-                vm.ScreenInvalidated = true;
                 vm.FrameShown = true;
             }
             return 0;

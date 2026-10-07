@@ -9,7 +9,7 @@
 // - (slots op_0849 registers for single messages: no game uses them);
 // - then the engine's own handling: WM_CLOSE runs the slot of op_078A (0x488098) and closes the
 //   window only when its "end" is not 0 (no slot: it closes); WM_ACTIVATEAPP the slots of op_076C
-//   / 076D (losing / getting the focus); Alt+Enter the slot of op_0794; WM_TIMER the slot of op_0AF0.
+//   (getting the focus) / 076D (losing it); Alt+Enter the slot of op_0794; WM_TIMER the slot of op_0AF0.
 // op_0AFA / 0AFB start and stop the timers (SetTimer / KillTimer). WM_PAINT comes after op_07D0
 // (InvalidateRect), at the next pump of the message queue: the next frame here.
 
@@ -20,9 +20,9 @@ public enum ScnEvent
 {
     /// <summary>Alt+Enter (slot of op_0794, 0x48808C).</summary>
     ToggleFullScreen,
-    /// <summary>The window lost the focus (op_076C, 0x488090).</summary>
+    /// <summary>The window lost the focus (op_076D, 0x488094; WM_ACTIVATEAPP with wParam 0).</summary>
     Deactivate,
-    /// <summary>The window got the focus back (op_076D, 0x488094).</summary>
+    /// <summary>The window got the focus (op_076C, 0x488090; WM_ACTIVATEAPP with wParam 1).</summary>
     Activate,
 }
 
@@ -49,8 +49,8 @@ public sealed partial class ScnVm
     private static int EventGlobal(ScnEvent e) => e switch
     {
         ScnEvent.ToggleFullScreen => 0x48808C,
-        ScnEvent.Deactivate => 0x488090,
-        _ => 0x488094,
+        ScnEvent.Deactivate => 0x488094,
+        _ => 0x488090,
     };
 
     /// <summary>
@@ -146,17 +146,11 @@ public sealed partial class ScnVm
         return RunSlotSync(slot) != 0;
     }
 
-    // op_07D0 (InvalidateRect) asked for WM_PAINT
+    // An invalid part of the window waits for WM_PAINT
     private bool m_paintPending;
 
-    /// <summary>The messages the engine's queue would have for the window by now: WM_PAINT after op_07D0.</summary>
-    private void PumpMessages()
-    {
-        if (!m_paintPending)
-            return;
-        m_paintPending = false;
-        MessageHook(ScnMessage.Paint, 0, 0);
-    }
+    /// <summary>The messages the engine's queue would have for the window by now: WM_PAINT for an invalid part.</summary>
+    private void PumpMessages() => Paint();
 
     /// <summary>Runs the timer slot once for every timer that is due (WM_TIMER is not queued twice).</summary>
     private void FireTimers()

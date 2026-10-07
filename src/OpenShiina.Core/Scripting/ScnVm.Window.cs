@@ -49,7 +49,8 @@ public sealed partial class ScnVm
         Register(0x07BC, (vm, c, i) => vm.WindowMessage(c, i));
         Register(0x07BD, (vm, c, i) => vm.WindowMessage(c, i));
         // 07D1 UpdateWindow, 07D2 l, t, r, b: ValidateRect - nothing to do
-        Register(0x07D1, (vm, c, i) => 0);
+        // 07D1: UpdateWindow - WM_PAINT now if part of the window is invalid
+        Register(0x07D1, (vm, c, i) => { vm.Paint(); return 0; });
         Register(0x07D2, (vm, c, i) =>
         {
             foreach (var a in i.Args)
@@ -64,8 +65,8 @@ public sealed partial class ScnVm
             return 0;
         });
         // 0778 on: full screen on / off; 0776: full screen off
-        Register(0x0778, (vm, c, i) => { vm.m_host.SetFullScreen(vm.Value(c, i.Args[0]) != 0); return 0; });
-        Register(0x0776, (vm, c, i) => { vm.m_host.SetFullScreen(false); return 0; });
+        Register(0x0778, (vm, c, i) => { vm.m_host.SetFullScreen(vm.Value(c, i.Args[0]) != 0); vm.InvalidateWindow(); return 0; });
+        Register(0x0776, (vm, c, i) => { vm.m_host.SetFullScreen(false); vm.InvalidateWindow(); return 0; });
         // 079E: the window gets a maximise box
         Register(0x079E, (vm, c, i) => 0);
         // Engine settings kept in globals

@@ -168,21 +168,17 @@ public sealed class GameThread : IDisposable
         }
     }
 
-    /// <summary>The surface the engine shows, as BGRA, into the back buffer; then the buffers swap.</summary>
+    /// <summary>The window's picture (ScnVm.Window), as BGRA, into the back buffer; then the buffers swap.</summary>
     private void CopyFrame()
     {
-        int surface = m_vm.DisplaySurface;
-        int pixels = m_vm.SurfaceField(surface, 2);
-        int w = Math.Min(m_vm.SurfaceField(surface, 7), Width), h = Math.Min(m_vm.SurfaceField(surface, 8), Height);
-        int pitch = m_vm.SurfaceField(surface, 10), bytes = m_vm.SurfaceField(surface, 9) >> 3;
-        if (pixels == 0 || w <= 0 || h <= 0 || bytes is not (3 or 4))
-            return;
-        var row = new byte[w * bytes];
+        var window = m_vm.Window;
+        int stride = m_vm.ScreenWidth * 3;
+        int w = Math.Min(m_vm.ScreenWidth, Width), h = Math.Min(m_vm.ScreenHeight, Height);
         for (int y = 0; y < h; y++)
         {
-            m_vm.ReadBytes(pixels + y * pitch, row);
+            var row = window.Slice(y * stride, w * 3);
             var dst = m_back.AsSpan(y * Width * 4, w * 4);
-            for (int x = 0, s = 0, d = 0; x < w; x++, s += bytes, d += 4)
+            for (int x = 0, s = 0, d = 0; x < w; x++, s += 3, d += 4)
             {
                 dst[d] = row[s];
                 dst[d + 1] = row[s + 1];

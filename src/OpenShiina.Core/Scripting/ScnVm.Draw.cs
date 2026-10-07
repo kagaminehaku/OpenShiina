@@ -187,7 +187,7 @@ public sealed partial class ScnVm
             }
             if (vm.Value(c, i.Args[1]) != 0)
             {
-                vm.ScreenInvalidated = true;
+                vm.InvalidateWindow();
                 vm.FrameShown = true;
             }
             return 0;
@@ -237,10 +237,7 @@ public sealed partial class ScnVm
             int b = (srcB < 0 ? srcB & 0xFF : vm.SurfaceField(srcB & 0xFF, 2)) + offsetB;
             vm.BlendRows(dst, a, b, v[11], v[12], width, rows, pitch);
             if (dstSurface == vm.DisplaySurface)
-            {
-                vm.ScreenInvalidated = true;
                 vm.FrameShown = true;
-            }
             return 0;
         });
         // 0568 dst, A, B (-1: none), rule, t: a rule transition between surfaces (FUN_004182E0)
@@ -256,18 +253,16 @@ public sealed partial class ScnVm
                 vm.SurfaceField(rule, 2), pixels, (int)t);
             if (dst == vm.DisplaySurface)
             {
-                vm.ScreenInvalidated = true;
+                vm.InvalidateWindow();
                 vm.FrameShown = true;
             }
             return 0;
         });
-        // 07D0 l, t, r, b: InvalidateRect - the window shows the display surface again
+        // 07D0 l, t, r, b: InvalidateRect - the next WM_PAINT shows that part of the display surface
         Register(0x07D0, (vm, c, i) =>
         {
-            for (int k = 0; k < 4; k++)
-                vm.Value(c, i.Args[k]);
-            vm.m_paintPending = true;
-            vm.ScreenInvalidated = true;
+            int l = vm.Value(c, i.Args[0]), t = vm.Value(c, i.Args[1]), r = vm.Value(c, i.Args[2]), b = vm.Value(c, i.Args[3]);
+            vm.InvalidateWindow(l, t, r, b);
             vm.FrameShown = true;
             return 0;
         });

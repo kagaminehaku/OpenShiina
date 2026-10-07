@@ -59,10 +59,10 @@ public sealed partial class ScnVm
     // The local buffer of "_i/text/"
     private int m_indentScratch;
 
-    /// <summary>The surface the window shows (0x13B43E4); text drawn into it invalidates the window.</summary>
+    /// <summary>The surface WM_PAINT shows in the window (0x13B43E4).</summary>
     public int DisplaySurface => EngineGlobals.GetValueOrDefault(0x13B43E4);
 
-    /// <summary>Text was drawn into the shown surface (InvalidateRect): the host should present it.</summary>
+    /// <summary>The window's picture (Window) changed: the host should present it (and clear this).</summary>
     public bool ScreenInvalidated { get; set; }
 
     public int RecordAddress(int index) => TextRegion + index * RecordSize;
@@ -1238,9 +1238,10 @@ public sealed partial class ScnVm
         if (restore)
             UseColor(rec, OColor);
         DrawGlyph(rec, surface, font, x, y, ch, length);
+        // InvalidateRect of the character's rectangle (FUN_00417560)
         if (invalidate && G(rec, RLayer) == -1)
         {
-            ScreenInvalidated = true;
+            InvalidateWindow(G(rec, RRect), G(rec, RRect + 1), G(rec, RRect + 2), G(rec, RRect + 3));
             FrameShown = true;
         }
     }
@@ -1463,10 +1464,19 @@ public sealed partial class ScnVm
         int rec = CurrentRecord(c);
         int surface = c.TextSurface;
         S(rec, RContext, c.Slot);
+        int at = G(rec, RPtr);
         TextStep(rec, surface is >= 0 and < SurfaceCount ? surface : -1, surface == DisplaySurface);
+        if (G(rec, RPtr) != at)
+            m_textWentOn = true;
         if (G(rec, RState) == 0)
+        {
             c.Flags &= ~8;
+            m_textWentOn = true;
+        }
     }
+
+    // A task's 0083 text went on in this round without waiting for time
+    private bool m_textWentOn;
 
     private void RegisterText()
     {

@@ -183,7 +183,8 @@ game's own. It is split in two projects:
   engine frame per frame the window draws (and at least one every 1/60 s), and take the picture
   as BGRA; window events and messages (focus, Alt+Enter, keys, mouse buttons, the wheel) are
   queued for that thread, the title and the game's end posted back. Slow frames no longer hold up
-  the window's input, moving or resizing. The X button sends WM_CLOSE to the scripts first
+  the window's input, moving or resizing. They show the window's picture (ScnVm.Window: what
+  WM_PAINT has put there, see section 10), not the display surface. The X button sends WM_CLOSE to the scripts first
   (`GameThread.RequestClose`): the window closes when they let it (START saves its system data
   then), and at once when the game no longer runs or on a second try before they answer.
 - `OpenShiina.App` (Avalonia, every platform) with the head `OpenShiina.Desktop` (Windows,
@@ -240,7 +241,9 @@ Finding problems:
   SCNBOOT_TRACE="from:to" (time and main-loop rounds of each frame), SCNBOOT_JIT=0|sync,
   SCNBOOT_JOY="frame:x,y[:buttons[:frames]];..." (joystick 0, 0-65535, read whatever RIO.INI says),
   SCNBOOT_WHEEL="frame[:-],..." (a notch away from / towards the user), SCNBOOT_CLOSE=frame
-  (WM_CLOSE; presses and clicks are sent as window messages too),
+  (WM_CLOSE; presses and clicks are sent as window messages too), SCNBOOT_FOCUS="frame:0|1,..."
+  (focus lost / back), SCNBOOT_HOT="from:to" (every instruction run in those frames, by module
+  and offset); frame_NNNN.png is the window's picture (ScnVm.Window), _sK the surfaces asked for,
   SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10).
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
@@ -480,7 +483,10 @@ the functions they call from the decompile. First findings:
   by the table level * v / 255; 256 or the last level again: nothing).
 - Window events: each runs a slot to its end (FUN_0042BF60): WM_TIMER the slot of `0AF0`
   (Oreimo 193, every 100 ms from `0AFA id, ms, v`; `0AFB` KillTimer), Alt+Enter `0794`
-  (252), focus lost `076C` (253, pauses), focus back `076D` (254), WM_CLOSE `078A` (255), and
+  (252), focus back `076C` (253: music on, play time counted again), focus lost `076D` (254:
+  music paused; 0x488090 runs in WM_ACTIVATEAPP's active branch, 0x488094 in the other - they
+  were swapped here until 2026-10-07, so music stopped when the window got the focus back),
+  WM_CLOSE `078A` (255), and
   every message first `07E4` (248; see "Window messages" below). `00DD` mounts each WAR archive; `0A8D` detaches the IME.
 - The main loop is not tied to frames: it pumps messages and runs every task once per round
   (`0033` makes tasks yield after every instruction, `0032` ends that); pictures reach the
@@ -593,6 +599,25 @@ the functions they call from the decompile. First findings:
   `CloseWindow`; WM_PAINT is sent at the start of the frame after `07D0`, WM_TIMER before the
   timer slot. Checked in ScnBoot: a turn away opens the backlog, 'S' skips to the first choice,
   'A' turns AUTO on, closing writes the save file (it did not before).
+- **The window's picture** (ScnVm.Paint.cs): the engine draws into the display surface
+  (0x13B43E4, a DIB) and the window shows it only where it is repainted. With RIO.INI's `Render`
+  unset (all eleven games; 0x487F30 = -1) WM_PAINT is GDI (FUN_0040DB10: BeginPaint, the
+  surface blitted, EndPaint), so only the invalid region changes (Render 1-3 = DirectDraw /
+  Direct3D / OpenGL blit all of it). What invalidates: `07D0 l, t, r, b`; `04C6 n, 1`, `0568`
+  and `056C` into the display surface (all of the window); `0564` / `0566` (they draw on the
+  window and invalidate their rectangle); text drawn by the engine into the display surface
+  without a layer (the character's rectangle, FUN_00417560); full screen on / off. `07D1` is
+  UpdateWindow (WM_PAINT at once); otherwise WM_PAINT comes at the next pump of the queue, after
+  the round. Sprites, fades (`04F6`), BitBlt / StretchBlt, fills and movies only draw into
+  surfaces. The hosts show ScnVm.Window, so what the original never put on the screen stays
+  off it: the save screen's cursor (START 0x2BE6C, frame 2230 of slot 20, 49..365 x 49..153)
+  is drawn after the slot (57..357 x 57..145) is composed again, and only the slot is
+  invalidated - showing the whole surface left an orange ring after the pointer moved away.
+- **Text over rounds**: `0083` text goes on a character a round, and the engine's rounds take
+  no time; the backlog draws its lines again every frame, so a frame that ended at the
+  `07D0` showed them half drawn (the first line came and went). RunFrame now goes on with rounds
+  while a task's text goes on without waiting for time (text that waits between characters
+  still appears over time).
 - **Wheel** in the engine: WM_MOUSEWHEEL also sets 0x13B52B4 to 1 (away from the user) or -1,
   read only by text: with `_s` key 8 a turn ends the text's waits (FUN_00432F00), and `0083`
   clears it. START's message window sets `_s13` (decide, Ctrl, wheel), but that only counts

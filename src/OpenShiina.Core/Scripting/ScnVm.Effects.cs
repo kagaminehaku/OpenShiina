@@ -46,14 +46,23 @@ public sealed partial class ScnVm
         return true;
     }
 
-    /// <summary>Drawing into the shown surface shows it (InvalidateRect).</summary>
+    /// <summary>
+    /// Drawing into the display surface ends the host frame; the window shows it only where it is
+    /// repainted (ScnVm.Paint).
+    /// </summary>
     private void Shown(int surface)
     {
         if (surface == DisplaySurface)
-        {
-            ScreenInvalidated = true;
             FrameShown = true;
-        }
+    }
+
+    /// <summary>The effects that paint the window themselves (0564, 0566, 056C) invalidate what they drew.</summary>
+    private void ShownOnWindow(int surface, int l, int t, int r, int b)
+    {
+        if (surface != DisplaySurface)
+            return;
+        InvalidateWindow(l, t, r, b);
+        FrameShown = true;
     }
 
     /// <summary>FillRect of a surface with a colour (0x00BBGGRR); 32-bit pixels get 0 in their fourth byte.</summary>
@@ -304,7 +313,7 @@ public sealed partial class ScnVm
         if (size < 1)
         {
             BitBlt(dst, d[0], d[1], d[2] - d[0], d[3] - d[1], src, s[0], s[1]);
-            Shown(dst);
+            ShownOnWindow(dst, x, y, x + w, y + h);
             return;
         }
         int pitch = SurfaceField(dst, 10), bytes = SurfaceField(dst, 9) >> 3;
@@ -336,11 +345,7 @@ public sealed partial class ScnVm
             }
             sampleRow += size;
         }
-        if (dst == 0)
-        {
-            ScreenInvalidated = true;
-            FrameShown = true;
-        }
+        ShownOnWindow(dst, x, y, x + w, y + h);
     }
 
     /// <summary>
@@ -396,7 +401,7 @@ public sealed partial class ScnVm
                 }
             }
         }
-        Shown(dst);
+        ShownOnWindow(dst, x, y, x + w, y + h);
     }
 
     /// <summary>
@@ -444,7 +449,8 @@ public sealed partial class ScnVm
                 WriteBytes(br, pixel);
             }
         }
-        Shown(dst);
+        // InvalidateRect(NULL): all of the window
+        ShownOnWindow(dst, 0, 0, ScreenWidth, ScreenHeight);
     }
 
     /// <summary>v / 256 rounded towards 0 (cdq / and edx, 0FFh / add / sar 8).</summary>

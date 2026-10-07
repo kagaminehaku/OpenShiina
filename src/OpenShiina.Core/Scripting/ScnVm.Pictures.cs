@@ -377,7 +377,6 @@ public sealed partial class ScnVm
             vm.FillMemory(vm.SurfaceField(n, 2), vm.ScreenWidth * vm.ScreenHeight * (vm.Bpp >> 3), 0);
             if (n == 0)
             {
-                vm.ScreenInvalidated = true;
                 vm.FrameShown = true;
             }
             return 0;

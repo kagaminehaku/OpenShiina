@@ -329,7 +329,6 @@ public sealed partial class ScnVm
             vm.BitBlt(dst, v[1], v[2], v[3], v[4], src, v[6], v[7]);
             if (dst == vm.DisplaySurface)
             {
-                vm.ScreenInvalidated = true;
                 vm.FrameShown = true;
             }
             return 0;

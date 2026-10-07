@@ -561,19 +561,29 @@ public sealed partial class ScnVm
     /// <summary>
     /// Runs rounds of the engine's main loop (every running task until it yields) until the
     /// scripts show a picture or <paramref name="maxRounds"/> have run. False once the game quits.
+    /// A task's 0083 text goes on a character a round; text that does not wait for time is
+    /// finished before the frame ends - the engine's rounds take no time, so the window never
+    /// shows it half drawn (the backlog draws its lines again each frame).
     /// </summary>
     public bool RunFrame(int maxRounds = 20000)
     {
         MakePages();
         PumpGraphMovies();
+        // The window is shown at start: all of it waits for its first WM_PAINT
+        if (m_window == null)
+            InvalidateWindow();
         PumpMessages();
         FrameShown = false;
         FrameRounds = 0;
-        for (int round = 0; round < maxRounds && !FrameShown && !QuitRequested; round++)
+        for (int round = 0; round < maxRounds && !QuitRequested; round++)
         {
             FrameRounds = round + 1;
+            m_textWentOn = false;
             RunRound();
             FireTimers();
+            PumpMessages();
+            if (FrameShown && !m_textWentOn)
+                break;
         }
         return !QuitRequested;
     }

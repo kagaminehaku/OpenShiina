@@ -7,7 +7,7 @@
 // holds virtual keys down (default 3 frames), e.g. "700:0x0D" presses Return at frame 700.
 // SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];..." puts the mouse at (x, y) from that frame on and
 // holds buttons (1 left, 2 right, 4 middle; default none) for some frames (default 3).
-// With a picture folder, the surface the window shows is saved as frame_NNNN.png every n frames
+// With a picture folder, the window's picture is saved as frame_NNNN.png every n frames
 // (default 10) and when the run ends. SCNBOOT_INI="Key=value;..." changes keys of RIO.INI as the
 // scripts read it (the file stays as it is). SCNBOOT_JIT=0 runs every embedded x86 routine without
 // a C# version on the interpreter instead of translating it (X86Jit); SCNBOOT_JIT=sync translates
@@ -17,6 +17,7 @@
 // mouse wheel one notch away from the user (":-" towards) at those frames. Presses and clicks are
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
+// SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames.
 // The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
 
 using System.Text;
@@ -88,6 +89,12 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_TRACE") is { } trace && trace.Sp
 
 var wheel = (Environment.GetEnvironmentVariable("SCNBOOT_WHEEL") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
     .ToDictionary(w => int.Parse(w.Split(':')[0]), w => w.EndsWith(":-") ? -120 : 120);
+var focus = (Environment.GetEnvironmentVariable("SCNBOOT_FOCUS") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+    .ToDictionary(f => int.Parse(f.Split(':')[0]), f => f.EndsWith(":1"));
+// SCNBOOT_HOT="from:to": every instruction run in those frames (slot, module, offset, opcode, times)
+int hotFrom = int.MaxValue, hotTo = -1;
+if (Environment.GetEnvironmentVariable("SCNBOOT_HOT") is { } hotRange && hotRange.Split(':') is [var hf, var ht])
+    (hotFrom, hotTo) = (int.Parse(hf), int.Parse(ht));
 int closeAt = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_CLOSE"), out int ca) ? ca : -1;
 int frame = 0;
 StartWatchdog();
@@ -102,6 +109,19 @@ try
         foreach (var (message, wParam) in host.Messages())
             vm.WindowMessage(message, wParam, message is >= ScnMessage.LButtonDown and <= ScnMessage.MButtonUp
                 ? ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y) : ScnMessage.Key(0, message == ScnMessage.KeyDown, false));
+        if (frame == hotFrom)
+            vm.HotSpots = new();
+        if (frame == hotTo + 1 && vm.HotSpots is { } hotSpots)
+        {
+            vm.HotSpots = null;
+            foreach (var ((slot, codeBase, offset, op), times) in hotSpots.OrderBy(h => h.Key.Base).ThenBy(h => h.Key.Offset))
+                Console.WriteLine($"  [hot] slot {slot} {vm.DescribeAddress(codeBase + offset)} {op:X4} x{times}");
+        }
+        if (focus.TryGetValue(frame, out bool active))
+        {
+            Console.WriteLine($"  [focus] frame {frame}: {(active ? "got" : "lost")}");
+            vm.Notify(active ? ScnEvent.Activate : ScnEvent.Deactivate);
+        }
         if (wheel.TryGetValue(frame, out int delta))
             vm.WindowMessage(ScnMessage.MouseWheel, delta << 16, ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y));
         if (frame == closeAt)
@@ -240,7 +260,9 @@ void PrintStall(int current, double seconds)
 // The surface the window shows, as the player would see it (and the others with SCNBOOT_SURFACES=1,2,..)
 void SaveScreen(int n)
 {
-    SaveSurface(vm.DisplaySurface, $"frame_{n:D4}.png");
+    // The window's picture (what WM_PAINT has put there), then any surfaces asked for
+    var window = new OpenShiina.Formats.PixelImage(vm.ScreenWidth, vm.ScreenHeight, OpenShiina.Formats.PixelLayout.Bgr24, vm.Window.ToArray());
+    File.WriteAllBytes(Path.Combine(pictures!, $"frame_{n:D4}.png"), OpenShiina.Formats.PngEncoder.Encode(window));
     foreach (var extra in (Environment.GetEnvironmentVariable("SCNBOOT_SURFACES") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
         SaveSurface(int.Parse(extra), $"frame_{n:D4}_s{extra}.png");
 }
@@ -416,8 +438,8 @@ sealed class TestMusic : IScnMusic
     public void Close(int stream) => Console.WriteLine($"  [music] close {stream}");
     public void Play(int stream, bool loop) => Console.WriteLine($"  [music] play {stream}{(loop ? " looping" : "")}");
     public void Stop(int stream) { }
-    public void Pause(int stream) { }
-    public void Resume(int stream) { }
+    public void Pause(int stream) => Console.WriteLine($"  [music] pause {stream}");
+    public void Resume(int stream) => Console.WriteLine($"  [music] resume {stream}");
     public void SetVolume(int stream, int volume) => Console.WriteLine($"  [music] volume {stream} {volume}");
     public bool IsPlaying(int stream) => true;
 }
