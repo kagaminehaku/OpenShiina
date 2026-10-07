@@ -94,6 +94,17 @@ public sealed partial class ScnVm
             vm.CreateSurface(index, vm.ScreenWidth, vm.ScreenHeight, vm.Bpp, flags);
             return 0;
         });
+        // 0548 n, w, h, bpp, flags: surface n of that size (FUN_0041E7D0 -> FUN_00412230, as 0546
+        // with the screen's size); used by START's movie on its own (function 207) and v2.50's EFCLIB
+        Register(0x0548, (vm, c, i) =>
+        {
+            int index = vm.Value(c, i.Args[0]), width = vm.Value(c, i.Args[1]), height = vm.Value(c, i.Args[2]);
+            int bpp = vm.Value(c, i.Args[3]), flags = vm.Value(c, i.Args[4]);
+            if (index is < 0 or >= SurfaceCount || width <= 0 || height <= 0 || bpp is not (24 or 32))
+                return 2;
+            vm.CreateSurface(index, width, height, bpp, flags);
+            return 0;
+        });
         // 0547 n: free surface n (when it was made)
         Register(0x0547, (vm, c, i) =>
         {

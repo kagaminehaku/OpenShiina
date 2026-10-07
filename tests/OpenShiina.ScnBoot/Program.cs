@@ -57,7 +57,7 @@ using var data = GameData.Open(folder, scheme);
 Console.WriteLine($"{scheme.Name}, engine v{version}, first script {start}");
 
 // Save data of the test run: a temporary folder, never the player's real data
-string saves = Path.Combine(Path.GetTempPath(), "openshiina-scnboot", scheme.Name);
+string saves = Path.Combine(Path.GetTempPath(), "openshiina-scnboot", PlayerFolders.FolderName(scheme.Name));
 Directory.CreateDirectory(saves);
 var host = new Host(data, saves);
 var vm = new ScnVm(ScnOpcodes.ForVersion(version), host)

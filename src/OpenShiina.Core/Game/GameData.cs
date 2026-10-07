@@ -154,6 +154,9 @@ public static class PlayerFolders
         Environment.GetEnvironmentVariable("OPENSHIINA_DATA") is { Length: > 0 } root ? root
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenShiina");
 
-    public static string For(string kind, string game) =>
-        Path.Combine(Root, kind, string.Concat(game.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)));
+    public static string For(string kind, string game) => Path.Combine(Root, kind, FolderName(game));
+
+    /// <summary>A game's name as a folder name: characters a file name cannot hold become '_' ("Re: Rem Plus" -> "Re_ Rem Plus").</summary>
+    public static string FolderName(string game) =>
+        string.Concat(game.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 }
