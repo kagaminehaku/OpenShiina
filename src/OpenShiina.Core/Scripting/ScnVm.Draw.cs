@@ -175,6 +175,8 @@ public sealed partial class ScnVm
         Register(0x04C6, (vm, c, i) =>
         {
             int n = vm.Value(c, i.Args[0]);
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"04C6 surface {n}, show {vm.Value(c, i.Args[1])}");
             if (n != 0)
             {
                 int level = vm.EngineGlobals.GetValueOrDefault(0x4880D8, 0x100);
@@ -201,6 +203,8 @@ public sealed partial class ScnVm
             var v = new int[13];
             for (int k = 0; k < 13; k++)
                 v[k] = vm.Value(c, i.Args[k]);
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"04F6 into surface {v[0]} at {v[1]},{v[2]} {v[9]}x{v[10]}: surface {v[3]} and {v[6]:X}, {v[11]} / {v[12]}");
             int dstSurface = v[0], srcA = v[3], srcB = v[6];
             int l = v[1], t = v[2], r = v[1] + v[9], btm = v[2] + v[10];
             int ax = v[4], ay = v[5], bx = v[7], by = v[8];

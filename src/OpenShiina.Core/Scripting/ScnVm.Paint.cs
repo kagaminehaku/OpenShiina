@@ -23,6 +23,7 @@ public sealed partial class ScnVm
     /// <summary>InvalidateRect: the rectangle (clipped to the window) is repainted from the display surface by the next WM_PAINT.</summary>
     public void InvalidateWindow(int l, int t, int r, int b)
     {
+        Trace?.Add($"f{m_frameNumber} r{m_rounds} invalidate {l},{t}-{r},{b}");
         l = Math.Max(l, 0);
         t = Math.Max(t, 0);
         r = Math.Min(r, ScreenWidth);
@@ -50,9 +51,11 @@ public sealed partial class ScnVm
         // A slot that takes WM_PAINT leaves the region invalid: Windows sends it again
         if (MessageHook(ScnMessage.Paint, 0, 0))
         {
+            Trace?.Add($"f{m_frameNumber} r{m_rounds} WM_PAINT taken by the message slot, {m_invalid.Count} rectangles left invalid");
             m_paintPending = true;
             return;
         }
+        Trace?.Add($"f{m_frameNumber} r{m_rounds} WM_PAINT: {m_invalid.Count} rectangles from surface {DisplaySurface}");
         RunPaintSlot(0x4880B0);
         var window = m_window ??= new byte[ScreenWidth * ScreenHeight * 3];
         int surface = DisplaySurface;

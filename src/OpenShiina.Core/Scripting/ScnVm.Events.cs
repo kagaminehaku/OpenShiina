@@ -125,6 +125,8 @@ public sealed partial class ScnVm
         Write32(StackAddress(slot, c.Sp + 3), lParam);
         int result = RunSlotSync(slot);
         c.Sp += 4;
+        if (result != 0 && message != ScnMessage.Paint)
+            Trace?.Add($"f{m_frameNumber} r{m_rounds} message slot {slot} ended {result} on {message:X4}");
         return result != 0;
     }
 
@@ -134,7 +136,9 @@ public sealed partial class ScnVm
     /// </summary>
     public void WindowMessage(int message, int wParam, int lParam)
     {
-        if (MessageHook(message, wParam, lParam))
+        bool taken = MessageHook(message, wParam, lParam);
+        Trace?.Add($"f{m_frameNumber} r{m_rounds} message {message:X4} {wParam:X} {lParam:X}{(taken ? " taken" : "")}");
+        if (taken)
             return;
         if (message == ScnMessage.MouseWheel)
             MouseWheel((short)(wParam >> 16));

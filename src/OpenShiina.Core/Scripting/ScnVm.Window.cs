@@ -74,7 +74,13 @@ public sealed partial class ScnVm
         Register(0x076D, (vm, c, i) => vm.SetGlobal(0x488094, c, i));
         Register(0x078A, (vm, c, i) => vm.SetGlobal(0x488098, c, i));
         Register(0x0794, (vm, c, i) => vm.SetGlobal(0x48808C, c, i));
-        Register(0x07E4, (vm, c, i) => vm.SetGlobal(0x4880A8, c, i));
+        Register(0x07E4, (vm, c, i) =>
+        {
+            int result = vm.SetGlobal(0x4880A8, c, i);
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"07E4 message slot {vm.EngineGlobals.GetValueOrDefault(0x4880A8, -1)}");
+            return result;
+        });
         Register(0x0136, (vm, c, i) => vm.SetGlobal(0x4880D0, c, i));
     }
 

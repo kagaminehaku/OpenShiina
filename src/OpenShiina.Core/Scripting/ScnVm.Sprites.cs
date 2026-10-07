@@ -880,6 +880,8 @@ public sealed partial class ScnVm
             int w = vm.Value(c, i.Args[3]), h = vm.Value(c, i.Args[4]);
             int srcSurface = vm.Value(c, i.Args[5]);
             int sx = vm.Value(c, i.Args[6]), sy = vm.Value(c, i.Args[7]);
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"04E2 into surface {dstSurface} at {x},{y} {w}x{h} from surface {srcSurface} at {sx},{sy}");
             int l = x, t = y, r = x + w, b = y + h;
             int dw = vm.SurfaceField(dstSurface, 7), dh = vm.SurfaceField(dstSurface, 8);
             if (dw < l || dh < t)
