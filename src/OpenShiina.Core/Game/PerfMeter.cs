@@ -26,7 +26,10 @@ public sealed class PerfMeter : IDisposable
         m_name = name;
         m_log = log;
         if (log != null)
+        {
             vm.OpTimes = new();
+            log.WriteLine($"Drawing on {(vm.Accelerator is { } gpu ? $"the GPU: {gpu.Name}" : "the CPU")}");
+        }
     }
 
     /// <summary>A meter as OPENSHIINA_PERF asks for, or null when it is "0".</summary>

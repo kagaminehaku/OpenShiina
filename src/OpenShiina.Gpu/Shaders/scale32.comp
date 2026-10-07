@@ -1,0 +1,82 @@
+// scale32 (Oreimo START 78380, ScnVm.Scale32.cs) on the GPU: one invocation a destination pixel.
+// The tables of rows and columns come from the CPU (ScnVm.ScaleTable, the x86 code's integer
+// steps); here each destination pixel adds up its source pixels, each times the pmaddwd weight of
+// its row and column. The MMX code sums in 16-bit lanes that wrap; sums modulo 65536 do not
+// depend on their order, so adding pixel by pixel in 32 bits and keeping the low 16 bits gives
+// the same bytes.
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// The source rows the destination needs, `width` pixels each
+layout(std430, binding = 0) readonly buffer Source { uint source[]; };
+// Per destination row / column: first source row / column, flags (0x80 a partly covered first
+// one, 0x40 a partly covered last one), whole ones in between, the two partial weights
+layout(std430, binding = 1) readonly buffer Rows { int rows[]; };
+layout(std430, binding = 2) readonly buffer Columns { int columns[]; };
+layout(std430, binding = 3) writeonly buffer Output { uint pixels[]; };
+
+layout(push_constant) uniform Parameters
+{
+    int rowCount;
+    int columnCount;
+    int width;
+    uint fullRow;
+    uint fullColumn;
+};
+
+// pmaddwd of [a, a] and [b, b] as signed 16-bit words, >>> 21
+uint weight(uint a, uint b)
+{
+    int d = (int(a << 16) >> 16) * (int(b << 16) >> 16) + (int(a) >> 16) * (int(b) >> 16);
+    return uint(d) >> 21;
+}
+
+uvec4 sums;
+int notOpaque;
+
+void addPixel(int at, uint w, bool count)
+{
+    uint p = source[at];
+    sums += uvec4(p & 0xFFu, (p >> 8) & 0xFFu, (p >> 16) & 0xFFu, p >> 24) * w;
+    if (count && (p >> 24) != 0xFFu)
+        notOpaque++;
+}
+
+// One source row of the destination pixel, its row weight wy. skipShared leaves the partial first
+// column out of the opaque test for every column but the first (the general loop's register copy
+// of the x86 code; see ScnVm.Scale32.cs)
+void addRow(int y, uint wy, int c, int x0, int flags, int count, uint first, uint last, bool skipShared)
+{
+    int at = y * width + x0;
+    if ((flags & 0x80) != 0)
+        addPixel(at++, weight(first, wy), !(skipShared && c > 0));
+    uint whole = weight(fullColumn, wy);
+    for (int k = 0; k < count; k++)
+        addPixel(at++, whole, true);
+    if ((flags & 0x40) != 0)
+        addPixel(at, weight(last, wy), true);
+}
+
+void main()
+{
+    int c = int(gl_GlobalInvocationID.x), r = int(gl_GlobalInvocationID.y);
+    if (c >= columnCount || r >= rowCount)
+        return;
+    int y = rows[r * 5], rowFlags = rows[r * 5 + 1], rowWhole = rows[r * 5 + 2];
+    uint rowFirst = uint(rows[r * 5 + 3]), rowLast = uint(rows[r * 5 + 4]);
+    int x0 = columns[c * 5], flags = columns[c * 5 + 1], count = columns[c * 5 + 2];
+    uint first = uint(columns[c * 5 + 3]), last = uint(columns[c * 5 + 4]);
+    bool ownLoop = rowFlags == 0xC0 && rowWhole <= 1;
+    sums = uvec4(0u);
+    notOpaque = 0;
+    if ((rowFlags & 0x80) != 0)
+        addRow(y++, rowFirst, c, x0, flags, count, first, last, !ownLoop);
+    for (int k = 0; k < rowWhole; k++)
+        addRow(y++, fullRow, c, x0, flags, count, first, last, false);
+    if ((rowFlags & 0x40) != 0)
+        addRow(y, rowLast, c, x0, flags, count, first, last, !ownLoop);
+    uvec4 b = (sums >> 8) & 0xFFu;
+    if (notOpaque == 0)
+        b.w = 0xFFu;
+    pixels[r * columnCount + c] = b.x | (b.y << 8) | (b.z << 16) | (b.w << 24);
+}

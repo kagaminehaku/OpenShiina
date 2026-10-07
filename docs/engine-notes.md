@@ -257,7 +257,22 @@ Finding problems:
   (WM_CLOSE; presses and clicks are sent as window messages too), SCNBOOT_FOCUS="frame:0|1,..."
   (focus lost / back), SCNBOOT_HOT="from:to" (every instruction run in those frames, by module
   and offset); frame_NNNN.png is the window's picture (ScnVm.Window), _sK the surfaces asked for,
-  SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10).
+  SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10),
+  SCNBOOT_GPU=1 (the GPU mode; with SCNBOOT_VERIFY_NATIVE=1 the GPU's bytes are checked against
+  the x86 code).
+- `tools/ShaderBuild`: compiles the GPU mode's GLSL compute shaders (src/OpenShiina.Gpu/Shaders,
+  *.comp) to SPIR-V (*.spv, kept in the repository and embedded) with shaderc.
+- **The GPU mode** (`IScnAccelerator`, `src/OpenShiina.Gpu`; 2026-10-07): Vulkan 1.0 compute on
+  the best real GPU (discrete before integrated, never a software one). A C# routine keeps its
+  tables and its reads and writes of the scripts' memory, gathers what the shader needs straight
+  into mapped buffers (host-visible, cached: on a desktop card the shader reads them over PCIe,
+  cheaper than the CPU writing into the card's memory) and writes the output back. So far
+  scale32 (Shaders/scale32.comp: one invocation a destination pixel; the MMX code's 16-bit sums
+  wrap, and sums modulo 65536 do not depend on their order, so the bytes are the same): Re: Rem
+  Plus's zoom (1600 x 900 to 1280 x 720) 7.4 ms a call on the CPU, about 2.5 ms on an RTX 2070
+  (gather 0.9, shader 1.0, write back 0.6). Routines that only mix pixels (blend32, rule alpha)
+  gain little while every picture is copied there and back; the compositor (04C4) needs the
+  pictures kept on the GPU first.
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
 

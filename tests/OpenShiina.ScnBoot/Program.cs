@@ -68,6 +68,12 @@ foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm
     if (System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m)
         set(int.Parse(m.Groups[1].Value));
 vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
+// SCNBOOT_GPU=1: the GPU mode (Vulkan)
+if (Environment.GetEnvironmentVariable("SCNBOOT_GPU") == "1")
+{
+    vm.Accelerator = OpenShiina.Gpu.VulkanAccelerator.TryCreate(out string? gpuError);
+    Console.WriteLine(vm.Accelerator != null ? $"GPU: {vm.Accelerator.Name}" : $"No GPU: {gpuError}");
+}
 if (Environment.GetEnvironmentVariable("SCNBOOT_JOY") is { Length: > 0 })
     vm.Joypad = true;
 if (Environment.GetEnvironmentVariable("SCNBOOT_JIT") is { } jit)

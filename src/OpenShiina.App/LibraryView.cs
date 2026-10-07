@@ -1,7 +1,8 @@
 // The home screen: the games of the library (Game/GameLibrary.cs), each a card with the icon of
 // its .exe, its name and its folder; a click plays it, its menu (right click, or the "…" button)
 // opens its save folder or takes it off the list. "Add a game…" asks for a folder. A game whose
-// folder is gone is shown faded and cannot be played.
+// folder is gone is shown faded and cannot be played. "Settings" opens the player's settings
+// (Game/PlayerSettings.cs): drawing on the CPU or the GPU.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -42,22 +43,80 @@ public sealed class LibraryView : UserControl
     {
         var add = new Button { Content = "Add a game…", HorizontalAlignment = HorizontalAlignment.Right };
         add.Click += (_, _) => AddRequested?.Invoke();
+        var settings = new Button { Content = "Settings", Margin = new Thickness(0, 0, 8, 0), Flyout = SettingsFlyout() };
         var header = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
             Margin = new Thickness(24, 20, 24, 8),
             Children =
             {
                 new TextBlock { Text = "OpenShiina", FontSize = 28, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center },
+                settings,
                 add,
             },
         };
-        Grid.SetColumn(add, 1);
+        Grid.SetColumn(settings, 1);
+        Grid.SetColumn(add, 2);
         var body = new StackPanel { Spacing = 8, Margin = new Thickness(16, 0, 16, 16), Children = { m_cards, m_empty, m_message } };
         var page = new DockPanel { Children = { header, new ScrollViewer { Content = body } } };
         DockPanel.SetDock(header, Dock.Top);
         Content = page;
         Refresh();
+    }
+
+    /// <summary>
+    /// The settings, saved as they change: where the games' pictures are scaled and mixed (the
+    /// CPU or the GPU through Vulkan), counting from the next game started.
+    /// </summary>
+    private static Flyout SettingsFlyout()
+    {
+        var settings = PlayerSettings.Load();
+        var device = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray, Margin = new Thickness(28, 0, 0, 0) };
+        void ShowDevice() => device.Text = settings.Renderer != Renderer.Gpu ? ""
+            : PlayerSettings.Gpu(out string? error) is { } gpu ? gpu.Name : $"No GPU to use ({error}): the games run on the CPU.";
+        void Choose(Renderer renderer)
+        {
+            if (settings.Renderer == renderer)
+                return;
+            settings.Renderer = renderer;
+            settings.Save();
+            ShowDevice();
+        }
+        var cpu = new RadioButton { Content = "CPU", GroupName = "renderer", IsChecked = settings.Renderer == Renderer.Cpu };
+        var gpu = new RadioButton { Content = "GPU (Vulkan)", GroupName = "renderer", IsChecked = settings.Renderer == Renderer.Gpu };
+        cpu.IsCheckedChanged += (_, _) =>
+        {
+            if (cpu.IsChecked == true)
+                Choose(Renderer.Cpu);
+        };
+        gpu.IsCheckedChanged += (_, _) =>
+        {
+            if (gpu.IsChecked == true)
+                Choose(Renderer.Gpu);
+        };
+        ShowDevice();
+        return new Flyout
+        {
+            Placement = PlacementMode.BottomEdgeAlignedRight,
+            Content = new StackPanel
+            {
+                Width = 340,
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = "Drawing", FontSize = 16, FontWeight = FontWeight.SemiBold },
+                    new TextBlock
+                    {
+                        Text = "Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.",
+                        TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray,
+                    },
+                    cpu,
+                    gpu,
+                    device,
+                    new TextBlock { Text = "A change counts from the next game started.", Foreground = Brushes.LightGray, Margin = new Thickness(0, 8, 0, 0) },
+                },
+            },
+        };
     }
 
     /// <summary>A line under the cards (opening, an error); empty to clear it.</summary>

@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenShiina.Core\OpenShiina.Core.csproj" />
+    <ProjectReference Include="..\OpenShiina.Gpu\OpenShiina.Gpu.csproj" />
   </ItemGroup>
 
   <ItemGroup>

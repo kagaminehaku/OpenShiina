@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Compiles the GLSL compute shaders of src/OpenShiina.Gpu/Shaders (*.comp) to SPIR-V (*.spv)
+       with shaderc: shaderbuild [folder]. The .spv files are kept in the repository and embedded
+       in OpenShiina.Gpu, so the players carry no shader compiler. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>shaderbuild</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.Shaderc" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Shaderc.Native" Version="2.23.0" />
+  </ItemGroup>
+
+</Project>

@@ -35,10 +35,14 @@ public sealed class LibraryWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var add = new Button { Content = "Add a game…", Padding = new Thickness(12, 4, 12, 4), HorizontalAlignment = HorizontalAlignment.Right };
         add.Click += (_, _) => AddGame();
+        var settings = new Button { Content = "Settings", Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(0, 0, 8, 0) };
+        settings.Click += (_, _) => new SettingsWindow { Owner = this }.ShowDialog();
         var title = new TextBlock { Text = "OpenShiina", FontSize = 26, VerticalAlignment = VerticalAlignment.Center };
         var header = new DockPanel { Margin = new Thickness(24, 16, 24, 8), LastChildFill = false };
         DockPanel.SetDock(add, Dock.Right);
+        DockPanel.SetDock(settings, Dock.Right);
         header.Children.Add(add);
+        header.Children.Add(settings);
         header.Children.Add(title);
         var body = new StackPanel { Children = { m_cards, m_empty, m_message } };
         var page = new DockPanel();

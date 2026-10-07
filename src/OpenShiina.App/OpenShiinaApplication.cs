@@ -14,6 +14,8 @@ public sealed class OpenShiinaApplication : Application
 {
     public override void Initialize()
     {
+        // The GPU mode (Settings): Vulkan compute, made when a game first asks for it
+        Game.PlayerSettings.AcceleratorFactory = () => (Gpu.VulkanAccelerator.TryCreate(out string? error), error);
         Styles.Add(new FluentTheme());
         RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
     }

@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenShiina.Core\OpenShiina.Core.csproj" />
+    <ProjectReference Include="..\..\src\OpenShiina.Gpu\OpenShiina.Gpu.csproj" />
   </ItemGroup>
 
 </Project>

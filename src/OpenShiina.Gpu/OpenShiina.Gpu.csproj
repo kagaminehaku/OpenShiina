@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The GPU mode: the pixel work of the interpreter (ScnVm's IScnAccelerator) as Vulkan compute
+       shaders, on every platform with a Vulkan driver (Windows, Linux, Android; macOS through
+       MoltenVK). The shaders are GLSL in Shaders/*.comp, compiled to SPIR-V by tools/ShaderBuild. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>OpenShiina.Gpu</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Shaders\*.spv" LogicalName="OpenShiina.Gpu.%(Filename).spv" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShiina.Core\OpenShiina.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.Vulkan" Version="2.23.0" />
+  </ItemGroup>
+
+</Project>

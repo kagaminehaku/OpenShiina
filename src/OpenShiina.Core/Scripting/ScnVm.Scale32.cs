@@ -248,6 +248,9 @@ public sealed partial class ScnVm
             ReadByte(dstRow + r * dstPitch);
             ReadByte(dstRow + r * dstPitch + nc * 4 - 1);
         }
+        if (Accelerator is { } gpu
+            && Scale32OnGpu(gpu, rows, rowY, cols, colFrom, width, srcX, srcPitch, dstRow, dstPitch, fullRow, fullCol))
+            return true;
         // About two bands a core
         int Band = Math.Max(8, (nr + 2 * Environment.ProcessorCount - 1) / (2 * Environment.ProcessorCount));
         int bands = (nr + Band - 1) / Band;

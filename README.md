@@ -64,9 +64,15 @@ does. The Avalonia player draws text with the system's fonts, with MS Gothic's m
 Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux, for instance,
 `fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
 
+Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`):
+drawing on the CPU or on the GPU. The GPU mode runs heavy picture work as Vulkan compute shaders
+(`src/OpenShiina.Gpu`, so far the scaling of zoomed scenes) and gives the same pictures; without a
+Vulkan driver the games run on the CPU. It counts from the next game started.
+
 Settings for testing, as environment variables: `OPENSHIINA_PERF=0` hides the frame rate in the
 title (`=log` also writes `perf.log` to the save folder), `OPENSHIINA_X86JIT=0` runs embedded x86
-code on the interpreter only, `OPENSHIINA_WAYLAND=1` uses Avalonia's own Wayland backend on Linux.
+code on the interpreter only, `OPENSHIINA_GPU=1` / `=0` draws on the GPU / CPU whatever the
+settings say, `OPENSHIINA_WAYLAND=1` uses Avalonia's own Wayland backend on Linux.
 
 Game controllers: the first joystick or gamepad works as the engine reads it: the stick (or
 the first two axes) moves, button 1 decides, button 2 cancels. The games turn it off in their

@@ -15,6 +15,8 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        // The GPU mode (Settings): Vulkan compute, made when a game first asks for it
+        PlayerSettings.AcceleratorFactory = () => (Gpu.VulkanAccelerator.TryCreate(out string? error), error);
         if (e.Args.Length > 0 && await PlayAsync(e.Args[0], null))
             return;
         ShowLibrary();

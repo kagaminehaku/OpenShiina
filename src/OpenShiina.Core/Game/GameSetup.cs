@@ -59,6 +59,7 @@ public sealed class GameSetup
     /// <summary>
     /// The interpreter for this engine version with the first script loaded and started.
     /// OPENSHIINA_X86JIT=0 leaves embedded x86 routines without a C# version to the interpreter.
+    /// The GPU mode comes from the player's settings (PlayerSettings.Renderer).
     /// </summary>
     public ScnVm CreateVm(IScnHost host)
     {
@@ -68,6 +69,7 @@ public sealed class GameSetup
             ScreenWidth = Width,
             ScreenHeight = Height,
             Joypad = Joypad,
+            Accelerator = PlayerSettings.Load().AcceleratorForGame(),
         };
         if (Environment.GetEnvironmentVariable("OPENSHIINA_X86JIT") == "0")
             vm.JitX86 = false;
