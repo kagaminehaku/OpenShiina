@@ -867,6 +867,7 @@ public sealed partial class ScnVm
                 return 2;
             if (dst == vm.DisplaySurface)
             {
+                vm.PresentedByDirect3D(v[1], v[2], v[1] + v[3], v[2] + v[4]);
                 vm.FrameShown = true;
             }
             return 0;

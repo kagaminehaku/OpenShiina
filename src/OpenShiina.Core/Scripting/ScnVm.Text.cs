@@ -1527,6 +1527,9 @@ public sealed partial class ScnVm
             vm.SetText(rec, -1, -1, text);
             vm.TraceTextStart(c, 0x0083, c.TextSurface, rec, text);
             c.Flags |= 8;
+            // Text started is text going on: the frame does not end before its first step (v2.50's
+            // backlog draws its lines again one 0083 after another; ending there showed it half drawn)
+            vm.m_textWentOn = true;
             if ((vm.G(rec, RSkipKeys) & 8) != 0)
                 vm.EngineGlobals[0x13B52B4] = 0;
             return 0;

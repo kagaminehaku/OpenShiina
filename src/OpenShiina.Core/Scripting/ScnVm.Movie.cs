@@ -48,10 +48,22 @@ public sealed partial class ScnVm
 
     private Movie? MovieSlot(int n) => n is >= 0 and < MovieSlots ? m_movies[n] : null;
 
-    /// <summary>Opens the movie file of a record (FUN_0040B450); false when it cannot be played.</summary>
+    /// <summary>
+    /// Opens the movie file of a record (FUN_0040B450); false when it cannot be played. Windows
+    /// Media files (v2.50's ending, mv\ed.wmv) play as the MPEG-1 movie of the same name the games
+    /// ship beside them: DirectShow plays either, the decoder here MPEG-1 only.
+    /// </summary>
     private bool OpenMovie(Movie movie)
     {
-        var data = m_host.ReadLooseFile(movie.Name) ?? ReadScriptFile(movie.Name);
+        if (OpenMovieFile(movie, movie.Name))
+            return true;
+        return movie.Name.EndsWith(".wmv", StringComparison.OrdinalIgnoreCase)
+            && OpenMovieFile(movie, Path.ChangeExtension(movie.Name, ".mpg"));
+    }
+
+    private bool OpenMovieFile(Movie movie, string name)
+    {
+        var data = m_host.ReadLooseFile(name) ?? ReadScriptFile(name);
         if (data == null)
             return false;
         MovieSoundStop(movie);
@@ -59,11 +71,12 @@ public sealed partial class ScnVm
         {
             var stream = new MpegSystemStream(data);
             movie.Video = new Mpeg1Video(stream.Video);
-            if (!m_movieWaves.TryGetValue(movie.Name, out movie.Wave))
-                m_movieWaves[movie.Name] = movie.Wave = Music != null ? MpegAudio.ToWave(stream.Audio) : null;
+            if (!m_movieWaves.TryGetValue(name, out movie.Wave))
+                m_movieWaves[name] = movie.Wave = Music != null ? MpegAudio.ToWave(stream.Audio) : null;
         }
         catch (InvalidDataException)
         {
+            movie.Video = null;
             return false;
         }
         movie.Width = movie.Video.Width;
@@ -340,6 +353,7 @@ public sealed partial class ScnVm
             vm.BitBlt(dst, v[1], v[2], v[3], v[4], src, v[6], v[7]);
             if (dst == vm.DisplaySurface)
             {
+                vm.PresentedByDirect3D(v[1], v[2], v[1] + v[3], v[2] + v[4]);
                 vm.FrameShown = true;
             }
             return 0;

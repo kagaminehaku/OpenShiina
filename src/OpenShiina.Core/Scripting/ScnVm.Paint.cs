@@ -127,6 +127,17 @@ public sealed partial class ScnVm
         FrameShown = true;
     }
 
+    /// <summary>
+    /// v2.50 presents the display surface with Direct3D (06CC asks for it), so a copy into it shows
+    /// without InvalidateRect: its movie loop copies each frame there with 0514 / 051E and nothing
+    /// else. Here the rectangle is repainted then; earlier versions (GDI) leave it unseen.
+    /// </summary>
+    private void PresentedByDirect3D(int l, int t, int r, int b)
+    {
+        if (EngineVersion >= 250)
+            InvalidateWindow(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b));
+    }
+
     private void RunPaintSlot(int global)
     {
         int slot = EngineGlobals.GetValueOrDefault(global, -1);
