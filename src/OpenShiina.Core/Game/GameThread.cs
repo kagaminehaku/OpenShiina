@@ -31,6 +31,10 @@ public sealed class GameThread : IDisposable
     // Frames a second and the slowest frame in the title, perf.log with OPENSHIINA_PERF=log
     private readonly PerfMeter? m_perf;
 
+    // OPENSHIINA_PAINT=surface (for finding problems): show the display surface every frame, as
+    // the players did before ScnVm.Paint, instead of the window's picture
+    private readonly bool m_showSurface = Environment.GetEnvironmentVariable("OPENSHIINA_PAINT") == "surface";
+
     public int Width { get; }
     public int Height { get; }
 
@@ -139,7 +143,7 @@ public sealed class GameThread : IDisposable
                     return;
                 }
                 long engine = Stopwatch.GetTimestamp();
-                if (m_vm.ScreenInvalidated)
+                if (m_vm.ScreenInvalidated || m_showSurface)
                 {
                     m_vm.ScreenInvalidated = false;
                     CopyFrame();
@@ -171,25 +175,53 @@ public sealed class GameThread : IDisposable
     /// <summary>The window's picture (ScnVm.Window), as BGRA, into the back buffer; then the buffers swap.</summary>
     private void CopyFrame()
     {
-        var window = m_vm.Window;
-        int stride = m_vm.ScreenWidth * 3;
-        int w = Math.Min(m_vm.ScreenWidth, Width), h = Math.Min(m_vm.ScreenHeight, Height);
-        for (int y = 0; y < h; y++)
+        if (m_showSurface)
+            CopySurface();
+        else
         {
-            var row = window.Slice(y * stride, w * 3);
-            var dst = m_back.AsSpan(y * Width * 4, w * 4);
-            for (int x = 0, s = 0, d = 0; x < w; x++, s += 3, d += 4)
+            var window = m_vm.Window;
+            int stride = m_vm.ScreenWidth * 3;
+            int w = Math.Min(m_vm.ScreenWidth, Width), h = Math.Min(m_vm.ScreenHeight, Height);
+            for (int y = 0; y < h; y++)
             {
-                dst[d] = row[s];
-                dst[d + 1] = row[s + 1];
-                dst[d + 2] = row[s + 2];
-                dst[d + 3] = 0xFF;
+                var row = window.Slice(y * stride, w * 3);
+                var dst = m_back.AsSpan(y * Width * 4, w * 4);
+                for (int x = 0, s = 0, d = 0; x < w; x++, s += 3, d += 4)
+                {
+                    dst[d] = row[s];
+                    dst[d + 1] = row[s + 1];
+                    dst[d + 2] = row[s + 2];
+                    dst[d + 3] = 0xFF;
+                }
             }
         }
         lock (m_frameLock)
         {
             (m_front, m_back) = (m_back, m_front);
             m_frameNew = true;
+        }
+    }
+
+    /// <summary>The display surface itself, as BGRA, into the back buffer (OPENSHIINA_PAINT=surface).</summary>
+    private void CopySurface()
+    {
+        int surface = m_vm.DisplaySurface;
+        int pixels = m_vm.SurfaceField(surface, 2), pitch = m_vm.SurfaceField(surface, 10), bytes = m_vm.SurfaceField(surface, 9) >> 3;
+        int w = Math.Min(m_vm.SurfaceField(surface, 7), Width), h = Math.Min(m_vm.SurfaceField(surface, 8), Height);
+        if (pixels == 0 || w <= 0 || h <= 0 || bytes is not (3 or 4))
+            return;
+        var row = new byte[w * bytes];
+        for (int y = 0; y < h; y++)
+        {
+            m_vm.ReadBytes(pixels + y * pitch, row);
+            var dst = m_back.AsSpan(y * Width * 4, w * 4);
+            for (int x = 0, s = 0, d = 0; x < w; x++, s += bytes, d += 4)
+            {
+                dst[d] = row[s];
+                dst[d + 1] = row[s + 1];
+                dst[d + 2] = row[s + 2];
+                dst[d + 3] = 0xFF;
+            }
         }
     }
 

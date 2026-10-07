@@ -234,6 +234,8 @@ Finding problems:
   routines); timing every opcode halves the interpreter's speed. OPENSHIINA_X86JIT=0 keeps
   embedded x86 on the interpreter; OPENSHIINA_DATA moves the save folder (tests);
   OPENSHIINA_JOYPAD=0 hides the joystick from the scripts, =ini follows RIO.INI's Joypad.
+  OPENSHIINA_PAINT=surface shows the display surface every frame instead of the window's
+  picture (ScnVm.Paint), to tell a drawing problem from a repainting one.
 - **ScnBoot** (`tests/OpenShiina.ScnBoot`, `scnboot [folder] [frames] [picture folder] [every]`,
   60 frames a second of virtual time): SCNBOOT_PRESS="frame:vk[:frames],...",
   SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];...", SCNBOOT_SURFACES=1,2 (save more surfaces),
