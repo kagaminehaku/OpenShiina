@@ -5,9 +5,9 @@ It reads the game's own files and runs the game's own scripts (the engine's SCN 
 x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
 game's own.
 
-**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; Oreimo Plus, Sena
-Plus and Kuroneko Plus play through. Every game's state is in
-[docs/compatibility.md](docs/compatibility.md).
+**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; Azu Plus,
+Oreimo Plus, Homu☆Plus, Sena Plus, Kuroneko Plus and Nyaru Plus play through. Every game's
+state is in [docs/compatibility.md](docs/compatibility.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
 

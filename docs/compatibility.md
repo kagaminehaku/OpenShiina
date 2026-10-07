@@ -16,13 +16,13 @@ The state of every game OpenShiina aims at. Update a game's row when something c
 | Game | Japanese title | Release | VNDB | ShiinaRio | Status | Checked |
 |---|---|---|---|---|---|---|
 | Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | 🔴 Stops | 2026-10-07 |
-| Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | 🟢 Plays | 2026-10-07 |
+| Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-07 |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-07 |
-| Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | 🟡 Starts | 2026-10-07 |
+| Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | 🟡 Starts | 2026-10-07 |
 | Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-07 |
-| Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | 🟡 Starts | 2026-10-07 |
+| Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | 🟡 Starts | 2026-10-07 |
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ⚪ Not tried | — |
 | Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ⚪ Not tried | — |
@@ -38,19 +38,22 @@ commands are a subset of the others' (34, PRELOAD numbered differently), and it 
 movies with the filter-graph player (MovieMode 2).
 
 **Azu Plus** Needed `03C2` (a checksum of the executable, checked at start), `05C1` and `0516`
-(movies drawn straight onto the window). Checked in ScnBoot: the title, the opening, the route
-menu and one route with its movie, back to the menu.
+(movies drawn straight onto the window). Every route played through.
 
 **Oreimo Plus** The first game. Every route skipped through three times; title, choices, saves,
 OPTION page, backlog, movies (MovieMode 0 / 1 and 2).
 
-**Homu☆Plus, Yuru Plus, Nyaru Plus** Use no opcode OpenShiina lacks and boot to the title in
-ScnBoot. Their scenario command table is the same as Sena's and Kuroneko's.
+**Homu☆Plus** Every route skipped through; nothing was added for it.
+
+**Yuru Plus** Uses no opcode OpenShiina lacks and boots to the title in ScnBoot. Its scenario
+command table is the same as Sena's and Kuroneko's.
 
 **Sena Plus** Every route skipped through. It was slow (frames over 100 ms) until the v2.49
 builds of the hot embedded routines got their C# versions (engine-notes.md, section 10).
 
 **Kuroneko Plus** Every route skipped through; nothing was added for it.
+
+**Nyaru Plus** Every route skipped through; nothing was added for it.
 
 **Rikka Plus** Boots to the title; still lacks `0548`, which START uses later (also used by Maki
 Fes! and Re:Rem Plus).
