@@ -5,6 +5,7 @@
 // edges, corners swapped, 3 and 4 bytes a pixel, null brushes and pens, other colours, wide and
 // inside-frame pens). The first differences of each kind go to gdi-ellipse-check.txt as pictures.
 // GdiEllipseCheck show w h [pen width]: one ellipse, from both where GDI is there.
+// GdiEllipseCheck dump: what GDI draws, in gdi-ellipse-dump.txt.gz (Dump.cs).
 
 using System.Text;
 using OpenShiina.Platform;
@@ -23,6 +24,13 @@ if (args is ["show", var ws, var hs, ..])
 if (!OperatingSystem.IsWindows())
 {
     Console.WriteLine("GDI is Windows' own: run this on Windows (or 'show w h' for DibShapes alone).");
+    return;
+}
+
+if (args is ["dump", ..])
+{
+    Dump.Run("gdi-ellipse-dump.txt.gz");
+    Console.WriteLine($"Written: {Path.GetFullPath("gdi-ellipse-dump.txt.gz")}");
     return;
 }
 
