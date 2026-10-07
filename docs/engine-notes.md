@@ -632,12 +632,12 @@ the functions they call from the decompile. First findings:
   off it: the save screen's cursor (START 0x2BE6C, frame 2230 of slot 20, 49..365 x 49..153)
   is drawn after the slot (57..357 x 57..145) is composed again, and only the slot is
   invalidated - showing the whole surface left an orange ring after the pointer moved away.
-- **0083 waits** (2026-10-08): the task stops at `0083` until the main loop has drawn its text
+- **0083 waits** (2026-10-07): the task stops at `0083` until the main loop has drawn its text
   (flag 8, a step a round); a slot run to its end (events, callbacks) draws it at once. Until
   then the task ran on, so each `0083` replaced the text of the one before it unfinished: the
   backlog (START 0x2FE10: 【, name, 】, _r, a measuring pass, the line) showed only the last
   line it drew - the voiced lines, drawn again every frame (menu item flag 256), lost theirs.
-- **04E2 into the display surface repaints there** (2026-10-08, OpenShiina's own, not the
+- **04E2 into the display surface repaints there** (2026-10-07, OpenShiina's own, not the
   executable's): START's fade into the title (slot 212, 0x197AF) under Ctrl (skip) copies the
   title into the display surface with `04E2` and no `07D0`, after the title menu (0x7C7D4 /
   0x7C7FC) has saved the composed title to surface 1, put the old picture back from surface 4
@@ -865,7 +865,27 @@ the functions they call from the decompile. First findings:
   on all cores. Checked against the x86 code on 500 random rectangles (scratchpad scaletest)
   and in the game.
 - ScnBoot with SCNBOOT_VERIFY_NATIVE=1 runs the interpreter as well and compares the bytes written;
-  SCNBOOT_PROFILE=1 also times each C# routine.
+  SCNBOOT_PROFILE=1 also times each C# routine; SCNBOOT_PROFILE_FRAME=n gives the opcodes and
+  routines of frame n alone.
+- **The v2.49 builds of the hot routines** (2026-10-07): Homu, Yuru, Nyaru, Rikka, Sena and
+  Kuroneko Plus carry the same four routines (Sena START 787CE scale32, 767D4 subpixel32, 797B4
+  blend32, 79B33 rule alpha, at other offsets in the other games) with the same instructions
+  as Oreimo's, but ending with `ret` instead of `ret 4` and with other padding between blocks, so
+  their signatures differ and they ran translated: Sena's scale32 took ~110 ms a call (478 calls
+  in its first 2,500 frames; 399 frames over 100 ms in 20,000). Their signatures are now
+  registered for the same C# versions (checked with SCNBOOT_VERIFY_NATIVE=1 on 479 calls). Maki
+  Fes! and Re: Rem Plus have the v2.47 scale32 and the v2.49 blend32.
+- A routine with loops (a branch backwards) whose translation is not ready at its first call
+  waits for it instead of running on the interpreter (Sena's 75FAF: 250 ms there).
+- `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's
+  index instead of decoding the file (checked: the index's unpacked size is the decoded length
+  for every entry of the 11 games). `00CE` itself is the engine's background loader (START
+  polls `00CF` every 5 ms and goes on drawing), done at once here.
+- YH1 (Huffman) entries, some of the music, are decoded with a 12-bit look-up table instead of
+  a bit at a time: Sena's BGM25 (4.3 MB) 80 ms -> about 15 ms; the same bytes as before for the
+  50 YH1 entries of the 11 games.
+- `0562` draws whole rows of 1684 x 1261 pictures in Sena (zoomed characters); its runs are
+  read and written once a run and blended a pixel (dword) at a time: 40 ms -> 17 ms.
 - The compositor (04C4) gathers the shown entries once and sorts them by (priority, index), and
   draws rows straight into the page that holds them; it costs about 1-2 ns a pixel, under 1 ms a
   frame in the opening. VM memory pages are 64 KB.

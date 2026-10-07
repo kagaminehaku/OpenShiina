@@ -18,7 +18,8 @@
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
 // SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames.
-// The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
+// The game folder defaults to games\GrandCross\俺妹プラス (or games\GrandCross\Done\俺妹プラス, where
+// the games that play through are kept) in a folder above this program.
 
 using System.Text;
 using OpenShiina.Archives;
@@ -28,8 +29,8 @@ using OpenShiina.Game;
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 string? folder = args.Length > 0 && args[0].Length > 0 ? args[0] : null;
 for (var d = new DirectoryInfo(AppContext.BaseDirectory); folder == null && d != null; d = d.Parent)
-    if (Directory.Exists(Path.Combine(d.FullName, "games", "GrandCross", "俺妹プラス")))
-        folder = Path.Combine(d.FullName, "games", "GrandCross", "俺妹プラス");
+    folder = new[] { Path.Combine(d.FullName, "games", "GrandCross", "俺妹プラス"), Path.Combine(d.FullName, "games", "GrandCross", "Done", "俺妹プラス") }
+        .FirstOrDefault(Directory.Exists);
 int frames = args.Length > 1 ? int.Parse(args[1]) : 600;
 string? pictures = args.Length > 2 && args[2].Length > 0 ? args[2] : null;
 int every = args.Length > 3 ? int.Parse(args[3]) : 10;
@@ -74,7 +75,9 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_JIT") is { } jit)
     vm.JitX86 &= jit != "0";
     vm.JitInBackground = jit != "sync";
 }
-if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1")
+// SCNBOOT_PROFILE_FRAME=n: the opcodes and routines that took the time of frame n alone
+int profileFrame = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_PROFILE_FRAME"), out var pf) ? pf : -1;
+if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1" || profileFrame >= 0)
     vm.OpTimes = new();
 if (!vm.LoadModule(0, start, start: true))
 {
@@ -135,10 +138,23 @@ try
                 break;
             }
         }
+        if (frame == profileFrame)
+        {
+            vm.OpTimes!.Clear();
+            vm.NativeTimes.Clear();
+        }
         if (!vm.RunFrame())
         {
             Console.WriteLine($"The scripts quit after {frame} frames.");
             break;
+        }
+        if (frame == profileFrame)
+        {
+            Console.WriteLine($"  [profile] frame {frame}: {frameTime.Elapsed.TotalMilliseconds:F1} ms");
+            foreach (var (op, ticks) in vm.OpTimes!.OrderByDescending(t => t.Value).Take(8))
+                Console.WriteLine($"  [profile] op {op:X4}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F1} ms");
+            foreach (var (routine, (ticks, calls)) in vm.NativeTimes.OrderByDescending(t => t.Value.Ticks))
+                Console.WriteLine($"  [profile] {routine}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F1} ms ({calls} calls)");
         }
         if (frameTime.ElapsedMilliseconds >= 1000)
             Console.WriteLine($"  [slow] frame {frame}: {frameTime.ElapsedMilliseconds} ms, {vm.FrameRounds} rounds");
@@ -308,6 +324,7 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     public uint Clock { get; set; }
 
     public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
+    public long? ArchiveFileSize(string name) => data.Size(name.Replace('/', '\\'));
 
     public byte[]? ReadLooseFile(string name)
     {

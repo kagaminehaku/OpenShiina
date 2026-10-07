@@ -80,6 +80,16 @@ public sealed partial class ScnVm
         return m_host.ReadFile(p.Name) ?? m_host.ReadLooseFile(p.Name);
     }
 
+    /// <summary>The length ReadScriptFile gives, from the archive's index for a file of the archives.</summary>
+    public long? ScriptFileSize(string path)
+    {
+        if (ResolvePath(path) is not { } p)
+            return null;
+        if (p.Save)
+            return m_host.ReadSaveFile(p.Name)?.Length;
+        return m_host.ArchiveFileSize(p.Name) ?? m_host.ReadLooseFile(p.Name)?.Length;
+    }
+
     /// <summary>A file the scripts write: only save files, and only once op_AA82 allowed writes.</summary>
     public bool WriteScriptFile(string path, byte[] data)
     {
@@ -100,14 +110,15 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], vm.ReadScriptFile(path) != null ? 1 : 0);
             return 0;
         });
-        // 0158 file, size, packed size
+        // 0158 file, size, packed size: from the archive's index, as the engine does (START reads
+        // the size before every 00CE; decoding the file for it took as long as the load itself)
         Register(0x0158, (vm, c, i) =>
         {
             string path = vm.ReadString(vm.Value(c, i.Args[0]));
-            if (vm.ReadScriptFile(path) is not { } bytes)
+            if (vm.ScriptFileSize(path) is not { } size)
                 return 2;
-            vm.Store(c, i.Args[1], bytes.Length);
-            vm.Store(c, i.Args[2], bytes.Length);
+            vm.Store(c, i.Args[1], (int)size);
+            vm.Store(c, i.Args[2], (int)size);
             return 0;
         });
         // 0154 file, access, offset, size, packed size, handle: open for reading

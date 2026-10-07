@@ -129,6 +129,9 @@ public sealed class GameData : IDisposable
         return found == null ? null : WarcOpener.OpenEntry(found.Value.Archive, found.Value.Entry);
     }
 
+    /// <summary>The size <see cref="Read"/> gives for a script path, from the archive's index (nothing is decoded), or null.</summary>
+    public long? Size(string path, params string[] extensions) => Find(path, extensions)?.Entry.UnpackedSize;
+
     /// <summary>Full path of a loose file of the game folder (movies: "mv\ev03a.mpg"), or null.</summary>
     public string? LooseFile(string path) => ResolvePath(Folder, path);
 

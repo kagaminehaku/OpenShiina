@@ -2,6 +2,11 @@
 // X86Jit translation (Vector128, all cores). Each is found by the signature of the whole routine
 // (X86Routine.Signature) and must give the bytes the x86 code gives; VerifyNatives runs the
 // interpreter as well and compares (for tests).
+//
+// Each comes in two builds with the same instructions: the v2.47 one (Oreimo and Azu Plus, also
+// scale32 of Maki Fes! and Re: Rem Plus) ends with "ret 4", the v2.49 one (Homu, Yuru, Nyaru,
+// Rikka, Sena and Kuroneko Plus, also blend32 of Maki Fes! and Re: Rem Plus) with "ret"; the
+// padding between their blocks differs too, so their signatures do.
 
 namespace OpenShiina.Scripting;
 
@@ -12,10 +17,10 @@ public sealed partial class ScnVm
 
     private void RegisterNativeKernels()
     {
-        // Oreimo START 79366 (MMX): dst = A' * w + B' * (257 - w) >> 8 byte by byte over 32-bit
+        // Oreimo START 79366 (Sena 797B4; MMX): dst = A' * w + B' * (257 - w) >> 8 byte by byte over 32-bit
         // pixels, w = rB * 257 / (rA + rB); A' takes B's colour where A's alpha is 0 (and B' A's).
         // l[0] dst, l[1] A, l[2] B, l[3..5] their row strides, l[6] width, l[7] height, l[8] rA, l[9] rB
-        RegisterNative("A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "blend32", (vm, c, a) =>
+        RegisterNative(["A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "4A177932B7CDFCE9D2FBC516D15DCB24243F0A00"], "blend32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), sa = vm.NativeArg(a, 4), sb = vm.NativeArg(a, 5);
@@ -48,12 +53,12 @@ public sealed partial class ScnVm
             }
         });
 
-        // Oreimo START 76388 (MMX, 0x16157): copies a rectangle of a 32-bit picture to another
+        // Oreimo START 76388 (Sena 767D4; MMX, 0x16157): copies a rectangle of a 32-bit picture to another
         // with positions in 1/16 pixels (bilinear weights at the fractions, partial coverage in
         // the alpha of the edge pixels). Written out in ScnVm.Subpixel32.cs.
         // l[0] dst, l[1] its row stride, l[2] / l[3] dst x / y, l[4] / l[5] width / height,
         // l[6] src, l[7] its stride, l[8] / l[9] src x / y (all 1/16 pixels)
-        RegisterNative("D39944F06B961BEDC6A0F25C3C4F5A87D184E244", "subpixel32", (vm, c, a) =>
+        RegisterNative(["D39944F06B961BEDC6A0F25C3C4F5A87D184E244", "FDDD8FF834069B7A80B9424B868B9D71F6BDD4E8"], "subpixel32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
@@ -63,12 +68,12 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
-        // Oreimo START 78380 (MMX, 0x1632C): the scaling case of the same copy (source and
+        // Oreimo START 78380 (Sena 787CE; MMX, 0x1632C): the scaling case of the same copy (source and
         // destination rectangles of different sizes, scaling down), with two work buffers.
         // Written out in ScnVm.Scale32.cs. l[0] dst, l[1] its stride, l[2..5]
         // dst left, top, right, bottom, l[6] src, l[7] its stride, l[8..11] src left, top, right,
         // bottom (1/16 pixels), l[12] / l[13] work buffers
-        RegisterNative("3481E54756B5B7C00408FD13CDD6C7A5F211DC97", "scale32", (vm, c, a) =>
+        RegisterNative(["3481E54756B5B7C00408FD13CDD6C7A5F211DC97", "9122A668741F24CA756ABDBB886B20C41F54CB61"], "scale32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
@@ -79,13 +84,13 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
         });
 
-        // Oreimo START 796E5 (MMX, the rule fade of 0x16EB3): dst = S with its alpha byte made
+        // Oreimo START 796E5 (Sena 79B33; MMX, the rule fade of 0x16EB3): dst = S with its alpha byte made
         // from the rule mask M (the mask's top byte m, or 255 - m when dir is set): m <= imin
         // gives 0, m >= imax keeps S's alpha s, between them ((m - imin') * q in 16 bits, signed)
         // * s >> 15 with q = 0x8080 / (imax - imin + 1) and imin' = max(imin - 1, 0) (imin 0: 0).
         // Comparisons are signed 16-bit (pcmpgtw). l[0] dst, l[1] S, l[2] M, l[3..5] their row
         // strides, l[6] width, l[7] height, l[8] imax, l[9] imin, l[10] dir
-        RegisterNative("42BE6C919F9A6508C03AAA5B66020C3951CC7C05", "rulealpha", (vm, c, a) =>
+        RegisterNative(["42BE6C919F9A6508C03AAA5B66020C3951CC7C05", "5D646499AC90624AAED39ACAC0A3AD67B53C2A81"], "rulealpha", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), ps = vm.NativeArg(a, 1), pm = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), ss = vm.NativeArg(a, 4), sm = vm.NativeArg(a, 5);

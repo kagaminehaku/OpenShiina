@@ -126,58 +126,89 @@ public sealed partial class ScnVm
         }
     }
 
+    // A run's source and destination bytes, read and written once a run
+    private byte[] m_runSource = [], m_runTarget = [];
+
     private void DrawRun32(int method, int n, int data, int dst)
     {
+        if (n <= 0)
+            return;
+        if (m_runTarget.Length < n * 4)
+            m_runTarget = new byte[n * 4];
+        var target = m_runTarget.AsSpan(0, n * 4);
         switch (method)
         {
             case 2:
-                for (int i = 0; i < n; i++, data += 3, dst += 4)
-                    Write32(dst, Read32(data) << 8 | 0xFF);
-                return;
+            {
+                // 3-byte colours, opaque
+                if (m_runSource.Length < n * 3 + 1)
+                    m_runSource = new byte[n * 3 + 1];
+                var source = m_runSource.AsSpan(0, n * 3);
+                ReadBytes(data, source);
+                for (int i = 0, s = 0; i < target.Length; i += 4, s += 3)
+                {
+                    target[i] = 0xFF;
+                    target[i + 1] = source[s];
+                    target[i + 2] = source[s + 1];
+                    target[i + 3] = source[s + 2];
+                }
+                break;
+            }
             case 3:
             {
-                int color = Read32(data) << 8 | 0xFF;
-                for (int i = 0; i < n; i++, dst += 4)
-                    Write32(dst, color);
-                return;
+                // One opaque colour
+                uint color = (uint)(Read32(data) << 8 | 0xFF);
+                System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(target).Fill(color);
+                break;
             }
             case 4:
-                for (int i = 0; i < n; i++, data += 4, dst += 4)
-                    Over(dst, Read32(data));
-                return;
+            {
+                // ABGR colours over the target
+                if (m_runSource.Length < n * 4)
+                    m_runSource = new byte[n * 4];
+                var source = m_runSource.AsSpan(0, n * 4);
+                ReadBytes(data, source);
+                ReadBytes(dst, target);
+                var to = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(target);
+                var from = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(source);
+                for (int i = 0; i < to.Length; i++)
+                    to[i] = Over(to[i], from[i]);
+                break;
+            }
             default:
             {
-                int color = Read32(data);
-                for (int i = 0; i < n; i++, dst += 4)
-                    Over(dst, color);
-                return;
+                // One ABGR colour over the target
+                uint color = (uint)Read32(data);
+                ReadBytes(dst, target);
+                var to = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(target);
+                for (int i = 0; i < to.Length; i++)
+                    to[i] = Over(to[i], color);
+                break;
             }
         }
+        WriteBytes(dst, target);
     }
 
-    /// <summary>One source pixel (alpha, blue, green, red) over a destination pixel.</summary>
-    private void Over(int dst, int source)
+    /// <summary>One source pixel (alpha, blue, green, red from the low byte up) over a destination pixel.</summary>
+    private static uint Over(uint dst, uint source)
     {
-        uint sa = (uint)source & 0xFF;
+        uint sa = source & 0xFF;
         if (sa == 0)
-            return;
-        uint da = ReadByte(dst);
+            return dst;
+        uint da = dst & 0xFF;
         if (sa == 0xFF || da == 0)
-        {
-            Write32(dst, source);
-            return;
-        }
+            return source;
         uint a = unchecked((0xFE01 - (0xFF - sa) * (0xFF - da)) * 0x10203) >> 24;
-        WriteByte(dst, (byte)a);
         if (a == 0)
-            return;
-        uint inverse = 0x1000000 / a;
-        for (int k = 1; k <= 3; k++)
+            return dst & 0xFFFFFF00;
+        uint inverse = 0x1000000 / a, result = a;
+        for (int k = 8; k <= 24; k += 8)
         {
-            uint s = ((uint)source >> (8 * k)) & 0xFF, d = ReadByte(dst + k);
+            uint s = (source >> k) & 0xFF, d = (dst >> k) & 0xFF;
             uint sum = s * sa * 0xFF + (0xFF - sa) * da * d;
-            WriteByte(dst + k, (byte)((ulong)sum * inverse >> 32));
+            result |= (uint)((ulong)sum * inverse >> 32) << k;
         }
+        return result;
     }
 
     private void RegisterLayers()

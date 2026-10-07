@@ -35,6 +35,13 @@ public sealed partial class ScnVm
     /// <summary>Adds a routine by the signature <see cref="NativeSignature"/> gives for its code.</summary>
     public void RegisterNative(string signature, string name, NativeRoutine run) => m_natives[signature] = (name, run);
 
+    /// <summary>Adds a routine whose builds differ only in code the C# version does not depend on (one signature each).</summary>
+    public void RegisterNative(string[] signatures, string name, NativeRoutine run)
+    {
+        foreach (var signature in signatures)
+            RegisterNative(signature, name, run);
+    }
+
     /// <summary>The signature of the routine at an address (X86Routine.Signature).</summary>
     public string NativeSignature(int address) => RoutineAt(address).Code.Signature;
 
@@ -175,6 +182,10 @@ public sealed partial class ScnVm
                                          vm.StackAddress(c.Slot, c.Sp));
             vm.m_nativeTarget = target;
             var info = vm.RoutineAt(target);
+            // A routine with loops waits for its translation: on the interpreter its first call
+            // can take longer than translating it (Sena's 75FAF: 250 ms there, a few ms translated)
+            if (info.Native == null && info.Translation is { IsCompleted: false } pending && info.Code.Loops)
+                ((IAsyncResult)pending).AsyncWaitHandle.WaitOne();    // a failed translation leaves it to the interpreter
             long started = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             string name;
             vm.RememberCall(c, target, info.Native?.Name ?? (info.Translated != null ? "jit" : "x86"), args);

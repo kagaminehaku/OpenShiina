@@ -257,6 +257,7 @@ public sealed class ScnWindow : Window
         }
 
         public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
+        public long? ArchiveFileSize(string name) => data.Size(name.Replace('/', '\\'));
 
         public byte[]? ReadLooseFile(string name) => data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
 

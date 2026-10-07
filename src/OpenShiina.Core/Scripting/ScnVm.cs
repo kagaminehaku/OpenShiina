@@ -20,6 +20,9 @@ public interface IScnHost
     /// <summary>A file by the engine's rules (archives of the game, then its folder); null when missing.</summary>
     byte[]? ReadFile(string name);
 
+    /// <summary>The length ReadFile gives for a file of the archives, without reading it; null when it is not in them.</summary>
+    long? ArchiveFileSize(string name) => ReadFile(name)?.Length;
+
     /// <summary>A file of the game folder itself (RIO.INI, movies), or null.</summary>
     byte[]? ReadLooseFile(string name);
 

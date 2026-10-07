@@ -413,16 +413,71 @@ internal class HuffmanReader
         m_curbits = 0;
         m_curindex = 256;
         ushort root = CreateTree();
+        if (root < 256)
+        {
+            // A tree of one symbol: every byte is that symbol and reads no bits
+            m_dst.AsSpan().Fill((byte)root);
+            return m_dst;
+        }
+        var table = BuildTable(root);
+        // The bits that are left, the oldest at bit (bits - 1) of buffer; past the end of the
+        // input, zeros stand in for the peek, but taking them is the error it always was
+        ulong buffer = m_curbits == 0 ? 0 : m_cache & (uint)((1ul << m_curbits) - 1);
+        int bits = m_curbits;
         for (int i = 0; i < m_dst.Length; ++i)
         {
-            ushort symbol = root;
-            while (symbol >= 256)
+            if (bits < TableBits && m_remaining > 0)
             {
-                symbol = m_tree[GetBits(1), symbol];
+                buffer = (buffer << 32) | ReadUInt32();
+                bits += 32;
             }
-            m_dst[i] = (byte)symbol;
+            uint peek = (uint)(bits >= TableBits ? buffer >> (bits - TableBits) : buffer << (TableBits - bits)) & TableMask;
+            uint item = table[peek];
+            int length = (int)(item >> 16);
+            int node = (int)(item & 0xFFFF);
+            if (length > bits)
+                throw new InvalidDataException("Unexpected end of file");
+            bits -= length;
+            while (node >= 256)
+            {
+                if (bits == 0)
+                {
+                    if (m_remaining <= 0)
+                        throw new InvalidDataException("Unexpected end of file");
+                    buffer = ReadUInt32();
+                    bits = 32;
+                }
+                --bits;
+                node = m_tree[(int)(buffer >> bits) & 1, node];
+            }
+            m_dst[i] = (byte)node;
         }
         return m_dst;
+    }
+
+    // Codes up to TableBits bits long are decoded by one look-up: (length << 16) | symbol; longer
+    // ones give the node after TableBits bits, and the rest is read a bit at a time
+    private const int TableBits = 12;
+    private const uint TableMask = (1u << TableBits) - 1;
+
+    private uint[] BuildTable(ushort root)
+    {
+        var table = new uint[1 << TableBits];
+        var work = new Stack<(int Node, int Code, int Length)>();
+        work.Push((root, 0, 0));
+        while (work.Count > 0)
+        {
+            var (node, code, length) = work.Pop();
+            if (node < 256 || length == TableBits)
+            {
+                int shift = TableBits - length;
+                table.AsSpan(code << shift, 1 << shift).Fill((uint)(length << 16 | node));
+                continue;
+            }
+            work.Push((m_tree[0, node], code << 1, length + 1));
+            work.Push((m_tree[1, node], code << 1 | 1, length + 1));
+        }
+        return table;
     }
 
     private uint ReadUInt32()

@@ -26,6 +26,10 @@ public sealed class X86Routine
     /// <summary>The routine calls code (a direct call).</summary>
     public bool Calls { get; private set; }
 
+    /// <summary>Some branch goes back (a loop): the routine may run long.</summary>
+    public bool Loops => Code.Values.Any(i => i.FlowControl is FlowControl.ConditionalBranch or FlowControl.UnconditionalBranch &&
+                                              i.Op0Kind == OpKind.NearBranch32 && i.NearBranch32 <= i.IP32);
+
     /// <summary>SHA-1 of the routine, in hex.</summary>
     public string Signature { get; }
 
