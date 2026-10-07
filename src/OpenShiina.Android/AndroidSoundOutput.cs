@@ -76,7 +76,7 @@ public sealed class AndroidSoundOutput : IDisposable
             // The track takes what fits; the rest waits for room
             for (int at = 0; at < n && !m_stop;)
             {
-                int written = m_track.Write(buffer, at, n - at, WriteType.NonBlocking);
+                int written = m_track.Write(buffer, at, n - at, WriteMode.NonBlocking);
                 if (written < 0)
                     return;
                 at += written;
