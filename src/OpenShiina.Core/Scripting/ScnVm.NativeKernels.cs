@@ -17,6 +17,24 @@ public sealed partial class ScnVm
 
     private void RegisterNativeKernels()
     {
+        // Re:Rem Plus / Maki Fes! START 8BBD0: f[0] = the 16 bytes at l[0] against those at l[1]
+        // (repe cmpsb, signed bytes: -1, 0, 1); the compare 0294 sorts the montage table with
+        // (81,301 entries in Re:Rem Plus, so about 1.5 million calls at start)
+        RegisterNative("EE95B19696EABB2722809AF27EBEFAD9A6266667", "compare16", (vm, c, a) =>
+        {
+            int x = vm.NativeArg(a, 0), y = vm.NativeArg(a, 1), result = 0;
+            for (int k = 0; k < 16; k++)
+            {
+                sbyte p = (sbyte)vm.ReadByte(x + k), q = (sbyte)vm.ReadByte(y + k);
+                if (p != q)
+                {
+                    result = p > q ? 1 : -1;
+                    break;
+                }
+            }
+            vm.Write32(a.F, result);
+        });
+
         // Oreimo START 79366 (Sena 797B4; MMX): dst = A' * w + B' * (257 - w) >> 8 byte by byte over 32-bit
         // pixels, w = rB * 257 / (rA + rB); A' takes B's colour where A's alpha is 0 (and B' A's).
         // l[0] dst, l[1] A, l[2] B, l[3..5] their row strides, l[6] width, l[7] height, l[8] rA, l[9] rB.

@@ -229,6 +229,8 @@ public sealed partial class ScnVm
         RegisterNativeKernels();
         RegisterEffects();
         RegisterGdi();
+        RegisterMenus();
+        RegisterEngine250();
     }
 
     public ScnContext Slot(int index) => m_slots[index];

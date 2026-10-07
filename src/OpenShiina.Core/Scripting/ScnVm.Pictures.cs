@@ -9,7 +9,11 @@ namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
 {
-    public const int PictureSlots = 0x101;
+    /// <summary>Room for the picture slots of every version: 0-0x100 up to v2.49, 0-0x400 in v2.50.</summary>
+    public const int PictureSlots = 0x401;
+
+    /// <summary>The last picture slot the engine takes (0x100, v2.50's 0x400: REMPLUS 0x42B29A).</summary>
+    private int MaxPictureSlot => EngineVersion >= 250 ? 0x400 : 0x100;
     private const int PictureRegion = 0x09300000;
     // 0xFB3BBC: the slot owns its memory (loaded by 04B0 / made by 055A), so it is freed when replaced
     private readonly bool[] m_pictureOwned = new bool[PictureSlots];
@@ -211,7 +215,7 @@ public sealed partial class ScnVm
         {
             int slot = vm.Value(c, i.Args[0]);
             string file = vm.ReadString(vm.Value(c, i.Args[1]));
-            if ((uint)slot > 0x100)
+            if ((uint)slot > (uint)vm.MaxPictureSlot)
                 return 2;
             if (vm.m_pictureOwned[slot])
                 vm.ReleasePicture(slot);
@@ -245,7 +249,7 @@ public sealed partial class ScnVm
         Register(0x055C, (vm, c, i) =>
         {
             int slot = vm.Value(c, i.Args[0]), surface = vm.Value(c, i.Args[1]);
-            if ((uint)slot > 0x100 || surface is < 0 or >= SurfaceCount)
+            if ((uint)slot > (uint)vm.MaxPictureSlot || surface is < 0 or >= SurfaceCount)
                 return 2;
             if (vm.m_pictureOwned[slot])
                 vm.ReleasePicture(slot);
@@ -319,7 +323,7 @@ public sealed partial class ScnVm
         Register(0x04B1, (vm, c, i) =>
         {
             int slot = vm.Value(c, i.Args[0]);
-            if ((uint)slot > 0x100)
+            if ((uint)slot > (uint)vm.MaxPictureSlot)
                 return 2;
             if (vm.Picture(slot) != 0)
             {
@@ -344,7 +348,7 @@ public sealed partial class ScnVm
         Register(0x04B2, (vm, c, i) =>
         {
             int slot = vm.Value(c, i.Args[0]);
-            if ((uint)slot > 0x100)
+            if ((uint)slot > (uint)vm.MaxPictureSlot)
                 return 2;
             if (vm.m_pictureOwned[slot])
                 vm.ReleasePicture(slot);
@@ -360,7 +364,7 @@ public sealed partial class ScnVm
         {
             int slot = vm.Value(c, i.Args[0]), width = vm.Value(c, i.Args[1]), height = vm.Value(c, i.Args[2]);
             int bpp = vm.Value(c, i.Args[3]), frames = vm.Value(c, i.Args[4]);
-            if ((uint)slot > 0x100)
+            if ((uint)slot > (uint)vm.MaxPictureSlot)
                 return 2;
             if (vm.m_pictureOwned[slot])
                 vm.ReleasePicture(slot);

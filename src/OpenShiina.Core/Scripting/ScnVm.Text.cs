@@ -1289,9 +1289,14 @@ public sealed partial class ScnVm
             throw new NotSupportedException("Opaque text background (_O) is not supported yet");
 
         int code = count == 1 ? (ushort)(sbyte)ch[0] : ch[0] << 8 | ch[1];
-        var cache = m_glyphs[G(rec, RIndex) % TextRecords] ??= new Dictionary<int, ScnGlyph>();
-        if (!cache.TryGetValue(code, out var glyph))
-            cache[code] = glyph = fonts.Glyph(font, code);
+        // v2.50: a character of 009C's pictures comes before the font's
+        var glyph = Glyph250For(G(rec, RIndex), code);
+        if (glyph == null)
+        {
+            var cache = m_glyphs[G(rec, RIndex) % TextRecords] ??= new Dictionary<int, ScnGlyph>();
+            if (!cache.TryGetValue(code, out glyph))
+                cache[code] = glyph = fonts.Glyph(font, code);
+        }
 
         int ascent = fonts.Ascent(font);
         int alpha = G(rec, RAlpha);
@@ -1302,7 +1307,7 @@ public sealed partial class ScnVm
             y += G(rec, ROffsetY);
         }
         int gx = glyph.OriginX + x;
-        int top = ascent - glyph.OriginY + y;
+        int top = glyph.OriginY == int.MinValue ? y : ascent - glyph.OriginY + y;
         int right = glyph.BlackBoxX + gx, bottom = glyph.BlackBoxY + top;
         // FUN_00417790: clip to the surface
         int cl = gx, ct = top, cr = right, cb = bottom;
