@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# GdiEllipseCheck output
+gdi-ellipse-check.txt
+gdi-ellipse-dump.txt.gz

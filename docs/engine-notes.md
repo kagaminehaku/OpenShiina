@@ -192,6 +192,12 @@ game's own. It is split in two projects:
 - `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` runs the engine on the window's render event;
   sound through the same mixer on NAudio's wave output; text and shapes with GDI (Core
   `Platform/GdiFonts.cs`, `GdiShapes.cs`, Windows only), pixel for pixel as the games.
+  Keys and mouse buttons are read with GetAsyncKeyState when the scripts ask, as the engine
+  does: WPF's key events and `Mouse.LeftButton` change only after the frame (which runs in the
+  render event), so with slow frames a released Ctrl stayed held and skipping went on.
+- Both players open one sound output for the whole game (`ScnMixer`, 44.1 kHz stereo; sound
+  buffers and music streams are voices of it). Opening a WaveOutEvent per sound took 17-33 ms
+  (107 ms the first time) on the window's thread and made every hover sound drop frames.
 
 An earlier player (2026-10-03 to 10-07, "Play Story", `OpenShiina.exe --story`) rewrote the
 story engine in C# instead: StoryPlayer, ScnMachine (SRC_MAIN only), StageMath, its own WPF
@@ -204,6 +210,26 @@ in the git history. What it found about the engine is in sections 3, 8 and 9.
 dotnet run --project tools/ScnTools -- opscan oreimoplus <OREIMOPLUS_dump_SCY.exe> ops.tsv
 dotnet run --project tools/ScnTools -- dis tools/ScnTools/tables/ops_oreimoplus.tsv out.txt SRC_MAIN.SCN
 ```
+
+Finding problems:
+
+- **crash.log** (save folder): on a script error both players append `ScnVm.CrashReport`: the
+  module and offset of the address, whether the code there is still as loaded (the changed
+  bytes), the task's module, base, pc and previous instruction, and the 64 latest embedded
+  routine calls with their l[0..13], marking those that point into the damage. ScnBoot prints it.
+- **OPENSHIINA_PERF** (`Game/PerfMeter.cs`, both players): frames a second and the slowest frame
+  in the title (on unless `0`); `log` also writes perf.log every second (slowest engine and
+  picture times, main-loop rounds, heap in use, the costliest opcodes, C# routines and x86
+  routines); timing every opcode halves the interpreter's speed. OPENSHIINA_X86JIT=0 keeps
+  embedded x86 on the interpreter; OPENSHIINA_DATA moves the save folder (tests).
+- **ScnBoot** (`tests/OpenShiina.ScnBoot`, `scnboot [folder] [frames] [picture folder] [every]`,
+  60 frames a second of virtual time): SCNBOOT_PRESS="frame:vk[:frames],...",
+  SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];...", SCNBOOT_SURFACES=1,2 (save more surfaces),
+  SCNBOOT_INI="Key=value;..." (RIO.INI as the scripts read it, e.g. MovieMode=2),
+  SCNBOOT_TRACE="from:to" (time and main-loop rounds of each frame), SCNBOOT_JIT=0|sync,
+  SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10).
+- `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
+  `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
 
 ## 8. START.SCN / EFCLIB.SCN findings (Oreimo build, used by the player)
 
