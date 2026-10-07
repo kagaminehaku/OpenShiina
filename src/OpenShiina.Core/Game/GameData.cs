@@ -2,7 +2,8 @@
 // scripts name them ("e\ev01_00.S25", "v\KIR0001.ogv", ...). The directory prefix only tells the
 // engine which archive to search, and the extension may differ from the stored one (scripts say
 // "bgm16.ogg" for BGM16.OGV), so files are found by their stem. Loose files of the game folder
-// (RIO.INI, movies) are found by their path.
+// (RIO.INI, movies) are found by their path. Names are matched without regard to case and with
+// either slash, as on Windows, also where the file system cares (Linux, Android).
 
 using System.IO;
 
@@ -28,7 +29,7 @@ public sealed class GameData : IDisposable
         var data = new GameData(folder, scheme.Name);
         try
         {
-            foreach (var path in Directory.GetFiles(folder, "*.war").OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            foreach (var path in Directory.GetFiles(folder, "*.war", s_anyCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
             {
                 var view = new ArcView(path);
                 WarcArchive? warc;
@@ -65,6 +66,45 @@ public sealed class GameData : IDisposable
         return data;
     }
 
+    private static readonly EnumerationOptions s_anyCase = new() { MatchCasing = MatchCasing.CaseInsensitive };
+
+    /// <summary>The first .WAR archive of a game folder (by name, any case), or null.</summary>
+    public static string? FindArchive(string folder) =>
+        Directory.Exists(folder)
+            ? Directory.GetFiles(folder, "*.war", s_anyCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).FirstOrDefault()
+            : null;
+
+    /// <summary>
+    /// The file a Windows-style relative path names under <paramref name="folder"/>, matching each
+    /// part without regard to case; null when there is none or the path leaves the folder.
+    /// </summary>
+    public static string? ResolvePath(string folder, string path)
+    {
+        string current = folder;
+        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string part = parts[i];
+            if (part is "." or ".." || part.Contains(':'))
+                return null;
+            string exact = Path.Combine(current, part);
+            bool last = i == parts.Length - 1;
+            if (last ? File.Exists(exact) : Directory.Exists(exact))
+            {
+                current = exact;
+                continue;
+            }
+            if (!Directory.Exists(current))
+                return null;
+            string? match = (last ? Directory.EnumerateFiles(current) : Directory.EnumerateDirectories(current))
+                .FirstOrDefault(p => Path.GetFileName(p).Equals(part, StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+                return null;
+            current = match;
+        }
+        return parts.Length > 0 ? current : null;
+    }
+
     private static string Stem(string path) => Path.GetFileNameWithoutExtension(path.Replace('\\', '/').Trim());
 
     /// <summary>Finds an entry by a script path; an entry with one of <paramref name="extensions"/> wins.</summary>
@@ -90,11 +130,7 @@ public sealed class GameData : IDisposable
     }
 
     /// <summary>Full path of a loose file of the game folder (movies: "mv\ev03a.mpg"), or null.</summary>
-    public string? LooseFile(string path)
-    {
-        string full = Path.GetFullPath(Path.Combine(Folder, path.Replace('/', '\\')));
-        return full.StartsWith(Path.GetFullPath(Folder), StringComparison.OrdinalIgnoreCase) && File.Exists(full) ? full : null;
-    }
+    public string? LooseFile(string path) => ResolvePath(Folder, path);
 
     public void Dispose()
     {

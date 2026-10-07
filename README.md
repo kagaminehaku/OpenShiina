@@ -16,8 +16,10 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 | Project | Platform |
 |---|---|
 | `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter and its x86 translator |
-| `src/OpenShiina.Windows` | Windows player (WPF) |
-| Linux, macOS, Android, iOS | Planned |
+| `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
+| `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
+| `src/OpenShiina.Windows` | The Windows player on WPF, whose text is drawn by Windows GDI as the games draw it |
+| Android, iOS | Planned, on `OpenShiina.App` |
 
 ## Building
 
@@ -27,16 +29,27 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 dotnet build -c Release
 ```
 
-The Windows player is written to `bin/Release/OpenShiina.Windows/`, with the scheme data
-(`Formats.Json` and `ShiinaImage/`) next to `OpenShiina.exe`.
+The players are written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
+`dotnet OpenShiina.dll`) and `bin/Release/OpenShiina.Windows/`, with the scheme data
+(`Formats.Json` and `ShiinaImage/`) next to them. The WPF player builds on Windows only.
 
 ## Usage
 
-Run `OpenShiina.exe` and choose the game's folder (the one with its `.exe` and `.WAR` files), or
+Run `OpenShiina` and choose the game's folder (the one with its `.exe` and `.WAR` files), or
 pass the folder on the command line. The game is recognised by its `.exe`. The player runs the
 game's own SCN scripts, so the game looks and behaves as it does in its own engine.
 
-Saves and settings are kept in `%AppData%\OpenShiina`.
+Text: the games ask for MS Gothic. The WPF player draws it with Windows GDI, exactly as the game
+does. The Avalonia player draws text with the system's fonts, with MS Gothic's measures: on
+Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux, for instance,
+`fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
+
+Settings for testing, as environment variables: `OPENSHIINA_PERF=0` hides the frame rate in the
+title (`=log` also writes `perf.log` to the save folder), `OPENSHIINA_X86JIT=0` runs embedded x86
+code on the interpreter only, `OPENSHIINA_WAYLAND=1` uses Avalonia's own Wayland backend on Linux.
+
+Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`); both
+players share them.
 
 ## Documentation
 
@@ -51,6 +64,8 @@ Saves and settings are kept in `%AppData%\OpenShiina`.
 - Archive formats and encryption schemes are based on [GARbro](https://github.com/morkt/GARbro) by morkt.
 - Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor).
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
+- The Avalonia player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
+  and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
 
 ## License
 

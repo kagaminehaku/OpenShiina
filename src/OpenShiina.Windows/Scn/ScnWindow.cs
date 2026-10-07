@@ -28,26 +28,11 @@ public sealed class ScnWindow : Window
     public ScnWindow(GameData data)
     {
         m_data = data;
-        string ini = OpenShiina.IO.Encodings.cp932.GetString(data.LooseFile("RIO.INI") is { } path ? File.ReadAllBytes(path) : []);
-        string version = System.Text.RegularExpressions.Regex.Match(ini, @"v(\d+\.\d+)").Groups[1].Value;
-        string start = System.Text.RegularExpressions.Regex.Match(ini, @"(?im)^Scn=(.+)$").Groups[1].Value.Trim();
-        int width = IniNumber(ini, "WindowWidth", 800), height = IniNumber(ini, "WindowHeight", 600);
-
-        string saves = PlayerFolders.For("scn", data.SchemeName);
-        Directory.CreateDirectory(saves);
-        m_saves = saves;
+        var setup = GameSetup.Read(data);
+        int width = setup.Width, height = setup.Height;
+        string saves = m_saves = setup.SaveFolder;
         m_host = new Host(this, data, saves);
-        m_vm = new ScnVm(ScnOpcodes.ForVersion(version), m_host)
-        {
-            EngineVersion = (int)Math.Round(double.Parse(version, System.Globalization.CultureInfo.InvariantCulture) * 100),
-            ScreenWidth = width,
-            ScreenHeight = height,
-        };
-        // OPENSHIINA_X86JIT=0: embedded x86 routines without a C# version run on the interpreter
-        if (Environment.GetEnvironmentVariable("OPENSHIINA_X86JIT") == "0")
-            m_vm.JitX86 = false;
-        if (!m_vm.LoadModule(0, start, start: true))
-            throw new InvalidDataException($"{start} is missing.");
+        m_vm = setup.CreateVm(m_host);
         if (m_perfLogged)
         {
             m_vm.OpTimes = new();
@@ -81,9 +66,6 @@ public sealed class ScnWindow : Window
             m_data.Dispose();
         };
     }
-
-    private static int IniNumber(string ini, string key, int fallback) =>
-        System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m ? int.Parse(m.Groups[1].Value) : fallback;
 
     private void Notify(ScnEvent e)
     {

@@ -82,7 +82,7 @@ public partial class App : Application
     private static GameData OpenGame(string folder)
     {
         var formats = FormatManager.Instance;
-        string archive = Directory.GetFiles(folder, "*.war").FirstOrDefault()
+        string archive = GameData.FindArchive(folder)
             ?? throw new InvalidDataException("The folder has no .WAR archives.");
         var scheme = formats.LookupGame(archive) is { } name ? formats.GetScheme(name) : null;
         if (scheme == null)

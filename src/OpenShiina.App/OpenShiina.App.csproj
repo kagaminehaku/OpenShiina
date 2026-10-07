@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The player on Avalonia, shared by every platform head (OpenShiina.Desktop for Windows,
+       Linux and macOS; Android and iOS later): the game view and its host, the interpreter on
+       its own thread, sound through SDL3, text with SkiaSharp. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>OpenShiina.App</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>OpenShiina</Product>
+    <Description>An unofficial, open-source player for visual novels made with the ShiinaRio (椎名里緒) engine.</Description>
+    <Version>0.1.0</Version>
+    <Authors>kagaminehaku</Authors>
+    <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <!-- The sound device (and later game controllers) on every platform -->
+    <PackageReference Include="ppy.SDL3-CS" Version="2026.1002.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShiina.Core\OpenShiina.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -220,10 +220,13 @@ public class FormatManager
         string dir = Path.GetDirectoryName(arcPath) ?? "";
         if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
 
-        // Check if known game exe exists in same directory
+        // Check if known game exe exists in same directory (any case: the folder may be on Linux)
+        var files = Directory.Exists(dir)
+            ? Directory.EnumerateFiles(dir).Select(Path.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string?>();
         foreach (var kvp in GameMap)
         {
-            if (File.Exists(Path.Combine(dir, kvp.Key)))
+            if (files.Contains(kvp.Key))
                 return kvp.Value;
         }
 

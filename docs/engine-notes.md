@@ -179,9 +179,16 @@ game's own. It is split in two projects:
   (`Formats/`), the game folder (`Game/GameData.cs`, `PlayerFolders`), the SCN interpreter with
   its embedded x86 code (`Scripting/`). The platform supplies the window, input, sound and fonts
   through `IScnHost`, `IScnSound`, `IScnMusic`, `IScnFonts`, `IScnShapes`.
-- `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` shows the engine's screen and feeds it input;
-  sound through one NAudio mixer (`Scn/ScnMixer.cs`); text and shapes with GDI (Core
-  `Platform/GdiFonts.cs`, `GdiShapes.cs`, Windows only).
+- `OpenShiina.App` (Avalonia, every platform) with the head `OpenShiina.Desktop` (Windows,
+  Linux, macOS): `GameSession` runs the interpreter on a thread of its own, one engine frame per
+  frame the window draws (every 1/60 s when it draws none), and hands over the picture as BGRA;
+  `GameView` shows it scaled and passes on keys, mouse and touch (`InputState`, Windows virtual
+  keys); sound is the Core mixer (`Audio/ScnMixer.cs`) on SDL3 (`SdlAudioOutput`); text is
+  `SkiaFonts`: GDI's font calls on SkiaSharp, with a Japanese stand-in for a missing face,
+  measured as MS Gothic (cell = em, ascent 0.859 em, average width half an em).
+- `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` runs the engine on the window's render event;
+  sound through the same mixer on NAudio's wave output; text and shapes with GDI (Core
+  `Platform/GdiFonts.cs`, `GdiShapes.cs`, Windows only), pixel for pixel as the games.
 
 An earlier player (2026-10-03 to 10-07, "Play Story", `OpenShiina.exe --story`) rewrote the
 story engine in C# instead: StoryPlayer, ScnMachine (SRC_MAIN only), StageMath, its own WPF
