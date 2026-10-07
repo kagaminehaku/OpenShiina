@@ -308,6 +308,17 @@ public sealed partial class ScnVm
                 vm.UpdateMovie(movie);
             return 0;
         });
+        // 05C1 n: 05C0, then the movie's surface Blt straight onto the window at its rectangle
+        // (+0x20: 0, 0, w, h). Azu Plus plays 800 x 600 movies so in a window
+        Register(0x05C1, (vm, c, i) =>
+        {
+            if (vm.MovieSlot(vm.Value(c, i.Args[0])) is not { } movie)
+                return 0;
+            vm.UpdateMovie(movie);
+            if (movie.Video != null)
+                vm.BltToWindow(0, 0, movie.Width, movie.Height, movie.Surface, 0, 0, movie.Width, movie.Height);
+            return 0;
+        });
         // 05C3 n, volume: volume 0-100 (FUN_0040B9A0)
         Register(0x05C3, (vm, c, i) =>
         {
@@ -331,6 +342,28 @@ public sealed partial class ScnVm
             {
                 vm.FrameShown = true;
             }
+            return 0;
+        });
+        // 0516 dst, l, t, r, b, src, sl, st, sr, sb, flags, fx (FUN_0041DED0): DirectDraw's Blt of
+        // the rectangle sl..sb of a surface onto l..b of another, stretched; dst -1 is the window
+        // (client rectangle, not scaled). Only DDBLT_WAIT is used (Azu Plus: movies in a window)
+        Register(0x0516, (vm, c, i) =>
+        {
+            var v = new int[12];
+            for (int k = 0; k < 12; k++)
+                v[k] = vm.Value(c, i.Args[k]);
+            if ((v[10] & ~0x01000000) != 0 || v[11] != 0 || v[5] is < 0 or >= SurfaceCount)
+                return 2;
+            if (v[0] == -1)
+                vm.BltToWindow(v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9]);
+            else if (v[0] is >= 0 and < SurfaceCount)
+            {
+                vm.StretchCopy(v[0], v[1], v[2], v[3] - v[1], v[4] - v[2], v[5], v[6], v[7], v[8] - v[6], v[9] - v[7]);
+                if (v[0] == vm.DisplaySurface)
+                    vm.FrameShown = true;
+            }
+            else
+                return 2;
             return 0;
         });
         // 055E slot, frame, x, y, w, h, surface, sx, sy (FUN_00410BF0): a rectangle of a surface

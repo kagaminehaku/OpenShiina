@@ -36,6 +36,15 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], vm.EngineGlobal(0x487F24));
             return 0;
         });
+        // 03C2 v: 0x13B41BC, a checksum of the executable (FUN_004374D0 / FUN_004085C0: checksums of its
+        // code, its "riox" section and its version resource). Only Azu Plus reads it: START 0x002F0
+        // stops with "Program Revision Error" unless v ^ 306723180 is 1804523910 - the value of an
+        // unchanged AZUPLUS.EXE.
+        Register(0x03C2, (vm, c, i) =>
+        {
+            vm.Store(c, i.Args[0], 306723180 ^ 1804523910);
+            return 0;
+        });
         // 09F6 w, h: the window size
         Register(0x09F6, (vm, c, i) =>
         {

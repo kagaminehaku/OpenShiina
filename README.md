@@ -6,8 +6,9 @@ x86 code embedded in it), so the title screen, effects, text, menus, saves and s
 game's own.
 
 **Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; **Oreimo Plus** plays
-from beginning to end with its title screen, choices, saves, OPTION page and backlog. The
-others cannot be played yet.
+from beginning to end with its title screen, choices, saves, OPTION page and backlog. **Azu
+Plus** (the same engine version) starts and plays its routes; it has not been played through
+yet. The others cannot be played yet.
 
 You need your own installed copy of the game. OpenShiina contains no game data.
 

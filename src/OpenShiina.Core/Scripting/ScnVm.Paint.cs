@@ -89,6 +89,44 @@ public sealed partial class ScnVm
         RunPaintSlot(0x4880B4);
     }
 
+    /// <summary>
+    /// DirectDraw's Blt onto the primary surface (op_0516 into -1, op_05C1): a rectangle of a
+    /// surface drawn straight onto the window, stretched to the rectangle (l, t, r, b), past the
+    /// display surface; a later WM_PAINT covers it again where it repaints.
+    /// </summary>
+    private void BltToWindow(int l, int t, int r, int b, int src, int sl, int st, int sr, int sb)
+    {
+        Trace?.Add($"f{m_frameNumber} r{m_rounds} blt onto the window {l},{t}-{r},{b} from surface {src} {sl},{st}-{sr},{sb}");
+        int pixels = SurfaceField(src, 2), pitch = SurfaceField(src, 10), bytes = SurfaceField(src, 9) >> 3;
+        int sw = SurfaceField(src, 7), sh = SurfaceField(src, 8);
+        if (pixels == 0 || bytes is not (3 or 4) || r <= l || b <= t || sr <= sl || sb <= st)
+            return;
+        var window = m_window ??= new byte[ScreenWidth * ScreenHeight * 3];
+        var row = new byte[(sr - sl) * bytes];
+        for (int y = Math.Max(t, 0); y < Math.Min(b, ScreenHeight); y++)
+        {
+            int fy = st + (int)((long)(y - t) * (sb - st) / (b - t));
+            if (fy < 0 || fy >= sh)
+                continue;
+            int x0 = Math.Max(sl, 0), x1 = Math.Min(sr, sw);
+            if (x0 >= x1)
+                continue;
+            ReadBytes(pixels + fy * pitch + x0 * bytes, row.AsSpan((x0 - sl) * bytes, (x1 - x0) * bytes));
+            for (int x = Math.Max(l, 0); x < Math.Min(r, ScreenWidth); x++)
+            {
+                int fx = sl + (int)((long)(x - l) * (sr - sl) / (r - l));
+                if (fx < x0 || fx >= x1)
+                    continue;
+                int s = (fx - sl) * bytes, d = (y * ScreenWidth + x) * 3;
+                window[d] = row[s];
+                window[d + 1] = row[s + 1];
+                window[d + 2] = row[s + 2];
+            }
+        }
+        ScreenInvalidated = true;
+        FrameShown = true;
+    }
+
     private void RunPaintSlot(int global)
     {
         int slot = EngineGlobals.GetValueOrDefault(global, -1);

@@ -473,6 +473,11 @@ the functions they call from the decompile. First findings:
 - Checks: engine version `03C0` (247), window size `09F6` (RIO.INI 800 x 600), colour depth
   `09E2` (GetDeviceCaps BITSPIXEL >= 16), DirectDraw `06C2` / DirectSound `06A4` ready, no other
   copy running (`07B2` FindWindow), `D382` / `AA82` switches (AA82 enables file writes).
+- Azu Plus also checks the executable: `03C2 v` gives 0x13B41BC, a checksum the engine makes at
+  start (FUN_004374D0 / FUN_004085C0: checksums of its code, its "riox" section and its version
+  resource), and START 0x002F0 stops with "Program Revision Error" unless v ^ 306723180 is
+  1804523910 (or when bit 0 of 0x487F24 from `03C0` is set). OpenShiina gives the value of an
+  unchanged AZUPLUS.EXE (0x79C6E0EA). No other game reads it.
 - Registry (`00FA` key, `00FF` exists, `00FE` string, `00FD` number): HKCU\software\GrandCross\
   <title>, DataPath (the save folder; START appends `oreimoplus_save.bin`) and InstMode (0 - one
   install choice in SETUP.INI). OpenShiina emulates it: DataPath is the host's save folder.
@@ -780,6 +785,15 @@ the functions they call from the decompile. First findings:
   y, w, h, surface, sx, sy` (FUN_00410BF0: the source rectangle clipped to the surface, the
   destination moving with its left and top edge; 3-byte frames take the bytes, 4-byte frames
   get FF, B, G, R).
+- Azu Plus's START function 207 (a movie on its own: TOPMENU's `mv\STCODE_T.MPG`, not in the
+  game, and the `MOVIE` command, which its scenario never uses) draws in a window without the
+  display surface: an 800 x 600 movie with `05C1 n` (05C0, then the movie's DirectDraw surface
+  Blt onto the primary surface at the record's rectangle +0x20, which is 0, 0, w, h), any other
+  size with `05C0` and `0516 dst, l, t, r, b, src, sl, st, sr, sb, flags, fx` (FUN_0041DED0:
+  IDirectDrawSurface::Blt of rectangles, stretched; dst -1 the window's client area, not scaled;
+  surfaces from `0546 n | 0xC0000000`). Full screen it uses 05C0 and 0514 as Oreimo does. In
+  OpenShiina both draw onto the window's picture (ScnVm.Paint `BltToWindow`), where the next
+  WM_PAINT covers them only in its invalid rectangles.
 - MovieMode 2 (and ERO-ON always) uses a DirectShow filter graph with a sample grabber (16
   records: 0x1B0 bytes at 0x4B9130 in v2.47, 0x220 at 0x4F14F0 in v2.49; states 0 closed, 1
   stopped, 2 paused, 3 running): `05C9 n, file, loop` open and play (v2.49: file 0 plays the one
