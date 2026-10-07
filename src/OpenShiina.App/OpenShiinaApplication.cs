@@ -1,6 +1,6 @@
 // The Avalonia application: on the desktop a window with the game view (its title, full screen
-// and size follow the game; a folder on the command line starts that game at once), on phones and
-// tablets the game view alone.
+// and size follow the game; a folder on the command line starts that game at once; a game that
+// ends goes back to the home screen), on phones and tablets the game view alone.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -34,7 +34,7 @@ public sealed class OpenShiinaApplication : Application
             };
             view.TitleChanged += title => window.Title = title;
             view.FullScreenChanged += full => window.WindowState = full ? WindowState.FullScreen : WindowState.Normal;
-            view.GameEnded += window.Close;
+            // The X while a game plays goes back to the home screen; on the home screen it closes
             window.Closing += (_, e) =>
             {
                 if (view.AllowClose())

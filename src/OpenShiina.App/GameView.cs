@@ -38,7 +38,7 @@ public sealed class GameView : UserControl, IGameWindow
     /// <summary>The game asks for full screen or a window.</summary>
     public event Action<bool>? FullScreenChanged;
 
-    /// <summary>The game ended itself (the window should close).</summary>
+    /// <summary>A game ended and the home screen is back (the window shows the player's title again).</summary>
     public event Action? GameEnded;
 
     public GameView()
@@ -277,7 +277,7 @@ public sealed class GameView : UserControl, IGameWindow
             if (close)
             {
                 m_closeAllowed = true;
-                GameEnded?.Invoke();
+                ReturnToLibrary();
             }
         };
         if (session.Setup.Joypad != false)
@@ -328,31 +328,54 @@ public sealed class GameView : UserControl, IGameWindow
     public Task<int> ShowMessageAsync(string text, string caption, int type) =>
         MessageDialog.ShowAsync(TopLevel.GetTopLevel(this), text, caption, type);
 
-    public void Stopped(Exception? error, string? log)
+    public async void Stopped(Exception? error, string? log)
     {
         m_animating = false;
         OnFrame();
-        if (error == null)
+        if (error != null)
         {
-            GameEnded?.Invoke();
-            return;
+            string message = error is ScnException ? error.Message : $"{error.GetType().Name}: {error.Message}";
+            await MessageDialog.ShowAsync(TopLevel.GetTopLevel(this), log != null ? $"{message}\n\nDetails: {log}" : message, "OpenShiina", 0);
         }
-        string message = error is ScnException ? error.Message : $"{error.GetType().Name}: {error.Message}";
-        _ = MessageDialog.ShowAsync(TopLevel.GetTopLevel(this), log != null ? $"{message}\n\nDetails: {log}" : message, "OpenShiina", 0);
+        ReturnToLibrary();
     }
 
     /// <summary>
-    /// The window is asked to close (its X): false while the scripts are asked first (WM_CLOSE;
-    /// GameEnded follows when they let it). A second try before they answer, or a game that no
-    /// longer runs, closes at once.
+    /// The window is asked to close (its X), or the back button: true when nothing is playing (the
+    /// window may close). While a game plays, the scripts are asked first (WM_CLOSE) and the home
+    /// screen comes back when they let it; a second try before they answer, or a game that no
+    /// longer runs, goes back at once.
     /// </summary>
     public bool AllowClose()
     {
-        if (m_session == null || m_closeAllowed || m_closeAsked || !m_session.Running)
+        if (m_session == null)
             return true;
-        m_closeAsked = true;
-        m_session.RequestClose();
+        if (m_closeAllowed || m_closeAsked || !m_session.Running)
+            ReturnToLibrary();
+        else
+        {
+            m_closeAsked = true;
+            m_session.RequestClose();
+        }
         return false;
+    }
+
+    /// <summary>The game is put away and the home screen shows again.</summary>
+    public void ReturnToLibrary()
+    {
+        if (m_session == null)
+            return;
+        Close();
+        m_closeAsked = m_closeAllowed = false;
+        m_image.IsVisible = false;
+        m_image.Source = null;
+        m_bitmap?.Dispose();
+        m_bitmap = null;
+        m_library.IsVisible = true;
+        m_library.Refresh();
+        FullScreenChanged?.Invoke(false);
+        TitleChanged?.Invoke("OpenShiina");
+        GameEnded?.Invoke();
     }
 
     /// <summary>Stops the game (the window closes).</summary>
