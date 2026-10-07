@@ -6,7 +6,7 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using OpenShiina.Scripting;
 
-namespace OpenShiina.Windows.Scn;
+namespace OpenShiina.Audio;
 
 public sealed class ScnSound(ScnMixer mixer) : IScnSound, IDisposable
 {

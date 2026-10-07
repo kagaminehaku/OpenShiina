@@ -217,13 +217,16 @@ public sealed class ScnWindow : Window
     {
         private readonly Stopwatch m_clock = Stopwatch.StartNew();
         private readonly GdiFonts m_fonts = new();
-        // One sound output for the buffers and the music streams
-        private readonly (ScnMixer Mixer, ScnSound Sound, ScnMusic Music) m_audio = CreateAudio();
+        // One sound output for the buffers and the music streams: the mix on the Windows sound device
+        private readonly (ScnMixer Mixer, ScnSound Sound, ScnMusic Music, NAudio.Wave.WaveOutEvent Output) m_audio = CreateAudio();
 
-        private static (ScnMixer, ScnSound, ScnMusic) CreateAudio()
+        private static (ScnMixer, ScnSound, ScnMusic, NAudio.Wave.WaveOutEvent) CreateAudio()
         {
             var mixer = new ScnMixer();
-            return (mixer, new ScnSound(mixer), new ScnMusic(mixer));
+            var output = new NAudio.Wave.WaveOutEvent { DesiredLatency = 100 };
+            output.Init(new NAudio.Wave.SampleProviders.SampleToWaveProvider(mixer.Output));
+            output.Play();
+            return (mixer, new ScnSound(mixer), new ScnMusic(mixer), output);
         }
 
         public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
@@ -333,6 +336,8 @@ public sealed class ScnWindow : Window
 
         public void Dispose()
         {
+            m_audio.Output.Stop();
+            m_audio.Output.Dispose();
             m_audio.Sound.Dispose();
             m_audio.Music.Dispose();
             m_audio.Mixer.Dispose();

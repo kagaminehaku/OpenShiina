@@ -1,24 +1,21 @@
-// One NAudio output for every sound of the scripts: the sound buffers (ScnSound) and the music
-// streams (ScnMusic) are inputs of a mixer at 44.1 kHz stereo. Starting a sound only adds an
-// input - opening a wave output for each one took 20-30 ms (100 ms the first time) on the window's
-// thread, a dropped frame or two every time a button played its sound under the mouse.
+// One mix of every sound of the scripts: the sound buffers (ScnSound) and the music streams
+// (ScnMusic) are inputs of a mixer at 44.1 kHz stereo, float. Starting a sound only adds an input
+// - opening a device output for each one took 20-30 ms (100 ms the first time), a dropped frame
+// or two every time a button played its sound under the mouse. The platform plays Output on its
+// sound device (Windows: NAudio's WaveOutEvent; elsewhere SDL), reading it on its own thread.
 
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
-namespace OpenShiina.Windows.Scn;
+namespace OpenShiina.Audio;
 
 public sealed class ScnMixer : IDisposable
 {
     public const int Rate = 44100;
     private readonly MixingSampleProvider m_mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(Rate, 2)) { ReadFully = true };
-    private readonly WaveOutEvent m_output = new() { DesiredLatency = 100 };
 
-    public ScnMixer()
-    {
-        m_output.Init(m_mixer);
-        m_output.Play();
-    }
+    /// <summary>The mix: 44.1 kHz stereo float samples, silence when nothing plays (never ends).</summary>
+    public ISampleProvider Output => m_mixer;
 
     /// <summary>Plays samples (any rate, mono or stereo); the voice ends at their end or when stopped.</summary>
     public ScnVoice Start(ISampleProvider source, float gain, IDisposable? owner = null)
@@ -35,11 +32,7 @@ public sealed class ScnMixer : IDisposable
         return voice;
     }
 
-    public void Dispose()
-    {
-        m_output.Stop();
-        m_output.Dispose();
-    }
+    public void Dispose() => m_mixer.RemoveAllMixerInputs();
 }
 
 /// <summary>A sound playing in the mixer: volume, pause and stop from any thread.</summary>
