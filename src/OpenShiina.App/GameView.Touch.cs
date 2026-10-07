@@ -12,14 +12,15 @@
 //     turn towards.
 //   - Android's Back button is a right click while a game plays; on the home screen it leaves.
 // A bar of buttons on the right, over the black beside the picture when there is room, does what
-// the keyboard does in the games: Menu (right click), Auto ('A', AUTO on / off), Skip ('S', SKIP
-// on / off), Log (a turn of the wheel away) and Exit (as the window's X: the scripts are asked);
+// the keyboard does in the games: Menu (right click), Auto ('A', AUTO on / off), Skip (hold to
+// skip, as Ctrl on desktop), Log (a turn of the wheel away) and Exit (as the window's X: the scripts are asked);
 // its arrow folds it away. It shows from the start where the screen is the only input
 // (PlayerPlatform.Touch), elsewhere once a finger touches the game.
 
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -66,6 +67,29 @@ public sealed partial class GameView
             button.Click += (_, _) => action();
             return button;
         }
+        var skipButton = new Button
+        {
+            Content = "Skip", Width = 64, Height = 44, Padding = new Thickness(0), FontSize = 14,
+            HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Brushes.Transparent, Foreground = Brushes.White, Focusable = false,
+        };
+        skipButton.AddHandler(PointerPressedEvent, (_, e) =>
+        {
+            HoldCtrl(true);
+            skipButton.Background = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
+            e.Pointer.Capture(skipButton);
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        skipButton.AddHandler(PointerReleasedEvent, (_, _) =>
+        {
+            HoldCtrl(false);
+            skipButton.Background = Brushes.Transparent;
+        }, RoutingStrategies.Tunnel);
+        skipButton.PointerCaptureLost += (_, _) =>
+        {
+            HoldCtrl(false);
+            skipButton.Background = Brushes.Transparent;
+        };
         m_barButtons = new StackPanel
         {
             Spacing = 2,
@@ -73,7 +97,7 @@ public sealed partial class GameView
             {
                 Make("Menu", RightClick),
                 Make("Auto", () => TypeKey(Avalonia.Input.Key.A)),
-                Make("Skip", () => TypeKey(Avalonia.Input.Key.S)),
+                skipButton,
                 Make("Log", () => Wheel(1)),
                 Make("Exit", () => AllowClose()),
             },
@@ -96,6 +120,16 @@ public sealed partial class GameView
             Child = new StackPanel { Spacing = 2, Children = { m_barFold, m_barButtons } },
         };
         return m_bar;
+    }
+
+    /// <summary>Hold or release Ctrl (VK_CONTROL) for hold-to-skip on touch.</summary>
+    private void HoldCtrl(bool down)
+    {
+        if (m_session is not { } session)
+            return;
+        // VK_LCONTROL = 0xA2, VK_CONTROL = 0x11
+        session.Input.Press(Avalonia.Input.Key.LeftCtrl, down);
+        session.PostMessage(down ? ScnMessage.KeyDown : ScnMessage.KeyUp, 0x11, ScnMessage.Key(0, down, false));
     }
 
     private void UpdateTouchBar()

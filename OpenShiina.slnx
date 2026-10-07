@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/OpenShiina.Android/OpenShiina.Android.csproj">
+      <Deploy />
+    </Project>
     <Project Path="src/OpenShiina.App/OpenShiina.App.csproj" />
     <Project Path="src/OpenShiina.Core/OpenShiina.Core.csproj" />
     <Project Path="src/OpenShiina.Desktop/OpenShiina.Desktop.csproj" />
