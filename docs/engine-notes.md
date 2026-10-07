@@ -188,7 +188,7 @@ game's own. It is split in two projects:
   until the pointer moves); sound is the Core mixer (`Audio/ScnMixer.cs`) on SDL3
   (`SdlAudioOutput`); text is `SkiaFonts`: GDI's font calls on SkiaSharp, with a Japanese
   stand-in for a missing face, measured as MS Gothic (cell = em, ascent 0.859 em, average width
-  half an em); shapes are Core's `Platform/DibShapes.cs` (GDI's Ellipse as Wine draws it).
+  half an em); shapes are Core's `Platform/DibShapes.cs` (GDI's Ellipse, worked out from Windows' pixels).
 - `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` runs the engine on the window's render event;
   sound through the same mixer on NAudio's wave output; text and shapes with GDI (Core
   `Platform/GdiFonts.cs`, `GdiShapes.cs`, Windows only), pixel for pixel as the games.
@@ -610,18 +610,22 @@ the functions they call from the decompile. First findings:
   call gdi32 CreateSolidBrush, CreatePen, SelectObject, Ellipse, DeleteObject (EFCLIB's circle
   wipe draws grey discs into a surface's device context, op_0529), user32 GetForegroundWindow,
   AdjustWindowRect and kernel32 GlobalMemoryStatusEx. Brushes and pens are kept by the VM;
-  shapes go to IScnShapes: GDI itself on Windows (GdiShapes), elsewhere DibShapes, Ellipse as
-  Wine's DIB driver draws it. Ellipse(l, t, r, b) leaves out r and b; the outline is Zingl's
-  algorithm on the (r - l) x (b - t) box (a quarter, mirrored), joined as a closed polyline of the
-  1-pixel pen (each line without its last pixel, so every outline pixel is drawn); the brush fills
-  CreateEllipticRgn's rows of the same box (from the outline's left to its right pixel), the pen
-  drawn over it; 2 pixels wide or high or less is Rectangle. Wine stops short of the tips of an
-  ellipse 1.75 times as tall as wide or more; DibShapes draws them (the middle column or two).
-  Pens wider than a pixel are a disc on each outline pixel (GDI: a polygon). Checked against Wine
-  9.0's GDI (`tools/GdiEllipseCheck` under Wine): all sizes to 96 x 96 and circles to 1100 across
-  with EFCLIB's brush and pen the same, apart from the tall tips; against Windows' GDI, run
-  `dotnet run -c Release --project tools/GdiEllipseCheck` on Windows (differences go to
-  gdi-ellipse-check.txt).
+  shapes go to IScnShapes: GDI itself on Windows (GdiShapes), elsewhere DibShapes. Worked out
+  from Windows 10's pixels (`GdiEllipseCheck dump`): Ellipse(l, t, r, b) in GM_COMPATIBLE is the
+  path StrokeAndFillPath would draw (the same pixels): four Béziers around the box (16l, 16t,
+  16(r - 1), 16(b - 1)) in 28.4, from (right, middle) counterclockwise, control points
+  ceil(k * w / 2) across and floor(k * h / 2) up and down from the middles (k = 4(√2 - 1)/3);
+  flattened by GDI's hybrid forward differencing (the code is in WPF's bezier.cpp, with GDI's
+  2/3-pixel error); filled at pixel centres (left and top edges in); and drawn over by the pen
+  with GDI's cosmetic lines: a pixel is lit when the line meets its diamond |x| + |y| < 1/2, with
+  the right and bottom corners, the pixel holding the line's end left out; a line at exactly 45
+  degrees counts as moved a little (right and down for ++ and --, left and down for +- and -+).
+  Checked: all 1401 circles to 2200 across but 2048, 25577 of 25600 ellipses to 160 x 160 (the
+  rest a pixel off, at 45-degree ties), every flattened path (182), pen alone and two colours
+  (182), moved and cut circles. Not worked out: with a null pen the brush fills
+  CreateEllipticRgn(l, t, r, b) (symmetric, a pixel smaller), approximated; pens wider than a
+  pixel, approximated. `dotnet run -c Release --project tools/GdiEllipseCheck` on Windows
+  compares the two (gdi-ellipse-check.txt).
 - `006F -, v` lists the fixed-pitch TrueType SHIFTJIS_CHARSET faces (no "@" faces) in 32-byte
   entries (IScnFonts.FixedPitchJapaneseFaces). `04E8 mode, a, b, c, v` picks the renderer (0
   GDI, 2 Direct3D, 3 OpenGL): only GDI is offered (v = 1; 0 for the others, the scripts then

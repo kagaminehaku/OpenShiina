@@ -67,8 +67,8 @@ players share them.
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
 - The Avalonia player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
-- Ellipses without Windows follow how [Wine](https://www.winehq.org)'s GDI draws them, with
-  Alois Zingl's ellipse algorithm.
+- Ellipses without Windows flatten their curves with GDI's Bézier flattener as kept in
+  [WPF](https://github.com/dotnet/wpf)'s bezier.cpp (MIT, .NET Foundation).
 
 ## License
 
