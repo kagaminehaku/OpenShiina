@@ -314,7 +314,7 @@ DRAW_EX 423F5, EFECT 42EC3, SE 454A6, EX 46E58, A_CHR 4766C, WAITA 41B0B, L_MONT
 | v2.47 | Oreimo Plus, Azu Plus | Azu: no `L_MONT`, `WAIT_L_MOVIE` (40 commands) |
 | v2.49 | Homu, Yuru, Nyaru, Rikka, Sena, Kuroneko Plus | identical (42 commands, same ids) |
 | v2.49 | ERO-ON | subset (34 commands, PRELOAD renumbered) |
-| v2.50 | Maki Fes!, Re: Rem Plus | 53 commands: adds `WAITSE L_DELAY FADEVOICE L_SMOVIE L_ZBG L_ZBG2 LOOP DATE DELAYRUN DELAYRESET REGMSG L_PRIORITY` |
+| v2.50 | Maki Fes!, Re: Rem Plus | 53 commands: adds `WAITSE L_DELAY FADEVOICE L_SMOVIE L_ZBG L_ZBG2 LOOP DATE DELAYRUN DELAYRESET REGMSG L_PRIORITY`; opcodes numbered apart from v2.49 above 0C30 (section 10, "Engine v2.50") |
 
 Every scenario command used in any game is in that game's table. Beyond what the Oreimo
 player handles, the scripts use:
@@ -399,7 +399,7 @@ engine does, instead of reimplementing their behaviour by hand (sections 6 and 8
 files of the 11 games were disassembled with ScnTools (Oreimo / Azu with the Oreimo table,
 the others with the Sena table):
 
-- **Opcode numbers are shared by every engine version**: the Oreimo table (v2.47, 704
+- **Opcode numbers are shared by v2.47 and v2.49** (not v2.50: see "Engine v2.50" below): the Oreimo table (v2.47, 704
   opcodes) is a subset of the Sena table (1,658); only 5 opcodes (02DB, 04E7, 05D5, 05D6,
   0C30) have different operands.
 - **Oreimo's six files use 247 distinct opcodes** (START 237, TOPMENU 60, EFCLIB 50, SRC_MAIN
@@ -891,6 +891,38 @@ the functions they call from the decompile. First findings:
   row stride (the same address again, seconds of work); scale16 does not step. 5E878 (blend) is
   other code giving the same bytes as Oreimo's 79366 (300 random cases, both on the interpreter)
   and runs as blend32; 5EB4A (a rectangle copy) stays translated.
+- **Engine v2.50** (Re:Rem Plus, Maki Fes!; 2026-10-07). REMPLUS.EXE is not packed: it is read
+  as it is (its interpreter FUN_004297D0, getVar 4164D0, setVar 415F80, the invalid opcode
+  430382; `ScnTools opscan` gives tools/ScnTools/tables/ops_remplus.tsv = Data/ScnOps/ops_v250.tsv).
+  - The opcode table: below 0C30 v2.49's numbers, but `0C30` takes 3 operands and `009C 00CD
+    0113 02C2 02FD 02FE 0410 077A 0A05 0A06 0A07` are new; v2.49's block from 0C31 is numbered
+    from 1069 on. The old survey read v2.50's scripts with Sena's table, so `077A` looked like
+    data; with their own table they use four opcodes v2.49 lacks: `077A w, h` (a size kept,
+    1280 x 720), `02FD` / `02FE` (zlib 1.2.7 blocks [total size, size, stream] for the saves),
+    `009C index, text, w, h, pixels` (a character of the task's text record drawn from w x h
+    bytes, 0-64, at (x, y) off the baseline; the text drawing looks this table up before the
+    font, lowest index first; the layout keeps the font's widths).
+  - v2.49 opcodes they use (ScnVm.Menus.cs, read from Sena's executable): `06CC` Direct3D 9
+    there (1; without it they stop with "Direct3D Error"), `07E5` / `07E6` Background on / off,
+    `0A00 w, h, flags` the screen's size (they ask for the one RIO.INI gives), `09DD`
+    GetSystemMetrics, the window menu `0898 08AC 08C0 08E8 08F2 08FC` and `0014` (kept as
+    handles nothing shows), `030C` a word, `0395` not, `0BCC` strchr, `012D` MoveFile of saves,
+    `0294 base, count, width, slot` the engine's qsort (VC6's, the comparison a slot run to its
+    end with l[0], l[1] the two elements: START sorts its 81,301-entry montage table with the
+    16-byte compare START 8BBD0, written out as `compare16`; that slot's non-zero end is its
+    answer, not the end of the game).
+  - 1025 picture slots (0-0x400; 0-0x100 before).
+  - The screen is shown with Direct3D: a copy into the display surface shows without
+    InvalidateRect. Its movie loop copies frames there with `0514` / `051E` and nothing else, so
+    those repaint their rectangle in v2.50 (the GDI window picture of ScnVm.Paint stays for the
+    rest: showing the surface every frame showed the backlog half drawn).
+  - Its backlog draws its lines again one `0083` after another every frame: `0083` starting
+    text counts as text going on, so a frame does not end between the lines (it flickered).
+  - Sounds in memory (`06B1`) are measured by the container, as the engine does: an Ogg stream
+    ends at its last page (the size of the last file loaded is not theirs). A Windows Media
+    movie (Maki Fes!'s `mv\ed.wmv`) plays the MPEG-1 of the same name beside it.
+  - The Windows players open the window a game pixel to a screen pixel (1280 x 720 at any DPI
+    scaling), smaller only where it does not fit.
 - A routine with loops (a branch backwards) whose translation is not ready at its first call
   waits for it instead of running on the interpreter (Sena's 75FAF: 250 ms there).
 - `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's
