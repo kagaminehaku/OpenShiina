@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The engine without a user interface: archives, decoders, the SCN interpreter, the story
-       engine with its effect formulas, and the audio mixer. No WPF or Windows API, so every
-       front end (Windows, Android, iOS, macOS, later Linux) uses the same code. -->
+  <!-- The engine without a user interface: archives, decoders, the game folder and the SCN
+       interpreter. No WPF, so every front end (Windows now; Linux, macOS, Android, iOS later)
+       uses the same code. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

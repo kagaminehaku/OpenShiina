@@ -1,8 +1,7 @@
 // The engine's namespaces, visible to each other everywhere in this project.
 
 global using OpenShiina.Archives;
-global using OpenShiina.Audio;
 global using OpenShiina.Formats;
 global using OpenShiina.IO;
 global using OpenShiina.Scripting;
-global using OpenShiina.Story;
+global using OpenShiina.Game;

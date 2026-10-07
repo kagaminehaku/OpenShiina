@@ -1,6 +1,5 @@
-// A decoded picture as plain pixels, so that decoders and the story engine need no UI toolkit.
-// Each front end turns it into its own bitmap (the WPF app: UI/Bitmaps.cs) and may keep that
-// bitmap in Native, so the conversion runs once per picture.
+// A decoded picture as plain pixels, so that decoders need no UI toolkit. A front end may turn it
+// into its own bitmap and keep that bitmap in Native, so the conversion runs once per picture.
 
 namespace OpenShiina.Formats;
 

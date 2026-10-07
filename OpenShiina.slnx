@@ -4,7 +4,6 @@
     <Project Path="src/OpenShiina.Windows/OpenShiina.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/OpenShiina.Harness/OpenShiina.Harness.csproj" />
     <Project Path="tests/OpenShiina.ScnBoot/OpenShiina.ScnBoot.csproj" />
   </Folder>
 </Solution>

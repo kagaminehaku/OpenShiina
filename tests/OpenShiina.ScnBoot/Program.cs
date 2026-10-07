@@ -17,7 +17,7 @@
 using System.Text;
 using OpenShiina.Archives;
 using OpenShiina.Scripting;
-using OpenShiina.Story;
+using OpenShiina.Game;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 string? folder = args.Length > 0 && args[0].Length > 0 ? args[0] : null;

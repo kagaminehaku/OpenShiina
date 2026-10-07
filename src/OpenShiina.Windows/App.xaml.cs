@@ -1,9 +1,7 @@
 // OpenShiina for Windows: takes a game folder from the command line or asks for one, finds the
 // game by its .exe (Formats.Json), opens its archives and runs the game's own SCN scripts
-// (approach 2, Scn/ScnWindow).
-//   OpenShiina.exe [--story] [game folder]
-// --story plays it with the story engine and this player's own screens instead (approach 1.5,
-// Player/PlayerWindow; Oreimo Plus only).
+// (Scn/ScnWindow).
+//   OpenShiina.exe [game folder]
 
 using System.IO;
 using System.Windows;
@@ -20,9 +18,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        bool story = e.Args.Contains("--story", StringComparer.OrdinalIgnoreCase);
-        var rest = e.Args.Where(a => !a.Equals("--story", StringComparison.OrdinalIgnoreCase)).ToArray();
-        string? folder = rest.Length > 0 ? rest[0] : AskFolder();
+        string? folder = e.Args.Length > 0 ? e.Args[0] : AskFolder();
         if (folder == null)
         {
             Shutdown();
@@ -31,11 +27,11 @@ public partial class App : Application
 
         try
         {
-            var data = await Task.Run(() => OpenGame(folder, story));
+            var data = await Task.Run(() => OpenGame(folder));
             Window window;
             try
             {
-                window = story ? new PlayerWindow(data) : new Scn.ScnWindow(data);
+                window = new Scn.ScnWindow(data);
             }
             catch
             {
@@ -83,7 +79,7 @@ public partial class App : Application
     }
 
     /// <summary>Recognises the game in <paramref name="folder"/> and opens its archives.</summary>
-    private static GameData OpenGame(string folder, bool story)
+    private static GameData OpenGame(string folder)
     {
         var formats = FormatManager.Instance;
         string archive = Directory.GetFiles(folder, "*.war").FirstOrDefault()
@@ -91,8 +87,6 @@ public partial class App : Application
         var scheme = formats.LookupGame(archive) is { } name ? formats.GetScheme(name) : null;
         if (scheme == null)
             throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder.");
-        if (story && !StoryPlayer.Supports(scheme.Name))
-            throw new NotSupportedException($"{scheme.Name} cannot be played with --story. Supported: Oreimo Plus.");
         return GameData.Open(folder, scheme);
     }
 }

@@ -56,7 +56,7 @@ comments `;`. Every non-empty text line is one message (one click); no message s
 Comments carry the writers' notes (`;【...】` = scene title, `;/// 差分：... ///` = CG variant
 wanted here, `;※i ...` = director's instructions, `;;$L_MONT...` = disabled command).
 `①` in the text is the heart gaiji (`GAIJI.S25` in `_D`). Oreimo Plus: 35 files, ~15,000
-lines, 2,842 messages. Command use in Oreimo Plus, as the story player (`OpenShiina.Core/Story/`) reads them:
+lines, 2,842 messages. Command use in Oreimo Plus, as the scripts read them:
 
 | Command | Uses | Arguments and meaning |
 |---|---|---|
@@ -169,41 +169,24 @@ data), START 54 %, TOPMENU 56 % - START and TOPMENU still have unhandled special
    then a click wait). The staff roll code in SRC_MAIN (L_02080: `staff0-5.s25`,
    `vor0x.ogv`, "staff.asm") is never called: it is a template shared by the engine's games.
 
-## 6. Play Story - status
+## 6. The player
 
-Play Story plays Oreimo Plus from beginning to end (all 35 files, every choice), reading the
-archives of the game folder. It is split in two projects:
+OpenShiina runs the game's own SCN files (START.SCN, TOPMENU.SCN, EFCLIB.SCN, SRC_MAIN.SCN, ...)
+in an interpreter of the engine's bytecode (section 10), so every screen, effect and menu is the
+game's own. It is split in two projects:
 
-- `OpenShiina.Core` (`net10.0`, no WPF or Windows API): archives, decoders, the SCN
-  interpreter, the story engine and its formulas, the audio mixer. Pictures are `PixelImage`
-  (plain BGRA / BGR pixels), sound goes out through `IAudioOutput`, and the screen and the
-  window around it are the interfaces `IStage` and `IStoryView`, so every front end (Windows
-  now; Android, iOS and macOS with .NET MAUI later) reuses all of it.
-- `OpenShiina.Windows` (WPF): the player's screens on Windows.
+- `OpenShiina.Core` (`net10.0`, no WPF): archives and decryption (`Archives/`), decoders
+  (`Formats/`), the game folder (`Game/GameData.cs`, `PlayerFolders`), the SCN interpreter with
+  its embedded x86 code (`Scripting/`). The platform supplies the window, input, sound and fonts
+  through `IScnHost`, `IScnSound`, `IScnMusic`, `IScnFonts`, `IScnShapes`.
+- `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` shows the engine's screen and feeds it input;
+  sound through one NAudio mixer (`Scn/ScnMixer.cs`); text and shapes with GDI (Core
+  `Platform/GdiFonts.cs`, `GdiShapes.cs`, Windows only).
 
-The story runs from the game's own SRC_MAIN.SCN only. A hand-written Oreimo flow came before
-it (`StoryFlow.cs`, kept in the GrandCrossExtractor repository).
-
-| File | Role |
-|---|---|
-| Core `Story/StoryPlayer.cs` | the story engine: flow, scenario command interpreter, auto / skip / Ctrl, backlog, settings, saves and auto saves, save thumbnails, title sequence |
-| Core `Scripting/ScnMachine.cs` | interpreter for SRC_MAIN.SCN (the story order of any game): variables, expressions, jumps, switch / case, local calls; gosub 240 and callmod 203 go to StoryPlayer |
-| Core `Story/StoryOutline.cs` | the chapter list read from SRC_MAIN: files before the route menu = opening, the route menu's options and its switch targets = the routes (each ends at the goto back to the menu loop), the rest = ending |
-| Core `Scripting/ScenarioScript.cs` | TXT parser |
-| Core `Story/GameData.cs` | archives, lookup by stem, S25 cache, MONTBL / NWINTBL / SYSTEM.S25 |
-| Core `Story/IStage.cs` | what the screen must do: planes, the action queue, DRAW / DRAW_EX, effects, scroll, movie |
-| Core `Story/StageMath.cs` | the formulas of section 8: easings, A_CHR loops, rule fade / rule wipe levels, EFCLIB shake and zoom frames |
-| Core `Story/MessageLayout.cs` | message text layout with the engine's font metrics and kinsoku |
-| Core `Audio/AudioEngine.cs` | NAudio mixer (NAudio.Core): BGM, voice, SE channels, loops, fades |
-| Core `Story/SaveData.cs`, `PlayerConfig.cs` | saves, settings and messages read, in `%AppData%\OpenShiina` (`OPENSHIINA_DATA` points them elsewhere, for tests) |
-| Windows `Player/Stage.cs` | `IStage` with WPF: 800x600 planes, snapshot-based DRAW / DRAW_EX, plane animations, scroll, movie (WPF MediaElement plays the MPEG-1 files) |
-| Windows `Player/MessageText.cs` | draws the message text and gaiji at `MessageLayout`'s positions |
-| Windows `Player/WaveOutput.cs` | `IAudioOutput` on the Windows sound device (NAudio.WinMM) |
-| Windows `Player/PlayerWindow.*` | `IStoryView`: title buttons, message window and its button bar, choices, chapter list, input (`.Save` save / load pages, `.Option` OPTION page and backlog page, `.Dialog` YES / NO dialog) |
-
-Command behaviour and the screens follow section 8. Oreimo needs no ruby (its scripts have no
-ruby text; START.SCN loads `d\ruby.s25`, 165 small kana, for games that do) and no automatic
-lip sync / blinking (section 2). Other games: see section 9.
+An earlier player (2026-10-03 to 10-07, "Play Story", `OpenShiina.exe --story`) rewrote the
+story engine in C# instead: StoryPlayer, ScnMachine (SRC_MAIN only), StageMath, its own WPF
+screens. It was removed on 2026-10-07 once the SCN interpreter played Oreimo Plus through; it is
+in the git history. What it found about the engine is in sections 3, 8 and 9.
 
 ## 7. Tools
 
@@ -279,7 +262,7 @@ SRC_MAIN.SCN of every game follows the Oreimo pattern (opening, route menu that 
 routes, ejaculation choices, ending). Across all 11 they use few instructions: mov / local / if /
 goto / gosub / lea / switch / case / eval and arithmetic; TXT files run through `gosub 240`
 (357 calls), menus through `callmod 0,203` or `callmod 0,270`; the rest is the staff roll's
-drawing. The player runs this subset with `ScnMachine`:
+drawing. The old story player (section 6) ran this subset with its `ScnMachine`:
 
 - The script starts with `goto table[b[250]]` (table of code addresses): b[250] is the scene
   number set before each `gosub 240`, so loading a save (its a[] / b[] restored) or starting a
@@ -292,7 +275,7 @@ drawing. The player runs this subset with `ScnMachine`:
   `_Ln` = f[n], `_Zn` = l[n], `{name}`, `shl(x,y)`.
 - Drawing / staff roll instructions are skipped; the time (op 03BD) advances 100 ms per read.
 
-### Text, choices, L_MONT (used by the player)
+### Text, choices, L_MONT (read for the old story player)
 
 - **Message text** (style bank 0, START 22393): font `b[150]` = ＭＳ ゴシック, `_H24_X11_XZ23_Y29`
   (24 px glyphs, advance 11 half width / 23 full width, 29 px lines), white, text area from
@@ -358,7 +341,7 @@ the others with the Sena table):
 - Beyond Oreimo's set: Homu, Yuru, Nyaru, Sena, Kuroneko 1 opcode each; Rikka 2; ERO-ON and Azu
   3; Maki Fes! 22 and Re: Rem Plus 21 (engine v2.50). Running Oreimo's files covers almost all
   of the other games.
-- 56 of Oreimo's opcodes are already run by `ScnMachine` (flow, variables, arithmetic,
+- 56 of Oreimo's opcodes were run by the old `ScnMachine` (flow, variables, arithmetic,
   strings, calls); 29 have names. The list with uses per file is `docs/scn-opcodes.tsv`.
 
 The handlers of opcodes below 0x561 are not in the Ghidra decompile (its jump table has "too

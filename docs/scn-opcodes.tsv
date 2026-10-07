@@ -1,5 +1,5 @@
 # Opcodes used by the SCN files of Oreimo Plus (START, TOPMENU, EFCLIB, SRC_MAIN, LAUNCH, PLAUNCH).
-# op, name in the disassembly, uses, operand signature, run by ScnMachine now, uses per file. See engine-notes.md, section 10.
+# op, name in the disassembly, uses, operand signature, run by the old ScnMachine (removed), uses per file. See engine-notes.md, section 10.
 op	name	uses	sig	vm	files
 0000	end	85	V	yes	EFCLIB:1 LAUNCH:3 PLAUNCH:3 SRC_MAIN:3 START:71 TOPMENU:4
 0001	loadmod	14	V V	yes	LAUNCH:2 PLAUNCH:2 SRC_MAIN:2 START:7 TOPMENU:1

@@ -1,8 +1,9 @@
 # OpenShiina
 
 An unofficial, open-source player for visual novels made with the ShiinaRio (椎名里緒) engine.
-It reads the game's own files: its archives, its flow script `SRC_MAIN.SCN` and its scenario
-files, and shows the story with the engine's effects, text, saves and settings.
+It reads the game's own files and runs the game's own scripts (the engine's SCN bytecode, with the
+x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
+game's own.
 
 **Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; **Oreimo Plus** plays
 from beginning to end with its title screen, choices, saves, OPTION page and backlog. The
@@ -14,10 +15,9 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 
 | Project | Platform |
 |---|---|
-| `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter, the story engine, the audio mixer |
+| `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter and its x86 translator |
 | `src/OpenShiina.Windows` | Windows player (WPF) |
-| Android, iOS, macOS | Planned with .NET MAUI |
-| Linux | Later |
+| Linux, macOS, Android, iOS | Planned |
 
 ## Building
 
@@ -36,9 +36,6 @@ Run `OpenShiina.exe` and choose the game's folder (the one with its `.exe` and `
 pass the folder on the command line. The game is recognised by its `.exe`. The player runs the
 game's own SCN scripts, so the game looks and behaves as it does in its own engine.
 
-`OpenShiina.exe --story [folder]` starts the older player instead: it plays the story with the
-story engine and its own copies of the game's screens (Oreimo Plus only).
-
 Saves and settings are kept in `%AppData%\OpenShiina`.
 
 ## Documentation
@@ -46,8 +43,8 @@ Saves and settings are kept in `%AppData%\OpenShiina`.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.
 - `tools/ScnTools`: disassembler for SCN bytecode.
-- `tests/OpenShiina.Harness`: runs the Windows player off screen and muted, clicks through the
-  story and takes screenshots.
+- `tests/OpenShiina.ScnBoot`: runs a game's scripts without a screen, presses keys and clicks
+  at given frames, saves screenshots, and reports what the engine ran.
 
 ## Credits
 
