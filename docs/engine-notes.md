@@ -228,6 +228,8 @@ Finding problems:
   module and offset of the address, whether the code there is still as loaded (the changed
   bytes), the task's module, base, pc and previous instruction, and the 64 latest embedded
   routine calls with their l[0..13], marking those that point into the damage. ScnBoot prints it.
+- **stall.log** (save folder, both players): a frame that runs over 5 s gets where the
+  interpreter is and the instructions it ran most in the next 2 s (GameThread's stall watch).
 - **OPENSHIINA_PERF** (`Game/PerfMeter.cs`, both players): frames a second and the slowest frame
   in the title (on unless `0`); `log` also writes perf.log every second (slowest engine and
   picture times, main-loop rounds, heap in use, the costliest opcodes, C# routines and x86

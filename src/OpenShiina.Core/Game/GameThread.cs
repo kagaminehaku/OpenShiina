@@ -72,6 +72,72 @@ public sealed class GameThread : IDisposable
     {
         m_window = SynchronizationContext.Current ?? new SynchronizationContext();
         m_thread.Start();
+        new Thread(Watch) { IsBackground = true, Name = "OpenShiina stall watch" }.Start();
+    }
+
+    // Frames the interpreter has finished, for the stall watch
+    private volatile int m_frames;
+
+    /// <summary>
+    /// A frame that runs over 5 s: where the interpreter is and where its time goes (counted for
+    /// 2 s) are appended to stall.log in the save folder, once a stall.
+    /// </summary>
+    private void Watch()
+    {
+        int last = -1;
+        var since = Stopwatch.StartNew();
+        bool reported = false;
+        while (!m_stop && !m_finished)
+        {
+            Thread.Sleep(500);
+            int frames = m_frames;
+            if (frames != last || m_closed)
+            {
+                last = frames;
+                since.Restart();
+                reported = false;
+                m_vm.HotSpots = null;
+                continue;
+            }
+            double seconds = since.Elapsed.TotalSeconds;
+            if (reported || seconds < 5)
+                continue;
+            if (m_vm.HotSpots == null)
+            {
+                m_vm.HotSpots = new();
+                continue;
+            }
+            if (seconds < 7)
+                continue;
+            reported = true;
+            WriteStall(frames, seconds);
+            m_vm.HotSpots = null;
+        }
+    }
+
+    private void WriteStall(int frame, double seconds)
+    {
+        var hot = m_vm.HotSpots;
+        var text = new System.Text.StringBuilder();
+        text.AppendLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}: frame {frame + 1} has run {seconds:F0} s, {m_vm.FrameRounds} rounds");
+        if (m_vm.CurrentTask is { } task)
+            text.AppendLine($"  now slot {task.Slot}: {m_vm.DescribeAddress(task.Current)}, flags {task.Flags:X}");
+        if (hot != null)
+            lock (hot)
+            {
+                long total = hot.Values.Sum(v => (long)v);
+                text.AppendLine($"  {total} instructions in 2 s; the most run:");
+                foreach (var ((slot, codeBase, offset, op), n) in hot.OrderByDescending(h => h.Value).Take(20))
+                    text.AppendLine($"    slot {slot,3} {m_vm.DescribeAddress(codeBase + offset)}: {n,10} op {op:X4}");
+            }
+        try
+        {
+            File.AppendAllText(Path.Combine(m_saveFolder, "stall.log"), text.ToString());
+        }
+        catch (IOException)
+        {
+            // Only for finding problems
+        }
     }
 
     /// <summary>The window drew a frame: the interpreter may run the next one.</summary>
@@ -138,7 +204,9 @@ public sealed class GameThread : IDisposable
                     e(m_vm);
                 if (m_closed)
                     continue;
-                if (!m_vm.RunFrame())
+                bool running = m_vm.RunFrame();
+                m_frames++;
+                if (!running)
                 {
                     m_finished = true;
                     m_window!.Post(_ => Stopped?.Invoke(null, null), null);
