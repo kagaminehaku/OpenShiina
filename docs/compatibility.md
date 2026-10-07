@@ -15,7 +15,7 @@ The state of every game OpenShiina aims at. Update a game's row when something c
 
 | Game | Japanese title | Release | VNDB | ShiinaRio | Status | Checked |
 |---|---|---|---|---|---|---|
-| Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | 🔴 Stops | 2026-10-07 |
+| Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-07 |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-07 |
 | Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | ✅ Plays through | 2026-10-07 |
@@ -33,9 +33,11 @@ of one version share most of their START.SCN; see
 
 ## Notes
 
-**Ero-On!** Stops at the first frame on opcode `079F`, which no other game uses. Its scenario
-commands are a subset of the others' (34, PRELOAD numbered differently), and it always plays
-movies with the filter-graph player (MovieMode 2).
+**Ero-On!** Every route skipped through. It needed `079F` (the window loses its maximise box)
+and C# versions of its own zoom routines (START 5E2D6 scaling down, 5DFA5 enlarging: an earlier
+build than the other games', engine-notes.md section 10). It is shorter than the others, its
+scenario commands are a subset of theirs (34, PRELOAD numbered differently), and the game itself
+has no saves: its title offers only start and quit.
 
 **Azu Plus** Needed `03C2` (a checksum of the executable, checked at start), `05C1` and `0516`
 (movies drawn straight onto the window). Every route played through.
