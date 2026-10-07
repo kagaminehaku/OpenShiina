@@ -206,6 +206,10 @@ game's own. It is split in two projects:
   with GetCursorPos / ScreenToClient against the picture's place in the client area. Keys, mouse
   buttons, the wheel and Alt+Enter also go to the scripts as window messages. (Before the thread, WPF's key events and `Mouse.LeftButton`
   changed only after the frame, so with slow frames a released Ctrl stayed held.)
+- Both players start on a home screen of the games added (Core `Game/GameLibrary.cs`:
+  library.json in the player folder with each game's folder, scheme name, .exe and when it was
+  played; the .exe's icon read by `Formats/ExeIcon.cs` from its PE resources, without Windows):
+  Avalonia's `LibraryView`, WPF's `LibraryWindow`. A folder on the command line plays at once.
 - Both players open one sound output for the whole game (`ScnMixer`, 44.1 kHz stereo; sound
   buffers and music streams are voices of it). Opening a WaveOutEvent per sound took 17-33 ms
   (107 ms the first time) on the window's thread and made every hover sound drop frames.

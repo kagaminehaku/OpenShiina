@@ -1,30 +1,50 @@
-// OpenShiina for Windows: takes a game folder from the command line or asks for one, finds the
-// game by its .exe (Formats.Json), opens its archives and runs the game's own SCN scripts
-// (Scn/ScnWindow).
+// OpenShiina for Windows: the home screen with the games of the library (LibraryWindow), or the
+// game folder given on the command line; finds the game by its .exe (Formats.Json), opens its
+// archives and runs the game's own SCN scripts (Scn/ScnWindow).
 //   OpenShiina.exe [game folder]
 
 using System.IO;
 using System.Windows;
-using Microsoft.Win32;
 using OpenShiina.Archives;
 
 namespace OpenShiina.Windows;
 
 public partial class App : Application
 {
-    // The folder played last, offered first the next time
-    private static string LastFolderFile => Path.Combine(PlayerFolders.Root, "last-game.txt");
+    private LibraryWindow? m_library;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        string? folder = e.Args.Length > 0 ? e.Args[0] : AskFolder();
-        if (folder == null)
+        if (e.Args.Length > 0)
         {
-            Shutdown();
+            if (!await PlayAsync(e.Args[0]))
+                Shutdown();
             return;
         }
+        m_library = new LibraryWindow();
+        m_library.Play += async folder =>
+        {
+            m_library.Message = "Opening the game…";
+            m_library.IsEnabled = false;
+            bool started = await PlayAsync(folder);
+            m_library.IsEnabled = true;
+            if (started)
+                m_library.Close();
+        };
+        // Closed without a game: the player ends
+        m_library.Closed += (_, _) =>
+        {
+            if (MainWindow is not Scn.ScnWindow)
+                Shutdown();
+        };
+        MainWindow = m_library;
+        m_library.Show();
+    }
 
+    /// <summary>Opens the game in <paramref name="folder"/> in its window; false (and a message) when it cannot be played.</summary>
+    private async Task<bool> PlayAsync(string folder)
+    {
         try
         {
             var data = await Task.Run(() => OpenGame(folder));
@@ -41,40 +61,17 @@ public partial class App : Application
             MainWindow = window;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             window.Show();
-            RememberFolder(folder);
+            GameLibrary.Played(folder);
+            return true;
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not play the game in\n{folder}\n\n{ex.Message}", "OpenShiina", MessageBoxButton.OK, MessageBoxImage.Warning);
-            Shutdown();
-        }
-    }
-
-    private static string? AskFolder()
-    {
-        var dialog = new OpenFolderDialog { Title = "Choose the folder of an installed game (where its .exe and .WAR files are)" };
-        try
-        {
-            if (File.Exists(LastFolderFile) && File.ReadAllText(LastFolderFile).Trim() is { Length: > 0 } last && Directory.Exists(last))
-                dialog.InitialDirectory = last;
-        }
-        catch
-        {
-            // No remembered folder
-        }
-        return dialog.ShowDialog() == true ? dialog.FolderName : null;
-    }
-
-    private static void RememberFolder(string folder)
-    {
-        try
-        {
-            Directory.CreateDirectory(PlayerFolders.Root);
-            File.WriteAllText(LastFolderFile, folder);
-        }
-        catch
-        {
-            // Only a convenience
+            string message = $"Could not play the game in\n{folder}\n\n{ex.Message}";
+            if (m_library != null)
+                m_library.Message = message;
+            else
+                MessageBox.Show(message, "OpenShiina", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
     }
 

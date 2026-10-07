@@ -1,5 +1,5 @@
-// The player's one view, on every platform: first a page to choose the game's folder (or the
-// folder given on the command line), then the game's picture, scaled to the view with its
+// The player's one view, on every platform: first the home screen with the games of the library
+// (LibraryView; or the folder given on the command line), then the game's picture, scaled to the view with its
 // proportions kept, black around it. Keyboard, mouse, touch and joystick go to the game's
 // InputState (a touch is the left button), and keys, buttons and the wheel to the scripts as the
 // window messages of the engine. Closing asks the scripts first, as WM_CLOSE does. Each frame the view draws,
@@ -24,8 +24,7 @@ namespace OpenShiina.App;
 public sealed class GameView : UserControl, IGameWindow
 {
     private readonly Image m_image = new() { Stretch = Stretch.Uniform, IsVisible = false };
-    private readonly StackPanel m_start;
-    private readonly TextBlock m_message = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White, MaxWidth = 560 };
+    private readonly LibraryView m_library = new();
     private GameSession? m_session;
     private SdlJoystick? m_joystick;
     // Closing: asked the scripts and waiting for their answer / they let the window close
@@ -42,33 +41,14 @@ public sealed class GameView : UserControl, IGameWindow
     /// <summary>The game ended itself (the window should close).</summary>
     public event Action? GameEnded;
 
-    private static string LastFolderFile => Path.Combine(PlayerFolders.Root, "last-game.txt");
-
     public GameView()
     {
         Background = Brushes.Black;
         Focusable = true;
         RenderOptions.SetBitmapInterpolationMode(m_image, BitmapInterpolationMode.None);
-        var choose = new Button { Content = "Choose the game's folder…", HorizontalAlignment = HorizontalAlignment.Center };
-        choose.Click += async (_, _) => await ChooseFolderAsync();
-        m_start = new StackPanel
-        {
-            Spacing = 16,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Children =
-            {
-                new TextBlock { Text = "OpenShiina", FontSize = 28, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center },
-                new TextBlock
-                {
-                    Text = "Choose the folder of an installed game: the one with its .exe and .WAR files.",
-                    Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap, MaxWidth = 560,
-                },
-                choose,
-                m_message,
-            },
-        };
-        Content = new Grid { Children = { m_image, m_start } };
+        m_library.Play += async folder => await OpenAsync(folder);
+        m_library.AddRequested += async () => await AddGameAsync();
+        Content = new Grid { Children = { m_image, m_library } };
 
         m_image.PointerMoved += (_, e) => Pointer(e);
         m_image.PointerPressed += (_, e) => Pointer(e);
@@ -217,30 +197,41 @@ public sealed class GameView : UserControl, IGameWindow
         return (scale, (size.Width - session.Width * scale) / 2, (size.Height - session.Height * scale) / 2);
     }
 
-    /// <summary>Asks for the game's folder, starting from the one played last.</summary>
-    public async Task ChooseFolderAsync()
+    /// <summary>Asks for a game's folder (starting next to the game played last); null when none was chosen.</summary>
+    private async Task<string?> ChooseFolderAsync()
     {
         if (TopLevel.GetTopLevel(this) is not { } top)
-            return;
+            return null;
         var options = new FolderPickerOpenOptions { Title = "Choose the folder of an installed game", AllowMultiple = false };
         try
         {
-            if (File.Exists(LastFolderFile) && File.ReadAllText(LastFolderFile).Trim() is { Length: > 0 } last && Directory.Exists(last))
-                options.SuggestedStartLocation = await top.StorageProvider.TryGetFolderFromPathAsync(last);
+            if (GameLibrary.Load().FirstOrDefault(g => g.Available) is { } last && Path.GetDirectoryName(last.Folder) is { } near)
+                options.SuggestedStartLocation = await top.StorageProvider.TryGetFolderFromPathAsync(near);
         }
         catch (Exception)
         {
-            // No remembered folder
+            // No folder to start from
         }
         var folders = await top.StorageProvider.OpenFolderPickerAsync(options);
-        if (folders.Count > 0 && folders[0].TryGetLocalPath() is { } path)
-            await OpenAsync(path);
+        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }
+
+    /// <summary>"Add a game…": a folder into the library, when the game in it is recognised.</summary>
+    private async Task AddGameAsync()
+    {
+        if (await ChooseFolderAsync() is not { } folder)
+            return;
+        var game = await Task.Run(() => GameLibrary.Add(folder));
+        m_library.Message = game == null
+            ? $"No game was recognised in {folder}: choose the folder with the game's own .exe and .WAR files."
+            : "";
+        m_library.Refresh();
     }
 
     /// <summary>Recognises the game in a folder, opens its archives and starts it.</summary>
     public async Task OpenAsync(string folder)
     {
-        m_message.Text = "Opening the game…";
+        m_library.Message = "Opening the game…";
         try
         {
             var data = await Task.Run(() =>
@@ -263,24 +254,12 @@ public sealed class GameView : UserControl, IGameWindow
                 throw;
             }
             Start(session);
-            Remember(folder);
+            m_library.Message = "";
+            GameLibrary.Played(folder);
         }
         catch (Exception ex)
         {
-            m_message.Text = $"Could not play the game in {folder}:\n{ex.Message}";
-        }
-    }
-
-    private static void Remember(string folder)
-    {
-        try
-        {
-            Directory.CreateDirectory(PlayerFolders.Root);
-            File.WriteAllText(LastFolderFile, folder);
-        }
-        catch (Exception)
-        {
-            // Only a convenience
+            m_library.Message = $"Could not play the game in {folder}:\n{ex.Message}";
         }
     }
 
@@ -290,7 +269,7 @@ public sealed class GameView : UserControl, IGameWindow
         m_bitmap = new WriteableBitmap(new PixelSize(session.Width, session.Height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
         m_image.Source = m_bitmap;
         m_image.IsVisible = true;
-        m_start.IsVisible = false;
+        m_library.IsVisible = false;
         TitleChanged?.Invoke(session.Data.SchemeName);
         session.CloseAnswered += close =>
         {

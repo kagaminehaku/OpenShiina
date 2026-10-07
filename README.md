@@ -36,8 +36,11 @@ The players are written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` o
 
 ## Usage
 
-Run `OpenShiina` and choose the game's folder (the one with its `.exe` and `.WAR` files), or
-pass the folder on the command line. The game is recognised by its `.exe`. The player runs the
+Run `OpenShiina`: its home screen lists your games with the icons of their `.exe`. **Add a
+game…** takes the game's folder (the one with its `.exe` and `.WAR` files); then a click plays it,
+and its menu (right click) opens its save folder or takes it off the list. Passing a folder on the
+command line plays that game at once and adds it to the list. The game is recognised by its
+`.exe`. Both players share the list (`library.json` next to the saves). The player runs the
 game's own SCN scripts, so the game looks and behaves as it does in its own engine.
 
 Text: the games ask for MS Gothic. The WPF player draws it with Windows GDI, exactly as the game
