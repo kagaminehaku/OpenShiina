@@ -5,11 +5,9 @@ It reads the game's own files and runs the game's own scripts (the engine's SCN 
 x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
 game's own.
 
-**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; **Oreimo Plus** plays
-from beginning to end with its title screen, choices, saves, OPTION page and backlog. **Azu
-Plus** (the same engine version) starts and plays its routes; it has not been played through
-yet. **Kuroneko Plus** (engine v2.49) starts and plays with nothing added; it has not been
-played through either. The others cannot be played yet.
+**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; Oreimo Plus, Sena
+Plus and Kuroneko Plus play through. Every game's state is in
+[docs/compatibility.md](docs/compatibility.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
 
@@ -60,6 +58,7 @@ players share them.
 
 ## Documentation
 
+- [`docs/compatibility.md`](docs/compatibility.md): which games play, and how far each was checked.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.
 - `tools/ScnTools`: disassembler for SCN bytecode.
