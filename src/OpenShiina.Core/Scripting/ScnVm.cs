@@ -670,6 +670,9 @@ public sealed partial class ScnVm
             }
             if ((c.Flags & 1) == 0)
                 return 0;
+            // 0083 text: the task waits until the main loop has drawn it, a step a round
+            if ((c.Flags & 8) != 0)
+                return 0;
             if (ins.Op == 0x0034 || YieldEveryInstruction || count >= Budget)
                 return 0;
         }

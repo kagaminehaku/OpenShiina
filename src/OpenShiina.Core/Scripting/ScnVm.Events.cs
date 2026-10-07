@@ -69,6 +69,15 @@ public sealed partial class ScnVm
         c.Flags = 1;
         for (int guard = 0; (c.Flags & 1) != 0 && !QuitRequested && guard < 1_000_000; guard++)
         {
+            // A slot run to its end draws its 0083 text at once (text waiting for a key would
+            // never end here: it is cut short)
+            for (int step = 0; (c.Flags & 8) != 0 && !QuitRequested; step++)
+            {
+                if (step == 100_000)
+                    c.Flags &= ~8;
+                else
+                    StepTaskText(c);
+            }
             int result = Run(c);
             if (result is 1 or 3)
                 break;

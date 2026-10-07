@@ -618,6 +618,11 @@ the functions they call from the decompile. First findings:
   off it: the save screen's cursor (START 0x2BE6C, frame 2230 of slot 20, 49..365 x 49..153)
   is drawn after the slot (57..357 x 57..145) is composed again, and only the slot is
   invalidated - showing the whole surface left an orange ring after the pointer moved away.
+- **0083 waits** (2026-10-08): the task stops at `0083` until the main loop has drawn its text
+  (flag 8, a step a round); a slot run to its end (events, callbacks) draws it at once. Until
+  then the task ran on, so each `0083` replaced the text of the one before it unfinished: the
+  backlog (START 0x2FE10: 【, name, 】, _r, a measuring pass, the line) showed only the last
+  line it drew - the voiced lines, drawn again every frame (menu item flag 256), lost theirs.
 - **Text over rounds**: `0083` text goes on a character a round, and the engine's rounds take
   no time; the backlog draws its lines again every frame, so a frame that ended at the
   `07D0` showed them half drawn (the first line came and went). RunFrame now goes on with rounds
