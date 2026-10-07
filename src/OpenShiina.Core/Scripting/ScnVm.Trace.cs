@@ -1,8 +1,9 @@
 // A drawing trace for finding problems (OPENSHIINA_TRACE=draw): text started with 0083 / 0084
 // (record, surface, where, the text), where 0083 text ended and the rectangle its characters
-// covered, the positions set with 0078, sprite lists composed into surfaces (04C4 / 04C5) and
-// the rectangles invalidated (07D0), each with the frame, the task and its code offset. The
-// latest lines are kept and written out when the game closes.
+// covered, the positions set with 0078, sprite lists composed into surfaces (04C4 / 04C5), 04C6,
+// 04E2 and 04F6, the rectangles invalidated, WM_PAINT, the window messages and the answers of the
+// message slot (07E4), each with the frame, the task and its code offset. The latest lines are
+// kept and written out when the game closes.
 
 using System.Text;
 

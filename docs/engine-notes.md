@@ -239,8 +239,10 @@ Finding problems:
   OPENSHIINA_PAINT=surface shows the display surface every frame instead of the window's
   picture (ScnVm.Paint), to tell a drawing problem from a repainting one.
   OPENSHIINA_TRACE=draw keeps the latest 200,000 drawing events (text started and where it
-  ended, 0078, 04C4 / 04C5, 07D0, with frame, round, slot and offset) and writes them to
-  draw-trace.log in the save folder when the game closes (ScnVm.Trace.cs).
+  ended, 0078, 04C4 / 04C5, 04C6, 04E2, 04F6, 07D0 and every rectangle invalidated, WM_PAINT,
+  the window messages and what the message slot of 07E4 answered, with frame, round, slot and
+  offset) and writes them to draw-trace.log in the save folder when the game closes
+  (ScnVm.Trace.cs).
 - **ScnBoot** (`tests/OpenShiina.ScnBoot`, `scnboot [folder] [frames] [picture folder] [every]`,
   60 frames a second of virtual time): SCNBOOT_PRESS="frame:vk[:frames],...",
   SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];...", SCNBOOT_SURFACES=1,2 (save more surfaces),
@@ -494,7 +496,9 @@ the functions they call from the decompile. First findings:
   music paused; 0x488090 runs in WM_ACTIVATEAPP's active branch, 0x488094 in the other - they
   were swapped here until 2026-10-07, so music stopped when the window got the focus back),
   the players count a minimised window as not in front (Windows can activate it again while
-  minimised; the original then gets WM_ACTIVATEAPP false as the next window is activated),
+  minimised; the original then gets WM_ACTIVATEAPP false as the next window is activated) and
+  take the focus from the activation events themselves, since IsActive is not always up to
+  date while they are raised (coming back to the window left the game paused),
   WM_CLOSE `078A` (255), and
   every message first `07E4` (248; see "Window messages" below). `00DD` mounts each WAR archive; `0A8D` detaches the IME.
 - The main loop is not tied to frames: it pumps messages and runs every task once per round
@@ -617,7 +621,8 @@ the functions they call from the decompile. First findings:
   window and invalidate their rectangle); text drawn by the engine into the display surface
   without a layer (the character's rectangle, FUN_00417560); full screen on / off. `07D1` is
   UpdateWindow (WM_PAINT at once); otherwise WM_PAINT comes at the next pump of the queue, after
-  the round. Sprites, fades (`04F6`), BitBlt / StretchBlt, fills and movies only draw into
+  the round. OpenShiina adds one of its own: `04E2` into the display surface invalidates where
+  it copied (see "04E2 into the display surface repaints there" below). Sprites, fades (`04F6`), BitBlt / StretchBlt, fills and movies only draw into
   surfaces. The hosts show ScnVm.Window, so what the original never put on the screen stays
   off it: the save screen's cursor (START 0x2BE6C, frame 2230 of slot 20, 49..365 x 49..153)
   is drawn after the slot (57..357 x 57..145) is composed again, and only the slot is
