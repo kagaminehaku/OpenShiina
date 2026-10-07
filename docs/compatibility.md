@@ -19,7 +19,7 @@ The state of every game OpenShiina aims at. Update a game's row when something c
 | Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-07 |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-07 |
 | Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | ✅ Plays through | 2026-10-07 |
-| Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | 🟡 Starts | 2026-10-07 |
+| Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-07 |
@@ -45,8 +45,7 @@ OPTION page, backlog, movies (MovieMode 0 / 1 and 2).
 
 **Homu☆Plus** Every route skipped through; nothing was added for it.
 
-**Yuru Plus** Uses no opcode OpenShiina lacks and boots to the title in ScnBoot. Its scenario
-command table is the same as Sena's and Kuroneko's.
+**Yuru Plus** Every route skipped through; nothing was added for it.
 
 **Sena Plus** Every route skipped through. It was slow (frames over 100 ms) until the v2.49
 builds of the hot embedded routines got their C# versions (engine-notes.md, section 10).
