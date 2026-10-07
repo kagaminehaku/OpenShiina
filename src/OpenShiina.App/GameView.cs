@@ -92,8 +92,8 @@ public sealed class GameView : UserControl, IGameWindow
         if (top is Window window)
         {
             // Minimised counts as not in front (a minimised window can be activated again)
-            window.Activated += (_, _) => UpdateFocus(window);
-            window.Deactivated += (_, _) => UpdateFocus(window);
+            window.Activated += (_, _) => { m_activated = true; UpdateFocus(window); };
+            window.Deactivated += (_, _) => { m_activated = false; UpdateFocus(window); };
             window.PropertyChanged += (_, e) =>
             {
                 if (e.Property == Window.WindowStateProperty)
@@ -102,12 +102,14 @@ public sealed class GameView : UserControl, IGameWindow
         }
     }
 
-    // What the game was last told: in front or not
+    // The last activation event (IsActive may not be up to date while they are raised), and
+    // what the game was last told: in front or not
+    private bool m_activated = true;
     private bool? m_focused;
 
     private void UpdateFocus(Window window)
     {
-        bool focused = window.IsActive && window.WindowState != WindowState.Minimized;
+        bool focused = m_activated && window.WindowState != WindowState.Minimized;
         if (focused == m_focused || m_session == null)
             return;
         m_focused = focused;

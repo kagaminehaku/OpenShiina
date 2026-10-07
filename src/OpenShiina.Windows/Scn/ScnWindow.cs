@@ -76,8 +76,8 @@ public sealed class ScnWindow : Window
         };
         // Minimised counts as not in front: Windows can activate a minimised window again (the
         // original then gets WM_ACTIVATEAPP false as another window takes the focus)
-        Activated += (_, _) => UpdateFocus();
-        Deactivated += (_, _) => UpdateFocus();
+        Activated += (_, _) => { m_activated = true; UpdateFocus(); };
+        Deactivated += (_, _) => { m_activated = false; UpdateFocus(); };
         StateChanged += (_, _) => UpdateFocus();
         Closed += (_, _) =>
         {
@@ -88,12 +88,14 @@ public sealed class ScnWindow : Window
         };
     }
 
-    // What the game was last told: in front or not
+    // The last activation event (IsActive is not always up to date while they are raised), and
+    // what the game was last told: in front or not
+    private bool m_activated;
     private bool? m_focused;
 
     private void UpdateFocus()
     {
-        bool focused = IsActive && WindowState != WindowState.Minimized;
+        bool focused = m_activated && WindowState != WindowState.Minimized;
         if (focused != m_focused)
         {
             m_focused = focused;
