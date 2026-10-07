@@ -875,6 +875,18 @@ the functions they call from the decompile. First findings:
   in its first 2,500 frames; 399 frames over 100 ms in 20,000). Their signatures are now
   registered for the same C# versions (checked with SCNBOOT_VERIFY_NATIVE=1 on 479 calls). Maki
   Fes! and Re: Rem Plus have the v2.47 scale32 and the v2.49 blend32.
+- **Ero-On!'s own zoom routines** (2026-10-07): the first v2.49 build has other code for the
+  zoom and pan of 0x14A3B (case 0 START 5DCCA, the same size; case 1 5DFA5 when both sides grow;
+  case 2 5E2D6 otherwise). 5E2D6 scales down with weight tables counted in steps of 0x100 and
+  16 arguments (four work buffers), written out as `scale16` (ScnVm.Scale16.cs: ~90 ms a call
+  translated, 12 ms); 5DFA5 enlarges bilinearly with a table of (i * 257) / sW in l[12], written
+  out as `enlarge16` (ScnVm.Enlarge16.cs: 2.5 ms for 800 x 600). Both compared byte for byte
+  with the x86 code on the interpreter (scale16 about 900 random cases and 138 calls in the game;
+  enlarge16 250 cases, its table included). Quirk kept by result: when a destination row of
+  scale16 has only a partial last source row, the x86 code steps the source 2^32 times by the
+  row stride (the same address again, seconds of work); scale16 does not step. 5E878 (blend) is
+  other code giving the same bytes as Oreimo's 79366 (300 random cases, both on the interpreter)
+  and runs as blend32; 5EB4A (a rectangle copy) stays translated.
 - A routine with loops (a branch backwards) whose translation is not ready at its first call
   waits for it instead of running on the interpreter (Sena's 75FAF: 250 ms there).
 - `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's

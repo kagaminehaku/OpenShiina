@@ -19,8 +19,11 @@ public sealed partial class ScnVm
     {
         // Oreimo START 79366 (Sena 797B4; MMX): dst = A' * w + B' * (257 - w) >> 8 byte by byte over 32-bit
         // pixels, w = rB * 257 / (rA + rB); A' takes B's colour where A's alpha is 0 (and B' A's).
-        // l[0] dst, l[1] A, l[2] B, l[3..5] their row strides, l[6] width, l[7] height, l[8] rA, l[9] rB
-        RegisterNative(["A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "4A177932B7CDFCE9D2FBC516D15DCB24243F0A00"], "blend32", (vm, c, a) =>
+        // l[0] dst, l[1] A, l[2] B, l[3..5] their row strides, l[6] width, l[7] height, l[8] rA, l[9] rB.
+        // Ero-On!'s START 5E878 is other code that gives the same bytes (300 random cases on the
+        // interpreter against 79366)
+        RegisterNative(["A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "4A177932B7CDFCE9D2FBC516D15DCB24243F0A00",
+                        "9B44AD3EA3AFD3BEE7FA87EF120DEC2088989FA9"], "blend32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), sa = vm.NativeArg(a, 4), sb = vm.NativeArg(a, 5);
@@ -125,6 +128,53 @@ public sealed partial class ScnVm
                 }
                 vm.WriteBytes(dst, rowS);
             }
+        });
+
+        // Ero-On! START 5E2D6 (MMX, the scaling-down case of 0x14CC0): the first v2.49 build's
+        // own way of Oreimo's scale32, written out in ScnVm.Scale16.cs. l[0] dst, l[1] its stride,
+        // l[2..5] dst left, top, right, bottom, l[6] src, l[7] its stride, l[8..11] src left, top,
+        // right, bottom (1/16 pixels), l[12] / l[13] the column / row weights, l[14] / l[15] the
+        // column / row entries (24 bytes each). The x86 code makes the row entries before the
+        // column tables: where those run into them, it runs on the interpreter instead
+        RegisterNative("31DAD459219DC78270C7147720CA1959DFEA5AFB", "scale16", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), dr = vm.NativeArg(a, 4), db = vm.NativeArg(a, 5);
+            int sl = vm.NativeArg(a, 8), sr = vm.NativeArg(a, 10);
+            long columns = (uint)(dr - dl) >> 4, rows = (uint)(db - dt) >> 4;
+            long colWeights = vm.NativeArg(a, 12), colEntries = vm.NativeArg(a, 14), rowEntries = vm.NativeArg(a, 15);
+            long rowEnd = rowEntries + rows * 24;
+            bool Overlaps(long from, long length) => from < rowEnd && rowEntries < from + length;
+            if (Overlaps(colWeights, ((long)(uint)(dr - dl) + 1) * 8) || Overlaps(colEntries, columns * 24))
+            {
+                vm.Interpret(c, vm.m_nativeTarget, a);
+                return;
+            }
+            int length = rows == 0 || columns == 0 ? 0 : (int)(pitch * (((uint)dt >> 4) + rows - 1) + (((uint)dl >> 4) + columns) * 4);
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Scale16(dst, pitch, dl, dt, dr, db, vm.NativeArg(a, 6), vm.NativeArg(a, 7), sl, vm.NativeArg(a, 9), sr, vm.NativeArg(a, 11)))
+                throw vm.Error(c, "Embedded x86 routine (scale16): rectangles it cannot scale (the x86 code would not end)");
+        });
+
+        // Ero-On! START 5DFA5 (MMX, the enlarging case of 0x14BCE), written out in
+        // ScnVm.Enlarge16.cs. l[0] dst, l[1] its stride, l[2..5] dst left, top, right, bottom,
+        // l[6] src, l[7] its stride, l[8..11] src left, top, right, bottom (1/16 pixels), l[12] the
+        // weight table. Rectangles it does not enlarge run on the interpreter
+        RegisterNative("27A535558D763B2B8F0008F2476F0FA14EB45AAB", "enlarge16", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), dr = vm.NativeArg(a, 4), db = vm.NativeArg(a, 5);
+            long columns = (uint)(dr - dl) >> 4, rows = (uint)(db - dt) >> 4;
+            int sl = vm.NativeArg(a, 8), st = vm.NativeArg(a, 9), sr = vm.NativeArg(a, 10), sb = vm.NativeArg(a, 11);
+            if (sr - sl < 0 || sb - st < 0 || dr - dl < sr - sl || db - dt < sb - st)
+            {
+                vm.Interpret(c, vm.m_nativeTarget, a);
+                return;
+            }
+            int length = rows == 0 || columns == 0 ? 0 : (int)(pitch * (((uint)dt >> 4) + rows - 1) + (((uint)dl >> 4) + columns) * 4);
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Enlarge16(dst, pitch, dl, dt, dr, db, vm.NativeArg(a, 6), vm.NativeArg(a, 7), sl, st, sr, sb, vm.NativeArg(a, 12)))
+                throw vm.Error(c, "Embedded x86 routine (enlarge16): rectangles too large");
         });
     }
 }

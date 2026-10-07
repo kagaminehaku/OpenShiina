@@ -69,6 +69,9 @@ public sealed partial class ScnVm
         Register(0x0776, (vm, c, i) => { vm.m_host.SetFullScreen(false); vm.InvalidateWindow(); return 0; });
         // 079E: the window gets a maximise box
         Register(0x079E, (vm, c, i) => 0);
+        // 079F: the window loses it (FUN_004201C0: style 0x487F74 without WS_MAXIMIZEBOX, set
+        // when not full screen); Ero-On! does this at start
+        Register(0x079F, (vm, c, i) => 0);
         // Engine settings kept in globals
         Register(0x076C, (vm, c, i) => vm.SetGlobal(0x488090, c, i));
         Register(0x076D, (vm, c, i) => vm.SetGlobal(0x488094, c, i));
