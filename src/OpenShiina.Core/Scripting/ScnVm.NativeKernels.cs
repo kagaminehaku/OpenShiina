@@ -3,10 +3,10 @@
 // (X86Routine.Signature) and must give the bytes the x86 code gives; VerifyNatives runs the
 // interpreter as well and compares (for tests).
 //
-// Each comes in two builds with the same instructions: the v2.47 one (Oreimo and Azu Plus, also
-// scale32 of Maki Fes! and Re: Rem Plus) ends with "ret 4", the v2.49 one (Homu, Yuru, Nyaru,
-// Rikka, Sena and Kuroneko Plus, also blend32 of Maki Fes! and Re: Rem Plus) with "ret"; the
-// padding between their blocks differs too, so their signatures do.
+// Each comes in two builds with the same instructions: the v2.47 one (Oreimo and Azu Plus) ends
+// with "ret 4", the v2.49 one (Homu, Yuru, Nyaru, Rikka, Sena and Kuroneko Plus, also blend32 of
+// Maki Fes! and Re: Rem Plus) with "ret"; the padding between their blocks differs too, so their
+// signatures do. Maki Fes! and Re: Rem Plus have a third scale32: v2.47's blocks with "ret".
 
 namespace OpenShiina.Scripting;
 
@@ -89,12 +89,13 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
-        // Oreimo START 78380 (Sena 787CE; MMX, 0x1632C): the scaling case of the same copy (source and
+        // Oreimo START 78380 (Sena 787CE, Re: Rem Plus 87920; MMX, 0x1632C): the scaling case of the same copy (source and
         // destination rectangles of different sizes, scaling down), with two work buffers.
         // Written out in ScnVm.Scale32.cs. l[0] dst, l[1] its stride, l[2..5]
         // dst left, top, right, bottom, l[6] src, l[7] its stride, l[8..11] src left, top, right,
         // bottom (1/16 pixels), l[12] / l[13] work buffers
-        RegisterNative(["3481E54756B5B7C00408FD13CDD6C7A5F211DC97", "9122A668741F24CA756ABDBB886B20C41F54CB61"], "scale32", (vm, c, a) =>
+        RegisterNative(["3481E54756B5B7C00408FD13CDD6C7A5F211DC97", "9122A668741F24CA756ABDBB886B20C41F54CB61",
+                        "B4622533F3686687C2F5D363E992BE9B65E959EB"], "scale32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);

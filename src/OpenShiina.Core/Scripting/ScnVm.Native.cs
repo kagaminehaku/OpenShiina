@@ -187,26 +187,23 @@ public sealed partial class ScnVm
             if (info.Native == null && info.Translation is { IsCompleted: false } pending && info.Code.Loops)
                 ((IAsyncResult)pending).AsyncWaitHandle.WaitOne();    // a failed translation leaves it to the interpreter
             long started = vm.OpTimes != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
-            string name;
             vm.RememberCall(c, target, info.Native?.Name ?? (info.Translated != null ? "jit" : "x86"), args);
             if (info.Native is { } native)
             {
                 native.Run(vm, c, args);
-                name = native.Name;
             }
             else if (info.Translated is { } translated)
             {
                 vm.RunTranslated(c, target, args, translated);
-                name = $"jit {target - c.CodeBase:X5}";
             }
             else
             {
                 vm.Interpret(c, target, args);
-                name = $"x86 {target - c.CodeBase:X5}";
             }
             if (vm.OpTimes != null)
             {
-                // C# versions by name, translated and interpreted routines by their offset in the module
+                // C# versions by name, translated and interpreted routines by their module and offset
+                string name = info.Native?.Name ?? $"{(info.Translated != null ? "jit" : "x86")} {vm.DescribeAddress(target)}";
                 var (ticks, calls) = vm.NativeTimes.GetValueOrDefault(name);
                 vm.NativeTimes[name] = (ticks + System.Diagnostics.Stopwatch.GetTimestamp() - started, calls + 1);
             }

@@ -25,7 +25,7 @@ The state of every game OpenShiina aims at. Update a game's row when something c
 | Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-07 |
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-07 |
-| Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | 🟢 Plays | 2026-10-07 |
+| Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-07 |
 
 ShiinaRio is the engine version START.SCN checks (`03C0`, as in RIO.INI's section name). Games
 of one version share most of their START.SCN; see
@@ -65,7 +65,9 @@ make their pages with it).
 **Maki Fes!** Every route skipped through. Its ending movie is a Windows Media file
 (`mv\ed.wmv`), played as the MPEG-1 `mv\ed.mpg` the game ships beside it.
 
-**Re:Rem Plus** Plays; slow in places (being worked on).
+**Re:Rem Plus** Every route skipped through. Its zoomed scenes (`$A_CHR` 40 / 41, a 1600 x 900
+picture scaled to the screen every frame) took 200 ms a frame until its scaling routine ran as
+C# (a third build of scale32; engine-notes.md, section 10).
 
 **Both (engine v2.50)** 1280 x 720, 53 scenario commands, shown through Direct3D. v2.50 has an
 opcode table of its own (read from REMPLUS.EXE: Data/ScnOps/ops_v250.tsv) and 1025 picture

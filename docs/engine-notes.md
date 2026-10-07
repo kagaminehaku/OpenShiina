@@ -878,7 +878,10 @@ the functions they call from the decompile. First findings:
   their signatures differ and they ran translated: Sena's scale32 took ~110 ms a call (478 calls
   in its first 2,500 frames; 399 frames over 100 ms in 20,000). Their signatures are now
   registered for the same C# versions (checked with SCNBOOT_VERIFY_NATIVE=1 on 479 calls). Maki
-  Fes! and Re: Rem Plus have the v2.47 scale32 and the v2.49 blend32.
+  Fes! and Re: Rem Plus have the v2.49 blend32 and a third scale32 (Re: Rem START 87920, Maki
+  86DB0): v2.47's blocks ending with `ret`. It ran translated, 200-260 ms a call, in their zoomed
+  scenes (`$A_CHR` 40 / 41: a 1600 x 900 picture scaled to 1280 x 720 every frame); as C# about
+  5 ms (checked on 218 calls), the frame about 15 ms.
 - **Ero-On!'s own zoom routines** (2026-10-07): the first v2.49 build has other code for the
   zoom and pan of 0x14A3B (case 0 START 5DCCA, the same size; case 1 5DFA5 when both sides grow;
   case 2 5E2D6 otherwise). 5E2D6 scales down with weight tables counted in steps of 0x100 and

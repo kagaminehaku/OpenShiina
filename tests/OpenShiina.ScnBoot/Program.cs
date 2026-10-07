@@ -199,7 +199,7 @@ foreach (var (routine, (ticks, calls)) in vm.NativeTimes.OrderByDescending(t => 
 foreach (var (entry, p) in vm.Cpu.Profile.OrderByDescending(p => p.Value.Instructions).Take(8))
     Console.WriteLine($"  x86 {entry:X8}: {p.Calls} calls, {p.Instructions} instructions");
 foreach (var r in vm.RoutineReport().OrderBy(r => r.Address))
-    Console.WriteLine($"  routine {r.Address:X8} {r.Signature[..12]}: " +
+    Console.WriteLine($"  routine {r.Address:X8} {r.Signature}: " +
         (r.Native != null ? $"C# {r.Native}" : r.Translated ? "translated" : $"interpreter{(r.NotTranslated != null ? $" ({r.NotTranslated})" : "")}"));
 Console.WriteLine($"Opcodes run ({vm.OpCounts.Count} kinds): " +
     string.Join(" ", vm.OpCounts.OrderBy(k => k.Key).Select(k => $"{k.Key:X4}x{k.Value}")));

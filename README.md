@@ -5,9 +5,9 @@ It reads the game's own files and runs the game's own scripts (the engine's SCN 
 x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
 game's own.
 
-**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; ten play through:
-all nine on engine v2.47 and v2.49 (Ero-On!, Azu Plus, Oreimo Plus, Homu☆Plus, Yuru Plus, Sena
-Plus, Kuroneko Plus, Nyaru Plus, Rikka Plus) and Maki Fes! (v2.50); Re:Rem Plus (v2.50) plays.
+**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; all eleven play
+through: the nine on engine v2.47 and v2.49 (Ero-On!, Azu Plus, Oreimo Plus, Homu☆Plus, Yuru Plus,
+Sena Plus, Kuroneko Plus, Nyaru Plus, Rikka Plus) and the two on v2.50 (Maki Fes!, Re:Rem Plus).
 Every game's state is in [docs/compatibility.md](docs/compatibility.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
