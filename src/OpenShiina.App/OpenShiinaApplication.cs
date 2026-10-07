@@ -35,7 +35,13 @@ public sealed class OpenShiinaApplication : Application
             view.TitleChanged += title => window.Title = title;
             view.FullScreenChanged += full => window.WindowState = full ? WindowState.FullScreen : WindowState.Normal;
             view.GameEnded += window.Close;
-            window.Closing += (_, _) => view.Close();
+            window.Closing += (_, e) =>
+            {
+                if (view.AllowClose())
+                    view.Close();
+                else
+                    e.Cancel = true;
+            };
             desktop.MainWindow = window;
             if (desktop.Args is [var folder, ..] && folder.Length > 0)
                 window.Opened += async (_, _) => await view.OpenAsync(folder);

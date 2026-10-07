@@ -12,7 +12,8 @@
 // left button (WM_LBUTTONDBLCLK) into the masks 0x13B43FC / 0x13B4400, which only the engine's
 // own menus read (FUN_00411770 / FUN_00411B40, opcodes 0B72 / 0B86, used by none of the eleven).
 // The wheel (WM_MOUSEWHEEL) sets 0x13B52B4 to 1 (away from the user) or -1; only text with "_s"
-// key 8 reads it (it ends the text's waits) and op_0083 clears it.
+// key 8 reads it (it ends the text's waits) and op_0083 clears it. START sees the wheel itself
+// through its message slot (ScnVm.Events).
 
 namespace OpenShiina.Scripting;
 
@@ -80,7 +81,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>WM_MOUSEWHEEL: a turn of the wheel away from the user (delta > 0) or towards.</summary>
-    public void MouseWheel(int delta) => EngineGlobals[0x13B52B4] = delta >= 0 ? 1 : -1;
+    private void MouseWheel(int delta) => EngineGlobals[0x13B52B4] = delta >= 0 ? 1 : -1;
 
     /// <summary>FUN_00413810: the buttons with key repeat for one caller.</summary>
     public int RepeatButtons(int caller, int buttons)

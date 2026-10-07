@@ -266,6 +266,7 @@ public sealed partial class ScnVm
         {
             for (int k = 0; k < 4; k++)
                 vm.Value(c, i.Args[k]);
+            vm.m_paintPending = true;
             vm.ScreenInvalidated = true;
             vm.FrameShown = true;
             return 0;

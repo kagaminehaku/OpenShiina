@@ -3,7 +3,9 @@
 // frame WPF renders, so slow frames never hold up the window (its input, moving, resizing); the
 // window takes the latest picture when it renders. Text is drawn with GDI as the game does it,
 // sounds and music play through NAudio; keys, mouse buttons and the joystick are read with the
-// calls the engine makes (GetAsyncKeyState, joyGetPosEx) when the scripts ask. Save data goes to
+// calls the engine makes (GetAsyncKeyState, joyGetPosEx) when the scripts ask, and passed on as
+// the window messages the engine's window procedure gives the scripts (keys, mouse buttons, the
+// wheel). Closing the window asks the scripts first, as WM_CLOSE does. Save data goes to
 // %AppData%\OpenShiina\scn\<game>, never the game folder.
 
 using System.Diagnostics;
@@ -28,6 +30,8 @@ public sealed class ScnWindow : Window
     private readonly WriteableBitmap m_bitmap;
     private readonly byte[] m_frame;
     private bool m_stopped;
+    // Closing: asked the scripts and waiting for their answer / they let the window close
+    private bool m_closeAsked, m_closeAllowed;
 
     public ScnWindow(GameData data)
     {
@@ -40,6 +44,15 @@ public sealed class ScnWindow : Window
         m_game = new GameThread(setup.CreateVm(m_host), setup, data.SchemeName);
         m_game.TitleChanged += title => Title = title;
         m_game.Stopped += Stop;
+        m_game.CloseAnswered += close =>
+        {
+            m_closeAsked = false;
+            if (close)
+            {
+                m_closeAllowed = true;
+                Close();
+            }
+        };
 
         Title = data.SchemeName;
         Background = Brushes.Black;
@@ -78,6 +91,22 @@ public sealed class ScnWindow : Window
         m_game.Post(active ? ScnEvent.Activate : ScnEvent.Deactivate);
     }
 
+    /// <summary>
+    /// The X button (WM_CLOSE): the scripts run what they do on closing and answer; the window
+    /// closes when they let it. A second try while they have not answered, or a game that no
+    /// longer runs, closes at once.
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (!m_closeAllowed && !m_closeAsked && m_game.Running)
+        {
+            e.Cancel = true;
+            m_closeAsked = true;
+            m_game.RequestClose();
+        }
+        base.OnClosing(e);
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         // Alt+Enter: the engine's full screen switch
@@ -87,14 +116,63 @@ public sealed class ScnWindow : Window
             e.Handled = true;
             return;
         }
+        if (e.Key != Key.System)
+            m_game.PostMessage(ScnMessage.KeyDown, KeyInterop.VirtualKeyFromKey(e.Key), ScnMessage.Key(0, true, e.IsRepeat));
         base.OnKeyDown(e);
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        if (e.Key != Key.System)
+            m_game.PostMessage(ScnMessage.KeyUp, KeyInterop.VirtualKeyFromKey(e.Key), ScnMessage.Key(0, false, false));
+        base.OnKeyUp(e);
+    }
+
+    protected override void OnMouseDown(MouseButtonEventArgs e)
+    {
+        int message = e.ChangedButton switch
+        {
+            MouseButton.Left => e.ClickCount == 2 ? ScnMessage.LButtonDoubleClick : ScnMessage.LButtonDown,
+            MouseButton.Right => ScnMessage.RButtonDown,
+            MouseButton.Middle => ScnMessage.MButtonDown,
+            _ => 0,
+        };
+        if (message != 0)
+            m_game.PostMessage(message, MouseKeys(), MousePoint());
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseUp(MouseButtonEventArgs e)
+    {
+        int message = e.ChangedButton switch
+        {
+            MouseButton.Left => ScnMessage.LButtonUp,
+            MouseButton.Right => ScnMessage.RButtonUp,
+            MouseButton.Middle => ScnMessage.MButtonUp,
+            _ => 0,
+        };
+        if (message != 0)
+            m_game.PostMessage(message, MouseKeys(), MousePoint());
+        base.OnMouseUp(e);
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         if (e.Delta != 0)
-            m_game.PostWheel(e.Delta);
+            m_game.PostMessage(ScnMessage.MouseWheel, e.Delta << 16 | MouseKeys() & 0xFFFF, MousePoint());
         base.OnMouseWheel(e);
+    }
+
+    /// <summary>wParam of a mouse message: MK_LBUTTON 1, MK_RBUTTON 2, MK_SHIFT 4, MK_CONTROL 8, MK_MBUTTON 0x10.</summary>
+    private static int MouseKeys() =>
+        (Mouse.LeftButton == MouseButtonState.Pressed ? 1 : 0) | (Mouse.RightButton == MouseButtonState.Pressed ? 2 : 0) |
+        (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 4 : 0) | (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ? 8 : 0) |
+        (Mouse.MiddleButton == MouseButtonState.Pressed ? 0x10 : 0);
+
+    private int MousePoint()
+    {
+        var (x, y) = m_host.MousePosition;
+        return ScnMessage.Point(x, y);
     }
 
     // The time of the frame WPF rendered last: Rendering can be raised more than once a frame

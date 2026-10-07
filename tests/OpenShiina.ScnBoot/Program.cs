@@ -13,8 +13,10 @@
 // a C# version on the interpreter instead of translating it (X86Jit); SCNBOOT_JIT=sync translates
 // a routine before its first call instead of in the background. SCNBOOT_JOY="frame:x,y[:buttons[:frames]];..."
 // moves joystick 0 (0-65535, 32767 in the middle; buttons 1 and 2) for some frames (default 3)
-// and has the scripts read it whatever RIO.INI's Joypad says. SCNBOOT_WHEEL="frame,..." turns the
-// mouse wheel one notch (away from the user) at those frames.
+// and has the scripts read it whatever RIO.INI's Joypad says. SCNBOOT_WHEEL="frame[:-],..." turns the
+// mouse wheel one notch away from the user (":-" towards) at those frames. Presses and clicks are
+// also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
+// SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
 // The game folder defaults to games\GrandCross\俺妹プラス in a folder above this program.
 
 using System.Text;
@@ -85,7 +87,8 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_TRACE") is { } trace && trace.Sp
     (traceFrom, traceTo) = (int.Parse(tf), int.Parse(tt));
 
 var wheel = (Environment.GetEnvironmentVariable("SCNBOOT_WHEEL") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
-    .Select(int.Parse).ToHashSet();
+    .ToDictionary(w => int.Parse(w.Split(':')[0]), w => w.EndsWith(":-") ? -120 : 120);
+int closeAt = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_CLOSE"), out int ca) ? ca : -1;
 int frame = 0;
 StartWatchdog();
 try
@@ -96,8 +99,22 @@ try
         host.Clock = (uint)(frame * 1000L / 60);
         host.Frame = frame;
         frameTime.Restart();
-        if (wheel.Contains(frame))
-            vm.MouseWheel(120);
+        foreach (var (message, wParam) in host.Messages())
+            vm.WindowMessage(message, wParam, message is >= ScnMessage.LButtonDown and <= ScnMessage.MButtonUp
+                ? ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y) : ScnMessage.Key(0, message == ScnMessage.KeyDown, false));
+        if (wheel.TryGetValue(frame, out int delta))
+            vm.WindowMessage(ScnMessage.MouseWheel, delta << 16, ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y));
+        if (frame == closeAt)
+        {
+            bool closed = vm.CloseWindow();
+            Console.WriteLine($"  [close] frame {frame}: the scripts {(closed ? "let the window close" : "keep the window")}");
+            if (closed)
+            {
+                if (pictures != null)
+                    SaveScreen(frame);
+                break;
+            }
+        }
         if (!vm.RunFrame())
         {
             Console.WriteLine($"The scripts quit after {frame} frames.");
@@ -327,6 +344,28 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     }
 
     public int MouseButtons => m_mouse.Where(m => m.From <= Frame && Frame <= m.To).Select(m => m.Buttons).FirstOrDefault();
+
+    /// <summary>The window messages of this frame: keys and buttons that go down or up.</summary>
+    public IEnumerable<(int Message, int WParam)> Messages()
+    {
+        foreach (var p in m_presses)
+        {
+            if (p.From == Frame)
+                yield return (ScnMessage.KeyDown, p.Key);
+            if (p.To + 1 == Frame)
+                yield return (ScnMessage.KeyUp, p.Key);
+        }
+        foreach (var m in m_mouse)
+            foreach (var (bit, down, up) in new[] { (1, ScnMessage.LButtonDown, ScnMessage.LButtonUp), (2, ScnMessage.RButtonDown, ScnMessage.RButtonUp), (4, ScnMessage.MButtonDown, ScnMessage.MButtonUp) })
+            {
+                if ((m.Buttons & bit) == 0)
+                    continue;
+                if (m.From == Frame)
+                    yield return (down, bit);
+                if (m.To + 1 == Frame)
+                    yield return (up, 0);
+            }
+    }
 
     // SCNBOOT_JOY: (first frame, last frame, the joystick then); in the middle at other times
     private readonly List<(int From, int To, ScnJoystick Joystick)> m_joystick =

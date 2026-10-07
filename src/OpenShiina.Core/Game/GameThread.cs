@@ -2,9 +2,10 @@
 // window (its input, moving, resizing). Each frame the window shows, it lets the interpreter run
 // one frame (RunFrame: until the scripts show a picture); a window that draws fewer than 60
 // frames a second (or none, minimised) is topped up: the thread goes on after 1/60 s anyway. A picture the scripts showed is copied, as 32-bit
-// BGRA, into a buffer the window takes when it draws. Window events (focus, Alt+Enter, the wheel)
-// are queued for the interpreter's thread; the title and the end of the game are posted to the
-// window's thread (the SynchronizationContext Start is called on). Used by both players.
+// BGRA, into a buffer the window takes when it draws. Window events and messages (focus,
+// Alt+Enter, keys, mouse buttons, the wheel, closing) are queued for the interpreter's thread; the
+// title, the answer to closing and the end of the game are posted to the window's thread (the
+// SynchronizationContext Start is called on). Used by both players.
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -20,7 +21,7 @@ public sealed class GameThread : IDisposable
     private readonly SemaphoreSlim m_frameTick = new(0, 1);
     private readonly ConcurrentQueue<Action<ScnVm>> m_events = new();
     private SynchronizationContext? m_window;
-    private volatile bool m_stop;
+    private volatile bool m_stop, m_finished, m_closed;
 
     // The latest picture (BGRA, Width x Height) and whether the window has taken it
     private readonly object m_frameLock = new();
@@ -41,6 +42,12 @@ public sealed class GameThread : IDisposable
     /// with the path of the crash log it was written to (null when it could not be written).
     /// </summary>
     public event Action<Exception?, string?>? Stopped;
+
+    /// <summary>The answer to <see cref="RequestClose"/> (on the window's thread): true when the window may close.</summary>
+    public event Action<bool>? CloseAnswered;
+
+    /// <summary>The interpreter is still running frames (not ended, stopped by an error, or closed).</summary>
+    public bool Running => !m_finished && !m_stop && !m_closed;
 
     public GameThread(ScnVm vm, GameSetup setup, string name)
     {
@@ -80,8 +87,21 @@ public sealed class GameThread : IDisposable
     /// <summary>A window event for the scripts (focus, Alt+Enter, closing).</summary>
     public void Post(ScnEvent e) => m_events.Enqueue(vm => vm.Notify(e));
 
-    /// <summary>A turn of the mouse wheel (WM_MOUSEWHEEL's delta).</summary>
-    public void PostWheel(int delta) => m_events.Enqueue(vm => vm.MouseWheel(delta));
+    /// <summary>A window message for the scripts (ScnMessage: keys, mouse buttons, the wheel).</summary>
+    public void PostMessage(int message, int wParam, int lParam) => m_events.Enqueue(vm => vm.WindowMessage(message, wParam, lParam));
+
+    /// <summary>
+    /// The player closes the window (WM_CLOSE): the scripts run what they do on closing (START
+    /// saves what it keeps) and answer with <see cref="CloseAnswered"/>; when they let the window
+    /// close, no more frames run.
+    /// </summary>
+    public void RequestClose() => m_events.Enqueue(vm =>
+    {
+        bool close = vm.CloseWindow();
+        if (close)
+            m_closed = true;
+        m_window!.Post(_ => CloseAnswered?.Invoke(close), null);
+    });
 
     /// <summary>Copies the latest picture into <paramref name="target"/> when there is a new one.</summary>
     public bool TakeFrame(Span<byte> target, int stride)
@@ -108,10 +128,13 @@ public sealed class GameThread : IDisposable
                 if (m_stop)
                     break;
                 long started = Stopwatch.GetTimestamp();
-                while (m_events.TryDequeue(out var e))
+                while (!m_closed && m_events.TryDequeue(out var e))
                     e(m_vm);
+                if (m_closed)
+                    continue;
                 if (!m_vm.RunFrame())
                 {
+                    m_finished = true;
                     m_window!.Post(_ => Stopped?.Invoke(null, null), null);
                     return;
                 }
@@ -127,6 +150,7 @@ public sealed class GameThread : IDisposable
         }
         catch (Exception ex)
         {
+            m_finished = true;
             if (m_stop)
                 return;
             // What the engine knows about the error, for a bug report

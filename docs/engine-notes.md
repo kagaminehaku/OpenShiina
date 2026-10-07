@@ -181,8 +181,11 @@ game's own. It is split in two projects:
   through `IScnHost`, `IScnSound`, `IScnMusic`, `IScnFonts`, `IScnShapes`.
 - Both players run the interpreter on a thread of its own (Core `Game/GameThread.cs`), one
   engine frame per frame the window draws (and at least one every 1/60 s), and take the picture
-  as BGRA; window events (focus, Alt+Enter, the wheel) are queued for that thread, the title and
-  the game's end posted back. Slow frames no longer hold up the window's input, moving or resizing.
+  as BGRA; window events and messages (focus, Alt+Enter, keys, mouse buttons, the wheel) are
+  queued for that thread, the title and the game's end posted back. Slow frames no longer hold up
+  the window's input, moving or resizing. The X button sends WM_CLOSE to the scripts first
+  (`GameThread.RequestClose`): the window closes when they let it (START saves its system data
+  then), and at once when the game no longer runs or on a second try before they answer.
 - `OpenShiina.App` (Avalonia, every platform) with the head `OpenShiina.Desktop` (Windows,
   Linux, macOS): `GameSession` holds the GameThread and the host;
   `GameView` shows the picture scaled and passes on keys, mouse, touch, the wheel and joystick 0
@@ -199,8 +202,8 @@ game's own. It is split in two projects:
   `GdiShapes.cs`, Windows only), pixel for pixel as the games. Keys, mouse buttons and the
   joystick are read as the engine reads them, when the scripts ask: GetAsyncKeyState,
   joyGetPosEx(0) (a reading kept 4 ms; after a failure, no joystick for a second), the pointer
-  with GetCursorPos / ScreenToClient against the picture's place in the client area. Alt+Enter
-  and the wheel go to the scripts. (Before the thread, WPF's key events and `Mouse.LeftButton`
+  with GetCursorPos / ScreenToClient against the picture's place in the client area. Keys, mouse
+  buttons, the wheel and Alt+Enter also go to the scripts as window messages. (Before the thread, WPF's key events and `Mouse.LeftButton`
   changed only after the frame, so with slow frames a released Ctrl stayed held.)
 - Both players open one sound output for the whole game (`ScnMixer`, 44.1 kHz stereo; sound
   buffers and music streams are voices of it). Opening a WaveOutEvent per sound took 17-33 ms
@@ -236,6 +239,8 @@ Finding problems:
   SCNBOOT_INI="Key=value;..." (RIO.INI as the scripts read it, e.g. MovieMode=2),
   SCNBOOT_TRACE="from:to" (time and main-loop rounds of each frame), SCNBOOT_JIT=0|sync,
   SCNBOOT_JOY="frame:x,y[:buttons[:frames]];..." (joystick 0, 0-65535, read whatever RIO.INI says),
+  SCNBOOT_WHEEL="frame[:-],..." (a notch away from / towards the user), SCNBOOT_CLOSE=frame
+  (WM_CLOSE; presses and clicks are sent as window messages too),
   SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10).
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
@@ -475,8 +480,8 @@ the functions they call from the decompile. First findings:
   by the table level * v / 255; 256 or the last level again: nothing).
 - Window events: each runs a slot to its end (FUN_0042BF60): WM_TIMER the slot of `0AF0`
   (Oreimo 193, every 100 ms from `0AFA id, ms, v`; `0AFB` KillTimer), Alt+Enter `0794`
-  (252), focus lost `076C` (253, pauses), focus back `076D` (254), the end `078A` (255), close
-  request `07E4` (248). `00DD` mounts each WAR archive; `0A8D` detaches the IME.
+  (252), focus lost `076C` (253, pauses), focus back `076D` (254), WM_CLOSE `078A` (255), and
+  every message first `07E4` (248; see "Window messages" below). `00DD` mounts each WAR archive; `0A8D` detaches the IME.
 - The main loop is not tied to frames: it pumps messages and runs every task once per round
   (`0033` makes tasks yield after every instruction, `0032` ends that); pictures reach the
   window only through the drawing opcodes.
@@ -567,14 +572,33 @@ the functions they call from the decompile. First findings:
   0x420 into the masks 0x13B43FC / 0x13B4400 on WM_LBUTTONDBLCLK (0x20 on a left press, 0x10
   right, 0x800 middle); only the engine's built-in menus read those (FUN_00411770 / FUN_00411B40,
   opcodes `0B72` / `0B86`, which none of the eleven games uses).
-- **Wheel**: WM_MOUSEWHEEL sets 0x13B52B4 to 1 (away from the user) or -1. Only text reads it:
-  with `_s` key 8 a turn ends the text's waits (FUN_00432F00), and `0083` clears it. START's
-  message window sets `_s13` (decide, Ctrl, wheel), but that only counts when the line is typed
-  by the engine (`0083` at 0x0486B, taken when b[240] & 2 is clear). In normal play b[240] & 2 is
-  set and START shows the line itself, a character at a time fading in (0x0579F: `00A0` /
-  `00A1` into a table of characters, drawn as sprites); it ends that on a click, Return or Ctrl
-  read with `03E9`, which has no wheel. So in Oreimo the wheel does nothing to the dialogue, in
-  the original as here (5,000 frames of the opening: `0083` never ran).
+- **Window messages** (window procedure 0x4355B0; Ghidra leaves it out, read from the x86):
+  every message first goes to the slot of `07E4` (0x4880A8) with l[0] the window, l[1] the
+  message, l[2] wParam, l[3] lParam pushed on its stack; an "end" other than 0 takes the message.
+  Then the slots of `0849` (message -> slot pairs, 0x7DB128; `0848` clears, `084A` removes; no
+  game uses them), then the engine's own handling: WM_CLOSE runs the slot of `078A` and closes
+  only when its end is not 0 (no slot: closes); WM_ACTIVATEAPP the focus slots; WM_PAINT (after
+  `07D0`'s InvalidateRect) shows the back surface; WM_xBUTTONDOWN / UP keep the button masks
+  0x13B52AC (held) / 0x13B52B0 (pressed since the last read) / 0x13B43FC / 0x13B4400 (with 0x20,
+  0x10, 0x800, and 0x420 for a double click); WM_MOUSEMOVE clears 0x13B4404.
+  START's message slot (248, 0x17D11) takes nothing (end 0) but watches: WM_ACTIVATEAPP (b[17]
+  bit 4: read the keys; START sets it at boot too), WM_MOUSEWHEEL (b[18] |= 1 away from the
+  user, 2 towards: its button engine (0x7CDED) gives the turns to buttons - a turn away opens
+  the backlog, as in the game), WM_LBUTTONDOWN / WM_RBUTTONDOWN (end AUTO / SKIP, b[226] = 0),
+  WM_KEYDOWN 'A' (AUTO on / off: b[226] 2) and 'S' (SKIP on / off: b[226] 1), and WM_PAINT
+  (in SKIP with b[240] & 2: a clock drawn with sprites 4100+). Oreimo's START closes
+  with slot 255 (0x01363): it saves its system data (`gosub 330` / `333`), frees its blocks and
+  ends with 1 - no question asked; a game closed without it loses what it keeps there.
+  ScnVm: `Notify` (focus, Alt+Enter as WM_SYSKEYDOWN), `WindowMessage` (keys, buttons, wheel),
+  `CloseWindow`; WM_PAINT is sent at the start of the frame after `07D0`, WM_TIMER before the
+  timer slot. Checked in ScnBoot: a turn away opens the backlog, 'S' skips to the first choice,
+  'A' turns AUTO on, closing writes the save file (it did not before).
+- **Wheel** in the engine: WM_MOUSEWHEEL also sets 0x13B52B4 to 1 (away from the user) or -1,
+  read only by text: with `_s` key 8 a turn ends the text's waits (FUN_00432F00), and `0083`
+  clears it. START's message window sets `_s13` (decide, Ctrl, wheel), but that only counts
+  when the engine types the line (`0083` at 0x0486B, when b[240] & 2 is clear); in normal play
+  START shows the line itself, a character at a time fading in (0x0579F: `00A0` / `00A1`, the
+  characters drawn as sprites), and ends that on a click, Return or Ctrl read with `03E9`.
 - **Heap** (2026-10-07): GlobalAlloc / VirtualAlloc blocks come from ScnVm.Allocate and go back
   with ScnVm.Free: `04B1` and every opcode that puts a new picture into a slot (`04B0`, `055A`,
   `055C`, `04B2`) free the slot's picture - also a block `04B2` put there: START loads pictures

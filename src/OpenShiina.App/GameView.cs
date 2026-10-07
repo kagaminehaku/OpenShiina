@@ -1,7 +1,8 @@
 // The player's one view, on every platform: first a page to choose the game's folder (or the
 // folder given on the command line), then the game's picture, scaled to the view with its
 // proportions kept, black around it. Keyboard, mouse, touch and joystick go to the game's
-// InputState (a touch is the left button), the wheel to the scripts. Each frame the view draws,
+// InputState (a touch is the left button), and keys, buttons and the wheel to the scripts as the
+// window messages of the engine. Closing asks the scripts first, as WM_CLOSE does. Each frame the view draws,
 // it reads the joystick, takes the game's latest picture and lets the interpreter run its next frame.
 
 using Avalonia;
@@ -27,6 +28,8 @@ public sealed class GameView : UserControl, IGameWindow
     private readonly TextBlock m_message = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White, MaxWidth = 560 };
     private GameSession? m_session;
     private SdlJoystick? m_joystick;
+    // Closing: asked the scripts and waiting for their answer / they let the window close
+    private bool m_closeAsked, m_closeAllowed;
     private WriteableBitmap? m_bitmap;
     private bool m_animating;
 
@@ -74,7 +77,7 @@ public sealed class GameView : UserControl, IGameWindow
         m_image.PointerWheelChanged += (_, e) =>
         {
             if (m_session != null && e.Delta.Y != 0)
-                m_session.PostWheel(e.Delta.Y > 0 ? 120 : -120);
+                m_session.PostMessage(ScnMessage.MouseWheel, (int)Math.Round(e.Delta.Y * 120) << 16 | MouseKeys(e), PointOf(e));
         };
     }
 
@@ -113,7 +116,33 @@ public sealed class GameView : UserControl, IGameWindow
             return;
         }
         m_session.Input.Press(e.Key, down);
+        if (VirtualKeys.From(e.Key) is var vk and not 0)
+        {
+            // Ctrl, Shift and Alt as the general key, as WM_KEYDOWN gives them
+            int general = VirtualKeys.General(vk);
+            m_session.PostMessage(down ? ScnMessage.KeyDown : ScnMessage.KeyUp, general != 0 ? general : vk, ScnMessage.Key(0, down, false));
+        }
         e.Handled = true;
+    }
+
+    /// <summary>wParam of a mouse message: MK_LBUTTON 1, MK_RBUTTON 2, MK_SHIFT 4, MK_CONTROL 8, MK_MBUTTON 0x10.</summary>
+    private static int MouseKeys(PointerEventArgs e)
+    {
+        var p = e.GetCurrentPoint(null).Properties;
+        return (p.IsLeftButtonPressed ? 1 : 0) | (p.IsRightButtonPressed ? 2 : 0) | (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 4 : 0) |
+            (e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 8 : 0) | (p.IsMiddleButtonPressed ? 0x10 : 0);
+    }
+
+    /// <summary>lParam of a mouse message: the point in the game's picture.</summary>
+    private int PointOf(PointerEventArgs e)
+    {
+        if (m_session == null)
+            return 0;
+        var (scale, left, top) = Placement(m_session);
+        if (scale <= 0)
+            return 0;
+        var p = e.GetCurrentPoint(m_image).Position;
+        return ScnMessage.Point((int)Math.Floor((p.X - left) / scale), (int)Math.Floor((p.Y - top) / scale));
     }
 
     private void Pointer(PointerEventArgs e)
@@ -133,6 +162,31 @@ public sealed class GameView : UserControl, IGameWindow
             m_session.Input.Buttons = 0;
         if (e.RoutedEvent == PointerPressedEvent)
             e.Pointer.Capture(m_image);
+        // WM_xBUTTONDOWN / UP for the scripts
+        if (e is PointerPressedEventArgs pressed)
+        {
+            int message = point.Properties.PointerUpdateKind switch
+            {
+                PointerUpdateKind.LeftButtonPressed => pressed.ClickCount == 2 ? ScnMessage.LButtonDoubleClick : ScnMessage.LButtonDown,
+                PointerUpdateKind.RightButtonPressed => ScnMessage.RButtonDown,
+                PointerUpdateKind.MiddleButtonPressed => ScnMessage.MButtonDown,
+                _ => touch ? ScnMessage.LButtonDown : 0,
+            };
+            if (message != 0)
+                m_session.PostMessage(message, MouseKeys(e), PointOf(e));
+        }
+        else if (e is PointerReleasedEventArgs released)
+        {
+            int message = released.InitialPressMouseButton switch
+            {
+                MouseButton.Left => ScnMessage.LButtonUp,
+                MouseButton.Right => ScnMessage.RButtonUp,
+                MouseButton.Middle => ScnMessage.MButtonUp,
+                _ => touch ? ScnMessage.LButtonUp : 0,
+            };
+            if (message != 0)
+                m_session.PostMessage(message, MouseKeys(e), PointOf(e));
+        }
     }
 
     /// <summary>The picture is scaled uniformly into the image's bounds, centred.</summary>
@@ -218,6 +272,15 @@ public sealed class GameView : UserControl, IGameWindow
         m_image.IsVisible = true;
         m_start.IsVisible = false;
         TitleChanged?.Invoke(session.Data.SchemeName);
+        session.CloseAnswered += close =>
+        {
+            m_closeAsked = false;
+            if (close)
+            {
+                m_closeAllowed = true;
+                GameEnded?.Invoke();
+            }
+        };
         if (session.Setup.Joypad != false)
             m_joystick = new SdlJoystick();
         session.Start();
@@ -277,6 +340,20 @@ public sealed class GameView : UserControl, IGameWindow
         }
         string message = error is ScnException ? error.Message : $"{error.GetType().Name}: {error.Message}";
         _ = MessageDialog.ShowAsync(TopLevel.GetTopLevel(this), log != null ? $"{message}\n\nDetails: {log}" : message, "OpenShiina", 0);
+    }
+
+    /// <summary>
+    /// The window is asked to close (its X): false while the scripts are asked first (WM_CLOSE;
+    /// GameEnded follows when they let it). A second try before they answer, or a game that no
+    /// longer runs, closes at once.
+    /// </summary>
+    public bool AllowClose()
+    {
+        if (m_session == null || m_closeAllowed || m_closeAsked || !m_session.Running)
+            return true;
+        m_closeAsked = true;
+        m_session.RequestClose();
+        return false;
     }
 
     /// <summary>Stops the game (the window closes).</summary>

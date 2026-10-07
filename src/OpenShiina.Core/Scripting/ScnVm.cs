@@ -566,6 +566,7 @@ public sealed partial class ScnVm
     {
         MakePages();
         PumpGraphMovies();
+        PumpMessages();
         FrameShown = false;
         FrameRounds = 0;
         for (int round = 0; round < maxRounds && !FrameShown && !QuitRequested; round++)

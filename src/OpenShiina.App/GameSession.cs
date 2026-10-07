@@ -46,7 +46,17 @@ public sealed class GameSession : IDisposable
         m_thread = new GameThread(Setup.CreateVm(m_host), Setup, data.SchemeName);
         m_thread.TitleChanged += title => m_window.SetTitle(title);
         m_thread.Stopped += (error, log) => m_window.Stopped(error, log);
+        m_thread.CloseAnswered += close => CloseAnswered?.Invoke(close);
     }
+
+    /// <summary>The scripts' answer to <see cref="RequestClose"/> (on the window's thread): true when the window may close.</summary>
+    public event Action<bool>? CloseAnswered;
+
+    /// <summary>The interpreter still runs frames.</summary>
+    public bool Running => m_thread.Running;
+
+    /// <summary>The player closes the window: the scripts run what they do on closing (WM_CLOSE) and answer.</summary>
+    public void RequestClose() => m_thread.RequestClose();
 
     /// <summary>Starts the interpreter; call it on the window's thread.</summary>
     public void Start() => m_thread.Start();
@@ -57,8 +67,8 @@ public sealed class GameSession : IDisposable
     /// <summary>Window events for the scripts (focus, Alt+Enter, closing).</summary>
     public void Post(ScnEvent e) => m_thread.Post(e);
 
-    /// <summary>A turn of the mouse wheel (positive away from the user).</summary>
-    public void PostWheel(int delta) => m_thread.PostWheel(delta);
+    /// <summary>A window message for the scripts (ScnMessage: keys, mouse buttons, the wheel).</summary>
+    public void PostMessage(int message, int wParam, int lParam) => m_thread.PostMessage(message, wParam, lParam);
 
     /// <summary>Copies the latest picture into <paramref name="target"/> when there is a new one.</summary>
     public bool TakeFrame(Span<byte> target, int stride) => m_thread.TakeFrame(target, stride);
