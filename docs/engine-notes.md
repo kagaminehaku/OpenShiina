@@ -491,6 +491,8 @@ the functions they call from the decompile. First findings:
   (252), focus back `076C` (253: music on, play time counted again), focus lost `076D` (254:
   music paused; 0x488090 runs in WM_ACTIVATEAPP's active branch, 0x488094 in the other - they
   were swapped here until 2026-10-07, so music stopped when the window got the focus back),
+  the players count a minimised window as not in front (Windows can activate it again while
+  minimised; the original then gets WM_ACTIVATEAPP false as the next window is activated),
   WM_CLOSE `078A` (255), and
   every message first `07E4` (248; see "Window messages" below). `00DD` mounts each WAR archive; `0A8D` detaches the IME.
 - The main loop is not tied to frames: it pumps messages and runs every task once per round

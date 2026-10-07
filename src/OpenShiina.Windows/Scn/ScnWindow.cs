@@ -74,8 +74,11 @@ public sealed class ScnWindow : Window
             m_game.Start();
             CompositionTarget.Rendering += OnRendering;
         };
-        Activated += (_, _) => Focus(true);
-        Deactivated += (_, _) => Focus(false);
+        // Minimised counts as not in front: Windows can activate a minimised window again (the
+        // original then gets WM_ACTIVATEAPP false as another window takes the focus)
+        Activated += (_, _) => UpdateFocus();
+        Deactivated += (_, _) => UpdateFocus();
+        StateChanged += (_, _) => UpdateFocus();
         Closed += (_, _) =>
         {
             CompositionTarget.Rendering -= OnRendering;
@@ -83,6 +86,19 @@ public sealed class ScnWindow : Window
             m_host.Dispose();
             m_data.Dispose();
         };
+    }
+
+    // What the game was last told: in front or not
+    private bool? m_focused;
+
+    private void UpdateFocus()
+    {
+        bool focused = IsActive && WindowState != WindowState.Minimized;
+        if (focused != m_focused)
+        {
+            m_focused = focused;
+            Focus(focused);
+        }
     }
 
     private void Focus(bool active)

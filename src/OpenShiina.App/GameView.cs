@@ -91,9 +91,27 @@ public sealed class GameView : UserControl, IGameWindow
         top.AddHandler(KeyUpEvent, (_, k) => Key(k, false), RoutingStrategies.Tunnel, handledEventsToo: true);
         if (top is Window window)
         {
-            window.Activated += (_, _) => Focus(true);
-            window.Deactivated += (_, _) => Focus(false);
+            // Minimised counts as not in front (a minimised window can be activated again)
+            window.Activated += (_, _) => UpdateFocus(window);
+            window.Deactivated += (_, _) => UpdateFocus(window);
+            window.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == Window.WindowStateProperty)
+                    UpdateFocus(window);
+            };
         }
+    }
+
+    // What the game was last told: in front or not
+    private bool? m_focused;
+
+    private void UpdateFocus(Window window)
+    {
+        bool focused = window.IsActive && window.WindowState != WindowState.Minimized;
+        if (focused == m_focused || m_session == null)
+            return;
+        m_focused = focused;
+        Focus(focused);
     }
 
     private void Focus(bool active)
@@ -362,6 +380,7 @@ public sealed class GameView : UserControl, IGameWindow
         m_animating = false;
         m_session?.Dispose();
         m_session = null;
+        m_focused = null;
         m_joystick?.Dispose();
         m_joystick = null;
     }
