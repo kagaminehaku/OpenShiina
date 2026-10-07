@@ -38,6 +38,9 @@ public sealed partial class GameView : UserControl, IGameWindow
     /// <summary>The game asks for full screen or a window.</summary>
     public event Action<bool>? FullScreenChanged;
 
+    /// <summary>A game started: the size of its picture in pixels (the desktop window takes it).</summary>
+    public event Action<int, int>? GameSizeChanged;
+
     /// <summary>A game ended and the home screen is back (the window shows the player's title again).</summary>
     public event Action? GameEnded;
 
@@ -317,6 +320,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         m_image.IsVisible = true;
         m_library.IsVisible = false;
         TitleChanged?.Invoke(session.Data.SchemeName);
+        GameSizeChanged?.Invoke(session.Width, session.Height);
         session.CloseAnswered += close =>
         {
             m_closeAsked = false;

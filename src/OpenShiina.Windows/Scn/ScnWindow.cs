@@ -70,6 +70,21 @@ public sealed class ScnWindow : Window
         };
         SourceInitialized += (_, _) =>
         {
+            // The picture opens a game pixel to a screen pixel: WPF sizes in 1/96 inch, so a
+            // screen scaled to 125% would stretch it to 1.25 (blocky with nearest-neighbour);
+            // smaller than that only where it does not fit the screen
+            var dpi = VisualTreeHelper.GetDpi(this);
+            double w = width / dpi.DpiScaleX, h = height / dpi.DpiScaleY;
+            var area = SystemParameters.WorkArea;
+            double room = Math.Min((area.Width - 2 * SystemParameters.ResizeFrameVerticalBorderWidth) / w,
+                (area.Height - SystemParameters.WindowCaptionHeight - 2 * SystemParameters.ResizeFrameHorizontalBorderHeight) / h);
+            if (room < 1)
+            {
+                w *= room;
+                h *= room;
+            }
+            ((Image)Content).Width = w;
+            ((Image)Content).Height = h;
             m_host.Window = new WindowInteropHelper(this).Handle;
             m_game.Start();
             CompositionTarget.Rendering += OnRendering;
