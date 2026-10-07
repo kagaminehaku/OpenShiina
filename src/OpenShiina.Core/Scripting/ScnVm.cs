@@ -567,6 +567,7 @@ public sealed partial class ScnVm
     /// </summary>
     public bool RunFrame(int maxRounds = 20000)
     {
+        m_frameNumber++;
         MakePages();
         PumpGraphMovies();
         // The window is shown at start: all of it waits for its first WM_PAINT

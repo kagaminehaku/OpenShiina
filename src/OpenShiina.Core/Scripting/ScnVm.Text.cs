@@ -1465,7 +1465,10 @@ public sealed partial class ScnVm
         int surface = c.TextSurface;
         S(rec, RContext, c.Slot);
         int at = G(rec, RPtr);
+        int drawnAt = Trace != null ? G(rec, RRect) ^ G(rec, RRect + 1) ^ G(rec, RRect + 3) * 31 : 0;
         TextStep(rec, surface is >= 0 and < SurfaceCount ? surface : -1, surface == DisplaySurface);
+        if (Trace != null)
+            TraceTextStep(c, rec, surface >= 0 && (G(rec, RRect) ^ G(rec, RRect + 1) ^ G(rec, RRect + 3) * 31) != drawnAt);
         if (G(rec, RPtr) != at)
             m_textWentOn = true;
         if (G(rec, RState) == 0)
@@ -1501,6 +1504,7 @@ public sealed partial class ScnVm
             int surface = vm.Value(c, i.Args[0]), text = vm.Value(c, i.Args[1]);
             int rec = vm.CurrentRecord(c);
             vm.SetText(rec, -1, -1, text);
+            vm.TraceTextStart(c, 0x0084, surface, rec, text);
             bool invalidate = surface == vm.DisplaySurface;
             if (surface is < -1 or >= SurfaceCount)
                 surface = -1;
@@ -1516,6 +1520,7 @@ public sealed partial class ScnVm
             int text = vm.Value(c, i.Args[1]);
             int rec = vm.CurrentRecord(c);
             vm.SetText(rec, -1, -1, text);
+            vm.TraceTextStart(c, 0x0083, c.TextSurface, rec, text);
             c.Flags |= 8;
             if ((vm.G(rec, RSkipKeys) & 8) != 0)
                 vm.EngineGlobals[0x13B52B4] = 0;
@@ -1526,6 +1531,8 @@ public sealed partial class ScnVm
         {
             int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
             int rec = vm.CurrentRecord(c);
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"0078 record {vm.G(rec, RIndex)} to {x},{y}");
             vm.S(rec, RX, x);
             vm.S(rec, RLeft, x);
             vm.S(rec, RY, y);

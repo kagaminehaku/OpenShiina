@@ -60,6 +60,8 @@ public sealed class GameThread : IDisposable
         Width = setup.Width;
         Height = setup.Height;
         m_perf = PerfMeter.Create(vm, name, setup.SaveFolder);
+        if (Environment.GetEnvironmentVariable("OPENSHIINA_TRACE") == "draw")
+            vm.Trace = new DrawTrace();
         m_front = new byte[Width * Height * 4];
         m_back = new byte[Width * Height * 4];
         m_thread = new Thread(Run) { IsBackground = true, Name = "OpenShiina interpreter" };
@@ -235,5 +237,13 @@ public sealed class GameThread : IDisposable
         if (m_thread.IsAlive)
             m_thread.Join(1000);
         m_perf?.Dispose();
+        try
+        {
+            m_vm.Trace?.Save(Path.Combine(m_saveFolder, "draw-trace.log"));
+        }
+        catch (IOException)
+        {
+            // Only for finding problems
+        }
     }
 }

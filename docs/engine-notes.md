@@ -236,6 +236,9 @@ Finding problems:
   OPENSHIINA_JOYPAD=0 hides the joystick from the scripts, =ini follows RIO.INI's Joypad.
   OPENSHIINA_PAINT=surface shows the display surface every frame instead of the window's
   picture (ScnVm.Paint), to tell a drawing problem from a repainting one.
+  OPENSHIINA_TRACE=draw keeps the latest 200,000 drawing events (text started and where it
+  ended, 0078, 04C4 / 04C5, 07D0, with frame, round, slot and offset) and writes them to
+  draw-trace.log in the save folder when the game closes (ScnVm.Trace.cs).
 - **ScnBoot** (`tests/OpenShiina.ScnBoot`, `scnboot [folder] [frames] [picture folder] [every]`,
   60 frames a second of virtual time): SCNBOOT_PRESS="frame:vk[:frames],...",
   SCNBOOT_MOUSE="frame:x,y[:buttons[:frames]];...", SCNBOOT_SURFACES=1,2 (save more surfaces),

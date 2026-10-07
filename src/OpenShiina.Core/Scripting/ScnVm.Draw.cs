@@ -262,6 +262,8 @@ public sealed partial class ScnVm
         Register(0x07D0, (vm, c, i) =>
         {
             int l = vm.Value(c, i.Args[0]), t = vm.Value(c, i.Args[1]), r = vm.Value(c, i.Args[2]), b = vm.Value(c, i.Args[3]);
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"07D0 {l},{t}-{r},{b}");
             vm.InvalidateWindow(l, t, r, b);
             vm.FrameShown = true;
             return 0;

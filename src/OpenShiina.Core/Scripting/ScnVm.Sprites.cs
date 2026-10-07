@@ -789,6 +789,8 @@ public sealed partial class ScnVm
             if (n is < 0 or >= SurfaceCount || vm.SurfaceField(n, 2) == 0)
                 return 0;
             int list = vm.m_spriteList;
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"04C4 list {list} ({vm.m_spriteCounts[list]} entries) into surface {n}");
             vm.Compose(vm.TableAddress(list), vm.m_spriteCounts[list], vm.SurfaceField(n, 2),
                 vm.SurfaceField(n, 7), vm.SurfaceField(n, 8), vm.SurfaceField(n, 10), null);
             return 0;
@@ -801,6 +803,8 @@ public sealed partial class ScnVm
             if (n is < 0 or >= SurfaceCount || vm.SurfaceField(n, 2) == 0)
                 return 0;
             int list = vm.m_spriteList;
+            if (vm.Trace != null)
+                vm.TraceLine(c, $"04C5 list {list} ({vm.m_spriteCounts[list]} entries) into surface {n}, {l},{t}-{r},{b}");
             vm.Compose(vm.TableAddress(list), vm.m_spriteCounts[list], vm.SurfaceField(n, 2),
                 vm.SurfaceField(n, 7), vm.SurfaceField(n, 8), vm.SurfaceField(n, 10), (l, t, r, b));
             return 0;
