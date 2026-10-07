@@ -913,6 +913,11 @@ public sealed partial class ScnVm
                 vm.CopyMemory(dst, src, bytes * width);
             if (dstSurface == vm.DisplaySurface)
             {
+                // Not the original's (FUN_00417900 only draws): the window is repainted where the
+                // copy went. START's fade (slot 212, 0x197AF) skipped with Ctrl copies the title
+                // into the display surface without 07D0, after a WM_PAINT has shown the surface
+                // it was restored from - the title stayed white but where the pointer passed.
+                vm.InvalidateWindow(l, t, r, b);
                 vm.FrameShown = true;
             }
             return 0;

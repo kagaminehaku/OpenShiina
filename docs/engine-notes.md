@@ -627,6 +627,12 @@ the functions they call from the decompile. First findings:
   then the task ran on, so each `0083` replaced the text of the one before it unfinished: the
   backlog (START 0x2FE10: 【, name, 】, _r, a measuring pass, the line) showed only the last
   line it drew - the voiced lines, drawn again every frame (menu item flag 256), lost theirs.
+- **04E2 into the display surface repaints there** (2026-10-08, OpenShiina's own, not the
+  executable's): START's fade into the title (slot 212, 0x197AF) under Ctrl (skip) copies the
+  title into the display surface with `04E2` and no `07D0`, after the title menu (0x7C7D4 /
+  0x7C7FC) has saved the composed title to surface 1, put the old picture back from surface 4
+  and let a WM_PAINT show it: the window stayed white but where the pointer went over buttons.
+  Not checked against the original.
 - **Text over rounds**: `0083` text goes on a character a round, and the engine's rounds take
   no time; the backlog draws its lines again every frame, so a frame that ended at the
   `07D0` showed them half drawn (the first line came and went). RunFrame now goes on with rounds
