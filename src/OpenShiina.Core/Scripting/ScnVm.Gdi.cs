@@ -2,7 +2,7 @@
 // LoadLibraryA + GetProcAddress, the arguments up to an FF byte pushed as dwords). The functions
 // the eleven games call are done here: the GDI ones draw into the engine's surfaces through
 // their device contexts (0x00030000 + surface, op_0529), with brushes and pens kept here and the
-// shapes drawn by the platform (IScnShapes: GDI itself on Windows). Also the font list of op_006F.
+// shapes drawn by the platform (IScnShapes: GDI itself on Windows, else Platform/DibShapes.cs). Also the font list of op_006F.
 
 namespace OpenShiina.Scripting;
 
@@ -28,6 +28,8 @@ public sealed partial class ScnVm
     // What each device context has selected (a new one: the white brush and the black pen)
     private readonly Dictionary<int, (int Brush, int Pen)> m_gdiSelected = new();
     private int m_nextGdiObject = 0x00060001;
+    // Without the platform's GDI: GDI's shapes as Wine's DIB driver draws them
+    private static readonly Platform.DibShapes s_dibShapes = new();
     private const int WhiteBrush = 0x00050000, BlackPen = 0x00050001, NullBrush = 0x00050002, NullPen = 0x00050003;
 
     private void RegisterGdi()
@@ -149,50 +151,10 @@ public sealed partial class ScnVm
         var region = new byte[stride * (y1 - y0)];
         for (int y = y0; y < y1; y++)
             ReadBytes(pixels + y * pitch + x0 * bytes, region.AsSpan((y - y0) * stride, stride));
-        if (m_host.Shapes is { } shapes)
-            shapes.Ellipse(region, x1 - x0, y1 - y0, stride, bytes, l - x0, t - y0, r - x0, b - y0, fill, outline);
-        else
-            ApproximateEllipse(region, x1 - x0, y1 - y0, stride, bytes, l - x0, t - y0, r - x0, b - y0, fill, outline);
+        (m_host.Shapes ?? s_dibShapes).Ellipse(region, x1 - x0, y1 - y0, stride, bytes, l - x0, t - y0, r - x0, b - y0, fill, outline);
         for (int y = y0; y < y1; y++)
             WriteBytes(pixels + y * pitch + x0 * bytes, region.AsSpan((y - y0) * stride, stride));
         Shown(surface);
         return true;
-    }
-
-    /// <summary>
-    /// Without the platform's GDI: the ellipse inside (l, t) - (r - 1, b - 1), the pen on its
-    /// edge pixels. GDI's own shapes differ on some edge pixels.
-    /// </summary>
-    private static void ApproximateEllipse(Span<byte> pixels, int width, int height, int stride, int bytes,
-        int l, int t, int r, int b, int? brush, ScnPen? pen)
-    {
-        if (r < l)
-            (l, r) = (r, l);
-        if (b < t)
-            (t, b) = (b, t);
-        double cx = (l + r - 1) / 2.0, cy = (t + b - 1) / 2.0, ax = (r - l) / 2.0, ay = (b - t) / 2.0;
-        if (ax <= 0 || ay <= 0)
-            return;
-        bool Inside(int x, int y)
-        {
-            double dx = (x - cx) / ax, dy = (y - cy) / ay;
-            return dx * dx + dy * dy <= 1;
-        }
-        for (int y = Math.Max(t, 0); y < Math.Min(b, height); y++)
-            for (int x = Math.Max(l, 0); x < Math.Min(r, width); x++)
-            {
-                if (!Inside(x, y))
-                    continue;
-                bool edge = !Inside(x - 1, y) || !Inside(x + 1, y) || !Inside(x, y - 1) || !Inside(x, y + 1);
-                int? colour = edge && pen != null ? pen.Value.Color : brush;
-                if (colour is not { } c)
-                    continue;
-                int at = y * stride + x * bytes;
-                pixels[at] = (byte)(c >> 16);
-                pixels[at + 1] = (byte)(c >> 8);
-                pixels[at + 2] = (byte)c;
-                if (bytes == 4)
-                    pixels[at + 3] = 0;
-            }
     }
 }

@@ -56,6 +56,7 @@ players share them.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.
 - `tools/ScnTools`: disassembler for SCN bytecode.
+- `tools/GdiEllipseCheck`: compares the players' own ellipses with GDI's (run it on Windows).
 - `tests/OpenShiina.ScnBoot`: runs a game's scripts without a screen, presses keys and clicks
   at given frames, saves screenshots, and reports what the engine ran.
 
@@ -66,6 +67,8 @@ players share them.
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
 - The Avalonia player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
+- Ellipses without Windows follow how [Wine](https://www.winehq.org)'s GDI draws them, with
+  Alois Zingl's ellipse algorithm.
 
 ## License
 
