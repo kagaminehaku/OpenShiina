@@ -47,8 +47,8 @@ public sealed class GameSession : IDisposable
     private byte[] m_front, m_back;
     private bool m_frameNew;
 
-    // Frames a second and the slowest frame in the title (OPENSHIINA_PERF=0 turns it off)
-    private readonly bool m_perf = Environment.GetEnvironmentVariable("OPENSHIINA_PERF") != "0";
+    // Frames a second and the slowest frame in the title, perf.log with OPENSHIINA_PERF=log
+    private readonly PerfMeter? m_perf;
 
     public GameSession(GameData data, IGameWindow window)
     {
@@ -57,6 +57,7 @@ public sealed class GameSession : IDisposable
         Setup = GameSetup.Read(data);
         m_host = new Host(this);
         m_vm = Setup.CreateVm(m_host);
+        m_perf = PerfMeter.Create(m_vm, data.SchemeName, Setup.SaveFolder);
         m_front = new byte[Width * Height * 4];
         m_back = new byte[Width * Height * 4];
         m_thread = new Thread(Run) { IsBackground = true, Name = "OpenShiina interpreter" };
@@ -91,9 +92,6 @@ public sealed class GameSession : IDisposable
 
     private void Run()
     {
-        var perfClock = Stopwatch.StartNew();
-        double worst = 0;
-        int frames = 0;
         try
         {
             while (!m_stop)
@@ -109,24 +107,14 @@ public sealed class GameSession : IDisposable
                     Dispatcher.UIThread.Post(() => m_window.Stopped(null, null));
                     return;
                 }
+                long engine = Stopwatch.GetTimestamp();
                 if (m_vm.ScreenInvalidated)
                 {
                     m_vm.ScreenInvalidated = false;
                     CopyFrame();
                 }
-                if (m_perf)
-                {
-                    worst = Math.Max(worst, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
-                    frames++;
-                    if (perfClock.ElapsedMilliseconds >= 1000)
-                    {
-                        string title = $"{Data.SchemeName} - {frames * 1000.0 / perfClock.ElapsedMilliseconds:F0} fps, slowest {worst:F1} ms";
-                        Dispatcher.UIThread.Post(() => m_window.SetTitle(title));
-                        perfClock.Restart();
-                        worst = 0;
-                        frames = 0;
-                    }
-                }
+                if (m_perf?.Frame(started, engine, Stopwatch.GetTimestamp()) is { } title)
+                    Dispatcher.UIThread.Post(() => m_window.SetTitle(title));
             }
         }
         catch (Exception ex)
@@ -185,6 +173,7 @@ public sealed class GameSession : IDisposable
         FrameTick();
         // A message box the scripts wait for can hold the thread; it is a background thread
         m_thread.Join(1000);
+        m_perf?.Dispose();
         m_host.Dispose();
         Data.Dispose();
     }

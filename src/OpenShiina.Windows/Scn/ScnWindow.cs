@@ -33,11 +33,7 @@ public sealed class ScnWindow : Window
         string saves = m_saves = setup.SaveFolder;
         m_host = new Host(this, data, saves);
         m_vm = setup.CreateVm(m_host);
-        if (m_perfLogged)
-        {
-            m_vm.OpTimes = new();
-            m_perfLog = new StreamWriter(Path.Combine(saves, "perf.log"), append: false);
-        }
+        m_perf = PerfMeter.Create(m_vm, data.SchemeName, saves);
 
         m_bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr24, null);
         m_frame = new byte[width * height * 3];
@@ -61,7 +57,7 @@ public sealed class ScnWindow : Window
         Closed += (_, _) =>
         {
             CompositionTarget.Rendering -= OnRendering;
-            m_perfLog?.Dispose();
+            m_perf?.Dispose();
             m_host.Dispose();
             m_data.Dispose();
         };
@@ -81,24 +77,14 @@ public sealed class ScnWindow : Window
         }
     }
 
-    // Frames a second and the slowest frame (engine + picture) in the title; on for now,
-    // OPENSHIINA_PERF=0 turns it off. With OPENSHIINA_PERF=log, every second perf.log in the save
-    // folder also gets the slowest engine / picture times, the most main-loop rounds in a frame,
-    // and where the engine's time went: opcodes, C# routines and routines left to the x86
-    // interpreter ("x86 <offset>"). Timing every opcode makes the interpreter about half as fast.
-    private static readonly string? s_perfSetting = Environment.GetEnvironmentVariable("OPENSHIINA_PERF");
-    private readonly bool m_perf = s_perfSetting != "0", m_perfLogged = s_perfSetting == "log";
-    private readonly Stopwatch m_perfClock = Stopwatch.StartNew();
-    private readonly Stopwatch m_perfRun = Stopwatch.StartNew();
-    private StreamWriter? m_perfLog;
-    private double m_perfWorst, m_perfWorstEngine, m_perfWorstPicture;
-    private int m_perfFrames, m_perfRounds;
+    // Frames a second and the slowest frame in the title, perf.log with OPENSHIINA_PERF=log
+    private readonly PerfMeter? m_perf;
 
     private void OnRendering(object? sender, EventArgs e)
     {
         if (m_stopped)
             return;
-        long started = m_perf ? Stopwatch.GetTimestamp() : 0;
+        long started = Stopwatch.GetTimestamp();
         try
         {
             if (!m_vm.RunFrame())
@@ -111,49 +97,14 @@ public sealed class ScnWindow : Window
         {
             Stop(ex);
         }
-        long engine = m_perf ? Stopwatch.GetTimestamp() : 0;
+        long engine = Stopwatch.GetTimestamp();
         if (m_vm.ScreenInvalidated)
         {
             m_vm.ScreenInvalidated = false;
             Present();
         }
-        if (m_perf)
-            CountFrame(started, engine);
-    }
-
-    private void CountFrame(long started, long engine)
-    {
-        long now = Stopwatch.GetTimestamp();
-        double Ms(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
-        m_perfWorst = Math.Max(m_perfWorst, Ms(now - started));
-        m_perfWorstEngine = Math.Max(m_perfWorstEngine, Ms(engine - started));
-        m_perfWorstPicture = Math.Max(m_perfWorstPicture, Ms(now - engine));
-        m_perfRounds = Math.Max(m_perfRounds, m_vm.FrameRounds);
-        m_perfFrames++;
-        if (m_perfClock.ElapsedMilliseconds < 1000)
-            return;
-        double fps = m_perfFrames * 1000.0 / m_perfClock.ElapsedMilliseconds;
-        Title = $"{m_data.SchemeName} - {fps:F0} fps, slowest {m_perfWorst:F1} ms";
-        if (m_perfLog != null)
-        {
-            var ops = m_vm.OpTimes!;
-            long instructions = m_vm.OpCounts.Values.Sum();
-            m_perfLog.WriteLine($"{m_perfRun.Elapsed.TotalSeconds:F0} s: {fps:F0} fps, slowest {m_perfWorst:F1} ms " +
-                $"(engine {m_perfWorstEngine:F1}, picture {m_perfWorstPicture:F1}), up to {m_perfRounds} rounds a frame, " +
-                $"{instructions} instructions, engine total {Ms(ops.Values.Sum()):F0} ms, heap {m_vm.HeapInUse >> 20} MB");
-            m_perfLog.WriteLine("  ops: " + string.Join(", ", ops.OrderByDescending(t => t.Value).Take(8)
-                .Select(t => $"{t.Key:X4} {Ms(t.Value):F1} ms x{m_vm.OpCounts.GetValueOrDefault(t.Key)}")));
-            if (m_vm.NativeTimes.Count > 0)
-                m_perfLog.WriteLine("  routines: " + string.Join(", ", m_vm.NativeTimes.OrderByDescending(t => t.Value.Ticks).Take(6)
-                    .Select(t => $"{t.Key} {Ms(t.Value.Ticks):F1} ms x{t.Value.Calls}")));
-            m_perfLog.Flush();
-            ops.Clear();
-            m_vm.OpCounts.Clear();
-            m_vm.NativeTimes.Clear();
-        }
-        m_perfClock.Restart();
-        m_perfWorst = m_perfWorstEngine = m_perfWorstPicture = 0;
-        m_perfFrames = m_perfRounds = 0;
+        if (m_perf?.Frame(started, engine, Stopwatch.GetTimestamp()) is { } title)
+            Title = title;
     }
 
     /// <summary>Copies the surface the engine shows into the bitmap.</summary>
