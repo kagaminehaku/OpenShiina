@@ -20,7 +20,8 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 | `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
 | `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
 | `src/OpenShiina.Windows` | The Windows player on WPF, whose text is drawn by Windows GDI as the games draw it |
-| Android, iOS | Planned, on `OpenShiina.App` |
+| `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; not built and tested yet |
+| iOS | Planned, on `OpenShiina.App` |
 
 ## Building
 
@@ -33,6 +34,20 @@ dotnet build -c Release
 The players are written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
 `dotnet OpenShiina.dll`) and `bin/Release/OpenShiina.Windows/`, with the scheme data
 (`Formats.Json` and `ShiinaImage/`) next to them. The WPF player builds on Windows only.
+
+The Android player is not in the solution (it needs the .NET Android workload and the Android
+SDK); build it on its own:
+
+```
+dotnet workload install android
+dotnet build src/OpenShiina.Android -c Release
+```
+
+The APK is written to `bin/Release/OpenShiina.Android/`. It reads the games from the device's
+storage, so Android 11 and later ask for all files access the first time a game is added. On
+the screen: a tap clicks, holding a finger still (or a two-finger tap, or Back) is a right
+click, dragging holds the left button, two fingers moved up or down turn the wheel (down opens
+the backlog); the bar on the right has Menu, Auto, Skip, Log and Exit.
 
 ## Usage
 

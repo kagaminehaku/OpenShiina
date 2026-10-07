@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- OpenShiina on Android phones and tablets (Avalonia): the same player as the desktop's
+       (OpenShiina.App), with the sound on AudioTrack, the games read from the device's storage
+       (all files access) and the touch controls. Needs the .NET Android workload:
+       dotnet workload install android -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OpenShiina.Android</RootNamespace>
+    <AssemblyName>OpenShiina</AssemblyName>
+    <ApplicationId>com.kagaminehaku.openshiina</ApplicationId>
+    <ApplicationTitle>OpenShiina</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!-- Phones and tablets of today, and the emulator -->
+    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Android\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>OpenShiina</Product>
+    <Version>0.1.0</Version>
+    <Authors>kagaminehaku</Authors>
+    <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
+  </PropertyGroup>
+
+  <!-- The schemes and their ShiinaImage, which the desktop players keep next to the program: in
+       the package, copied out to the app's folder at start (MainApplication) -->
+  <ItemGroup>
+    <AndroidAsset Include="..\OpenShiina.Core\Data\Formats.Json" Link="Assets\Formats.Json" />
+    <AndroidAsset Include="..\OpenShiina.Core\Data\ShiinaImage\*" Link="Assets\ShiinaImage\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="12.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShiina.App\OpenShiina.App.csproj" />
+  </ItemGroup>
+
+</Project>

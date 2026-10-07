@@ -1,8 +1,8 @@
 // The player's one view, on every platform: first the home screen with the games of the library
 // (LibraryView; or the folder given on the command line), then the game's picture, scaled to the view with its
 // proportions kept, black around it. Keyboard, mouse, touch and joystick go to the game's
-// InputState (a touch is the left button), and keys, buttons and the wheel to the scripts as the
-// window messages of the engine. Closing asks the scripts first, as WM_CLOSE does. Each frame the view draws,
+// InputState (fingers as GameView.Touch.cs makes them a mouse), and keys, buttons and the wheel to
+// the scripts as the window messages of the engine. Closing asks the scripts first, as WM_CLOSE does. Each frame the view draws,
 // it reads the joystick, takes the game's latest picture and lets the interpreter run its next frame.
 
 using Avalonia;
@@ -21,12 +21,12 @@ using OpenShiina.Scripting;
 
 namespace OpenShiina.App;
 
-public sealed class GameView : UserControl, IGameWindow
+public sealed partial class GameView : UserControl, IGameWindow
 {
     private readonly Image m_image = new() { Stretch = Stretch.Uniform, IsVisible = false };
     private readonly LibraryView m_library = new();
     private GameSession? m_session;
-    private SdlJoystick? m_joystick;
+    private IPlayerJoystick? m_joystick;
     // Closing: asked the scripts and waiting for their answer / they let the window close
     private bool m_closeAsked, m_closeAllowed;
     private WriteableBitmap? m_bitmap;
@@ -48,12 +48,18 @@ public sealed class GameView : UserControl, IGameWindow
         RenderOptions.SetBitmapInterpolationMode(m_image, BitmapInterpolationMode.None);
         m_library.Play += async folder => await OpenAsync(folder);
         m_library.AddRequested += async () => await AddGameAsync();
-        Content = new Grid { Children = { m_image, m_library } };
+        Content = new Grid { Children = { m_image, TouchBar(), m_library } };
 
         m_image.PointerMoved += (_, e) => Pointer(e);
         m_image.PointerPressed += (_, e) => Pointer(e);
         m_image.PointerReleased += (_, e) => Pointer(e);
-        m_image.PointerCaptureLost += (_, _) => { if (m_session != null) m_session.Input.Buttons = 0; };
+        m_image.PointerCaptureLost += (_, e) =>
+        {
+            if (e.Pointer.Type == PointerType.Touch)
+                TouchLost(e.Pointer);
+            else if (m_session != null)
+                m_session.Input.Buttons = 0;
+        };
         m_image.PointerWheelChanged += (_, e) =>
         {
             if (m_session != null && e.Delta.Y != 0)
@@ -69,6 +75,13 @@ public sealed class GameView : UserControl, IGameWindow
         // Keys reach the game wherever the focus is
         top.AddHandler(KeyDownEvent, (_, k) => Key(k, true), RoutingStrategies.Tunnel, handledEventsToo: true);
         top.AddHandler(KeyUpEvent, (_, k) => Key(k, false), RoutingStrategies.Tunnel, handledEventsToo: true);
+        top.BackRequested += OnBackRequested;
+        // Phones: the app going to the background or coming back
+        PlayerPlatform.ActiveChanged += active =>
+        {
+            m_activated = active;
+            UpdateFocus(top as Window);
+        };
         if (top is Window window)
         {
             // Minimised counts as not in front (a minimised window can be activated again)
@@ -87,9 +100,9 @@ public sealed class GameView : UserControl, IGameWindow
     private bool m_activated = true;
     private bool? m_focused;
 
-    private void UpdateFocus(Window window)
+    private void UpdateFocus(Window? window)
     {
-        bool focused = m_activated && window.WindowState != WindowState.Minimized;
+        bool focused = m_activated && window?.WindowState != WindowState.Minimized;
         if (focused == m_focused || m_session == null)
             return;
         m_focused = focused;
@@ -100,6 +113,8 @@ public sealed class GameView : UserControl, IGameWindow
     {
         if (m_session == null)
             return;
+        if (!active)
+            ResetTouch();
         m_session.Input.Active = active;
         m_session.Post(active ? ScnEvent.Activate : ScnEvent.Deactivate);
     }
@@ -149,13 +164,19 @@ public sealed class GameView : UserControl, IGameWindow
     {
         if (m_session == null || m_bitmap == null)
             return;
+        // Fingers are a mouse of their own (GameView.Touch.cs); a pen is a mouse
+        if (e.Pointer.Type == PointerType.Touch)
+        {
+            Touch(e);
+            return;
+        }
         var point = e.GetCurrentPoint(m_image);
         var (scale, left, top) = Placement(m_session);
         if (scale <= 0)
             return;
         m_session.Input.Position = ((int)Math.Floor((point.Position.X - left) / scale), (int)Math.Floor((point.Position.Y - top) / scale));
         var p = point.Properties;
-        bool touch = e.Pointer.Type is PointerType.Touch or PointerType.Pen;
+        bool touch = e.Pointer.Type == PointerType.Pen;
         m_session.Input.Buttons = (p.IsLeftButtonPressed || touch && e.RoutedEvent == PointerPressedEvent ? 1 : 0)
             | (p.IsRightButtonPressed ? 2 : 0) | (p.IsMiddleButtonPressed ? 4 : 0);
         if (touch && e.RoutedEvent == PointerReleasedEvent)
@@ -213,12 +234,19 @@ public sealed class GameView : UserControl, IGameWindow
             // No folder to start from
         }
         var folders = await top.StorageProvider.OpenFolderPickerAsync(options);
-        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        if (folders.Count == 0)
+            return null;
+        if (PlayerPlatform.FolderPath(folders[0]) is { } path)
+            return path;
+        m_library.Message = "The player cannot read that folder: choose a folder on the device's storage or a memory card.";
+        return null;
     }
 
     /// <summary>"Add a game…": a folder into the library, when the game in it is recognised.</summary>
     private async Task AddGameAsync()
     {
+        if (!await FileAccessAsync())
+            return;
         if (await ChooseFolderAsync() is not { } folder)
             return;
         var game = await Task.Run(() => GameLibrary.Add(folder));
@@ -228,9 +256,27 @@ public sealed class GameView : UserControl, IGameWindow
         m_library.Refresh();
     }
 
+    /// <summary>The player may read the games' folders (Android asks the user once); else it says so.</summary>
+    private async Task<bool> FileAccessAsync()
+    {
+        try
+        {
+            if (await PlayerPlatform.EnsureFileAccessAsync())
+                return true;
+        }
+        catch (Exception)
+        {
+            // Asked below
+        }
+        m_library.Message = "OpenShiina needs access to the files to read the games: allow it, then try again.";
+        return false;
+    }
+
     /// <summary>Recognises the game in a folder, opens its archives and starts it.</summary>
     public async Task OpenAsync(string folder)
     {
+        if (!await FileAccessAsync())
+            return;
         m_library.Message = "Opening the game…";
         try
         {
@@ -281,8 +327,9 @@ public sealed class GameView : UserControl, IGameWindow
             }
         };
         if (session.Setup.Joypad != false)
-            m_joystick = new SdlJoystick();
+            m_joystick = PlayerPlatform.OpenJoystick();
         session.Start();
+        TouchSession(true);
         Focus();
         m_animating = true;
         RequestFrame();
@@ -373,6 +420,7 @@ public sealed class GameView : UserControl, IGameWindow
         m_bitmap = null;
         m_library.IsVisible = true;
         m_library.Refresh();
+        TouchSession(false);
         FullScreenChanged?.Invoke(false);
         TitleChanged?.Invoke("OpenShiina");
         GameEnded?.Invoke();
@@ -385,6 +433,8 @@ public sealed class GameView : UserControl, IGameWindow
         m_session?.Dispose();
         m_session = null;
         m_focused = null;
+        m_keepAwake?.Dispose();
+        m_keepAwake = null;
         m_joystick?.Dispose();
         m_joystick = null;
     }

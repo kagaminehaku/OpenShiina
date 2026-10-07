@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Black from the start, as the player is; no title bar -->
+  <style name="OpenShiinaTheme" parent="@style/Theme.AppCompat.NoActionBar">
+    <item name="android:windowBackground">@android:color/black</item>
+    <item name="android:windowActionBar">false</item>
+    <item name="android:windowNoTitle">true</item>
+  </style>
+</resources>

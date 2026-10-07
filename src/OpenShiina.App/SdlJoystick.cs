@@ -8,7 +8,7 @@ using SDL;
 
 namespace OpenShiina.App;
 
-public sealed unsafe class SdlJoystick : IDisposable
+public sealed unsafe class SdlJoystick : IPlayerJoystick
 {
     private readonly bool m_ready;
     private SDL_Joystick* m_joystick;

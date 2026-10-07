@@ -93,7 +93,7 @@ public sealed class GameSession : IDisposable
         private readonly ScnMixer m_mixer = new();
         private readonly ScnSound m_sound;
         private readonly ScnMusic m_music;
-        private readonly SdlAudioOutput? m_output;
+        private readonly IDisposable? m_output;
         private readonly SkiaFonts m_fonts = new();
 
         public Host(GameSession session)
@@ -101,7 +101,7 @@ public sealed class GameSession : IDisposable
             m_session = session;
             m_sound = new ScnSound(m_mixer);
             m_music = new ScnMusic(m_mixer);
-            m_output = SdlAudioOutput.TryStart(m_mixer.Output);
+            m_output = PlayerPlatform.StartSound(m_mixer.Output);
         }
 
         public byte[]? ReadFile(string name) => m_session.Data.Read(name);

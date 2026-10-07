@@ -59,11 +59,19 @@ public class FormatManager
         }
     }
 
+    /// <summary>
+    /// Where Formats.Json and ShiinaImage are when they are not next to the program (Android keeps
+    /// them in its package: the app copies them out to a folder first); set it before
+    /// <see cref="Instance"/> is first used.
+    /// </summary>
+    public static string? DataFolder { get; set; }
+
     private static string? FindSchemeFile()
     {
         string baseDir = AppContext.BaseDirectory;
         string[] candidates =
         {
+            Path.Combine(DataFolder ?? baseDir, SchemeFileName),
             Path.Combine(baseDir, SchemeFileName),
             Path.Combine(Directory.GetCurrentDirectory(), SchemeFileName),
         };
