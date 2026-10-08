@@ -8,7 +8,9 @@ game's own.
 **Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; all eleven play
 through: the nine on engine v2.47 and v2.49 (Ero-On!, Azu Plus, Oreimo Plus, Homu☆Plus, Yuru Plus,
 Sena Plus, Kuroneko Plus, Nyaru Plus, Rikka Plus) and the two on v2.50 (Maki Fes!, Re:Rem Plus).
-Every game's state is in [docs/compatibility.md](docs/compatibility.md).
+The Android player runs them on phones too (checked on a Galaxy S7). Every game's and platform's
+state is in [docs/compatibility.md](docs/compatibility.md); what is planned next is in
+[docs/todo.md](docs/todo.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
 
@@ -20,7 +22,7 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 | `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
 | `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
 | `src/OpenShiina.Windows` | The Windows player on WPF, whose text is drawn by Windows GDI as the games draw it |
-| `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; not built and tested yet |
+| `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; plays on a Galaxy S7 (Exynos 8890), heavy scenes are slow on phones that old |
 | iOS | Planned, on `OpenShiina.App` |
 
 ## Building
@@ -67,8 +69,9 @@ Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux,
 
 Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
 each counts from the next game started): drawing on the CPU or on the GPU (the GPU mode runs
-heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`, so far the scaling of zoomed
-scenes, and gives the same pictures; without a Vulkan driver the games run on the CPU), the frame
+heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
+rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
+faster on its first large calls, with the same pictures; without a Vulkan driver the games run on the CPU), the frame
 rate (the game's own pace, up to 60 frames a second with the window drawing only new pictures,
 as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
 scripts run as often: four times as much processor on a 240 Hz one), the game
@@ -93,7 +96,9 @@ players share them.
 
 ## Documentation
 
-- [`docs/compatibility.md`](docs/compatibility.md): which games play, and how far each was checked.
+- [`docs/compatibility.md`](docs/compatibility.md): which games play, and how far each was checked,
+  on which platforms.
+- [`docs/todo.md`](docs/todo.md): what is planned and not done yet.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.
 - `tools/ScnTools`: disassembler for SCN bytecode.

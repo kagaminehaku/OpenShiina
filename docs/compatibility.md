@@ -31,6 +31,24 @@ ShiinaRio is the engine version START.SCN checks (`03C0`, as in RIO.INI's sectio
 of one version share most of their START.SCN; see
 [engine-notes.md, section 9](engine-notes.md#9-the-other-games-survey-of-all-11-2026-10-03).
 
+## Platforms
+
+| Platform | Player | Status | Checked |
+|---|---|---|---|
+| Windows 10 / 11 | WPF (`OpenShiina.Windows`) and Avalonia (`OpenShiina.Desktop`) | ✅ The games above | 2026-10-08 |
+| Android | Avalonia (`OpenShiina.Android`), Release built with LLVM | 🟢 Plays | 2026-10-08 |
+| Linux, macOS | Avalonia (`OpenShiina.Desktop`) | ⚪ Builds; no game run recorded here | |
+| iOS | not written yet | ⚪ Planned | |
+
+**Windows** The games were played and checked on Windows 10 (6 cores, RTX 2070, a 240 Hz
+screen). At the game's own pace a title screen costs about as much processor as the original
+exe (Re:Rem Plus's: about 3% of the machine for both). The GPU mode needs a Vulkan driver.
+
+**Android** Checked on a Galaxy S7 (Exynos 8890, Mali-T880, Vulkan 1.0) with Maki Fes!: it
+plays, 18.4 frames a second over a session from its perf.log (6.2 before the Release build used
+LLVM and the changes of 2026-10-08). Zooms and transitions still drop frames on a phone that old.
+Touch controls are described in the README.
+
 ## Notes
 
 **Ero-On!** Every route skipped through. It needed `079F` (the window loses its maximise box)
@@ -83,7 +101,9 @@ When a game's state changes:
 1. Set its **Status** to the row of the legend that fits and **Checked** to the date (YYYY-MM-DD).
 2. Under **Notes**, say what was checked and how (played, skipped with Ctrl, ScnBoot), what was
    added for it, and what is known not to work.
-3. If it is the headline of a change, the commit message can name the game; README links here
+3. When a platform was tried (a phone, Linux, macOS), add or update its row under **Platforms**
+   with the device and what ran.
+4. If it is the headline of a change, the commit message can name the game; README links here
    and does not list the games itself.
 
 To see which opcodes a game's scripts use that OpenShiina does not run yet, boot it in ScnBoot
