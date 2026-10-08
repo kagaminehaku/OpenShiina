@@ -1,6 +1,6 @@
-// Where the time of a running game goes, for the players' title and perf.log (OPENSHIINA_PERF):
-// unset or anything but 0, frames a second and the slowest frame for the title; "log" also
-// writes, every second, the slowest engine and picture times, the most main-loop rounds in a
+// Where the time of a running game goes, for the players' title and perf.log (the settings
+// "Show the frame rate" and "Write perf.log", or OPENSHIINA_PERF): frames a second and the
+// slowest frame for the title; the log gets, every second, the slowest engine and picture times, the most main-loop rounds in a
 // frame and the heap in use, and the opcodes, C# routines and embedded x86 routines (translated:
 // "jit <offset>", interpreted: "x86 <offset>") that took the most time, to perf.log in the save
 // folder. Timing every opcode makes the interpreter about half as fast, so only "log" does it.
@@ -16,12 +16,14 @@ public sealed class PerfMeter : IDisposable
     private readonly ScnVm m_vm;
     private readonly string m_name;
     private readonly StreamWriter? m_log;
+    private readonly bool m_title;
     private readonly Stopwatch m_clock = Stopwatch.StartNew(), m_run = Stopwatch.StartNew();
     private double m_worst, m_worstEngine, m_worstPicture;
     private int m_frames, m_rounds;
 
-    private PerfMeter(ScnVm vm, string name, StreamWriter? log)
+    private PerfMeter(ScnVm vm, string name, StreamWriter? log, bool title)
     {
+        m_title = title;
         m_vm = vm;
         m_name = name;
         m_log = log;
@@ -32,14 +34,14 @@ public sealed class PerfMeter : IDisposable
         }
     }
 
-    /// <summary>A meter as OPENSHIINA_PERF asks for, or null when it is "0".</summary>
-    public static PerfMeter? Create(ScnVm vm, string gameName, string saveFolder)
+    /// <summary>A meter as the settings ask for, or null when they want neither the title nor the log.</summary>
+    public static PerfMeter? Create(ScnVm vm, string gameName, string saveFolder, PlayerSettings settings)
     {
-        string? setting = Environment.GetEnvironmentVariable("OPENSHIINA_PERF");
-        if (setting == "0")
+        var (title, writeLog) = settings.PerfForGame();
+        if (!title && !writeLog)
             return null;
-        var log = setting == "log" ? new StreamWriter(Path.Combine(saveFolder, "perf.log"), append: false) : null;
-        return new PerfMeter(vm, gameName, log);
+        var log = writeLog ? new StreamWriter(Path.Combine(saveFolder, "perf.log"), append: false) : null;
+        return new PerfMeter(vm, gameName, log, title);
     }
 
     /// <summary>
@@ -69,6 +71,12 @@ public sealed class PerfMeter : IDisposable
             if (m_vm.NativeTimes.Count > 0)
                 m_log.WriteLine("  routines: " + string.Join(", ", m_vm.NativeTimes.OrderByDescending(t => t.Value.Ticks).Take(6)
                     .Select(t => $"{t.Key} {Ms(t.Value.Ticks):F1} ms x{t.Value.Calls}")));
+            lock (m_vm.GpuChoices)
+            {
+                foreach (string choice in m_vm.GpuChoices)
+                    m_log.WriteLine("  chose " + choice);
+                m_vm.GpuChoices.Clear();
+            }
             m_log.Flush();
             ops.Clear();
             m_vm.OpCounts.Clear();
@@ -78,7 +86,7 @@ public sealed class PerfMeter : IDisposable
         m_clock.Restart();
         m_worst = m_worstEngine = m_worstPicture = 0;
         m_frames = m_rounds = 0;
-        return title;
+        return m_title ? title : null;
     }
 
     public void Dispose() => m_log?.Dispose();

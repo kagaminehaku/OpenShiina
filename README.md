@@ -64,20 +64,25 @@ does. The Avalonia player draws text with the system's fonts, with MS Gothic's m
 Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux, for instance,
 `fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
 
-Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`):
-drawing on the CPU or on the GPU. The GPU mode runs heavy picture work as Vulkan compute shaders
-(`src/OpenShiina.Gpu`, so far the scaling of zoomed scenes) and gives the same pictures; without a
-Vulkan driver the games run on the CPU. It counts from the next game started.
+Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
+each counts from the next game started): drawing on the CPU or on the GPU (the GPU mode runs
+heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`, so far the scaling of zoomed
+scenes, and gives the same pictures; without a Vulkan driver the games run on the CPU), the game
+controller, showing the frame rate (in the title; on phones over the game), and for bug reports
+writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
+`draw-trace.log` (both logs go to the game's save folder).
 
-Settings for testing, as environment variables: `OPENSHIINA_PERF=0` hides the frame rate in the
-title (`=log` also writes `perf.log` to the save folder), `OPENSHIINA_X86JIT=0` runs embedded x86
-code on the interpreter only, `OPENSHIINA_GPU=1` / `=0` draws on the GPU / CPU whatever the
-settings say, `OPENSHIINA_WAYLAND=1` uses Avalonia's own Wayland backend on Linux.
+The environment variables of the settings still win over them, for tests: `OPENSHIINA_GPU=1` /
+`=0`, `OPENSHIINA_JOYPAD=0` / `=ini` (below), `OPENSHIINA_PERF=0` (no frame rate) / `=log` (also
+`perf.log`), `OPENSHIINA_X86JIT=0`, `OPENSHIINA_TRACE=draw`. Only as variables:
+`OPENSHIINA_PAINT=surface` (shows the display surface every frame), `OPENSHIINA_DATA=<folder>`
+(the player's data instead of %AppData%\OpenShiina), `OPENSHIINA_WAYLAND=1` (Avalonia's own
+Wayland backend on Linux).
 
 Game controllers: the first joystick or gamepad works as the engine reads it: the stick (or
 the first two axes) moves, button 1 decides, button 2 cancels. The games turn it off in their
-RIO.INI (Joypad=0) but the players read it anyway; `OPENSHIINA_JOYPAD=0` turns it off,
-`OPENSHIINA_JOYPAD=ini` follows RIO.INI.
+RIO.INI (Joypad=0) but the players read it anyway; the setting "Game controller" (or
+`OPENSHIINA_JOYPAD=0`) turns it off, `OPENSHIINA_JOYPAD=ini` follows RIO.INI.
 
 Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`); both
 players share them.

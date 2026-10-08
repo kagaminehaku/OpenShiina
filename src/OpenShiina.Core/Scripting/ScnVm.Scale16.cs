@@ -131,6 +131,16 @@ public sealed partial class ScnVm
         int srcBase = src + (int)((uint)st >> 4) * srcPitch + (int)((uint)sl >> 4) * 4;
         int dstBase = dst + (int)((uint)dt >> 4) * dstPitch + (int)((uint)dl >> 4) * 4;
         int bytes = width * 4;
+        var timing = ChooseGpu("scale16", (long)nr * nc);
+        if (timing.Gpu)
+        {
+            if (ScaleOnGpu(Accelerator!, 1, rows, rowFrom, cols, colFrom, width, srcBase, srcPitch, dstBase, dstPitch, wholeRow, wholeCol))
+            {
+                GpuDone("scale16", timing);
+                return true;
+            }
+            timing = GpuFailed("scale16");
+        }
 
         void RunBand(int band)
         {
@@ -187,6 +197,7 @@ public sealed partial class ScnVm
         else
             for (int band = 0; band < bands; band++)
                 RunBand(band);
+        GpuDone("scale16", timing);
         return true;
     }
 

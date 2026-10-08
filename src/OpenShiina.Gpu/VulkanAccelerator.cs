@@ -11,7 +11,10 @@ public sealed class VulkanAccelerator : IScnAccelerator
     // Each shader's storage buffers and bytes of push constants (its layout in Shaders/name.comp)
     private static readonly Dictionary<string, (int Buffers, int PushBytes)> s_kernels = new()
     {
-        ["scale32"] = (4, 20),
+        ["scale"] = (4, 24),
+        ["enlarge16"] = (4, 12),
+        ["subpixel32"] = (3, 68),
+        ["rotatezoom"] = (4, 52),
     };
 
     private readonly VulkanCompute m_gpu;

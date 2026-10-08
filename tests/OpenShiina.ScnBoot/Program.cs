@@ -90,6 +90,18 @@ if (!vm.LoadModule(0, start, start: true))
     Console.WriteLine($"{start} is missing.");
     return 1;
 }
+// SCNBOOT_GPUCHECK=cases: the GPU kernels against the CPU code (GpuCheck.cs), then the end
+if (int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_GPUCHECK"), out int gpuCases))
+{
+    if (OpenShiina.Gpu.VulkanAccelerator.TryCreate(out string? checkError) is not { } checkGpu)
+    {
+        Console.WriteLine($"No GPU: {checkError}");
+        return 1;
+    }
+    Console.WriteLine($"GPU: {checkGpu.Name}");
+    using (checkGpu)
+        return GpuCheck.Run(vm, checkGpu, gpuCases);
+}
 
 // SCNBOOT_TRACE="from:to": the time and main-loop rounds of every frame in that range
 int traceFrom = int.MaxValue, traceTo = -1;
@@ -171,6 +183,8 @@ try
     }
     if (frame == frames)
         Console.WriteLine($"Still running after {frames} frames.");
+    foreach (string choice in vm.GpuChoices)
+        Console.WriteLine($"  [gpu] chose {choice}");
 }
 catch (ScnException ex)
 {

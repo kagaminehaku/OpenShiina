@@ -17,17 +17,15 @@ public sealed class GameSetup
     /// <summary>Where this game's save data goes: %AppData%\OpenShiina\scn\&lt;game&gt; (made when missing).</summary>
     public string SaveFolder { get; }
 
+    /// <summary>The player's settings as the game started (PlayerSettings, settings.json).</summary>
+    public PlayerSettings Settings { get; } = PlayerSettings.Load();
+
     /// <summary>
     /// Whether the scripts see joystick 0 (ScnVm.Joypad). The games ship with RIO.INI's Joypad=0,
     /// set by their own setup program, which the players do not have, so the players read the
-    /// joystick unless OPENSHIINA_JOYPAD=0; OPENSHIINA_JOYPAD=ini follows RIO.INI as the engine does.
+    /// joystick unless the settings turn it off (PlayerSettings.JoypadForGame; null: RIO.INI).
     /// </summary>
-    public bool? Joypad { get; } = Environment.GetEnvironmentVariable("OPENSHIINA_JOYPAD") switch
-    {
-        "0" => false,
-        "ini" => null,
-        _ => true,
-    };
+    public bool? Joypad => Settings.JoypadForGame();
 
     private GameSetup(string version, string start, int width, int height, string saves)
     {
@@ -58,8 +56,8 @@ public sealed class GameSetup
 
     /// <summary>
     /// The interpreter for this engine version with the first script loaded and started.
-    /// OPENSHIINA_X86JIT=0 leaves embedded x86 routines without a C# version to the interpreter.
-    /// The GPU mode comes from the player's settings (PlayerSettings.Renderer).
+    /// The settings choose the GPU mode and whether embedded x86 routines without a C# version are
+    /// translated or left to the interpreter.
     /// </summary>
     public ScnVm CreateVm(IScnHost host)
     {
@@ -69,9 +67,9 @@ public sealed class GameSetup
             ScreenWidth = Width,
             ScreenHeight = Height,
             Joypad = Joypad,
-            Accelerator = PlayerSettings.Load().AcceleratorForGame(),
+            Accelerator = Settings.AcceleratorForGame(),
         };
-        if (Environment.GetEnvironmentVariable("OPENSHIINA_X86JIT") == "0")
+        if (!Settings.X86JitForGame())
             vm.JitX86 = false;
         if (!vm.LoadModule(0, StartScript, start: true))
             throw new InvalidDataException($"{StartScript} is missing.");

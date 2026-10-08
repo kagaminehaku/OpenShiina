@@ -51,7 +51,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         RenderOptions.SetBitmapInterpolationMode(m_image, BitmapInterpolationMode.None);
         m_library.Play += async folder => await OpenAsync(folder);
         m_library.AddRequested += async () => await AddGameAsync();
-        Content = new Grid { Children = { m_image, TouchBar(), m_library } };
+        Content = new Grid { Children = { m_image, m_frameRate, TouchBar(), m_library } };
 
         m_image.PointerMoved += (_, e) => Pointer(e);
         m_image.PointerPressed += (_, e) => Pointer(e);
@@ -364,6 +364,26 @@ public sealed partial class GameView : UserControl, IGameWindow
 
     public void SetTitle(string title) => TitleChanged?.Invoke(title);
 
+    // The frame rate on phones and tablets, which have no title: a line over the game's corner
+    private readonly TextBlock m_frameRate = new()
+    {
+        FontSize = 12, Foreground = Brushes.White, Background = new SolidColorBrush(Color.FromArgb(0x80, 0, 0, 0)),
+        Padding = new Thickness(6, 2), Margin = new Thickness(4),
+        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false, IsVisible = false,
+    };
+
+    public void ShowFrameRate(string text)
+    {
+        if (!PlayerPlatform.Touch)
+        {
+            TitleChanged?.Invoke(text);
+            return;
+        }
+        m_frameRate.Text = text;
+        m_frameRate.IsVisible = m_session != null;
+    }
+
     public void SetFullScreen(bool fullScreen) => FullScreenChanged?.Invoke(fullScreen);
 
     public void MovePointer(int x, int y)
@@ -424,6 +444,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         m_bitmap = null;
         m_library.IsVisible = true;
         m_library.Refresh();
+        m_frameRate.IsVisible = false;
         TouchSession(false);
         FullScreenChanged?.Invoke(false);
         TitleChanged?.Invoke("OpenShiina");

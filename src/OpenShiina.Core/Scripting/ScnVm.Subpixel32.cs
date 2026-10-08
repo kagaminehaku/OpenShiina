@@ -87,6 +87,20 @@ public sealed partial class ScnVm
             ReadByte(d);
             ReadByte(d + outPixels * 4 - 1);
         }
+        var timing = ChooseGpu("subpixel32", (long)rows.Count * outPixels);
+        if (timing.Gpu)
+        {
+            if (SubpixelOnGpu(Accelerator!, rows, srcPitch, (int)middle + 3, outPixels, new SubpixelParameters
+                {
+                    Middle = (int)middle, AX = ax, BX = bx, TailX = tailX, SrcTailX = srcTailX, AY = ay, BY = by, TailY = tailY,
+                    SrcTailY = srcTailY, D0 = d0, D4 = d4, D8 = d8, DC = dc, CopyAcross = d0 == 0 ? 1 : 0,
+                }))
+            {
+                GpuDone("subpixel32", timing);
+                return true;
+            }
+            timing = GpuFailed("subpixel32");
+        }
         int band = Math.Max(8, (rows.Count + 2 * Environment.ProcessorCount - 1) / (2 * Environment.ProcessorCount));
         int bands = (rows.Count + band - 1) / band;
         void RunBand(int index)
@@ -109,6 +123,7 @@ public sealed partial class ScnVm
         else
             for (int i = 0; i < bands; i++)
                 RunBand(i);
+        GpuDone("subpixel32", timing);
         return true;
     }
 

@@ -1,0 +1,52 @@
+// 0574 (FUN_004193E0, ScnVm.RotateZoomPixels) on the GPU, one invocation a destination pixel:
+// the pixel takes the source pixel its position, turned and zoomed, falls on (32.32 fixed point,
+// nearest), or keeps its colour / gets the colour outside the source rectangle. The x86 code adds
+// (dux, dvx) along a row in 64 bits; k additions are k * (dux, dvx) modulo 2^64, done here in
+// 32-bit halves (no 64-bit integers needed on the device).
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// The source rectangle, sw pixels a row
+layout(std430, binding = 0) readonly buffer Source { uint source[]; };
+// Per destination row: u and v at its first pixel (low, high words each)
+layout(std430, binding = 1) readonly buffer Rows { uint rows[]; };
+// The destination rectangle before (read only when it keeps its colour outside the source)
+layout(std430, binding = 2) readonly buffer Before { uint before[]; };
+layout(std430, binding = 3) writeonly buffer Output { uint pixels[]; };
+
+layout(push_constant) uniform Parameters
+{
+    int width;
+    int height;
+    int sx, sy, sxEnd, syEnd;
+    int sw;
+    int keep;
+    uint colour;
+    uint duxLow, duxHigh, dvxLow, dvxHigh;
+};
+
+// (high word of) start + k * step, modulo 2^64
+int position(uint startLow, uint startHigh, uint stepLow, uint stepHigh, uint k)
+{
+    uint productHigh, productLow;
+    umulExtended(stepLow, k, productHigh, productLow);
+    productHigh += stepHigh * k;
+    uint carry;
+    uaddCarry(startLow, productLow, carry);
+    return int(startHigh + productHigh + carry);
+}
+
+void main()
+{
+    int x = int(gl_GlobalInvocationID.x), r = int(gl_GlobalInvocationID.y);
+    if (x >= width || r >= height)
+        return;
+    int fx = position(rows[r * 4], rows[r * 4 + 1], duxLow, duxHigh, uint(x));
+    int fy = position(rows[r * 4 + 2], rows[r * 4 + 3], dvxLow, dvxHigh, uint(x));
+    uint p;
+    if (fx >= sx && fx < sxEnd && fy >= sy && fy < syEnd)
+        p = source[(fy - sy) * sw + (fx - sx)];
+    else
+        p = keep != 0 ? before[r * width + x] : colour;
+    pixels[r * width + x] = p;
+}

@@ -1,0 +1,134 @@
+// subpixel32 (Oreimo START 76388, ScnVm.Subpixel32.cs) on the GPU, one invocation a destination
+// pixel: a rectangle copied with positions in 1/16 pixels, each pixel mixing up to 2 x 2 source
+// pixels. The CPU makes the list of destination rows (their kind and source row); every formula
+// is the MMX one in 16-bit lanes (products and sums wrap, >> 4 or >> 8, packuswb), with the x86
+// code's quirks: on rows from two source rows an edge pixel whose source starts inside a pixel
+// is stored as two unpacked 16-bit lanes, and the left one adds one of its products unshifted.
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// The source rows, inPixels each, from the first row's source row on
+layout(std430, binding = 0) readonly buffer Source { uint source[]; };
+// Per destination row: kind (0 top from one source row, 1 top from two, 2 / 3 middle, 4 / 5
+// bottom), its source row
+layout(std430, binding = 1) readonly buffer Rows { int rows[]; };
+layout(std430, binding = 2) writeonly buffer Output { uint pixels[]; };
+
+layout(push_constant) uniform Parameters
+{
+    int rowCount;
+    int outPixels;
+    int inPixels;
+    int middle;
+    uint ax, bx, tailX, srcTailX, ay, by, tailY, srcTailY;
+    uint d0, d4, d8, dc;
+    int copyAcross;
+};
+
+uvec4 px(int row, int at)
+{
+    uint p = source[row * inPixels + at];
+    return uvec4(p & 0xFFu, (p >> 8) & 0xFFu, (p >> 16) & 0xFFu, p >> 24);
+}
+
+uvec4 mul(uvec4 a, uvec4 b) { return (a * b) & 0xFFFFu; }
+uvec4 add(uvec4 a, uvec4 b) { return (a + b) & 0xFFFFu; }
+uvec4 lanes(uint w, uint alpha) { return uvec4(w, w, w, alpha); }
+
+// packuswb: the 16-bit lanes as signed words, saturated to 0-255
+uint packed(uvec4 x)
+{
+    uvec4 c = mix(min(x, uvec4(255u)), uvec4(0u), greaterThanEqual(x, uvec4(0x8000u)));
+    return c.x | (c.y << 8) | (c.z << 16) | (c.w << 24);
+}
+
+// movd without packuswb: lanes 0 and 1 as two 16-bit words
+uint words(uvec4 x) { return x.x | (x.y << 16); }
+
+void main()
+{
+    int o = int(gl_GlobalInvocationID.x), r = int(gl_GlobalInvocationID.y);
+    if (o >= outPixels || r >= rowCount)
+        return;
+    int kind = rows[r * 2], P = rows[r * 2 + 1], Q = P + 1;
+    bool two = (kind & 1) != 0;
+    bool middleOne = kind == 2;
+    uvec4 wyP = kind == 1 ? lanes(d8, by) : lanes(d8, d8);
+    uvec4 wyQ = kind == 5 ? lanes(dc, srcTailY) : lanes(dc, dc);
+    uvec4 v = kind == 0 ? lanes(16u, ay) : lanes(16u, tailY);
+    uvec4 B0 = lanes(d0, d0), B8 = lanes(d4, d4);
+    int first = ax != 0u && ax >= bx ? 1 : 0;
+    uint result;
+
+    if (ax != 0u && o == 0)
+    {
+        // The partly covered left pixel
+        uvec4 L70 = lanes(16u, ax), L50 = lanes(d0, bx);
+        if (ax <= bx)
+        {
+            uvec4 x = two ? mul(add(mul(px(P, 0), wyP), mul(px(Q, 0), wyQ)), L70)
+                    : middleOne ? mul(px(P, 0), L70) : mul(mul(px(P, 0), L70), v);
+            result = packed(x >> (two || !middleOne ? 8u : 4u));
+        }
+        else if (two)
+        {
+            uvec4 m1 = mul(mul(px(Q, 0), L50), wyQ);
+            uvec4 x = add(add(mul(mul(px(P, 0), L50), wyP), m1),
+                          add(mul(mul(px(P, 1), B8), wyP), mul(mul(px(Q, 1), B8), wyQ)));
+            result = words(add(x >> 8u, m1));
+        }
+        else
+        {
+            uvec4 x = add(mul(px(P, 0), L50), mul(px(P, 1), B8));
+            result = middleOne ? packed(x >> 4u) : packed(mul(x, v) >> 8u);
+        }
+    }
+    else
+    {
+        int i = o - (ax != 0u ? 1 : 0);
+        if (i < middle)
+        {
+            // A whole pixel
+            int s = first + i;
+            if (two)
+            {
+                if (copyAcross != 0)
+                    result = packed(add(mul(px(P, s), lanes(d8, d8)), mul(px(Q, s), lanes(dc, dc))) >> 4u);
+                else
+                {
+                    uvec4 a = lanes((d0 * d8) & 0xFFFFu, (d0 * d8) & 0xFFFFu), b = lanes((d4 * d8) & 0xFFFFu, (d4 * d8) & 0xFFFFu);
+                    uvec4 c = lanes((d0 * dc) & 0xFFFFu, (d0 * dc) & 0xFFFFu), d = lanes((d4 * dc) & 0xFFFFu, (d4 * dc) & 0xFFFFu);
+                    result = packed(add(add(mul(px(P, s), a), mul(px(P, s + 1), b)), add(mul(px(Q, s), c), mul(px(Q, s + 1), d))) >> 8u);
+                }
+            }
+            else if (copyAcross != 0)
+                result = source[P * inPixels + s];
+            else
+                result = packed(add(mul(px(P, s), B0), mul(px(P, s + 1), B8)) >> 4u);
+        }
+        else
+        {
+            // The partly covered right pixel
+            int s = first + middle;
+            uvec4 L80 = lanes(16u, tailX), L60 = lanes(d4, srcTailX);
+            if (tailX <= srcTailX)
+            {
+                uvec4 x = two ? mul(add(mul(px(P, s), wyP), mul(px(Q, s), wyQ)), L80)
+                        : middleOne ? mul(px(P, s), L80) : mul(mul(px(P, s), L80), v);
+                result = packed(x >> (two || !middleOne ? 8u : 4u));
+            }
+            else if (two)
+            {
+                uvec4 x = add(add(mul(mul(px(P, s), B0), wyP), mul(mul(px(Q, s), B0), wyQ)),
+                              add(mul(mul(px(P, s + 1), L60), wyP), mul(mul(px(Q, s + 1), L60), wyQ)));
+                result = words(x >> 8u);
+            }
+            else
+            {
+                uvec4 x = add(mul(px(P, s), B0), mul(px(P, s + 1), L60));
+                result = middleOne ? packed(x >> 4u) : packed(mul(x, v) >> 8u);
+            }
+        }
+    }
+    pixels[r * outPixels + o] = result;
+}

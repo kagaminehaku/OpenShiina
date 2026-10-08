@@ -259,20 +259,26 @@ Finding problems:
   and offset); frame_NNNN.png is the window's picture (ScnVm.Window), _sK the surfaces asked for,
   SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10),
   SCNBOOT_GPU=1 (the GPU mode; with SCNBOOT_VERIFY_NATIVE=1 the GPU's bytes are checked against
-  the x86 code).
+  the x86 code), SCNBOOT_GPUCHECK=cases (GpuCheck.cs: every GPU kernel against the CPU code on
+  random pictures and rectangles, byte for byte, then the time of a large case each way; runs no
+  frame).
 - `tools/ShaderBuild`: compiles the GPU mode's GLSL compute shaders (src/OpenShiina.Gpu/Shaders,
   *.comp) to SPIR-V (*.spv, kept in the repository and embedded) with shaderc.
 - **The GPU mode** (`IScnAccelerator`, `src/OpenShiina.Gpu`; 2026-10-07): Vulkan 1.0 compute on
   the best real GPU (discrete before integrated, never a software one). A C# routine keeps its
   tables and its reads and writes of the scripts' memory, gathers what the shader needs straight
   into mapped buffers (host-visible, cached: on a desktop card the shader reads them over PCIe,
-  cheaper than the CPU writing into the card's memory) and writes the output back. So far
-  scale32 (Shaders/scale32.comp: one invocation a destination pixel; the MMX code's 16-bit sums
-  wrap, and sums modulo 65536 do not depend on their order, so the bytes are the same): Re: Rem
-  Plus's zoom (1600 x 900 to 1280 x 720) 7.4 ms a call on the CPU, about 2.5 ms on an RTX 2070
-  (gather 0.9, shader 1.0, write back 0.6). Routines that only mix pixels (blend32, rule alpha)
-  gain little while every picture is copied there and back; the compositor (04C4) needs the
-  pictures kept on the GPU first.
+  cheaper than the CPU writing into the card's memory) and writes the output back. Kernels
+  (Shaders/, one invocation a destination pixel): `scale` (scale32 and scale16; the MMX code's
+  16-bit sums wrap, and sums modulo 65536 do not depend on their order, so the bytes are the
+  same), `enlarge16`, `subpixel32` (with its unpacked edge pixels), `rotatezoom` (0574; the
+  64-bit steps in 32-bit halves). Each routine chooses CPU or GPU by timing its first large calls
+  both ways (ScnVm.Accelerator.cs; perf.log says what it chose): on an RTX 2070 against 6 cores,
+  1280 x 720, scale32 6.0 / 2.1 ms (CPU / GPU), scale16 6-8 / 2-3.5, enlarge16 1.1 / 2.4,
+  subpixel32 1.0 / 2.9, 0574 1.5 / 4.5: routines that only mix a few pixels lose more to the
+  copies over PCIe than they gain (a phone's GPU shares the CPU's memory). For the CPU mode too,
+  enlarge16 and 0574 now share their rows out between the cores (2.5 -> 1.1 ms, 2.7 -> 1.5 ms;
+  0574 row by row as before when its source and destination share memory).
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
 

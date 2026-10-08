@@ -15,6 +15,10 @@ namespace OpenShiina.App;
 public interface IGameWindow
 {
     void SetTitle(string title);
+
+    /// <summary>The frame rate meter's line (the setting "Show the frame rate"), once a second.</summary>
+    void ShowFrameRate(string text);
+
     void SetFullScreen(bool fullScreen);
     Task<int> ShowMessageAsync(string text, string caption, int type);
 
@@ -44,7 +48,7 @@ public sealed class GameSession : IDisposable
         Setup = GameSetup.Read(data);
         m_host = new Host(this);
         m_thread = new GameThread(Setup.CreateVm(m_host), Setup, data.SchemeName);
-        m_thread.TitleChanged += title => m_window.SetTitle(title);
+        m_thread.TitleChanged += title => m_window.ShowFrameRate(title);
         m_thread.Stopped += (error, log) => m_window.Stopped(error, log);
         m_thread.CloseAnswered += close => CloseAnswered?.Invoke(close);
     }

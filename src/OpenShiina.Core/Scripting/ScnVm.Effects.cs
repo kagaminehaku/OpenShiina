@@ -612,21 +612,109 @@ public sealed partial class ScnVm
         double turned = radians + Math.PI / 2;
         long duy = TruncateToLong(Math.Cos(turned) * 4294967296.0 / zoomX), dvy = TruncateToLong(Math.Sin(turned) * 4294967296.0 / zoomY);
 
-        var row = new byte[Math.Max(0, (r - l) * 4)];
-        for (int yy = t; yy < b; yy++)
+        RotateZoomPixels(new RotateZoomArea(dstBase, dstStride, l, t, r, b, srcBase, srcStride, sx, sy, sxEnd, syEnd,
+                                            u0, v0, dux, dvx, duy, dvy, keep, colour));
+    }
+
+    /// <summary>
+    /// What 0574 draws, its geometry worked out: the destination rectangle (l, t)-(r, b) of the
+    /// frame at dstBase, the source rectangle (sx, sy)-(sxEnd, syEnd) of the one at srcBase, and the
+    /// source position (32.32 fixed point) of destination pixel (x, y): u = y * duy + u0 + (x - l) *
+    /// dux, v = y * dvy + v0 + (x - l) * dvx (wrapping 64-bit sums).
+    /// </summary>
+    public readonly record struct RotateZoomArea(int DstBase, int DstStride, int L, int T, int R, int B,
+                                                 int SrcBase, int SrcStride, int SX, int SY, int SXEnd, int SYEnd,
+                                                 long U0, long V0, long DUX, long DVX, long DUY, long DVY, bool Keep, int Colour);
+
+    /// <summary>
+    /// The pixels of 0574. The x86 code goes row by row reading the source as it goes, so where the
+    /// source rectangle shares memory with the destination one (a frame turned in place) the rows
+    /// are drawn in turn as it draws them. Otherwise the source rectangle is read once and the rows
+    /// are shared out between the cores, or drawn on the GPU (Shaders/rotatezoom.comp).
+    /// <paramref name="inTurn"/> draws row by row in any case (tests).
+    /// </summary>
+    public void RotateZoomPixels(RotateZoomArea a, bool inTurn = false)
+    {
+        int width = a.R - a.L, height = a.B - a.T;
+        if (width <= 0 || height <= 0)
+            return;
+        long sw = (long)a.SXEnd - a.SX, sh = (long)a.SYEnd - a.SY;
+        long dstFrom = a.DstBase + (long)a.T * a.DstStride + a.L * 4L, dstTo = a.DstBase + (long)(a.B - 1) * a.DstStride + a.R * 4L;
+        long srcFrom = a.SrcBase + (long)a.SY * a.SrcStride + a.SX * 4L, srcTo = a.SrcBase + (long)(a.SYEnd - 1) * a.SrcStride + a.SXEnd * 4L;
+        bool apart = sw > 0 && sh > 0 && sw * sh <= 1 << 24 && a.SrcStride > 0 && a.DstStride > 0 && (srcTo <= dstFrom || dstTo <= srcFrom);
+        if (!apart || inTurn)
         {
-            long u = unchecked(yy * duy + u0), vv = unchecked(yy * dvy + v0);
-            int at = dstBase + yy * dstStride + l * 4;
+            RotateZoomInTurn(a);
+            return;
+        }
+        // The source rectangle, read once
+        var source = new int[sw * sh];
+        var sourceBytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(source.AsSpan());
+        for (int y = 0; y < sh; y++)
+            ReadBytes((int)(srcFrom + (long)y * a.SrcStride), sourceBytes.Slice((int)(y * sw * 4), (int)(sw * 4)));
+        var timing = ChooseGpu("rotatezoom", (long)width * height);
+        if (timing.Gpu)
+        {
+            if (RotateZoomOnGpu(Accelerator!, a, source, (int)sw, (int)sh))
+            {
+                GpuDone("rotatezoom", timing);
+                return;
+            }
+            timing = GpuFailed("rotatezoom");
+        }
+        for (int y = a.T; y < a.B; y++)
+        {
+            ReadByte(a.DstBase + y * a.DstStride + a.L * 4);
+            ReadByte(a.DstBase + y * a.DstStride + a.R * 4 - 1);
+        }
+        void Rows(int from, int to)
+        {
+            var row = new byte[width * 4];
+            for (int yy = from; yy < to; yy++)
+            {
+                long u = unchecked(yy * a.DUY + a.U0), vv = unchecked(yy * a.DVY + a.V0);
+                int at = a.DstBase + yy * a.DstStride + a.L * 4;
+                ReadBytes(at, row);
+                for (int k = 0; k < row.Length; k += 4)
+                {
+                    int fx = (int)(u >> 32), fy = (int)(vv >> 32);
+                    if (fx >= a.SX && fx < a.SXEnd && fy >= a.SY && fy < a.SYEnd)
+                        BitConverter.TryWriteBytes(row.AsSpan(k), source[(fy - a.SY) * sw + (fx - a.SX)]);
+                    else if (!a.Keep)
+                        BitConverter.TryWriteBytes(row.AsSpan(k), a.Colour);
+                    u = unchecked(u + a.DUX);
+                    vv = unchecked(vv + a.DVX);
+                }
+                WriteBytes(at, row);
+            }
+        }
+        const int Band = 16;
+        int bands = (height + Band - 1) / Band;
+        if (bands > 1 && (long)width * height >= 20000)
+            Parallel.For(0, bands, i => Rows(a.T + i * Band, Math.Min(a.B, a.T + (i + 1) * Band)));
+        else
+            Rows(a.T, a.B);
+        GpuDone("rotatezoom", timing);
+    }
+
+    /// <summary>0574 row by row as the x86 code draws it, reading the source as it goes.</summary>
+    private void RotateZoomInTurn(RotateZoomArea a)
+    {
+        var row = new byte[(a.R - a.L) * 4];
+        for (int yy = a.T; yy < a.B; yy++)
+        {
+            long u = unchecked(yy * a.DUY + a.U0), vv = unchecked(yy * a.DVY + a.V0);
+            int at = a.DstBase + yy * a.DstStride + a.L * 4;
             ReadBytes(at, row);
-            for (int xx = l, k = 0; xx < r; xx++, k += 4)
+            for (int k = 0; k < row.Length; k += 4)
             {
                 int fx = (int)(u >> 32), fy = (int)(vv >> 32);
-                if (fx >= sx && fx < sxEnd && fy >= sy && fy < syEnd)
-                    BitConverter.TryWriteBytes(row.AsSpan(k), Read32(srcBase + fy * srcStride + fx * 4));
-                else if (!keep)
-                    BitConverter.TryWriteBytes(row.AsSpan(k), colour);
-                u = unchecked(u + dux);
-                vv = unchecked(vv + dvx);
+                if (fx >= a.SX && fx < a.SXEnd && fy >= a.SY && fy < a.SYEnd)
+                    BitConverter.TryWriteBytes(row.AsSpan(k), Read32(a.SrcBase + fy * a.SrcStride + fx * 4));
+                else if (!a.Keep)
+                    BitConverter.TryWriteBytes(row.AsSpan(k), a.Colour);
+                u = unchecked(u + a.DUX);
+                vv = unchecked(vv + a.DVX);
             }
             WriteBytes(at, row);
         }

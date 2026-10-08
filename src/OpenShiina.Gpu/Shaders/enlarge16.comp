@@ -1,0 +1,58 @@
+// enlarge16 (Ero-On! START 5DFA5, ScnVm.Enlarge16.cs) on the GPU, one invocation a destination
+// pixel. The walks down and across the picture come from the CPU: per destination row its source
+// row and whether it is mixed with the next (by wa and wb), per destination column its source
+// pixel and whether it is mixed with the next (by four words each side). Every product keeps its
+// low 16 bits (pmullw), every sum wraps at 16 bits (paddw), each mix ends with >> 8.
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// The source rows the destination needs, `width` pixels each
+layout(std430, binding = 0) readonly buffer Source { uint source[]; };
+// Per destination row: source row, mixed (0 / 1), wa, wb
+layout(std430, binding = 1) readonly buffer Rows { int rows[]; };
+// Per destination column: source pixel, mixed (0 / 1), the left words (4), the right words (4)
+layout(std430, binding = 2) readonly buffer Columns { int columns[]; };
+layout(std430, binding = 3) writeonly buffer Output { uint pixels[]; };
+
+layout(push_constant) uniform Parameters
+{
+    int rowCount;
+    int columnCount;
+    int width;
+};
+
+// The four bytes of source pixel x of the destination row: one source row, or two mixed
+uvec4 mixedRow(int y, bool mixed, uint wa, uint wb, int x)
+{
+    uint p = source[y * width + x];
+    uvec4 upper = uvec4(p & 0xFFu, (p >> 8) & 0xFFu, (p >> 16) & 0xFFu, p >> 24);
+    if (!mixed)
+        return upper;
+    uint q = source[(y + 1) * width + x];
+    uvec4 lower = uvec4(q & 0xFFu, (q >> 8) & 0xFFu, (q >> 16) & 0xFFu, q >> 24);
+    return ((((upper * wa) & 0xFFFFu) + ((lower * wb) & 0xFFFFu)) & 0xFFFFu) >> 8;
+}
+
+void main()
+{
+    int c = int(gl_GlobalInvocationID.x), r = int(gl_GlobalInvocationID.y);
+    if (c >= columnCount || r >= rowCount)
+        return;
+    int y = rows[r * 4];
+    bool rowMixed = rows[r * 4 + 1] != 0;
+    uint wa = uint(rows[r * 4 + 2]), wb = uint(rows[r * 4 + 3]);
+    int at = c * 10;
+    int x = columns[at];
+    uvec4 left = mixedRow(y, rowMixed, wa, wb, x), b;
+    if (columns[at + 1] == 0)
+        b = left;
+    else
+    {
+        uvec4 right = mixedRow(y, rowMixed, wa, wb, x + 1);
+        uvec4 wl = uvec4(columns[at + 2], columns[at + 3], columns[at + 4], columns[at + 5]);
+        uvec4 wr = uvec4(columns[at + 6], columns[at + 7], columns[at + 8], columns[at + 9]);
+        b = ((((left * wl) & 0xFFFFu) + ((right * wr) & 0xFFFFu)) & 0xFFFFu) >> 8;
+    }
+    b &= 0xFFu;
+    pixels[r * columnCount + c] = b.x | (b.y << 8) | (b.z << 16) | (b.w << 24);
+}

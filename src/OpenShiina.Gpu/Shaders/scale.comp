@@ -1,9 +1,11 @@
-// scale32 (Oreimo START 78380, ScnVm.Scale32.cs) on the GPU: one invocation a destination pixel.
-// The tables of rows and columns come from the CPU (ScnVm.ScaleTable, the x86 code's integer
-// steps); here each destination pixel adds up its source pixels, each times the pmaddwd weight of
-// its row and column. The MMX code sums in 16-bit lanes that wrap; sums modulo 65536 do not
-// depend on their order, so adding pixel by pixel in 32 bits and keeping the low 16 bits gives
-// the same bytes.
+// The scripts' zoom and pan by area averaging on the GPU, one invocation a destination pixel:
+//   mode 0: scale32 (Oreimo START 78380, ScnVm.Scale32.cs), weight pmaddwd >>> 21, with the
+//           general loop's quirk (the partial first column left out of the opaque test);
+//   mode 1: scale16 (Ero-On! START 5E2D6, ScnVm.Scale16.cs), weight saturate16(pmaddwd >>> 8).
+// The tables of rows and columns come from the CPU (the x86 code's integer steps); here each
+// destination pixel adds up its source pixels, each times the weight of its row and column. The
+// MMX code sums in 16-bit lanes that wrap; sums modulo 65536 do not depend on their order, so
+// adding pixel by pixel in 32 bits and keeping the low 16 bits gives the same bytes.
 #version 450
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -22,13 +24,14 @@ layout(push_constant) uniform Parameters
     int width;
     uint fullRow;
     uint fullColumn;
+    int mode;
 };
 
-// pmaddwd of [a, a] and [b, b] as signed 16-bit words, >>> 21
+// pmaddwd of [a, a] and [b, b] as signed 16-bit words, then the mode's shift
 uint weight(uint a, uint b)
 {
     int d = (int(a << 16) >> 16) * (int(b << 16) >> 16) + (int(a) >> 16) * (int(b) >> 16);
-    return uint(d) >> 21;
+    return mode == 0 ? uint(d) >> 21 : min(uint(d) >> 8, 0x7FFFu);
 }
 
 uvec4 sums;
@@ -43,8 +46,8 @@ void addPixel(int at, uint w, bool count)
 }
 
 // One source row of the destination pixel, its row weight wy. skipShared leaves the partial first
-// column out of the opaque test for every column but the first (the general loop's register copy
-// of the x86 code; see ScnVm.Scale32.cs)
+// column out of the opaque test for every column but the first (scale32's general loop keeps the
+// previous pixel's last column in a register; see ScnVm.Scale32.cs)
 void addRow(int y, uint wy, int c, int x0, int flags, int count, uint first, uint last, bool skipShared)
 {
     int at = y * width + x0;
@@ -66,15 +69,15 @@ void main()
     uint rowFirst = uint(rows[r * 5 + 3]), rowLast = uint(rows[r * 5 + 4]);
     int x0 = columns[c * 5], flags = columns[c * 5 + 1], count = columns[c * 5 + 2];
     uint first = uint(columns[c * 5 + 3]), last = uint(columns[c * 5 + 4]);
-    bool ownLoop = rowFlags == 0xC0 && rowWhole <= 1;
+    bool skipShared = mode == 0 && !(rowFlags == 0xC0 && rowWhole <= 1);
     sums = uvec4(0u);
     notOpaque = 0;
     if ((rowFlags & 0x80) != 0)
-        addRow(y++, rowFirst, c, x0, flags, count, first, last, !ownLoop);
+        addRow(y++, rowFirst, c, x0, flags, count, first, last, skipShared);
     for (int k = 0; k < rowWhole; k++)
         addRow(y++, fullRow, c, x0, flags, count, first, last, false);
     if ((rowFlags & 0x40) != 0)
-        addRow(y, rowLast, c, x0, flags, count, first, last, !ownLoop);
+        addRow(y, rowLast, c, x0, flags, count, first, last, skipShared);
     uvec4 b = (sums >> 8) & 0xFFu;
     if (notOpaque == 0)
         b.w = 0xFFu;

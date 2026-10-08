@@ -59,8 +59,8 @@ public sealed class GameThread : IDisposable
         m_saveFolder = setup.SaveFolder;
         Width = setup.Width;
         Height = setup.Height;
-        m_perf = PerfMeter.Create(vm, name, setup.SaveFolder);
-        if (Environment.GetEnvironmentVariable("OPENSHIINA_TRACE") == "draw")
+        m_perf = PerfMeter.Create(vm, name, setup.SaveFolder, setup.Settings);
+        if (setup.Settings.DrawTraceForGame())
             vm.Trace = new DrawTrace();
         m_front = new byte[Width * Height * 4];
         m_back = new byte[Width * Height * 4];

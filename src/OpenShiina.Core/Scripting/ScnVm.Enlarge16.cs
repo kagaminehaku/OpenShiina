@@ -10,11 +10,15 @@
 // y >= sH takes one source row (y -= sH; at 0 the next row and y = dH), else two rows are mixed by
 // (y << 8) / sH and ((sH - y) << 8) / sH (then the next row, y += dH - sH). Every product keeps
 // its low 16 bits (pmullw), every sum wraps at 16 bits (paddw), and each mix ends with >> 8.
+// Both walks are made first, so the rows can be drawn on all cores (or on the GPU).
 
 namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
 {
+    /// <summary>A destination row of Enlarge16: its source row, and whether it mixes it with the next by Upper and Lower.</summary>
+    private readonly record struct Enlarge16Row(int Source, bool Mixed, int Upper, int Lower);
+
     /// <summary>
     /// Ero-On! START 5DFA5: the rectangle (sl, st)-(sr, sb) of a 32-bit picture into (dl, dt)-(dr, db)
     /// of another, enlarging (1/16 pixels), with the weight table at <paramref name="table"/>.
@@ -82,55 +86,106 @@ public sealed partial class ScnVm
                     right[c * 4 + k] = Weight(mixRight[c], k);
                 }
 
-        int srcRow = src + (int)((uint)st >> 4) * srcPitch + (int)((uint)sl >> 4) * 4;
-        int dstRow = dst + (int)((uint)dt >> 4) * dstPitch + (int)((uint)dl >> 4) * 4;
-        var upper = new byte[width * 4];
-        var lower = new byte[width * 4];
-        var mixed = new int[width * 4];
-        var output = new byte[columns * 4];
-        int y = dH - (int)((uint)((st & 15) * sH) >> 4);
-        for (int r = dH >> 4; r > 0; r--, dstRow += dstPitch)
+        // The walk down the picture: per destination row its source row, one or two mixed by
+        // (y << 8) / sH and ((sH - y) << 8) / sH
+        var rows = new Enlarge16Row[dH >> 4];
+        int y = dH - (int)((uint)((st & 15) * sH) >> 4), source = 0;
+        for (int r = 0; r < rows.Length; r++)
         {
-            ReadBytes(srcRow, upper);
             if (y >= sH)
             {
-                // One source row
-                for (int i = 0; i < mixed.Length; i++)
-                    mixed[i] = upper[i];
+                rows[r] = new Enlarge16Row(source, false, 0, 0);
                 y -= sH;
                 if (y == 0)
                 {
-                    srcRow += srcPitch;
+                    source++;
                     y = dH;
                 }
             }
             else
             {
-                // Two source rows: (a * wa + b * wb) >> 8 in 16 bits
-                int wa = (y << 8) / sH & 0xFFFF, wb = ((sH - y) << 8) / sH & 0xFFFF;
-                ReadBytes(srcRow + srcPitch, lower);
-                for (int i = 0; i < mixed.Length; i++)
-                    mixed[i] = ((upper[i] * wa & 0xFFFF) + (lower[i] * wb & 0xFFFF) & 0xFFFF) >> 8;
-                srcRow += srcPitch;
+                rows[r] = new Enlarge16Row(source, true, (y << 8) / sH & 0xFFFF, ((sH - y) << 8) / sH & 0xFFFF);
+                source++;
                 y += dH - sH;
             }
-            for (int c = 0, o = 0; c < columns; c++, o += 4)
-            {
-                int p = from[c] * 4;
-                if (mixLeft[c] < 0)
-                {
-                    for (int k = 0; k < 4; k++)
-                        output[o + k] = (byte)mixed[p + k];
-                    continue;
-                }
-                for (int k = 0; k < 4; k++)
-                {
-                    int sum = (mixed[p + k] * left[o + k] & 0xFFFF) + (mixed[p + 4 + k] * right[o + k] & 0xFFFF) & 0xFFFF;
-                    output[o + k] = (byte)(sum >> 8);
-                }
-            }
-            WriteBytes(dstRow, output);
         }
+
+        int srcBase = src + (int)((uint)st >> 4) * srcPitch + (int)((uint)sl >> 4) * 4;
+        int dstBase = dst + (int)((uint)dt >> 4) * dstPitch + (int)((uint)dl >> 4) * 4;
+        var timing = ChooseGpu("enlarge16", (long)rows.Length * columns);
+        if (timing.Gpu)
+        {
+            if (Enlarge16OnGpu(Accelerator!, rows, from, mixLeft, left, right, width, srcBase, srcPitch, dstBase, dstPitch))
+            {
+                GpuDone("enlarge16", timing);
+                return true;
+            }
+            timing = GpuFailed("enlarge16");
+        }
+        void RunBand(int band)
+        {
+            var upper = new byte[width * 4];
+            var lower = new byte[width * 4];
+            var mixed = new int[width * 4];
+            var output = new byte[columns * 4];
+            for (int r = band * Enlarge16Band, end = Math.Min(rows.Length, r + Enlarge16Band); r < end; r++)
+            {
+                var row = rows[r];
+                ReadBytes(srcBase + row.Source * srcPitch, upper);
+                if (!row.Mixed)
+                {
+                    // One source row
+                    for (int i = 0; i < mixed.Length; i++)
+                        mixed[i] = upper[i];
+                }
+                else
+                {
+                    // Two source rows: (a * wa + b * wb) >> 8 in 16 bits
+                    int wa = row.Upper, wb = row.Lower;
+                    ReadBytes(srcBase + (row.Source + 1) * srcPitch, lower);
+                    for (int i = 0; i < mixed.Length; i++)
+                        mixed[i] = ((upper[i] * wa & 0xFFFF) + (lower[i] * wb & 0xFFFF) & 0xFFFF) >> 8;
+                }
+                for (int c = 0, o = 0; c < columns; c++, o += 4)
+                {
+                    int p = from[c] * 4;
+                    if (mixLeft[c] < 0)
+                    {
+                        for (int k = 0; k < 4; k++)
+                            output[o + k] = (byte)mixed[p + k];
+                        continue;
+                    }
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int sum = (mixed[p + k] * left[o + k] & 0xFFFF) + (mixed[p + 4 + k] * right[o + k] & 0xFFFF) & 0xFFFF;
+                        output[o + k] = (byte)(sum >> 8);
+                    }
+                }
+                WriteBytes(dstBase + r * dstPitch, output);
+            }
+        }
+        // Rows are independent: bands of them run on all cores (the pages they touch exist first,
+        // as the page table makes pages on first use)
+        int sourceRows = rows.Length == 0 ? 0 : rows.Max(row => row.Source + (row.Mixed ? 2 : 1));
+        for (int r = 0; r < sourceRows; r++)
+        {
+            ReadByte(srcBase + r * srcPitch);
+            ReadByte(srcBase + r * srcPitch + width * 4 - 1);
+        }
+        for (int r = 0; r < rows.Length; r++)
+        {
+            ReadByte(dstBase + r * dstPitch);
+            ReadByte(dstBase + r * dstPitch + columns * 4 - 1);
+        }
+        int bands = (rows.Length + Enlarge16Band - 1) / Enlarge16Band;
+        if (bands > 1 && (long)rows.Length * columns >= 20000)
+            Parallel.For(0, bands, RunBand);
+        else
+            for (int band = 0; band < bands; band++)
+                RunBand(band);
+        GpuDone("enlarge16", timing);
         return true;
     }
+
+    private const int Enlarge16Band = 16;
 }

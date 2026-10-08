@@ -2,7 +2,7 @@
 // its .exe, its name and its folder; a click plays it, its menu (right click, or the "…" button)
 // opens its save folder or takes it off the list. "Add a game…" asks for a folder. A game whose
 // folder is gone is shown faded and cannot be played. "Settings" opens the player's settings
-// (Game/PlayerSettings.cs): drawing on the CPU or the GPU.
+// (Game/PlayerSettings.cs): drawing on the CPU or the GPU, and the on / off settings.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -65,8 +65,9 @@ public sealed class LibraryView : UserControl
     }
 
     /// <summary>
-    /// The settings, saved as they change: where the games' pictures are scaled and mixed (the
-    /// CPU or the GPU through Vulkan), counting from the next game started.
+    /// The settings, saved as they change, counting from the next game started: where the games'
+    /// pictures are scaled and mixed (the CPU or the GPU through Vulkan), then the on / off
+    /// settings (PlayerSettings.Switches) in their sections; it scrolls on small screens.
     /// </summary>
     private static Flyout SettingsFlyout()
     {
@@ -95,27 +96,45 @@ public sealed class LibraryView : UserControl
                 Choose(Renderer.Gpu);
         };
         ShowDevice();
+        static TextBlock Heading(string text) =>
+            new() { Text = text, FontSize = 16, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
+        static TextBlock Help(string text, double indent) =>
+            new() { Text = text, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray, Margin = new Thickness(indent, 0, 0, 0) };
+        var page = new StackPanel
+        {
+            Width = 340,
+            Spacing = 4,
+            Children =
+            {
+                Heading("Drawing"),
+                Help("Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.", 0),
+                cpu,
+                gpu,
+                device,
+            },
+        };
+        string? section = null;
+        foreach (var item in PlayerSettings.Switches)
+        {
+            if (item.Section != section)
+            {
+                section = item.Section;
+                page.Children.Add(Heading(section));
+            }
+            var box = new CheckBox { Content = item.Label, IsChecked = item.Get(settings) };
+            box.IsCheckedChanged += (_, _) =>
+            {
+                item.Set(settings, box.IsChecked == true);
+                settings.Save();
+            };
+            page.Children.Add(box);
+            page.Children.Add(Help(item.Help, 28));
+        }
+        page.Children.Add(new TextBlock { Text = "A change counts from the next game started.", Foreground = Brushes.LightGray, Margin = new Thickness(0, 8, 0, 0) });
         return new Flyout
         {
             Placement = PlacementMode.BottomEdgeAlignedRight,
-            Content = new StackPanel
-            {
-                Width = 340,
-                Spacing = 4,
-                Children =
-                {
-                    new TextBlock { Text = "Drawing", FontSize = 16, FontWeight = FontWeight.SemiBold },
-                    new TextBlock
-                    {
-                        Text = "Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.",
-                        TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray,
-                    },
-                    cpu,
-                    gpu,
-                    device,
-                    new TextBlock { Text = "A change counts from the next game started.", Foreground = Brushes.LightGray, Margin = new Thickness(0, 8, 0, 0) },
-                },
-            },
+            Content = new ScrollViewer { MaxHeight = 560, Content = page },
         };
     }
 
