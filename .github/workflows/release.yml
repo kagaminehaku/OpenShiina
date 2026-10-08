@@ -1,0 +1,147 @@
+# Builds the players and, for a tag v*, publishes them as a GitHub release:
+#   OpenShiina-<version>-windows-x64-wpf.zip   the WPF player (text drawn by Windows GDI)
+#   OpenShiina-<version>-windows-x64.zip       the Avalonia player for Windows
+#   OpenShiina-<version>-linux-x64.tar.gz      the Avalonia player for Linux
+#   OpenShiina-<version>-android.apk           the Android player (arm64, arm, x64)
+# The version is the tag's (v0.2.0 -> 0.2.0). Run by hand (Actions > Release > Run workflow),
+# it only builds, and the files are kept as the run's artifacts.
+#
+# The APK is signed with the keystore in the repository's secrets when there is one:
+#   ANDROID_KEYSTORE_BASE64   the .keystore file, base64
+#   ANDROID_KEY_ALIAS         its key's alias
+#   ANDROID_KEY_PASSWORD      the key's password (also used for the store)
+# Without them it is signed with a debug key made for the run: fine to try, but an APK signed
+# with another key cannot be installed over it.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish src/OpenShiina.Windows -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/wpf
+          dotnet publish src/OpenShiina.Desktop -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/desktop
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path out/wpf/* -DestinationPath "dist/OpenShiina-$env:VERSION-windows-x64-wpf.zip"
+          Compress-Archive -Path out/desktop/* -DestinationPath "dist/OpenShiina-$env:VERSION-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish
+        run: |
+          dotnet publish src/OpenShiina.Desktop -c Release -r linux-x64 --self-contained -p:Version=$VERSION -o out/OpenShiina
+          chmod +x out/OpenShiina/OpenShiina
+          mkdir -p dist
+          tar -czf "dist/OpenShiina-$VERSION-linux-x64.tar.gz" -C out OpenShiina
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Android workload and SDK packages
+        run: |
+          dotnet workload install android
+          dotnet build src/OpenShiina.Android -t:InstallAndroidDependencies -f net10.0-android \
+            -p:AndroidSdkDirectory="$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=true
+      - name: Publish
+        run: |
+          signing=()
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            signing=(-p:AndroidKeyStore=true
+                     -p:AndroidSigningKeyStore="$RUNNER_TEMP/release.keystore"
+                     -p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS"
+                     -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD
+                     -p:AndroidSigningStorePass=env:ANDROID_KEY_PASSWORD)
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK is signed with a debug key"
+          fi
+          dotnet publish src/OpenShiina.Android -c Release -f net10.0-android \
+            -p:AndroidSdkDirectory="$ANDROID_HOME" \
+            -p:Version=$VERSION -p:ApplicationDisplayVersion=$VERSION -p:ApplicationVersion=$GITHUB_RUN_NUMBER \
+            "${signing[@]}" -o out/android
+          mkdir -p dist
+          cp out/android/*-Signed.apk "dist/OpenShiina-$VERSION-android.apk"
+          rm -f "$RUNNER_TEMP/release.keystore"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

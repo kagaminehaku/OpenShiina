@@ -52,6 +52,12 @@ the screen: a tap clicks, dragging holds the left button, two fingers moved up o
 the wheel (down opens the backlog); the bar on the right has Menu (a right click, as is Back),
 Auto, Skip, Log and Exit.
 
+Releases: pushing a tag `v*` (for instance `v0.2.0`) has GitHub Actions
+(`.github/workflows/release.yml`) build the WPF and Avalonia players for Windows, the Avalonia
+player for Linux and the APK, with the tag's version, and publish them as a release. The APK is
+signed with the keystore in the repository's secrets (`ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), or with a debug key when there is none.
+
 ## Usage
 
 Run `OpenShiina`: its home screen lists your games with the icons of their `.exe`. **Add a
