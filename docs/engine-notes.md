@@ -279,6 +279,63 @@ Finding problems:
   copies over PCIe than they gain (a phone's GPU shares the CPU's memory). For the CPU mode too,
   enlarge16 and 0574 now share their rows out between the cores (2.5 -> 1.1 ms, 2.7 -> 1.5 ms;
   0574 row by row as before when its source and destination share memory).
+- **The compositor on all cores** (04C4 / 04C5, ScnVm.Sprites.cs): the sprites stay in order,
+  but each row of a frame goes into its own destination row, so a large frame's rows are shared
+  out between the cores (per-thread row buffers; the pages touched exist first). The pictures of
+  ScnBoot runs are the same as before (Re: Rem Plus's zoom, 109 frames; Oreimo's park route to
+  frame 8000, 161 frames), the compositor's time 5.6 -> 2.1 s and 5.5 -> 3.1 s. The GPU would
+  have to take whole surfaces there and back for each call, as the pictures live in the scripts'
+  memory, so it stays on the CPU.
+- **More of the time found by SCNBOOT_PROFILE** (2026-10-08): `010E` (a file exists) decoded the
+  whole file to know (64 ms for some of Re: Rem Plus's); it asks the archive's index now, as
+  `0158` does. `04F6` / `0500` (BlendRows, two surfaces mixed in a fade) went row by row through
+  local functions: tight loops now, the rows on all cores where no row reads what another
+  writes (the source the destination itself or apart from it), 6.1 -> 0.9 ms at 1280 x 720
+  (600 random cases the same as before, sources a few rows off the destination among them).
+  The key stream XOR of 9 games' START (Oreimo 75C3D: 0xD94A4 dwords, a count of each game) is
+  found by its bytes with the count left open and runs as C# (`xorstream`, 21 -> 3 ms a call;
+  SCNBOOT_VERIFY_NATIVE on Oreimo's park route). `0294` with a slot that is "0276 compare16 / end
+  f[0]" (Re: Rem Plus, Maki Fes!) compares in C# and leaves the slot as its last run would
+  (l[0], l[1], f[0], its end): the same sorted table, 0.65 s -> 80 ms at start. `06D6` looked
+  slow in ScnBoot only: its test host measures each piece of music with NVorbis; the players
+  only read the file.
+- **From a Galaxy S7's perf.log** (Exynos 8890, Mono, 2026-10-08; Maki Fes!): Release builds of
+  the Android player use LLVM (6.2 -> 18.4 fps over the session with today's changes). Then:
+  `CopyMemory` (04E2's rows, 02C6) made a buffer a call - page to page now (`MoveMemory`: exact
+  memmove, 3,000 random cases); Maki Fes! / Re: Rem Plus have v2.50's own subpixel32 (START
+  850F8 / 85C68: its loop over the rows from two source rows draws one row fewer and the
+  partly covered bottom row is not drawn; `Subpixel32(v250)`, 387 random cases the same as the
+  x86 code; translated it took 93 ms a call there); the MPEG-1 decoder decodes a picture's slices
+  on all cores (ed.mpg has about 3 a picture) and ToBgr24 shares its rows out (7.1 -> 2.8 ms a
+  1280 x 720 frame, the same bytes on all 3,115 frames); Ogg sounds are decoded as they play
+  (ScnMusic.Source) instead of all at 06B1 (100 ms a voice there; only the headers are read
+  first); 051E's stretches copied a pixel through a 3-byte array (CopyPixel24 now); 0568
+  (RuleBlend) goes in 64 KB parts on all cores where its inputs are the output or apart from it
+  (19.4 -> 4.0 ms, 300 random cases the same). ScnBoot's pictures of Re: Rem Plus's zoom and
+  Oreimo's park route are the same as before all of these.
+- **The game's pace** (GameThread, PlayerSettings.FramePacing, 2026-10-08): the players ran a
+  frame for every refresh of the screen (WPF's CompositionTarget.Rendering, Avalonia's animation
+  frames), four times the engine's pace on a 240 Hz screen, and drew all the time. The engine's
+  loop sleeps with Sleep(1) (a tick of the Windows clock, 15.6 ms), so it goes at about 60 a
+  second and next to no processor while it waits. Now by default the interpreter's thread keeps
+  that pace itself (60 a second, later when 002A asks to sleep longer; timeBeginPeriod(1) on
+  Windows, so that 1/60 s is not two ticks) and posts each new picture (FrameReady), which the
+  window draws then; "every refresh" is still a setting. Thread pool workers no longer spin for
+  work (UnfairSemaphoreSpinLimit 0), and the BGR to BGRA copy of a picture is a store a pixel.
+  Re: Rem Plus's title (animated, 60 new pictures a second), whole machine (12 threads): Avalonia
+  11.4% -> about 3%, WPF about 3% (it was 2.7-6.6% depending on the moment).
+  The original REMPLUS.EXE (through Locale Emulator) at the same title: 2.9-3.0%.
+- **enlarge32** (ScnVm.Enlarge32.cs, 2026-10-08): the enlarging case of the zoom and pan, Oreimo
+  START 77108 / Re: Rem Plus 866A8, in 10 of the 11 games (not Ero-On!, which has enlarge16), three
+  builds (v2.47, v2.49, v2.50 signatures). A table of the destination columns that mix two source
+  columns (an accumulator that loses sW a pixel, weights acc * 257 / sW by scale32's reciprocal
+  division; the partly covered first and last columns their own, alpha lane scaled by the part),
+  then rows of five kinds (partly covered top and bottom, from one source row or two mixed;
+  whole rows from one or two), each with the x86 code's MMX formulas and its quirk (a used-up
+  partly covered first column makes the rows from one source row take that pixel again). Each
+  build checked against its x86 code on the interpreter (150 random cases each, 899 for Re:
+  Rem Plus's). Re: Rem Plus's kiss zoom in the prologue ($A_CHR 50 to 130 %): 50 ms a frame
+  translated, 9 ms with the C# version (4 ms the routine; rows on all cores).
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
 

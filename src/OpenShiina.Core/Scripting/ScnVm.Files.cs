@@ -103,11 +103,12 @@ public sealed partial class ScnVm
 
     private void RegisterFiles()
     {
-        // 010E file, v: whether the file exists
+        // 010E file, v: whether the file exists - for a file of the archives from their index
+        // (decoding it to know took 64 ms for some of Re: Rem Plus's)
         Register(0x010E, (vm, c, i) =>
         {
             string path = vm.ReadString(vm.Value(c, i.Args[0]));
-            vm.Store(c, i.Args[1], vm.ReadScriptFile(path) != null ? 1 : 0);
+            vm.Store(c, i.Args[1], vm.ScriptFileSize(path) != null ? 1 : 0);
             return 0;
         });
         // 0158 file, size, packed size: from the archive's index, as the engine does (START reads

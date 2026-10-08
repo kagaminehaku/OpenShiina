@@ -107,23 +107,40 @@ public sealed class MpegFrame
     /// The picture as 24-bit BGR (ITU-R BT.601, video range, each chroma sample covering 2 x 2
     /// pixels), <paramref name="width"/> x <paramref name="height"/> pixels from the top left.
     /// </summary>
-    public void ToBgr24(Span<byte> dst, int pitch, int width, int height)
+    public unsafe void ToBgr24(Span<byte> dst, int pitch, int width, int height)
     {
         width = Math.Min(width, Width);
         height = Math.Min(height, Height);
-        for (int y = 0; y < height; y++)
+        if (width <= 0 || height <= 0)
+            return;
+        // Every row is checked to fit before any is written (the rows are written through a pointer)
+        _ = dst.Slice((height - 1) * pitch, width * 3);
+        fixed (byte* start = dst)
         {
-            var row = dst.Slice(y * pitch, width * 3);
-            int yi = y * Stride, ci = (y >> 1) * ChromaStride;
-            for (int x = 0; x < width; x++)
+            nint at = (nint)start;
+            void Rows(int from, int to)
             {
-                int c = ci + (x >> 1);
-                int l = (Y[yi + x] - 16) * 76309;
-                int cb = Cb[c] - 128, cr = Cr[c] - 128;
-                row[x * 3] = Clamp((l + 132201 * cb + 32768) >> 16);
-                row[x * 3 + 1] = Clamp((l - 25675 * cb - 53279 * cr + 32768) >> 16);
-                row[x * 3 + 2] = Clamp((l + 104597 * cr + 32768) >> 16);
+                for (int y = from; y < to; y++)
+                {
+                    var row = new Span<byte>((byte*)at + (nint)y * pitch, width * 3);
+                    int yi = y * Stride, ci = (y >> 1) * ChromaStride;
+                    for (int x = 0; x < width; x++)
+                    {
+                        int c = ci + (x >> 1);
+                        int l = (Y[yi + x] - 16) * 76309;
+                        int cb = Cb[c] - 128, cr = Cr[c] - 128;
+                        row[x * 3] = Clamp((l + 132201 * cb + 32768) >> 16);
+                        row[x * 3 + 1] = Clamp((l - 25675 * cb - 53279 * cr + 32768) >> 16);
+                        row[x * 3 + 2] = Clamp((l + 104597 * cr + 32768) >> 16);
+                    }
+                }
             }
+            // The rows on all cores (half of a 1280 x 720 movie's time on one)
+            const int Band = 32;
+            if (height >= 2 * Band && pitch >= width * 3)
+                Parallel.For(0, (height + Band - 1) / Band, band => Rows(band * Band, Math.Min(height, (band + 1) * Band)));
+            else
+                Rows(0, height);
         }
     }
 
@@ -142,7 +159,12 @@ public sealed class Mpeg1Video
     /// <summary>Frames a second (picture_rate of the sequence header).</summary>
     public double FrameRate { get; private set; } = 30;
     /// <summary>Slices that did not decode cleanly so far.</summary>
-    public int Errors { get; private set; }
+    public int Errors => m_errors;
+    private int m_errors;
+
+    // The slices of the picture being decoded (vertical position, bit after the start code)
+    private readonly List<(int Code, int Bit)> m_slices = [];
+    private SliceDecoder? m_slice;
 
     private int m_mbWidth, m_mbHeight;
     private readonly int[] m_intraMatrix = new int[64];
@@ -157,13 +179,6 @@ public sealed class Mpeg1Video
     private bool m_fullPelForward, m_fullPelBackward;
     private int m_forwardRSize, m_backwardRSize;
     private MpegFrame m_current = null!, m_forwardRef = null!, m_backwardRef = null!;
-    private int m_quantScale;
-    private int m_mbAddress, m_mbRow, m_mbCol;
-    private int m_forwardH, m_forwardV, m_backwardH, m_backwardV;  // predictors, full or half pel
-    private int m_mvForwardH, m_mvForwardV, m_mvBackwardH, m_mvBackwardV;  // half pel
-    private bool m_mbForward, m_mbBackward;
-    private int m_dcY, m_dcCb, m_dcCr;
-    private readonly int[] m_block = new int[64];
 
     private static readonly double[] s_frameRates = [0, 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60000.0 / 1001, 60, 0, 0, 0, 0, 0, 0, 0];
 
@@ -349,23 +364,16 @@ public sealed class Mpeg1Video
             m_backwardRef = m_newer!;
         }
 
-        // Slices up to the next picture, GOP or sequence start code
+        // Slices up to the next picture, GOP or sequence start code: found first, then decoded
+        // on all cores (each writes macroblocks of its own)
+        m_slices.Clear();
         while (true)
         {
             if (!NextStartCode(-1))
                 break;
             int code = m_data[(m_bit >> 3) - 1];
             if (code is >= 0x01 and <= 0xAF)
-            {
-                try
-                {
-                    DecodeSlice(code);
-                }
-                catch (Exception e) when (e is InvalidDataException or IndexOutOfRangeException)
-                {
-                    Errors++;
-                }
-            }
+                m_slices.Add((code, m_bit));
             else if (code is 0xB2 or 0xB5)
                 continue;                   // user data, extension
             else
@@ -373,6 +381,29 @@ public sealed class Mpeg1Video
                 m_bit = (m_bit >> 3) * 8 - 32;
                 break;
             }
+        }
+        void DecodeOne(SliceDecoder decoder, int index)
+        {
+            try
+            {
+                decoder.Decode(m_slices[index].Code, m_slices[index].Bit);
+            }
+            catch (Exception e) when (e is InvalidDataException or IndexOutOfRangeException)
+            {
+                Interlocked.Increment(ref m_errors);
+            }
+        }
+        if (m_slices.Count >= 2)
+            Parallel.For(0, m_slices.Count, () => new SliceDecoder(this), (index, _, decoder) =>
+            {
+                DecodeOne(decoder, index);
+                return decoder;
+            }, _ => { });
+        else
+        {
+            m_slice ??= new SliceDecoder(this);
+            for (int index = 0; index < m_slices.Count; index++)
+                DecodeOne(m_slice, index);
         }
 
         if (m_pictureType == PictureB)
@@ -387,326 +418,387 @@ public sealed class Mpeg1Video
 
     #region Slices and macroblocks
 
-    private void DecodeSlice(int verticalPosition)
+    /// <summary>
+    /// The decoding of slices: a picture's slices write macroblocks of their own, so each runs
+    /// on a decoder of its own (bit position, quantiser, motion predictors, DC predictors, block)
+    /// and the picture's slices are shared out between the cores. The picture (its type, motion
+    /// sizes, reference frames, matrices) is the video's, only read here.
+    /// </summary>
+    private sealed class SliceDecoder(Mpeg1Video video)
     {
-        m_quantScale = Read(5);
-        while (ReadBit())
-            Read(8);
-        m_mbAddress = (verticalPosition - 1) * m_mbWidth - 1;
-        ResetMotion();
-        ResetDc();
-        bool first = true;
-        do
+        private readonly byte[] m_data = video.m_data;
+        private readonly int m_end = video.m_end;
+        private int m_bit;
+
+        private int m_pictureType => video.m_pictureType;
+        private bool m_fullPelForward => video.m_fullPelForward;
+        private bool m_fullPelBackward => video.m_fullPelBackward;
+        private int m_forwardRSize => video.m_forwardRSize;
+        private int m_backwardRSize => video.m_backwardRSize;
+        private MpegFrame m_current => video.m_current;
+        private MpegFrame m_forwardRef => video.m_forwardRef;
+        private MpegFrame m_backwardRef => video.m_backwardRef;
+        private int m_mbWidth => video.m_mbWidth;
+        private int m_mbHeight => video.m_mbHeight;
+        private int[] m_intraMatrix => video.m_intraMatrix;
+        private int[] m_nonIntraMatrix => video.m_nonIntraMatrix;
+
+        private int m_quantScale;
+        private int m_mbAddress, m_mbRow, m_mbCol;
+        private int m_forwardH, m_forwardV, m_backwardH, m_backwardV;  // predictors, full or half pel
+        private int m_mvForwardH, m_mvForwardV, m_mvBackwardH, m_mvBackwardV;  // half pel
+        private bool m_mbForward, m_mbBackward;
+        private int m_dcY, m_dcCb, m_dcCr;
+        private readonly int[] m_block = new int[64];
+
+        /// <summary>The slice whose start code (vertical position <paramref name="code"/>) ends at bit <paramref name="bit"/>.</summary>
+        public void Decode(int code, int bit)
         {
-            DecodeMacroblock(first);
-            first = false;
+            m_bit = bit;
+            DecodeSlice(code);
         }
-        while (m_bit < m_end && !AtStartCode);
-    }
 
-    private void ResetMotion() => m_forwardH = m_forwardV = m_backwardH = m_backwardV = 0;
-
-    private void ResetDc() => m_dcY = m_dcCb = m_dcCr = 1024;
-
-    private void DecodeMacroblock(bool first)
-    {
-        int increment = 0;
-        while (true)
+        private int Peek(int count)
         {
-            int v = ReadVlc(s_addressIncrement, 11);
-            if (v == 34)
-                continue;                   // stuffing
-            if (v == 35)
-            {
-                increment += 33;            // escape
-                continue;
-            }
-            increment += v;
-            break;
+            int b = m_bit >> 3;
+            uint v = (uint)(m_data[b] << 24 | m_data[b + 1] << 16 | m_data[b + 2] << 8 | m_data[b + 3]);
+            v = (v << (m_bit & 7)) | (uint)(m_data[b + 4] >> (8 - (m_bit & 7)));
+            return (int)(v >> (32 - count));
         }
-        if (first)
-            m_mbAddress += increment;
-        else
-        {
-            // Skipped macroblocks
-            for (int k = 1; k < increment; k++)
-            {
-                m_mbAddress++;
-                SetPosition();
-                ResetDc();
-                if (m_pictureType == PictureP)
-                {
-                    m_forwardH = m_forwardV = 0;
-                    m_mvForwardH = m_mvForwardV = 0;
-                    m_mbForward = true;
-                    m_mbBackward = false;
-                    Predict();
-                }
-                else if (m_pictureType == PictureB)
-                    Predict();
-                else
-                    throw new InvalidDataException("skipped macroblock in an I picture");
-            }
-            m_mbAddress++;
-        }
-        SetPosition();
-        if (m_mbRow >= m_mbHeight)
-            throw new InvalidDataException("macroblock outside the picture");
 
-        int type = m_pictureType switch
+        private int Read(int count)
         {
-            PictureI => ReadVlc(s_typeI, 2),
-            PictureP => ReadVlc(s_typeP, 6),
-            _ => ReadVlc(s_typeB, 6),
-        };
-        bool intra = (type & 1) != 0;
-        if ((type & 0x10) != 0)
+            int v = Peek(count);
+            m_bit += count;
+            return v;
+        }
+
+        private bool ReadBit() => Read(1) != 0;
+
+        private bool AtStartCode => Peek(23) == 0;
+
+        private int ReadVlc(int[] table, int bits)
+        {
+            int entry = table[Peek(bits)];
+            if (entry == 0)
+                throw new InvalidDataException("bad VLC");
+            m_bit += entry & 0x1F;
+            return entry >> 5;
+        }
+
+        private void DecodeSlice(int verticalPosition)
+        {
             m_quantScale = Read(5);
-        if (intra)
-        {
+            while (ReadBit())
+                Read(8);
+            m_mbAddress = (verticalPosition - 1) * m_mbWidth - 1;
             ResetMotion();
-            m_mbForward = m_mbBackward = false;
-        }
-        else
-        {
             ResetDc();
-            m_mbForward = (type & 8) != 0;
-            m_mbBackward = (type & 4) != 0;
-            if (m_mbForward)
+            bool first = true;
+            do
             {
-                m_forwardH = DecodeMotion(m_forwardRSize, m_forwardH);
-                m_forwardV = DecodeMotion(m_forwardRSize, m_forwardV);
-                m_mvForwardH = m_fullPelForward ? m_forwardH << 1 : m_forwardH;
-                m_mvForwardV = m_fullPelForward ? m_forwardV << 1 : m_forwardV;
+                DecodeMacroblock(first);
+                first = false;
             }
-            else if (m_pictureType == PictureP)
+            while (m_bit < m_end && !AtStartCode);
+        }
+
+        private void ResetMotion() => m_forwardH = m_forwardV = m_backwardH = m_backwardV = 0;
+
+        private void ResetDc() => m_dcY = m_dcCb = m_dcCr = 1024;
+
+        private void DecodeMacroblock(bool first)
+        {
+            int increment = 0;
+            while (true)
             {
-                // P macroblock without motion: zero vector, the predictor starts again
-                m_forwardH = m_forwardV = 0;
-                m_mvForwardH = m_mvForwardV = 0;
-                m_mbForward = true;
-            }
-            if (m_mbBackward)
-            {
-                m_backwardH = DecodeMotion(m_backwardRSize, m_backwardH);
-                m_backwardV = DecodeMotion(m_backwardRSize, m_backwardV);
-                m_mvBackwardH = m_fullPelBackward ? m_backwardH << 1 : m_backwardH;
-                m_mvBackwardV = m_fullPelBackward ? m_backwardV << 1 : m_backwardV;
-            }
-            Predict();
-        }
-
-        int pattern = intra ? 0x3F : (type & 2) != 0 ? ReadVlc(s_codedBlockPattern, 9) : 0;
-        for (int b = 0; b < 6; b++)
-        {
-            if ((pattern & (0x20 >> b)) == 0)
-                continue;
-            DecodeBlock(b, intra);
-        }
-    }
-
-    private void SetPosition()
-    {
-        m_mbRow = m_mbAddress / m_mbWidth;
-        m_mbCol = m_mbAddress % m_mbWidth;
-    }
-
-    private int DecodeMotion(int rSize, int predictor)
-    {
-        int code = ReadVlc(s_motion, 11);
-        if (code != 0 && ReadBit())
-            code = -code;
-        int f = 1 << rSize;
-        int delta;
-        if (f != 1 && code != 0)
-        {
-            int r = Read(rSize);
-            delta = ((Math.Abs(code) - 1) << rSize) + r + 1;
-            if (code < 0)
-                delta = -delta;
-        }
-        else
-            delta = code;
-        int v = predictor + delta;
-        if (v > (f << 4) - 1)
-            v -= f << 5;
-        else if (v < -(f << 4))
-            v += f << 5;
-        return v;
-    }
-
-    #endregion
-
-    #region Prediction
-
-    /// <summary>The prediction of the macroblock from the reference pictures (no residual yet).</summary>
-    private void Predict()
-    {
-        if (m_mbForward)
-        {
-            PredictFrom(m_forwardRef, m_mvForwardH, m_mvForwardV, false);
-            if (m_mbBackward)
-                PredictFrom(m_backwardRef, m_mvBackwardH, m_mvBackwardV, true);
-        }
-        else if (m_mbBackward)
-            PredictFrom(m_backwardRef, m_mvBackwardH, m_mvBackwardV, false);
-    }
-
-    private void PredictFrom(MpegFrame reference, int h, int v, bool average)
-    {
-        var cur = m_current;
-        PredictBlock(reference.Y, cur.Y, cur.Stride, m_mbHeight * 16, m_mbCol * 16, m_mbRow * 16, 16, h, v, average);
-        h /= 2;
-        v /= 2;
-        PredictBlock(reference.Cb, cur.Cb, cur.ChromaStride, m_mbHeight * 8, m_mbCol * 8, m_mbRow * 8, 8, h, v, average);
-        PredictBlock(reference.Cr, cur.Cr, cur.ChromaStride, m_mbHeight * 8, m_mbCol * 8, m_mbRow * 8, 8, h, v, average);
-    }
-
-    private static void PredictBlock(byte[] src, byte[] dst, int stride, int rows, int x0, int y0, int size, int h, int v, bool average)
-    {
-        int sx = x0 + (h >> 1), sy = y0 + (v >> 1);
-        bool hx = (h & 1) != 0, hy = (v & 1) != 0;
-        int maxX = stride - 1, maxY = rows - 1;
-        bool inside = sx >= 0 && sy >= 0 && sx + size + (hx ? 1 : 0) <= stride && sy + size + (hy ? 1 : 0) <= rows;
-        for (int y = 0; y < size; y++)
-        {
-            int d = (y0 + y) * stride + x0;
-            for (int x = 0; x < size; x++)
-            {
-                int p;
-                if (inside)
+                int v = ReadVlc(s_addressIncrement, 11);
+                if (v == 34)
+                    continue;                   // stuffing
+                if (v == 35)
                 {
-                    int s = (sy + y) * stride + sx + x;
-                    if (!hx && !hy)
-                        p = src[s];
-                    else if (hx && !hy)
-                        p = (src[s] + src[s + 1] + 1) >> 1;
-                    else if (!hx)
-                        p = (src[s] + src[s + stride] + 1) >> 1;
-                    else
-                        p = (src[s] + src[s + 1] + src[s + stride] + src[s + stride + 1] + 2) >> 2;
+                    increment += 33;            // escape
+                    continue;
                 }
-                else
+                increment += v;
+                break;
+            }
+            if (first)
+                m_mbAddress += increment;
+            else
+            {
+                // Skipped macroblocks
+                for (int k = 1; k < increment; k++)
                 {
-                    int ax = Math.Clamp(sx + x, 0, maxX), bx = Math.Clamp(sx + x + 1, 0, maxX);
-                    int ay = Math.Clamp(sy + y, 0, maxY), by = Math.Clamp(sy + y + 1, 0, maxY);
-                    int a = src[ay * stride + ax];
-                    if (!hx && !hy)
-                        p = a;
-                    else if (hx && !hy)
-                        p = (a + src[ay * stride + bx] + 1) >> 1;
-                    else if (!hx)
-                        p = (a + src[by * stride + ax] + 1) >> 1;
+                    m_mbAddress++;
+                    SetPosition();
+                    ResetDc();
+                    if (m_pictureType == PictureP)
+                    {
+                        m_forwardH = m_forwardV = 0;
+                        m_mvForwardH = m_mvForwardV = 0;
+                        m_mbForward = true;
+                        m_mbBackward = false;
+                        Predict();
+                    }
+                    else if (m_pictureType == PictureB)
+                        Predict();
                     else
-                        p = (a + src[ay * stride + bx] + src[by * stride + ax] + src[by * stride + bx] + 2) >> 2;
+                        throw new InvalidDataException("skipped macroblock in an I picture");
                 }
-                dst[d + x] = average ? (byte)((dst[d + x] + p + 1) >> 1) : (byte)p;
+                m_mbAddress++;
             }
-        }
-    }
+            SetPosition();
+            if (m_mbRow >= m_mbHeight)
+                throw new InvalidDataException("macroblock outside the picture");
 
-    #endregion
-
-    #region Blocks
-
-    private void DecodeBlock(int b, bool intra)
-    {
-        var block = m_block;
-        Array.Clear(block);
-        int n;
-        int[] matrix;
-        if (intra)
-        {
-            int size = b < 4 ? ReadVlc(s_dcSizeLuma, 7) : ReadVlc(s_dcSizeChroma, 8);
-            int diff = 0;
-            if (size > 0)
+            int type = m_pictureType switch
             {
-                diff = Read(size);
-                if ((diff & (1 << (size - 1))) == 0)
-                    diff -= (1 << size) - 1;
-            }
-            ref int predictor = ref b < 4 ? ref m_dcY : ref b == 4 ? ref m_dcCb : ref m_dcCr;
-            predictor += diff * 8;
-            block[0] = predictor;
-            n = 1;
-            matrix = m_intraMatrix;
-        }
-        else
-        {
-            n = 0;
-            matrix = m_nonIntraMatrix;
-        }
-
-        while (true)
-        {
-            int run, level;
-            if (n == 0 && !intra && Peek(1) == 1)
+                PictureI => ReadVlc(s_typeI, 2),
+                PictureP => ReadVlc(s_typeP, 6),
+                _ => ReadVlc(s_typeB, 6),
+            };
+            bool intra = (type & 1) != 0;
+            if ((type & 0x10) != 0)
+                m_quantScale = Read(5);
+            if (intra)
             {
-                // dct_coeff_first: "1s" is run 0, level 1
-                m_bit++;
-                run = 0;
-                level = ReadBit() ? -1 : 1;
+                ResetMotion();
+                m_mbForward = m_mbBackward = false;
             }
             else
             {
-                int entry = ReadVlc(s_dctCoefficients, 16);
-                if (entry == EndOfBlock)
-                    break;
-                if (entry == Escape)
+                ResetDc();
+                m_mbForward = (type & 8) != 0;
+                m_mbBackward = (type & 4) != 0;
+                if (m_mbForward)
                 {
-                    run = Read(6);
-                    level = Read(8);
-                    if (level == 0)
-                        level = Read(8);
-                    else if (level == 128)
-                        level = Read(8) - 256;
-                    else if (level > 128)
-                        level -= 256;
+                    m_forwardH = DecodeMotion(m_forwardRSize, m_forwardH);
+                    m_forwardV = DecodeMotion(m_forwardRSize, m_forwardV);
+                    m_mvForwardH = m_fullPelForward ? m_forwardH << 1 : m_forwardH;
+                    m_mvForwardV = m_fullPelForward ? m_forwardV << 1 : m_forwardV;
+                }
+                else if (m_pictureType == PictureP)
+                {
+                    // P macroblock without motion: zero vector, the predictor starts again
+                    m_forwardH = m_forwardV = 0;
+                    m_mvForwardH = m_mvForwardV = 0;
+                    m_mbForward = true;
+                }
+                if (m_mbBackward)
+                {
+                    m_backwardH = DecodeMotion(m_backwardRSize, m_backwardH);
+                    m_backwardV = DecodeMotion(m_backwardRSize, m_backwardV);
+                    m_mvBackwardH = m_fullPelBackward ? m_backwardH << 1 : m_backwardH;
+                    m_mvBackwardV = m_fullPelBackward ? m_backwardV << 1 : m_backwardV;
+                }
+                Predict();
+            }
+
+            int pattern = intra ? 0x3F : (type & 2) != 0 ? ReadVlc(s_codedBlockPattern, 9) : 0;
+            for (int b = 0; b < 6; b++)
+            {
+                if ((pattern & (0x20 >> b)) == 0)
+                    continue;
+                DecodeBlock(b, intra);
+            }
+        }
+
+        private void SetPosition()
+        {
+            m_mbRow = m_mbAddress / m_mbWidth;
+            m_mbCol = m_mbAddress % m_mbWidth;
+        }
+
+        private int DecodeMotion(int rSize, int predictor)
+        {
+            int code = ReadVlc(s_motion, 11);
+            if (code != 0 && ReadBit())
+                code = -code;
+            int f = 1 << rSize;
+            int delta;
+            if (f != 1 && code != 0)
+            {
+                int r = Read(rSize);
+                delta = ((Math.Abs(code) - 1) << rSize) + r + 1;
+                if (code < 0)
+                    delta = -delta;
+            }
+            else
+                delta = code;
+            int v = predictor + delta;
+            if (v > (f << 4) - 1)
+                v -= f << 5;
+            else if (v < -(f << 4))
+                v += f << 5;
+            return v;
+        }
+
+        /// <summary>The prediction of the macroblock from the reference pictures (no residual yet).</summary>
+        private void Predict()
+        {
+            if (m_mbForward)
+            {
+                PredictFrom(m_forwardRef, m_mvForwardH, m_mvForwardV, false);
+                if (m_mbBackward)
+                    PredictFrom(m_backwardRef, m_mvBackwardH, m_mvBackwardV, true);
+            }
+            else if (m_mbBackward)
+                PredictFrom(m_backwardRef, m_mvBackwardH, m_mvBackwardV, false);
+        }
+
+        private void PredictFrom(MpegFrame reference, int h, int v, bool average)
+        {
+            var cur = m_current;
+            PredictBlock(reference.Y, cur.Y, cur.Stride, m_mbHeight * 16, m_mbCol * 16, m_mbRow * 16, 16, h, v, average);
+            h /= 2;
+            v /= 2;
+            PredictBlock(reference.Cb, cur.Cb, cur.ChromaStride, m_mbHeight * 8, m_mbCol * 8, m_mbRow * 8, 8, h, v, average);
+            PredictBlock(reference.Cr, cur.Cr, cur.ChromaStride, m_mbHeight * 8, m_mbCol * 8, m_mbRow * 8, 8, h, v, average);
+        }
+
+        private static void PredictBlock(byte[] src, byte[] dst, int stride, int rows, int x0, int y0, int size, int h, int v, bool average)
+        {
+            int sx = x0 + (h >> 1), sy = y0 + (v >> 1);
+            bool hx = (h & 1) != 0, hy = (v & 1) != 0;
+            int maxX = stride - 1, maxY = rows - 1;
+            bool inside = sx >= 0 && sy >= 0 && sx + size + (hx ? 1 : 0) <= stride && sy + size + (hy ? 1 : 0) <= rows;
+            for (int y = 0; y < size; y++)
+            {
+                int d = (y0 + y) * stride + x0;
+                for (int x = 0; x < size; x++)
+                {
+                    int p;
+                    if (inside)
+                    {
+                        int s = (sy + y) * stride + sx + x;
+                        if (!hx && !hy)
+                            p = src[s];
+                        else if (hx && !hy)
+                            p = (src[s] + src[s + 1] + 1) >> 1;
+                        else if (!hx)
+                            p = (src[s] + src[s + stride] + 1) >> 1;
+                        else
+                            p = (src[s] + src[s + 1] + src[s + stride] + src[s + stride + 1] + 2) >> 2;
+                    }
+                    else
+                    {
+                        int ax = Math.Clamp(sx + x, 0, maxX), bx = Math.Clamp(sx + x + 1, 0, maxX);
+                        int ay = Math.Clamp(sy + y, 0, maxY), by = Math.Clamp(sy + y + 1, 0, maxY);
+                        int a = src[ay * stride + ax];
+                        if (!hx && !hy)
+                            p = a;
+                        else if (hx && !hy)
+                            p = (a + src[ay * stride + bx] + 1) >> 1;
+                        else if (!hx)
+                            p = (a + src[by * stride + ax] + 1) >> 1;
+                        else
+                            p = (a + src[ay * stride + bx] + src[by * stride + ax] + src[by * stride + bx] + 2) >> 2;
+                    }
+                    dst[d + x] = average ? (byte)((dst[d + x] + p + 1) >> 1) : (byte)p;
+                }
+            }
+        }
+
+        private void DecodeBlock(int b, bool intra)
+        {
+            var block = m_block;
+            Array.Clear(block);
+            int n;
+            int[] matrix;
+            if (intra)
+            {
+                int size = b < 4 ? ReadVlc(s_dcSizeLuma, 7) : ReadVlc(s_dcSizeChroma, 8);
+                int diff = 0;
+                if (size > 0)
+                {
+                    diff = Read(size);
+                    if ((diff & (1 << (size - 1))) == 0)
+                        diff -= (1 << size) - 1;
+                }
+                ref int predictor = ref b < 4 ? ref m_dcY : ref b == 4 ? ref m_dcCb : ref m_dcCr;
+                predictor += diff * 8;
+                block[0] = predictor;
+                n = 1;
+                matrix = m_intraMatrix;
+            }
+            else
+            {
+                n = 0;
+                matrix = m_nonIntraMatrix;
+            }
+
+            while (true)
+            {
+                int run, level;
+                if (n == 0 && !intra && Peek(1) == 1)
+                {
+                    // dct_coeff_first: "1s" is run 0, level 1
+                    m_bit++;
+                    run = 0;
+                    level = ReadBit() ? -1 : 1;
                 }
                 else
                 {
-                    run = entry >> 8;
-                    level = entry & 0xFF;
-                    if (ReadBit())
-                        level = -level;
+                    int entry = ReadVlc(s_dctCoefficients, 16);
+                    if (entry == EndOfBlock)
+                        break;
+                    if (entry == Escape)
+                    {
+                        run = Read(6);
+                        level = Read(8);
+                        if (level == 0)
+                            level = Read(8);
+                        else if (level == 128)
+                            level = Read(8) - 256;
+                        else if (level > 128)
+                            level -= 256;
+                    }
+                    else
+                    {
+                        run = entry >> 8;
+                        level = entry & 0xFF;
+                        if (ReadBit())
+                            level = -level;
+                    }
                 }
+                n += run;
+                if (n > 63)
+                    throw new InvalidDataException("too many coefficients");
+                int z = s_zigZag[n];
+                int sign = level < 0 ? -1 : 1;
+                int c = intra
+                    ? 2 * level * m_quantScale * matrix[z] / 16
+                    : (2 * level + sign) * m_quantScale * matrix[z] / 16;
+                if ((c & 1) == 0 && c != 0)
+                    c -= sign;
+                block[z] = Math.Clamp(c, -2048, 2047);
+                n++;
             }
-            n += run;
-            if (n > 63)
-                throw new InvalidDataException("too many coefficients");
-            int z = s_zigZag[n];
-            int sign = level < 0 ? -1 : 1;
-            int c = intra
-                ? 2 * level * m_quantScale * matrix[z] / 16
-                : (2 * level + sign) * m_quantScale * matrix[z] / 16;
-            if ((c & 1) == 0 && c != 0)
-                c -= sign;
-            block[z] = Math.Clamp(c, -2048, 2047);
-            n++;
-        }
 
-        var cur = m_current;
-        byte[] plane;
-        int stride, offset;
-        if (b < 4)
-        {
-            plane = cur.Y;
-            stride = cur.Stride;
-            offset = (m_mbRow * 16 + (b >> 1) * 8) * stride + m_mbCol * 16 + (b & 1) * 8;
-        }
-        else
-        {
-            plane = b == 4 ? cur.Cb : cur.Cr;
-            stride = cur.ChromaStride;
-            offset = m_mbRow * 8 * stride + m_mbCol * 8;
-        }
-        Idct(block);
-        for (int y = 0; y < 8; y++, offset += stride)
-        {
-            for (int x = 0; x < 8; x++)
+            var cur = m_current;
+            byte[] plane;
+            int stride, offset;
+            if (b < 4)
             {
-                int v = block[y * 8 + x] + (intra ? 0 : plane[offset + x]);
-                plane[offset + x] = (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
+                plane = cur.Y;
+                stride = cur.Stride;
+                offset = (m_mbRow * 16 + (b >> 1) * 8) * stride + m_mbCol * 16 + (b & 1) * 8;
+            }
+            else
+            {
+                plane = b == 4 ? cur.Cb : cur.Cr;
+                stride = cur.ChromaStride;
+                offset = m_mbRow * 8 * stride + m_mbCol * 8;
+            }
+            Idct(block);
+            for (int y = 0; y < 8; y++, offset += stride)
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    int v = block[y * 8 + x] + (intra ? 0 : plane[offset + x]);
+                    plane[offset + x] = (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
+                }
             }
         }
     }

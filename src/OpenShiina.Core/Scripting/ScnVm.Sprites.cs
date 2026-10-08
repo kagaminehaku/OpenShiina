@@ -154,14 +154,43 @@ public sealed partial class ScnVm
                 0x10000000 => new SpriteBlend(BlendKind.Add, alpha),
                 _ => new SpriteBlend(BlendKind.Add, Math.Min(alpha, 0x100)),
             };
-        for (; rows > 0; rows--, row += 4, dst += target.Pitch)
+        void DrawRow(int pointer, int at)
         {
             if (blend?.Kind == BlendKind.Silhouette)
-                DrawRowSilhouette(Read32(row), dst, skip, visible, blend);
+                DrawRowSilhouette(pointer, at, skip, visible, blend);
             else
-                DrawRowPlain(Read32(row), dst, skip, visible, blend);
+                DrawRowPlain(pointer, at, skip, visible, blend);
         }
+        // Each row of a frame goes into its own destination row, so a large frame's rows are
+        // shared out between the cores (the sprites themselves stay in order); the pages they
+        // touch exist first, as the page table makes pages on first use
+        if (rows >= 2 * ComposeBand && visible > 0 && target.Pitch >= visible * 3 && (long)rows * visible >= 20000)
+        {
+            var pointers = new int[rows];
+            for (int i = 0; i < rows; i++)
+            {
+                int p = Read32(row + i * 4);
+                pointers[i] = p;
+                int end = p + Read16(p) + 16;
+                for (int at = p; at < end; at += 0x4000)
+                    ReadByte(at);
+                ReadByte(end - 1);
+                int d = dst + i * target.Pitch;
+                ReadByte(d);
+                ReadByte(d + visible * 3 - 1);
+            }
+            Parallel.For(0, (rows + ComposeBand - 1) / ComposeBand, band =>
+            {
+                for (int i = band * ComposeBand, last = Math.Min(rows, i + ComposeBand); i < last; i++)
+                    DrawRow(pointers[i], dst + i * target.Pitch);
+            });
+            return;
+        }
+        for (; rows > 0; rows--, row += 4, dst += target.Pitch)
+            DrawRow(Read32(row), dst);
     }
+
+    private const int ComposeBand = 16;
 
     private enum BlendKind { Alpha, Tint, Add, Silhouette, Opaque, Mask }
 
@@ -313,15 +342,25 @@ public sealed partial class ScnVm
     private byte[] ReadRow(int p)
     {
         int n = Read16(p) + 16;
-        if (m_rowSource.Length < n)
-            m_rowSource = new byte[n];
-        ReadBytes(p, m_rowSource.AsSpan(0, n));
-        return m_rowSource;
+        if (t_rowSource == null || t_rowSource.Length < n)
+            t_rowSource = new byte[Math.Max(n, 0x4000)];
+        ReadBytes(p, t_rowSource.AsSpan(0, n));
+        return t_rowSource;
+    }
+
+    /// <summary>The thread's buffer for a destination row that crosses pages.</summary>
+    private static byte[] RowTarget(int bytes)
+    {
+        if (t_rowTarget == null || t_rowTarget.Length < bytes)
+            t_rowTarget = new byte[Math.Max(bytes, 0x4000)];
+        return t_rowTarget;
     }
 
     // Row buffers of the compositor, used again for every row (the runs of a frame row, and the
-    // destination pixels it is drawn over)
-    private byte[] m_rowSource = new byte[0x4000], m_rowTarget = new byte[0x4000];
+    // destination pixels it is drawn over); one pair a thread, as the rows of a sprite are drawn
+    // on all cores
+    [ThreadStatic]
+    private static byte[]? t_rowSource, t_rowTarget;
 
     /// <summary>Where the data of a run ends (methods 0-1 none, 2 BGR each, 3 one BGR, 4 ABGR each, 5+ one ABGR).</summary>
     private static int RunEnd(int method, int count, int data) => method switch
@@ -349,9 +388,7 @@ public sealed partial class ScnVm
         bool direct = TryDirect(dst, rowBytes, out byte[] row, out int d0);
         if (!direct)
         {
-            if (m_rowTarget.Length < rowBytes)
-                m_rowTarget = new byte[rowBytes];
-            row = m_rowTarget;
+            row = RowTarget(rowBytes);
             d0 = 0;
             ReadBytes(dst, row.AsSpan(0, rowBytes));
         }
@@ -698,9 +735,30 @@ public sealed partial class ScnVm
                 int tx = x + col, fx = sx + (int)((long)col * sw / w);
                 if (tx < 0 || tx >= dw || fx < 0 || fx >= swid)
                     continue;
-                WriteBytes(d0 + ty * dp + tx * 3, ReadBytes(s0 + fy * spitch + fx * 3, 3));
+                CopyPixel24(d0 + ty * dp + tx * 3, s0 + fy * spitch + fx * 3);
             }
         }
+    }
+
+    /// <summary>
+    /// A 24-bit pixel: its three bytes read, then written (a pixel at a time, as the stretches go,
+    /// with no buffer: a 3-byte array a pixel made 051E take 190 ms on a phone).
+    /// </summary>
+    private void CopyPixel24(int dst, int src)
+    {
+        byte b = ReadByte(src), g = ReadByte(src + 1), r = ReadByte(src + 2);
+        if ((dst & (PageSize - 1)) <= PageSize - 3)
+        {
+            var page = Page(dst);
+            int o = dst & (PageSize - 1);
+            page[o] = b;
+            page[o + 1] = g;
+            page[o + 2] = r;
+            return;
+        }
+        WriteByte(dst, b);
+        WriteByte(dst + 1, g);
+        WriteByte(dst + 2, r);
     }
 
     /// <summary>
@@ -754,7 +812,7 @@ public sealed partial class ScnVm
             for (int x = startX; x < endX; x++, q += 3)
             {
                 p += table[x];
-                WriteBytes(q, ReadBytes(p, 3));
+                CopyPixel24(q, p);
             }
         }
     }

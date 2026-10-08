@@ -1,18 +1,16 @@
 // The engine's DirectSound buffers (IScnSound) with NAudio: a buffer the scripts start is a
-// voice of the shared mixer (ScnMixer). Volumes are DirectSound's hundredths of a decibel.
+// voice of the shared mixer (ScnMixer), decoded as it plays (ScnMusic.Source: an Ogg Vorbis
+// sound is not decoded up front). Volumes are DirectSound's hundredths of a decibel.
 
-using System.IO;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 using OpenShiina.Scripting;
 
 namespace OpenShiina.Audio;
 
 public sealed class ScnSound(ScnMixer mixer) : IScnSound, IDisposable
 {
-    private sealed class Buffer(byte[] wave)
+    private sealed class Buffer(byte[] file)
     {
-        public readonly byte[] Wave = wave;
+        public readonly byte[] File = file;
         public ScnVoice? Voice;
         public float Gain = 1;
         public bool Looping;
@@ -21,10 +19,10 @@ public sealed class ScnSound(ScnMixer mixer) : IScnSound, IDisposable
     private readonly Dictionary<int, Buffer> m_buffers = new();
     private int m_next = 0x10000;
 
-    public int CreateBuffer(byte[] wave)
+    public int CreateBuffer(byte[] file)
     {
         int id = m_next++;
-        m_buffers[id] = new Buffer(wave);
+        m_buffers[id] = new Buffer(file);
         return id;
     }
 
@@ -41,11 +39,9 @@ public sealed class ScnSound(ScnMixer mixer) : IScnSound, IDisposable
         Close(b);
         try
         {
-            WaveStream reader = new WaveFileReader(new MemoryStream(b.Wave));
             b.Looping = (flags & 1) != 0;
-            if (b.Looping)
-                reader = new LoopStream(reader);
-            b.Voice = mixer.Start(reader.ToSampleProvider(), b.Gain, reader);
+            var source = new ScnMusic.Source(b.File, b.Looping);
+            b.Voice = mixer.Start(source, b.Gain, source);
         }
         catch (Exception)
         {
@@ -83,37 +79,5 @@ public sealed class ScnSound(ScnMixer mixer) : IScnSound, IDisposable
         foreach (var b in m_buffers.Values)
             Close(b);
         m_buffers.Clear();
-    }
-
-    /// <summary>A wave that starts again at its end (DSBPLAY_LOOPING).</summary>
-    private sealed class LoopStream(WaveStream source) : WaveStream
-    {
-        public override WaveFormat WaveFormat => source.WaveFormat;
-        public override long Length => long.MaxValue;
-        public override long Position { get => source.Position; set => source.Position = value; }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            int total = 0;
-            while (total < count)
-            {
-                int n = source.Read(buffer, offset + total, count - total);
-                if (n == 0)
-                {
-                    if (source.Length == 0)
-                        break;
-                    source.Position = 0;
-                }
-                total += n;
-            }
-            return total;
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-                source.Dispose();
-            base.Dispose(disposing);
-        }
     }
 }

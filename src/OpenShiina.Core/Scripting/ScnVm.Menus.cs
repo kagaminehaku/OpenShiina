@@ -153,6 +153,48 @@ public sealed partial class ScnVm
     /// result (a slot without code: 1). The engine calls it once more after a scan has run off
     /// its range and drops the result; that call is left out (the slot only answers).
     /// </summary>
+    /// <summary>16 bytes against 16 as signed bytes (Re: Rem Plus START 8BBD0, the C# compare16): -1, 0 or 1.</summary>
+    private int Compare16(int x, int y)
+    {
+        for (int k = 0; k < 16; k++)
+        {
+            sbyte p = (sbyte)ReadByte(x + k), q = (sbyte)ReadByte(y + k);
+            if (p != q)
+                return p > q ? 1 : -1;
+        }
+        return 0;
+    }
+
+    /// <summary>Whether the slot is "0276 &lt;compare16&gt;" then "end f[0]".</summary>
+    private bool IsCompare16Slot(int slot)
+    {
+        var c = m_slots[slot];
+        if (c.CodeBase == 0)
+            return false;
+        int savedBase = c.Base;
+        try
+        {
+            c.Base = c.CodeBase;
+            var call = Decode(c, c.Entry);
+            if (call.Op != 0x0276 || call.Args.Length != 1 || RoutineAt(Value(c, call.Args[0])).Native?.Name != "compare16")
+                return false;
+            var end = Decode(c, c.Entry + call.Length);
+            if (end.Op != 0x0000 || end.Args.Length != 1)
+                return false;
+            var o = end.Args[0];
+            return !o.AddressOf && !o.Relative && (o.Kind & 1) == 0 && o.Kind is not (4 or 6 or 0x10 or 0x12)
+                   && AddressOf(c, o) == FAddress(slot, 0);
+        }
+        catch (ScnException)
+        {
+            return false;
+        }
+        finally
+        {
+            c.Base = savedBase;
+        }
+    }
+
     private void SortElements(int lo, int count, int width, int slot)
     {
         if ((uint)count < 2 || width == 0)
@@ -166,11 +208,21 @@ public sealed partial class ScnVm
             WriteBytes(a, other);
             WriteBytes(b, swap);
         }
+        // Re: Rem Plus and Maki Fes! sort with a slot that is "0276 compare16 / end f[0]": the
+        // compare is done here at once (1.7 million runs of the slot took 0.9 s at start), and
+        // what the slot leaves behind (l[0], l[1], f[0], its end) is written for the last one
+        bool direct = IsCompare16Slot(slot);
+        int last = 0, lastElement = 0, lastWith = 0;
         int Compare(int element, int with)
         {
             var c = m_slots[slot];
             if (c.CodeBase == 0 || c.Sp < 2)
                 return 1;
+            if (direct)
+            {
+                (lastElement, lastWith) = (element, with);
+                return last = Compare16(element, with);
+            }
             c.Sp -= 2;
             Write32(StackAddress(slot, c.Sp), element);
             Write32(StackAddress(slot, c.Sp + 1), with);
@@ -182,6 +234,26 @@ public sealed partial class ScnVm
             return result;
         }
 
+        try
+        {
+            SortRange(lo, count, width, Compare, Swap);
+        }
+        finally
+        {
+            if (direct && lastElement != 0)
+            {
+                var c = m_slots[slot];
+                Write32(StackAddress(slot, c.Sp - 2), lastElement);
+                Write32(StackAddress(slot, c.Sp - 1), lastWith);
+                Write32(FAddress(slot, 0), last);
+                c.ExitCode = last;
+            }
+        }
+    }
+
+    /// <summary>The VC6 qsort of 0294 over count elements of width bytes from lo.</summary>
+    private static void SortRange(int lo, int count, int width, Func<int, int, int> Compare, Action<int, int> Swap)
+    {
         var stack = new Stack<(int Lo, int Hi)>();
         int hi = lo + (count - 1) * width;
         while (true)

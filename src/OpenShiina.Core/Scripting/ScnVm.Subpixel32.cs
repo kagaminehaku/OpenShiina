@@ -24,8 +24,11 @@ public sealed partial class ScnVm
     /// <summary>
     /// START 76388 written out (see the top of the file). Positions and sizes are in 1/16
     /// pixels. False when the x86 code would not end (less than one whole pixel across or down).
+    /// <paramref name="v250"/>: the build of Maki Fes! and Re: Rem Plus (START 850F8 / ...), whose
+    /// loop over the whole rows from two source rows counts down by two and up by one (it draws
+    /// one row fewer, at least one) and whose partly covered bottom row is not drawn at all.
     /// </summary>
-    public bool Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, int src, int srcPitch, int stx, int sty)
+    public bool Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, int src, int srcPitch, int stx, int sty, bool v250 = false)
     {
         if (dtx < 0 || dty < 0 || stx < 0 || sty < 0 || w < 0 || h < 0)
             return true;
@@ -66,13 +69,14 @@ public sealed partial class ScnVm
             dstRow += dstPitch;
         }
         var middleKind = ay == by ? SubpixelRow.MiddleOne : SubpixelRow.MiddleTwo;
-        for (uint r = 0; r < rowsMiddle; r++)
+        uint drawn = v250 && middleKind == SubpixelRow.MiddleTwo && rowsMiddle >= 2 ? rowsMiddle - 1 : rowsMiddle;
+        for (uint r = 0; r < drawn; r++)
         {
             rows.Add((middleKind, srcRow, dstRow));
             srcRow += srcPitch;
             dstRow += dstPitch;
         }
-        if (tailY != 0)
+        if (tailY != 0 && !v250)
             rows.Add((tailY > srcTailY ? SubpixelRow.BottomTwo : SubpixelRow.BottomOne, srcRow, dstRow));
 
         int outPixels = (ax != 0 ? 1 : 0) + (int)middle + (tailX != 0 ? 1 : 0);

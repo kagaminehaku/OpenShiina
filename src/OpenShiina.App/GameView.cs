@@ -335,8 +335,39 @@ public sealed partial class GameView : UserControl, IGameWindow
         session.Start();
         TouchSession(true);
         Focus();
+        if (session.PacesItself)
+        {
+            // The game's pace: a new picture is drawn when the interpreter has one, the joystick
+            // read 60 times a second (nothing runs while the game waits)
+            session.FrameReady += TakeNewFrame;
+            if (m_joystick != null)
+            {
+                m_joystickTimer = new DispatcherTimer(TimeSpan.FromSeconds(1.0 / 60), DispatcherPriority.Input, (_, _) =>
+                {
+                    if (m_session != null && m_joystick != null)
+                        m_session.Input.Joystick = m_joystick.Poll();
+                });
+                m_joystickTimer.Start();
+            }
+            return;
+        }
         m_animating = true;
         RequestFrame();
+    }
+
+    private DispatcherTimer? m_joystickTimer;
+
+    /// <summary>The game's pace: the interpreter's new picture into the bitmap.</summary>
+    private unsafe void TakeNewFrame()
+    {
+        if (m_session == null || m_bitmap == null)
+            return;
+        using (var buffer = m_bitmap.Lock())
+        {
+            var target = new Span<byte>((void*)buffer.Address, buffer.RowBytes * m_session.Height);
+            if (m_session.TakeFrame(target, buffer.RowBytes))
+                m_image.InvalidateVisual();
+        }
     }
 
     private void RequestFrame()
@@ -455,6 +486,8 @@ public sealed partial class GameView : UserControl, IGameWindow
     public void Close()
     {
         m_animating = false;
+        m_joystickTimer?.Stop();
+        m_joystickTimer = null;
         m_session?.Dispose();
         m_session = null;
         m_focused = null;

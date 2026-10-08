@@ -23,6 +23,14 @@
     <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Android\</OutputPath>
   </PropertyGroup>
 
+  <!-- Release: every assembly compiled ahead of time with LLVM's optimiser instead of Mono's own
+       code generator (better loops and registers, Vector128 as NEON) - the interpreter and the
+       picture routines are what a phone's CPU spends its time on. Builds take minutes longer. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <EnableLLVM>true</EnableLLVM>
+  </PropertyGroup>
+
   <PropertyGroup>
     <Product>OpenShiina</Product>
     <Version>0.1.0</Version>
@@ -43,6 +51,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenShiina.App\OpenShiina.App.csproj" />
+  </ItemGroup>
+
+  <!-- Thread pool workers go to sleep as soon as they run out of work instead of spinning for
+       more (the game's work comes in bursts, Parallel.For a frame: spinning kept cores busy
+       while the game waited) -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Threading.ThreadPool.UnfairSemaphoreSpinLimit" Value="0" />
   </ItemGroup>
 
 </Project>

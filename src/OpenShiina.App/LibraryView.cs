@@ -2,7 +2,8 @@
 // its .exe, its name and its folder; a click plays it, its menu (right click, or the "…" button)
 // opens its save folder or takes it off the list. "Add a game…" asks for a folder. A game whose
 // folder is gone is shown faded and cannot be played. "Settings" opens the player's settings
-// (Game/PlayerSettings.cs): drawing on the CPU or the GPU, and the on / off settings.
+// (Game/PlayerSettings.cs): drawing on the CPU or the GPU, the frame rate, and the on / off
+// settings.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -111,8 +112,25 @@ public sealed class LibraryView : UserControl
                 cpu,
                 gpu,
                 device,
+                Heading("Frame rate"),
             },
         };
+        foreach (var (pacing, label) in new[] { (FramePacing.Game, "The game's pace (as the original: up to 60 frames a second, little processor while it waits)"), (FramePacing.Display, "Every refresh of the screen (smoother on a fast screen, more processor)") })
+        {
+            var choice = new RadioButton
+            {
+                Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
+                GroupName = "pacing", IsChecked = settings.FramePacing == pacing,
+            };
+            choice.IsCheckedChanged += (_, _) =>
+            {
+                if (choice.IsChecked != true)
+                    return;
+                settings.FramePacing = pacing;
+                settings.Save();
+            };
+            page.Children.Add(choice);
+        }
         string? section = null;
         foreach (var item in PlayerSettings.Switches)
         {

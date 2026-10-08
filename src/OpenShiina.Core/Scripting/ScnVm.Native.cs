@@ -2,7 +2,8 @@
 // pointer to {b, a, s, f of the slot, the stack top}; they read their arguments from l[0], l[1]...
 // and work on picture buffers in script memory. A routine runs, in order of preference:
 //   - as a C# version written by hand (ScnVm.NativeKernels.cs), found by the signature of the
-//     whole routine (X86Routine: every reachable instruction and its offset);
+//     whole routine (X86Routine: every reachable instruction and its offset), or by its bytes
+//     with a constant left open (one routine whose builds differ only in it);
 //   - translated to .NET by X86Jit when it is first called (the translation is made in the
 //     background; the interpreter runs the routine until it is ready);
 //   - on X86Cpu, an interpreter working on the VM's flat memory (routines X86Jit does not take,
@@ -79,6 +80,8 @@ public sealed partial class ScnVm
         info = new RoutineInfo(new X86Routine(this, (uint)address));
         if (m_natives.TryGetValue(info.Code.Signature, out var native))
             info.Native = native;
+        else if (NativeByPattern(address) is { } found)
+            info.Native = found;
         else if (JitX86)
         {
             var code = info.Code;

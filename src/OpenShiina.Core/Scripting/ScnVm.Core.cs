@@ -446,7 +446,7 @@ public sealed partial class ScnVm
         Register(0x02C6, (vm, c, i) =>
         {
             int dst = vm.Value(c, i.Args[0]), src = vm.Value(c, i.Args[1]), n = vm.Value(c, i.Args[2]);
-            vm.WriteBytes(dst, vm.ReadBytes(src, Math.Clamp(n, 0, 0x4000000)));
+            vm.MoveMemory(dst, src, Math.Clamp(n, 0, 0x4000000));
             return 0;
         });
         // 02C7 dst, n, byte: memset

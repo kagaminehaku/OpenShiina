@@ -39,4 +39,11 @@
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
   </ItemGroup>
 
+  <!-- Thread pool workers go to sleep as soon as they run out of work instead of spinning for
+       more (the game's work comes in bursts, Parallel.For a frame: spinning kept cores busy
+       while the game waited) -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Threading.ThreadPool.UnfairSemaphoreSpinLimit" Value="0" />
+  </ItemGroup>
+
 </Project>

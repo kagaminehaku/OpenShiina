@@ -87,7 +87,12 @@ public sealed class ScnWindow : Window
             ((Image)Content).Height = h;
             m_host.Window = new WindowInteropHelper(this).Handle;
             m_game.Start();
-            CompositionTarget.Rendering += OnRendering;
+            // At the game's pace the window draws a new picture when there is one; at the
+            // screen's, every refresh (which also lets the interpreter run its next frame)
+            if (m_game.PacesItself)
+                m_game.FrameReady += Present;
+            else
+                CompositionTarget.Rendering += OnRendering;
         };
         // Minimised counts as not in front: Windows can activate a minimised window again (the
         // original then gets WM_ACTIVATEAPP false as another window takes the focus)

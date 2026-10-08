@@ -9,8 +9,8 @@ namespace OpenShiina.Scripting;
 /// <summary>DirectSound buffers of the platform.</summary>
 public interface IScnSound
 {
-    /// <summary>A buffer of a RIFF WAVE file; returns its handle (above 0xFFFF), or 0.</summary>
-    int CreateBuffer(byte[] wave);
+    /// <summary>A buffer of a RIFF WAVE file or an Ogg Vorbis stream; returns its handle (above 0xFFFF), or 0.</summary>
+    int CreateBuffer(byte[] file);
 
     void Release(int buffer);
 
@@ -78,9 +78,26 @@ public sealed partial class ScnVm
         return at - address;
     }
 
-    /// <summary>SoundToWave; with no platform sound only the kind of file is checked.</summary>
+    /// <summary>
+    /// SoundToWave; with no platform sound only the kind of file is checked. An Ogg Vorbis stream
+    /// stays as it is: the platform decodes it as it plays (decoding a voice up front stopped the
+    /// game for 100 ms on a phone); only its headers are read here, so that one that does not
+    /// decode is still left out.
+    /// </summary>
     private byte[]? ToWave(byte[] data)
     {
+        if (Sound != null && data.Length >= 12 && BitConverter.ToUInt32(data, 0) == 0x5367674F)
+        {
+            try
+            {
+                using var reader = new NVorbis.VorbisReader(new MemoryStream(data), true);
+                return reader.Channels > 0 && reader.SampleRate > 0 ? data : null;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidDataException or EndOfStreamException or IndexOutOfRangeException)
+            {
+                return null;
+            }
+        }
         if (Sound != null)
             return SoundToWave(data);
         if (data.Length < 12)

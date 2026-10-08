@@ -330,16 +330,20 @@ public sealed partial class ScnVm
         }
     }
 
-    /// <summary>memmove (rep movsd / movsb on blocks that do not overlap).</summary>
+    /// <summary>
+    /// memmove (rep movsd / movsb on blocks that do not overlap), page to page with no buffer (a
+    /// buffer a call cost a phone's garbage collector more than the copy: 04E2 copies a row at a
+    /// time). Overlapping blocks of more than 1 MB are copied 64 KB at a time from the start, as
+    /// before.
+    /// </summary>
     public void CopyMemory(int dst, int src, int count)
     {
         if (count <= 0)
             return;
-        var buffer = count <= 1 << 20 ? new byte[count] : null;
-        if (buffer != null)
+        bool overlap = (long)dst < (long)src + count && (long)src < (long)dst + count;
+        if (!overlap || count <= 1 << 20)
         {
-            ReadBytes(src, buffer);
-            WriteBytes(dst, buffer);
+            MoveMemory(dst, src, count);
             return;
         }
         const int Chunk = 1 << 16;
@@ -347,6 +351,37 @@ public sealed partial class ScnVm
         {
             int n = Math.Min(Chunk, count - done);
             WriteBytes(dst + done, ReadBytes(src + done, n));
+        }
+    }
+
+    /// <summary>
+    /// memmove exactly (as if through a buffer), page to page: blocks that overlap with the
+    /// destination first are copied from the start, the others from the end.
+    /// </summary>
+    public void MoveMemory(int dst, int src, int count)
+    {
+        if (count <= 0 || dst == src)
+            return;
+        if ((uint)dst < (uint)src || (long)dst >= (long)src + count)
+        {
+            for (int done = 0; done < count; )
+            {
+                int s = src + done, d = dst + done;
+                int so = s & (PageSize - 1), d0 = d & (PageSize - 1);
+                int n = Math.Min(count - done, Math.Min(PageSize - so, PageSize - d0));
+                Page(s).AsSpan(so, n).CopyTo(Page(d).AsSpan(d0, n));
+                done += n;
+            }
+            return;
+        }
+        for (int left = count; left > 0; )
+        {
+            // The last bytes not yet copied: up to the start of the page each end is in
+            int s = src + left, d = dst + left;
+            int so = ((s - 1) & (PageSize - 1)) + 1, d0 = ((d - 1) & (PageSize - 1)) + 1;
+            int n = Math.Min(left, Math.Min(so, d0));
+            Page(s - n).AsSpan(so - n, n).CopyTo(Page(d - n).AsSpan(d0 - n, n));
+            left -= n;
         }
     }
 
@@ -581,6 +616,7 @@ public sealed partial class ScnVm
         PumpMessages();
         FrameShown = false;
         FrameRounds = 0;
+        SleepRequested = 0;
         for (int round = 0; round < maxRounds && !QuitRequested; round++)
         {
             FrameRounds = round + 1;
@@ -593,6 +629,12 @@ public sealed partial class ScnVm
         }
         return !QuitRequested;
     }
+
+    /// <summary>
+    /// The longest sleep (002A, ms) the scripts asked for in this frame: the engine's thread slept
+    /// that long (GameThread waits for it at the game's pace).
+    /// </summary>
+    public int SleepRequested { get; private set; }
 
     /// <summary>For diagnostics: rounds of the main loop run in the current frame so far.</summary>
     public int FrameRounds { get; private set; }

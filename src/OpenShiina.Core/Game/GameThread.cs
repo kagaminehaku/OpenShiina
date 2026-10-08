@@ -1,8 +1,13 @@
 // A game running: the interpreter on a thread of its own, so slow frames never hold up the
-// window (its input, moving, resizing). Each frame the window shows, it lets the interpreter run
-// one frame (RunFrame: until the scripts show a picture); a window that draws fewer than 60
-// frames a second (or none, minimised) is topped up: the thread goes on after 1/60 s anyway. A picture the scripts showed is copied, as 32-bit
-// BGRA, into a buffer the window takes when it draws. Window events and messages (focus,
+// window (its input, moving, resizing). It runs a frame (RunFrame: until the scripts show a
+// picture) at the pace the settings ask for (PlayerSettings.FramePacing):
+//   - the game's: up to 60 frames a second, or later when the scripts asked to sleep longer
+//     (002A), as the engine's own loop goes (its Sleep(1) a round sleeps a tick of the Windows
+//     clock); a new picture is posted to the window (FrameReady), which draws only then, so a
+//     game that waits for a key costs next to nothing, as the original does;
+//   - the screen's: each frame the window shows lets the interpreter run one frame, topped up
+//     after 1/60 s when the window draws fewer (or none, minimised).
+// A picture the scripts showed is copied, as 32-bit BGRA, into a buffer the window takes. Window events and messages (focus,
 // Alt+Enter, keys, mouse buttons, the wheel, closing) are queued for the interpreter's thread; the
 // title, the answer to closing and the end of the game are posted to the window's thread (the
 // SynchronizationContext Start is called on). Used by both players.
@@ -19,6 +24,9 @@ public sealed class GameThread : IDisposable
     private readonly string m_saveFolder;
     private readonly Thread m_thread;
     private readonly SemaphoreSlim m_frameTick = new(0, 1);
+    private readonly bool m_gamePace;
+    // A FrameReady posted to the window and not run yet
+    private int m_readyPosted;
     private readonly ConcurrentQueue<Action<ScnVm>> m_events = new();
     private SynchronizationContext? m_window;
     private volatile bool m_stop, m_finished, m_closed;
@@ -37,6 +45,15 @@ public sealed class GameThread : IDisposable
 
     public int Width { get; }
     public int Height { get; }
+
+    /// <summary>
+    /// The interpreter keeps its own pace (PlayerSettings.FramePacing.Game): the window draws on
+    /// <see cref="FrameReady"/> instead of every refresh, and need not call <see cref="FrameTick"/>.
+    /// </summary>
+    public bool PacesItself => m_gamePace;
+
+    /// <summary>A new picture to take (on the window's thread), at the game's pace.</summary>
+    public event Action? FrameReady;
 
     /// <summary>The title the frame rate meter asks for (on the window's thread).</summary>
     public event Action<string>? TitleChanged;
@@ -60,6 +77,7 @@ public sealed class GameThread : IDisposable
         Width = setup.Width;
         Height = setup.Height;
         m_perf = PerfMeter.Create(vm, name, setup.SaveFolder, setup.Settings);
+        m_gamePace = setup.Settings.FramePacing == FramePacing.Game;
         if (setup.Settings.DrawTraceForGame())
             vm.Trace = new DrawTrace();
         m_front = new byte[Width * Height * 4];
@@ -190,13 +208,29 @@ public sealed class GameThread : IDisposable
         }
     }
 
+    [System.Runtime.InteropServices.DllImport("winmm.dll")]
+    private static extern uint timeBeginPeriod(uint period);
+
+    [System.Runtime.InteropServices.DllImport("winmm.dll")]
+    private static extern uint timeEndPeriod(uint period);
+
     private void Run()
     {
+        // Waits at the game's pace end on the clock's ticks: 15.6 ms on Windows unless asked for
+        // 1 ms (as games do), which would turn 1/60 s into two ticks
+        bool fineClock = m_gamePace && OperatingSystem.IsWindows() && timeBeginPeriod(1) == 0;
+        long next = Stopwatch.GetTimestamp(), interval = Stopwatch.Frequency / 60;
         try
         {
             while (!m_stop)
             {
-                m_frameTick.Wait(1000 / 60);
+                if (m_gamePace)
+                {
+                    for (long wait; !m_stop && (wait = (next - Stopwatch.GetTimestamp()) * 1000 / Stopwatch.Frequency) > 0; )
+                        m_frameTick.Wait((int)Math.Min(wait, 100));
+                }
+                else
+                    m_frameTick.Wait(1000 / 60);
                 if (m_stop)
                     break;
                 long started = Stopwatch.GetTimestamp();
@@ -220,6 +254,14 @@ public sealed class GameThread : IDisposable
                 }
                 if (m_perf?.Frame(started, engine, Stopwatch.GetTimestamp()) is { } title)
                     m_window!.Post(_ => TitleChanged?.Invoke(title), null);
+                if (m_gamePace)
+                {
+                    // The next frame 1/60 s after this one was due (late by more than a frame: after
+                    // this one, no catching up), or after the sleep the scripts asked for
+                    long due = started - next > interval ? started + interval : next + interval;
+                    long sleep = Math.Min(m_vm.SleepRequested, 1000) * Stopwatch.Frequency / 1000;
+                    next = sleep > interval ? started + sleep : due;
+                }
             }
         }
         catch (Exception ex)
@@ -240,6 +282,11 @@ public sealed class GameThread : IDisposable
             CopyFrame();
             m_window!.Post(_ => Stopped?.Invoke(ex, log), null);
         }
+        finally
+        {
+            if (fineClock)
+                timeEndPeriod(1);
+        }
     }
 
     /// <summary>The window's picture (ScnVm.Window), as BGRA, into the back buffer; then the buffers swap.</summary>
@@ -252,17 +299,13 @@ public sealed class GameThread : IDisposable
             var window = m_vm.Window;
             int stride = m_vm.ScreenWidth * 3;
             int w = Math.Min(m_vm.ScreenWidth, Width), h = Math.Min(m_vm.ScreenHeight, Height);
+            // A pixel a store (BGR to BGRA with A = FF): the copy runs every new picture
             for (int y = 0; y < h; y++)
             {
                 var row = window.Slice(y * stride, w * 3);
-                var dst = m_back.AsSpan(y * Width * 4, w * 4);
-                for (int x = 0, s = 0, d = 0; x < w; x++, s += 3, d += 4)
-                {
-                    dst[d] = row[s];
-                    dst[d + 1] = row[s + 1];
-                    dst[d + 2] = row[s + 2];
-                    dst[d + 3] = 0xFF;
-                }
+                var dst = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(m_back.AsSpan(y * Width * 4, w * 4));
+                for (int x = 0, s = 0; x < dst.Length; x++, s += 3)
+                    dst[x] = row[s] | (uint)row[s + 1] << 8 | (uint)row[s + 2] << 16 | 0xFF000000;
             }
         }
         lock (m_frameLock)
@@ -270,6 +313,12 @@ public sealed class GameThread : IDisposable
             (m_front, m_back) = (m_back, m_front);
             m_frameNew = true;
         }
+        if (m_gamePace && m_window != null && Interlocked.Exchange(ref m_readyPosted, 1) == 0)
+            m_window.Post(_ =>
+            {
+                Volatile.Write(ref m_readyPosted, 0);
+                FrameReady?.Invoke();
+            }, null);
     }
 
     /// <summary>The display surface itself, as BGRA, into the back buffer (OPENSHIINA_PAINT=surface).</summary>

@@ -43,7 +43,8 @@ dotnet workload install android
 dotnet build src/OpenShiina.Android -c Release
 ```
 
-The APK is written to `bin/Release/OpenShiina.Android/`. It reads the games from the device's
+The APK is written to `bin/Release/OpenShiina.Android/`; a Release build compiles everything
+ahead of time with LLVM, which takes several minutes (about 9 on a 6-core laptop). It reads the games from the device's
 storage, so Android 11 and later ask for all files access the first time a game is added. On
 the screen: a tap clicks, dragging holds the left button, two fingers moved up or down turn
 the wheel (down opens the backlog); the bar on the right has Menu (a right click, as is Back),
@@ -67,7 +68,10 @@ Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux,
 Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
 each counts from the next game started): drawing on the CPU or on the GPU (the GPU mode runs
 heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`, so far the scaling of zoomed
-scenes, and gives the same pictures; without a Vulkan driver the games run on the CPU), the game
+scenes, and gives the same pictures; without a Vulkan driver the games run on the CPU), the frame
+rate (the game's own pace, up to 60 frames a second with the window drawing only new pictures,
+as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
+scripts run as often: four times as much processor on a 240 Hz one), the game
 controller, showing the frame rate (in the title; on phones over the game), and for bug reports
 writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
 `draw-trace.log` (both logs go to the game's save folder).

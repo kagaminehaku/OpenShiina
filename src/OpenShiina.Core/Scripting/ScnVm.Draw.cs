@@ -40,46 +40,74 @@ public sealed partial class ScnVm
             m = (int)((ulong)(uint)a * 256 / (uint)sum);
         }
         int rowBytes = width * 3;
-        var rowA = new byte[rowBytes];
-        var rowB = level ? null : new byte[rowBytes];
-        var output = new byte[rowBytes];
-        for (int y = 0; y < height; y++, dst += pitch, source += pitch, source2 += level ? 0 : pitch)
+        void Rows(int from, int to)
         {
-            ReadBytes(source, rowA);
-            if (rowB != null)
-                ReadBytes(source2, rowB);
-            byte Table(int i) => level ? tableA[rowA[i]] : (byte)(tableA[rowA[i]] + tableB[rowB![i]]);
-            byte Block(int i)
+            var rowA = new byte[rowBytes];
+            var rowB = level ? null : new byte[rowBytes];
+            var output = new byte[rowBytes];
+            for (int y = from; y < to; y++)
             {
-                if (level)
-                    return (byte)Math.Min(255, ((rowA[i] * m) >> 8) + k);
-                return (byte)Math.Min(255, (rowA[i] * m + rowB![i] * (256 - m) & 0xFFFF) >> 8);
+                int at = dst + y * pitch;
+                ReadBytes(source + y * pitch, rowA);
+                if (rowB != null)
+                    ReadBytes(source2 + y * pitch, rowB);
+                BlendRow(rowA, rowB, output, at, tableA, tableB, m, k);
+                WriteBytes(at, output);
             }
-            int n = rowBytes, at = 0;
-            int head = -dst & 7;
-            for (int h = head & 3; h > 0 && n > 0; h--, at++, n--)
-                output[at] = Table(at);
-            if (n >= 4 && (head & 4) != 0)
-            {
-                for (int q = 0; q < 4; q++)
-                    output[at + q] = Block(at + q);
-                at += 4;
-                n -= 4;
-            }
-            for (; n >= 8; at += 8, n -= 8)
-                for (int q = 0; q < 8; q++)
-                    output[at + q] = Block(at + q);
-            if (n >= 4)
-            {
-                for (int q = 0; q < 4; q++)
-                    output[at + q] = Block(at + q);
-                at += 4;
-                n -= 4;
-            }
-            for (; n > 0; at++, n--)
-                output[at] = Table(at);
-            WriteBytes(dst, output);
         }
+        // The rows go on all cores where no row reads what another writes: a source that is the
+        // destination itself or apart from it (a source a few rows off the destination is read
+        // after the rows above were written, so those are drawn in turn)
+        long Region(int start) => start + (long)(height - 1) * pitch + rowBytes;
+        bool Apart(int from) => from == dst || Region(from) <= dst || Region(dst) <= from;
+        if (height >= 2 * BlendBand && pitch >= rowBytes && (long)width * height >= 20000 && Apart(source) && (level || Apart(source2)))
+        {
+            for (int y = 0; y < height; y++)
+            {
+                foreach (int start in level ? [dst, source] : new[] { dst, source, source2 })
+                {
+                    ReadByte(start + y * pitch);
+                    ReadByte(start + y * pitch + rowBytes - 1);
+                }
+            }
+            Parallel.For(0, (height + BlendBand - 1) / BlendBand, band => Rows(band * BlendBand, Math.Min(height, (band + 1) * BlendBand)));
+        }
+        else
+            Rows(0, height);
+    }
+
+    private const int BlendBand = 16;
+
+    /// <summary>
+    /// One row of BlendRows into <paramref name="output"/> (its destination at <paramref name="dst"/>):
+    /// the tables for the bytes up to an 8-byte aligned address and the last 1-3, the MMX blocks
+    /// between. <paramref name="rowB"/> null: a grey level (tableA has it, m and k the blocks).
+    /// </summary>
+    private static void BlendRow(byte[] rowA, byte[]? rowB, byte[] output, int dst, byte[] tableA, byte[] tableB, int m, int k)
+    {
+        int n = output.Length, head = -dst & 7;
+        // The x86 code's order: 1-3 bytes from the tables to a 4-byte boundary, a 4-byte block to
+        // an 8-byte one, 8-byte blocks, a 4-byte block, the last 1-3 bytes from the tables
+        int start = Math.Min(head & 3, n), rest = n - start;
+        int afterFour = rest - (rest >= 4 && (head & 4) != 0 ? 4 : 0);
+        int end = n - afterFour % 4;
+        if (rowB == null)
+        {
+            for (int i = 0; i < start; i++)
+                output[i] = tableA[rowA[i]];
+            for (int i = start; i < end; i++)
+                output[i] = (byte)Math.Min(255, ((rowA[i] * m) >> 8) + k);
+            for (int i = end; i < n; i++)
+                output[i] = tableA[rowA[i]];
+            return;
+        }
+        int w = 256 - m;
+        for (int i = 0; i < start; i++)
+            output[i] = (byte)(tableA[rowA[i]] + tableB[rowB[i]]);
+        for (int i = start; i < end; i++)
+            output[i] = (byte)Math.Min(255, (rowA[i] * m + rowB[i] * w & 0xFFFF) >> 8);
+        for (int i = end; i < n; i++)
+            output[i] = (byte)(tableA[rowA[i]] + tableB[rowB[i]]);
     }
 
     /// <summary>FUN_004396B4: table[v] ~ v * weight / total, stepping a counter that starts at total / 2.</summary>
@@ -133,27 +161,62 @@ public sealed partial class ScnVm
             return;
         bool invert = t < 0, hard = (t & 0x40000000) != 0;
         int value = t & 0x3FFFFFFF;
-        byte[] ra = ReadBytes(rule, bytes), sa = ReadBytes(a, bytes), sb = b != 0 ? ReadBytes(b, bytes) : [];
-        var o = new byte[bytes];
         short threshold = (short)(0x100 - value);
-        for (int i = 0; i < bytes; i++)
+        // Byte i of the output takes byte i of each input only: in parts of 64 KB on all cores,
+        // where every input is the output itself or apart from it (else all is read first, as
+        // the engine reads it)
+        bool Apart(int from) => from == dst || (long)from + bytes <= dst || (long)dst + bytes <= from;
+        void Part(int from, int count, byte[] ra, byte[] sa, byte[] sb, byte[] o)
         {
-            int r = invert ? ra[i] ^ 0xFF : ra[i];
-            if (hard)
+            ReadBytes(rule + from, ra.AsSpan(0, count));
+            ReadBytes(a + from, sa.AsSpan(0, count));
+            if (b != 0)
+                ReadBytes(b + from, sb.AsSpan(0, count));
+            for (int i = 0; i < count; i++)
             {
-                bool take = r > threshold;
-                o[i] = take ? sa[i] : b != 0 ? sb[i] : (byte)0;
-                continue;
+                int r = invert ? ra[i] ^ 0xFF : ra[i];
+                if (hard)
+                {
+                    bool take = r > threshold;
+                    o[i] = take ? sa[i] : b != 0 ? sb[i] : (byte)0;
+                    continue;
+                }
+                int sum = r + value;
+                int k = Math.Min(255, Math.Max(0, (sum & 0xFFFF) - 255));
+                if (((uint)sum >> 16) != 0)
+                    k = 255;
+                o[i] = b == 0
+                    ? (byte)Math.Min(255, sa[i] * k >> 8)
+                    : (byte)Math.Min(255, Math.Min(0xFFFF, sa[i] * k + sb[i] * (256 - k)) >> 8);
             }
-            int sum = r + value;
-            int k = Math.Min(255, Math.Max(0, (sum & 0xFFFF) - 255));
-            if (((uint)sum >> 16) != 0)
-                k = 255;
-            o[i] = b == 0
-                ? (byte)Math.Min(255, sa[i] * k >> 8)
-                : (byte)Math.Min(255, Math.Min(0xFFFF, sa[i] * k + sb[i] * (256 - k)) >> 8);
         }
-        WriteBytes(dst, o);
+        if (Apart(rule) && Apart(a) && (b == 0 || Apart(b)))
+        {
+            const int Chunk = 1 << 16;
+            int parts = (bytes + Chunk - 1) / Chunk;
+            // the pages exist before the parts are shared out
+            for (int at = 0; at < bytes; at += Chunk / 2)
+            {
+                ReadByte(dst + at);
+                ReadByte(rule + at);
+                ReadByte(a + at);
+                if (b != 0)
+                    ReadByte(b + at);
+            }
+            ReadByte(dst + bytes - 1);
+            Parallel.For(0, parts, () => (new byte[Chunk], new byte[Chunk], new byte[b != 0 ? Chunk : 0], new byte[Chunk]), (part, _, buffers) =>
+            {
+                int from = part * Chunk, count = Math.Min(Chunk, bytes - from);
+                Part(from, count, buffers.Item1, buffers.Item2, buffers.Item3, buffers.Item4);
+                WriteBytes(dst + from, buffers.Item4.AsSpan(0, count));
+                return buffers;
+            }, _ => { });
+            return;
+        }
+        var all = new byte[bytes];
+        var whole = (new byte[bytes], new byte[bytes], new byte[b != 0 ? bytes : 0]);
+        Part(0, bytes, whole.Item1, whole.Item2, whole.Item3, all);
+        WriteBytes(dst, all);
     }
 
     private void RegisterDraw()
@@ -276,7 +339,7 @@ public sealed partial class ScnVm
         // paces frames itself)
         Register(0x002A, (vm, c, i) =>
         {
-            vm.Value(c, i.Args[0]);
+            vm.SleepRequested = Math.Max(vm.SleepRequested, vm.Value(c, i.Args[0]));
             vm.FrameShown = true;
             return 0;
         });

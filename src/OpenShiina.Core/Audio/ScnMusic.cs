@@ -94,7 +94,12 @@ public sealed class ScnMusic(ScnMixer mixer) : IScnMusic, IDisposable
     }
 
     /// <summary>Samples of a sound file, from the start again at its end when looping.</summary>
-    private sealed class Source : ISampleProvider, IDisposable
+    /// <summary>
+    /// A file played as it is decoded (Ogg Vorbis, OGV, PAD or a RIFF WAVE), from the start again
+    /// at its end when it loops; music and, since decoding a whole voice up front stopped the game
+    /// for 100 ms on a phone, the sound buffers too (ScnSound).
+    /// </summary>
+    internal sealed class Source : ISampleProvider, IDisposable
     {
         private readonly NVorbis.VorbisReader? m_vorbis;
         private readonly WaveFileReader? m_wave;

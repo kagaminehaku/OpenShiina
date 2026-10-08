@@ -1,6 +1,6 @@
 // The settings of the Windows player (Core Game/PlayerSettings.cs, shared with the Avalonia
-// player): where the interpreter's pixel work runs (the CPU or the GPU through Vulkan), then the
-// on / off settings (PlayerSettings.Switches) in their sections. Saved at once; each counts from
+// player): where the interpreter's pixel work runs (the CPU or the GPU through Vulkan), how often
+// it runs a frame, then the on / off settings (PlayerSettings.Switches) in their sections. Saved at once; each counts from
 // the next game started.
 
 using System.Windows;
@@ -33,6 +33,22 @@ public sealed class SettingsWindow : Window
         page.Children.Add(cpu);
         page.Children.Add(gpu);
         page.Children.Add(m_device);
+
+        page.Children.Add(Heading("Frame rate"));
+        foreach (var (pacing, label) in new[] { (FramePacing.Game, "The game's pace (as the original: up to 60 frames a second, little processor while it waits)"), (FramePacing.Display, "Every refresh of the screen (smoother on a fast screen, more processor)") })
+        {
+            var choice = new RadioButton
+            {
+                Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
+                GroupName = "pacing", IsChecked = m_settings.FramePacing == pacing, Margin = new Thickness(0, 6, 0, 0),
+            };
+            choice.Checked += (_, _) =>
+            {
+                m_settings.FramePacing = pacing;
+                m_settings.Save();
+            };
+            page.Children.Add(choice);
+        }
 
         string? section = null;
         foreach (var item in PlayerSettings.Switches)

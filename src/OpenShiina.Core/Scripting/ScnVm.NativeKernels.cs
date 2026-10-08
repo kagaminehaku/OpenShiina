@@ -15,6 +15,42 @@ public sealed partial class ScnVm
     /// <summary>Run each replaced routine on the interpreter too and compare the results.</summary>
     public bool VerifyNatives { get; set; }
 
+    // START 75C3D of Oreimo (6A6ED Azu, 5D88B Ero-On!, 75ED7 Homu, 76167 Yuru, 76687 Nyaru, 76647
+    // Rikka, 76097 Sena, 760B7 Kuroneko): xors count dwords at l[1] with a key stream from l[0]
+    // (xor [ebx],eax / inc eax / rol eax,3 / bswap eax), count a constant of each game (Oreimo
+    // 0xD94A4: 3.5 MB, 21 ms a call translated). Found by its bytes with the count left open,
+    // ending with "ret 4" (v2.47) or "ret".
+    private static readonly byte[] s_xorStreamHead = Convert.FromHexString("9C608B6C242883EC24FF7500FF7504FF7508FF750CFF75108B34248B068B5E04B9");
+    private static readonly byte[] s_xorStreamTail = Convert.FromHexString("31034083C304C1C0030FC84975F283C438619D");
+
+    /// <summary>A C# version for the routine at <paramref name="address"/> found by its bytes, or null.</summary>
+    private (string Name, NativeRoutine Run)? NativeByPattern(int address)
+    {
+        int length = s_xorStreamHead.Length + 4 + s_xorStreamTail.Length;
+        byte[] code = ReadBytes(address, length + 3);
+        if (!code.AsSpan(0, s_xorStreamHead.Length).SequenceEqual(s_xorStreamHead)
+            || !code.AsSpan(s_xorStreamHead.Length + 4, s_xorStreamTail.Length).SequenceEqual(s_xorStreamTail)
+            || !(code[length] == 0xC3 || code[length] == 0xC2 && code[length + 1] == 4 && code[length + 2] == 0))
+            return null;
+        int count = BitConverter.ToInt32(code, s_xorStreamHead.Length);
+        if (count <= 0 || count > 0x4000000)
+            return null;
+        return ("xorstream", new NativeRoutine((vm, c, a) =>
+        {
+            uint key = (uint)vm.NativeArg(a, 0);
+            int buffer = vm.NativeArg(a, 1);
+            using var verify = vm.VerifyRegion(c, a, buffer, count * 4);
+            byte[] bytes = vm.ReadBytes(buffer, count * 4);
+            var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytes.AsSpan());
+            for (int i = 0; i < words.Length; i++)
+            {
+                words[i] ^= key;
+                key = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Numerics.BitOperations.RotateLeft(key + 1, 3));
+            }
+            vm.WriteBytes(buffer, bytes);
+        }));
+    }
+
     private void RegisterNativeKernels()
     {
         // Re:Rem Plus / Maki Fes! START 8BBD0: f[0] = the 16 bytes at l[0] against those at l[1]
@@ -89,6 +125,37 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
+        // Maki Fes! START 850F8, Re: Rem Plus 85C68: v2.50's build of the same copy - its loop over
+        // the rows from two source rows draws one row fewer and the partly covered bottom row is
+        // not drawn (ScnVm.Subpixel32, v250; 387 random cases the same as the x86 code; translated it
+        // took 93 ms a call on a Galaxy S7). Arguments as above
+        RegisterNative("A7DB830A1F217956E69E27B70C2AA00DC6544167", "subpixel32 v2.50", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
+            int length = x < 0 || y < 0 || w < 0 || h < 0 ? 0 : pitch * ((y + h) >> 4) + (((x + w) >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Subpixel32(dst, pitch, x, y, w, h, vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9), v250: true))
+                throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
+        });
+
+        // Oreimo START 77108 (Azu 6BBB8; Sena 77556 and the other v2.49 games; Re: Rem Plus 866A8,
+        // Maki Fes! 85B38; MMX): the enlarging case of the same copy, written out in
+        // ScnVm.Enlarge32.cs (each build: 150 or more random cases the same as its x86 code; Re:
+        // Rem Plus's 130 % zoom took 50 ms a frame translated, 4 ms as C#). Arguments as scale32's;
+        // rectangles the C# version does not take run on the interpreter
+        RegisterNative(["67FD294324E188D2D3891314AB51537274147A92", "5F055480EAF613D53B5AAF6EE2475EA9FF247A76",
+                        "E17C33CA39A48D249E621A1EB13D0FBE757B99D8"], "enlarge32", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
+            int length = right < 0 || bottom < 0 ? 0 : pitch * ((bottom >> 4) + 1) + ((right >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Enlarge32(dst, pitch, vm.NativeArg(a, 2), vm.NativeArg(a, 3), right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7),
+                              vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11)))
+                vm.Interpret(c, vm.m_nativeTarget, a);
+        });
+
         // Oreimo START 78380 (Sena 787CE, Re: Rem Plus 87920; MMX, 0x1632C): the scaling case of the same copy (source and
         // destination rectangles of different sizes, scaling down), with two work buffers.
         // Written out in ScnVm.Scale32.cs. l[0] dst, l[1] its stride, l[2..5]
@@ -112,7 +179,9 @@ public sealed partial class ScnVm
         // * s >> 15 with q = 0x8080 / (imax - imin + 1) and imin' = max(imin - 1, 0) (imin 0: 0).
         // Comparisons are signed 16-bit (pcmpgtw). l[0] dst, l[1] S, l[2] M, l[3..5] their row
         // strides, l[6] width, l[7] height, l[8] imax, l[9] imin, l[10] dir
-        RegisterNative(["42BE6C919F9A6508C03AAA5B66020C3951CC7C05", "5D646499AC90624AAED39ACAC0A3AD67B53C2A81"], "rulealpha", (vm, c, a) =>
+        // Re: Rem Plus 88C84 and Maki Fes! 88114 are the same instructions (padding and ret apart)
+        RegisterNative(["42BE6C919F9A6508C03AAA5B66020C3951CC7C05", "5D646499AC90624AAED39ACAC0A3AD67B53C2A81",
+                        "60E811498D402206EC8562EE495A115C4A828B79"], "rulealpha", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), ps = vm.NativeArg(a, 1), pm = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), ss = vm.NativeArg(a, 4), sm = vm.NativeArg(a, 5);

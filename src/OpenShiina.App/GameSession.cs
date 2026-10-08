@@ -56,6 +56,16 @@ public sealed class GameSession : IDisposable
     /// <summary>The scripts' answer to <see cref="RequestClose"/> (on the window's thread): true when the window may close.</summary>
     public event Action<bool>? CloseAnswered;
 
+    /// <summary>The interpreter keeps the game's pace: draw on <see cref="FrameReady"/>, no <see cref="FrameTick"/> needed.</summary>
+    public bool PacesItself => m_thread.PacesItself;
+
+    /// <summary>A new picture to take (on the window's thread), at the game's pace.</summary>
+    public event Action? FrameReady
+    {
+        add => m_thread.FrameReady += value;
+        remove => m_thread.FrameReady -= value;
+    }
+
     /// <summary>The interpreter still runs frames.</summary>
     public bool Running => m_thread.Running;
 

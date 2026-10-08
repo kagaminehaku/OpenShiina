@@ -141,9 +141,7 @@ public sealed partial class ScnVm
         bool direct = TryDirect(dst, rowBytes, out byte[] row, out int d0);
         if (!direct)
         {
-            if (m_rowTarget.Length < rowBytes)
-                m_rowTarget = new byte[rowBytes];
-            row = m_rowTarget;
+            row = RowTarget(rowBytes);
             d0 = 0;
             ReadBytes(dst, row.AsSpan(0, rowBytes));
         }
