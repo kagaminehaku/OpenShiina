@@ -126,6 +126,12 @@ public sealed partial class GameView : UserControl, IGameWindow
     {
         if (m_session == null)
             return;
+        // The system's keys (volume, media, and keys Avalonia has no name for) are left to it:
+        // taken here, a phone's volume buttons did nothing while a game ran
+        if (e.Key is Avalonia.Input.Key.None or Avalonia.Input.Key.VolumeUp or Avalonia.Input.Key.VolumeDown
+            or Avalonia.Input.Key.VolumeMute or Avalonia.Input.Key.MediaPlayPause or Avalonia.Input.Key.MediaStop
+            or Avalonia.Input.Key.MediaNextTrack or Avalonia.Input.Key.MediaPreviousTrack)
+            return;
         // Alt+Enter: the engine's full screen switch
         if (down && e.Key == Avalonia.Input.Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {

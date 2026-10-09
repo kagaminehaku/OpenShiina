@@ -1,7 +1,8 @@
 // The one activity: landscape either way up (the games are wider than they are tall), kept as
 // it is when the screen turns or a keyboard comes (no restart, which would lose the game), and
 // telling the player when it goes to the background and comes back (the game is no longer in
-// front: it pauses its music, as on the desktop) and the answers to the permissions it asks.
+// front: it pauses its music, as on the desktop) and the answers to the permissions it asks. The
+// volume buttons set the media volume.
 
 using Android.App;
 using Android.Content.PM;
@@ -30,6 +31,8 @@ public sealed class MainActivity : AvaloniaMainActivity
     {
         Current = this;
         base.OnCreate(savedInstanceState);
+        // The volume buttons change the media volume (the game's sound), also between sounds
+        VolumeControlStream = global::Android.Media.Stream.Music;
     }
 
     protected override void OnResume()
