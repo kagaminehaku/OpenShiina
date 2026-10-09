@@ -6,6 +6,11 @@ README).
 
 ## Speed
 
+- [ ] **Measure against the original exe in heavy scenes.** So far only a title screen was
+  compared (Re:Rem Plus: about 3% of the machine for both). Take one heavy scene, for instance
+  Re:Rem Plus's prologue zoom (the original runs on Windows 10 through Locale Emulator), and
+  record the time a frame and the processor used on both, before and after the items below, to
+  know how far from the original the player still is.
 - [ ] **C# for the remaining embedded x86 routines.** About 25 distinct routines of the eleven
   games still run translated (X86Jit) or interpreted. Each gets a C# version found by its
   signature, as the zoom, compositor and blend routines have (ScnVm.NativeKernels.cs), and is
@@ -15,6 +20,12 @@ README).
   write looks its page up and the C# routines copy row by row across pages. One flat block
   (or one block per surface) would make the C# routines and the translated code faster; the
   largest win left on phones.
+- [ ] **The translated x86 code itself.** Each x86 instruction becomes several .NET ones
+  (flags, the page lookup, bounds): flags computed only where a later instruction reads them,
+  and direct memory access once memory is flat, for the routines that keep running translated.
+- [ ] **The SCN interpreter.** The engine's interpreter is compiled C++; ours dispatches each
+  opcode in C# and reads its operands through the paged memory. Script logic is rarely where the
+  time goes, but profile the dispatch (SCNBOOT_PROFILE) on a busy scene and trim what shows up.
 - [ ] **Load files in the background.** Pictures and sounds are read and decoded on the
   interpreter's thread, so a scene change waits for them. `ArcView` is not thread-safe: a
   loader thread needs its own view of the archives.
