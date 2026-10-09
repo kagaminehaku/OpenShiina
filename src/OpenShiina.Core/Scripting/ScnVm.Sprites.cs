@@ -162,23 +162,12 @@ public sealed partial class ScnVm
                 DrawRowPlain(pointer, at, skip, visible, blend);
         }
         // Each row of a frame goes into its own destination row, so a large frame's rows are
-        // shared out between the cores (the sprites themselves stay in order); the pages they
-        // touch exist first, as the page table makes pages on first use
+        // shared out between the cores (the sprites themselves stay in order)
         if (rows >= 2 * ComposeBand && visible > 0 && target.Pitch >= visible * 3 && (long)rows * visible >= 20000)
         {
             var pointers = new int[rows];
             for (int i = 0; i < rows; i++)
-            {
-                int p = Read32(row + i * 4);
-                pointers[i] = p;
-                int end = p + Read16(p) + 16;
-                for (int at = p; at < end; at += 0x4000)
-                    ReadByte(at);
-                ReadByte(end - 1);
-                int d = dst + i * target.Pitch;
-                ReadByte(d);
-                ReadByte(d + visible * 3 - 1);
-            }
+                pointers[i] = Read32(row + i * 4);
             Parallel.For(0, (rows + ComposeBand - 1) / ComposeBand, band =>
             {
                 for (int i = band * ComposeBand, last = Math.Min(rows, i + ComposeBand); i < last; i++)
@@ -229,7 +218,7 @@ public sealed partial class ScnVm
     /// from a 4-byte aligned pixel (after one 4-pixel table block when it is not 8-byte
     /// aligned): c + ((t - c) * a >> 8) in 16-bit words, which can differ from the tables by 1.
     /// </summary>
-    private static void DrawRunTint(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend blend)
+    private static void DrawRunTint(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, int address, SpriteBlend blend)
     {
         int[] tint = blend.Tint, part = blend.TintPart;
         byte[] t2 = blend.T2;
@@ -237,22 +226,22 @@ public sealed partial class ScnVm
         {
             case 2:
             {
-                void Table(int pixels)
+                void Table(ReadOnlySpan<byte> src, Span<byte> row, int pixels)
                 {
                     for (int k = 0; k < pixels * 3; k++, s++, d++, address++)
                         row[d] = (byte)(t2[src[s]] + part[k % 3]);
                 }
                 if (n < 15)
                 {
-                    Table(n);
+                    Table(src, row, n);
                     return;
                 }
                 int head = address & 3;
-                Table(head);
+                Table(src, row, head);
                 n -= head;
                 if ((address & 4) != 0)
                 {
-                    Table(4);
+                    Table(src, row, 4);
                     n -= 4;
                 }
                 int a = blend.Alpha;
@@ -267,10 +256,10 @@ public sealed partial class ScnVm
                 n &= 7;
                 if (n >= 4)
                 {
-                    Table(4);
+                    Table(src, row, 4);
                     n -= 4;
                 }
-                Table(n);
+                Table(src, row, n);
                 return;
             }
             case 3:
@@ -309,7 +298,7 @@ public sealed partial class ScnVm
 
     /// <summary>A run header at offset <paramref name="o"/> of a row read into <paramref name="row"/>
     /// from <paramref name="address"/> (headers are 2-byte aligned in memory).</summary>
-    private static (int Method, int Count, int Data) ReadRun(byte[] row, int address, int o)
+    private static (int Method, int Count, int Data) ReadRun(ReadOnlySpan<byte> row, int address, int o)
     {
         o = ((address + o + 1) & ~1) - address;
         int code = row[o] | row[o + 1] << 8;
@@ -317,7 +306,7 @@ public sealed partial class ScnVm
         int count = code & 0x7FF;
         if (count == 0)
         {
-            count = BitConverter.ToInt32(row, data);
+            count = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(row[data..]);
             data += 4;
         }
         return (code >> 13, count, data);
@@ -338,29 +327,27 @@ public sealed partial class ScnVm
         return (code >> 13, count, data);
     }
 
-    /// <summary>The row of a frame from its row pointer: its 16-bit length and the runs after it.</summary>
-    private byte[] ReadRow(int p)
+    /// <summary>
+    /// The row of a frame from its row pointer (its 16-bit length and the runs after it), read
+    /// in place; copied first when it shares bytes with the destination row [dst, dst + bytes)
+    /// (or, in a 32-bit process, is not one piece of memory: the 16 bytes read past its runs
+    /// can reach the next 16 MB part).
+    /// </summary>
+    private ReadOnlySpan<byte> ReadRow(int p, int dst, int bytes)
     {
         int n = Read16(p) + 16;
+        if (((long)p + n <= dst || (long)dst + bytes <= p) && IsContiguous(p, n))
+            return Bytes(p, n);
         if (t_rowSource == null || t_rowSource.Length < n)
             t_rowSource = new byte[Math.Max(n, 0x4000)];
         ReadBytes(p, t_rowSource.AsSpan(0, n));
-        return t_rowSource;
+        return t_rowSource.AsSpan(0, n);
     }
 
-    /// <summary>The thread's buffer for a destination row that crosses pages.</summary>
-    private static byte[] RowTarget(int bytes)
-    {
-        if (t_rowTarget == null || t_rowTarget.Length < bytes)
-            t_rowTarget = new byte[Math.Max(bytes, 0x4000)];
-        return t_rowTarget;
-    }
-
-    // Row buffers of the compositor, used again for every row (the runs of a frame row, and the
-    // destination pixels it is drawn over); one pair a thread, as the rows of a sprite are drawn
-    // on all cores
+    // The row buffer of the compositor for a frame row drawn over itself, used again for every
+    // such row; one a thread, as the rows of a sprite are drawn on all cores
     [ThreadStatic]
-    private static byte[]? t_rowSource, t_rowTarget;
+    private static byte[]? t_rowSource;
 
     /// <summary>Where the data of a run ends (methods 0-1 none, 2 BGR each, 3 one BGR, 4 ABGR each, 5+ one ABGR).</summary>
     private static int RunEnd(int method, int count, int data) => method switch
@@ -381,18 +368,11 @@ public sealed partial class ScnVm
     {
         if (visible <= 0)
             return;
-        byte[] src = ReadRow(p);
         int rowBytes = visible * 3;
-        // Draw straight into the page that holds the destination row, or into a copy of a row
-        // that crosses pages
-        bool direct = TryDirect(dst, rowBytes, out byte[] row, out int d0);
-        if (!direct)
-        {
-            row = RowTarget(rowBytes);
-            d0 = 0;
-            ReadBytes(dst, row.AsSpan(0, rowBytes));
-        }
-        int o = 2, d = d0;
+        var src = ReadRow(p, dst, rowBytes);
+        // drawn straight into script memory
+        Span<byte> row = Bytes(dst, rowBytes);
+        int o = 2, d = 0;
         int remaining = visible;
         // Left clip: whole runs are passed over, a run that crosses the edge is drawn from it
         while (skip > 0)
@@ -414,16 +394,12 @@ public sealed partial class ScnVm
             else
             {
                 int n = Math.Min(part, remaining);
-                DrawRun(method, n, src, at, row, d, dst + d - d0, blend);
+                DrawRun(method, n, src, at, row, d, dst + d, blend);
                 d += n * 3;
                 remaining -= n;
             }
             if (remaining <= 0)
-            {
-                if (!direct)
-                    WriteBytes(dst, row.AsSpan(0, rowBytes));
                 return;
-            }
             break;
         }
         while (remaining > 0)
@@ -437,22 +413,20 @@ public sealed partial class ScnVm
                 continue;
             }
             int n = Math.Min(count, remaining);
-            DrawRun(method, n, src, data, row, d, dst + d - d0, blend);
+            DrawRun(method, n, src, data, row, d, dst + d, blend);
             d += n * 3;
             remaining -= n;
         }
-        if (!direct)
-            WriteBytes(dst, row.AsSpan(0, rowBytes));
     }
 
-    private static void BlendByte(byte[] row, int at, int source, int alpha)
+    private static void BlendByte(Span<byte> row, int at, int source, int alpha)
     {
         int d = row[at];
         row[at] = (byte)(((source - d) * alpha >> 8) + d);
     }
 
     /// <summary>A run into the row: n pixels from src[s] to row[d] (row[d] is at memory address <paramref name="address"/>).</summary>
-    private static void DrawRun(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend? blend)
+    private static void DrawRun(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, int address, SpriteBlend? blend)
     {
         switch (blend?.Kind)
         {
@@ -475,7 +449,7 @@ public sealed partial class ScnVm
         switch (method)
         {
             case 2:
-                Array.Copy(src, s, row, d, n * 3);
+                src.Slice(s, n * 3).CopyTo(row[d..]);
                 return;
             case 3:
             {
@@ -522,7 +496,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>The runs of mode 0x40000000 (0x440F9C: the MMX + SSE path).</summary>
-    private static void DrawRunAlpha(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend blend)
+    private static void DrawRunAlpha(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, int address, SpriteBlend blend)
     {
         switch (method)
         {
@@ -530,38 +504,38 @@ public sealed partial class ScnVm
             {
                 // two sources: the run's pixels at a, the picture at 256 - a
                 int a = blend.Alpha, b = 256 - a;
-                byte Table(int i) => (byte)(blend.T1[src[s + i]] + blend.T2[row[d + i]]);
-                byte Block(int i) => (byte)Math.Min(255, (src[s + i] * a + row[d + i] * b & 0xFFFF) >> 8);
+                byte Table(ReadOnlySpan<byte> src, Span<byte> row, int i) => (byte)(blend.T1[src[s + i]] + blend.T2[row[d + i]]);
+                byte Block(ReadOnlySpan<byte> src, Span<byte> row, int i) => (byte)Math.Min(255, (src[s + i] * a + row[d + i] * b & 0xFFFF) >> 8);
                 int left = n * 3, at = 0, head = -address & 7;
                 if (head != 0)
                 {
                     for (int h = head & 3; h > 0 && left > 0; h--, at++, left--)
-                        row[d + at] = Table(at);
+                        row[d + at] = Table(src, row, at);
                     if (left > 0 && left < 4)
                     {
                         for (; left > 0; at++, left--)
-                            row[d + at] = Table(at);
+                            row[d + at] = Table(src, row, at);
                     }
                     else if (left > 0 && (head & 4) != 0)
                     {
                         for (int q = 0; q < 4; q++)
-                            row[d + at + q] = Block(at + q);
+                            row[d + at + q] = Block(src, row, at + q);
                         at += 4;
                         left -= 4;
                     }
                 }
                 for (; left >= 8; at += 8, left -= 8)
                     for (int q = 0; q < 8; q++)
-                        row[d + at + q] = Block(at + q);
+                        row[d + at + q] = Block(src, row, at + q);
                 if (left >= 4)
                 {
                     for (int q = 0; q < 4; q++)
-                        row[d + at + q] = Block(at + q);
+                        row[d + at + q] = Block(src, row, at + q);
                     at += 4;
                     left -= 4;
                 }
                 for (; left > 0; at++, left--)
-                    row[d + at] = Table(at);
+                    row[d + at] = Table(src, row, at);
                 return;
             }
             case 3:
@@ -569,7 +543,7 @@ public sealed partial class ScnVm
                 // one colour scaled by a, the picture by the table / MMX at 256 - a
                 int a = blend.Alpha, b = 256 - a;
                 byte c0 = (byte)(src[s] * a >> 8), c1 = (byte)(src[s + 1] * a >> 8), c2 = (byte)(src[s + 2] * a >> 8);
-                void TablePixel(int at)
+                void TablePixel(Span<byte> row, int at)
                 {
                     row[at] = (byte)(blend.T2[row[at]] + c0);
                     row[at + 1] = (byte)(blend.T2[row[at + 1]] + c1);
@@ -579,12 +553,12 @@ public sealed partial class ScnVm
                 if (left < 15)
                 {
                     for (; left > 0; left--, d += 3)
-                        TablePixel(d);
+                        TablePixel(row, d);
                     return;
                 }
                 int abs = address;
                 for (; (abs & 7) != 0; left--, d += 3, abs += 3)
-                    TablePixel(d);
+                    TablePixel(row, d);
                 for (int groups = left >> 3; groups > 0; groups--, d += 24, abs += 24)
                     for (int q = 0; q < 24; q++)
                     {
@@ -592,7 +566,7 @@ public sealed partial class ScnVm
                         row[d + q] = (byte)(Math.Min(255, row[d + q] * b >> 8) + c);
                     }
                 for (left &= 7; left > 0; left--, d += 3)
-                    TablePixel(d);
+                    TablePixel(row, d);
                 return;
             }
             case 4:
@@ -747,15 +721,6 @@ public sealed partial class ScnVm
     private void CopyPixel24(int dst, int src)
     {
         byte b = ReadByte(src), g = ReadByte(src + 1), r = ReadByte(src + 2);
-        if ((dst & (PageSize - 1)) <= PageSize - 3)
-        {
-            var page = Page(dst);
-            int o = dst & (PageSize - 1);
-            page[o] = b;
-            page[o + 1] = g;
-            page[o + 2] = r;
-            return;
-        }
         WriteByte(dst, b);
         WriteByte(dst + 1, g);
         WriteByte(dst + 2, r);

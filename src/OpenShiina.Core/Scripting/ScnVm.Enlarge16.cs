@@ -164,19 +164,7 @@ public sealed partial class ScnVm
                 WriteBytes(dstBase + r * dstPitch, output);
             }
         }
-        // Rows are independent: bands of them run on all cores (the pages they touch exist first,
-        // as the page table makes pages on first use)
-        int sourceRows = rows.Length == 0 ? 0 : rows.Max(row => row.Source + (row.Mixed ? 2 : 1));
-        for (int r = 0; r < sourceRows; r++)
-        {
-            ReadByte(srcBase + r * srcPitch);
-            ReadByte(srcBase + r * srcPitch + width * 4 - 1);
-        }
-        for (int r = 0; r < rows.Length; r++)
-        {
-            ReadByte(dstBase + r * dstPitch);
-            ReadByte(dstBase + r * dstPitch + columns * 4 - 1);
-        }
+        // Rows are independent: bands of them run on all cores
         int bands = (rows.Length + Enlarge16Band - 1) / Enlarge16Band;
         if (bands > 1 && (long)rows.Length * columns >= 20000)
             Parallel.For(0, bands, RunBand);

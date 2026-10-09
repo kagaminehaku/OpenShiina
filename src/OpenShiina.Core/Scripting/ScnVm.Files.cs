@@ -87,7 +87,7 @@ public sealed partial class ScnVm
             return null;
         if (p.Save)
             return m_host.ReadSaveFile(p.Name)?.Length;
-        return m_host.ArchiveFileSize(p.Name) ?? m_host.ReadLooseFile(p.Name)?.Length;
+        return m_host.ArchiveFileSize(p.Name) ?? m_host.LooseFileSize(p.Name);
     }
 
     /// <summary>A file the scripts write: only save files, and only once op_AA82 allowed writes.</summary>

@@ -16,7 +16,7 @@ public sealed partial class ScnVm
     /// 5 pixels or more take MMX for whole 8-byte groups from an 8-byte aligned byte:
     /// (c * a &amp; 0xFFFF) >> 8, which can differ from the table.
     /// </summary>
-    private static void DrawRunAdd(int method, int n, byte[] src, int s, byte[] row, int d, int address, SpriteBlend blend)
+    private static void DrawRunAdd(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, int address, SpriteBlend blend)
     {
         byte[] t1 = blend.T1;
         switch (method)
@@ -72,12 +72,12 @@ public sealed partial class ScnVm
     }
 
     /// <summary>Mode 0x08000000 (0x442E8B): the colours, alpha left out. One-colour ABGR runs write blue, green, blue.</summary>
-    private static void DrawRunOpaque(int method, int n, byte[] src, int s, byte[] row, int d)
+    private static void DrawRunOpaque(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d)
     {
         switch (method)
         {
             case 2:
-                Array.Copy(src, s, row, d, n * 3);
+                src.Slice(s, n * 3).CopyTo(row[d..]);
                 return;
             case 3:
                 for (int i = 0; i < n; i++, d += 3)
@@ -107,13 +107,13 @@ public sealed partial class ScnVm
     }
 
     /// <summary>Mode 0x04000000 (0x4431C0): the alpha as grey; colour runs are opaque (white).</summary>
-    private static void DrawRunMask(int method, int n, byte[] src, int s, byte[] row, int d)
+    private static void DrawRunMask(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d)
     {
         switch (method)
         {
             case 2:
             case 3:
-                Array.Fill(row, (byte)0xFF, d, n * 3);
+                row.Slice(d, n * 3).Fill(0xFF);
                 return;
             case 4:
                 for (int i = 0; i < n; i++, s += 4, d += 3)
@@ -136,16 +136,11 @@ public sealed partial class ScnVm
     {
         if (visible <= 0)
             return;
-        byte[] src = ReadRow(p);
         int rowBytes = visible * 3;
-        bool direct = TryDirect(dst, rowBytes, out byte[] row, out int d0);
-        if (!direct)
-        {
-            row = RowTarget(rowBytes);
-            d0 = 0;
-            ReadBytes(dst, row.AsSpan(0, rowBytes));
-        }
-        int o = 2, d = d0, remaining = visible, pending = 0;
+        var src = ReadRow(p, dst, rowBytes);
+        // drawn straight into script memory
+        Span<byte> row = Bytes(dst, rowBytes);
+        int o = 2, d = 0, remaining = visible, pending = 0;
         // Left clip: the run that crosses the edge goes on from there
         while (skip > 0)
         {
@@ -184,7 +179,7 @@ public sealed partial class ScnVm
             o = RunEnd(method, count, data);
             if (pending > 0 && method is not (1 or 2 or 3))
             {
-                PaintPending(pending, row, d, dst + d - d0, blend);
+                PaintPending(pending, row, d, dst + d, blend);
                 d += pending * 3;
                 pending = 0;
             }
@@ -204,25 +199,20 @@ public sealed partial class ScnVm
             }
             remaining -= n;
         }
-        if (!direct)
-            WriteBytes(dst, row.AsSpan(0, rowBytes));
-        if (pending > 0)
+        // A method 1 run at the end can take the drawing past the row (even past the picture:
+        // in a 32-bit process maybe into the next 16 MB part, then through a copy)
+        if (pending > 0 && IsContiguous(dst + d, pending * 3))
+            PaintPending(pending, Bytes(dst + d, pending * 3), 0, dst + d, blend);
+        else if (pending > 0)
         {
-            // A method 1 run at the end can take the drawing past the row
-            int at = dst + d - d0;
-            if (d - d0 + pending * 3 <= rowBytes && direct)
-                PaintPending(pending, row, d, at, blend);
-            else
-            {
-                var bytes = ReadBytes(at, pending * 3);
-                PaintPending(pending, bytes, 0, at, blend);
-                WriteBytes(at, bytes);
-            }
+            var bytes = ReadBytes(dst + d, pending * 3);
+            PaintPending(pending, bytes, 0, dst + d, blend);
+            WriteBytes(dst + d, bytes);
         }
     }
 
     /// <summary>ABGR runs of mode 0x60000000: each pixel's alpha gives the weight of the tint.</summary>
-    private static void PaintTint(int method, int n, byte[] src, int s, byte[] row, int d, SpriteBlend blend)
+    private static void PaintTint(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, SpriteBlend blend)
     {
         int[] tint = blend.Tint;
         for (int i = 0; i < n; i++, d += 3)
@@ -241,12 +231,12 @@ public sealed partial class ScnVm
     /// dwords of those sums (carries cross the bytes) to reach 8-byte alignment; whole groups of 8
     /// pixels in MMX, d + ((t - d) * a >> 8); then 4 pixels as dwords and the rest from the tables.
     /// </summary>
-    private static void PaintPending(int n, byte[] row, int d, int address, SpriteBlend blend)
+    private static void PaintPending(int n, Span<byte> row, int d, int address, SpriteBlend blend)
     {
         byte[] t2 = blend.T2;
         int[] part = blend.TintPart, tint = blend.Tint;
         int start = d;
-        void Table(int pixels)
+        void Table(Span<byte> row, int pixels)
         {
             for (; pixels > 0; pixels--, d += 3)
             {
@@ -255,7 +245,7 @@ public sealed partial class ScnVm
                 row[d + 2] = (byte)(t2[row[d + 2]] + part[2]);
             }
         }
-        void Dwords()
+        void Dwords(Span<byte> row)
         {
             for (int j = 0; j < 3; j++, d += 4)
             {
@@ -265,20 +255,20 @@ public sealed partial class ScnVm
                     v |= (uint)t2[row[d + k]] << 8 * k;
                     add |= (uint)part[(j * 4 + k) % 3] << 8 * k;
                 }
-                BitConverter.TryWriteBytes(row.AsSpan(d), v + add);
+                BitConverter.TryWriteBytes(row[d..], v + add);
             }
         }
         if (n < 15)
         {
-            Table(n);
+            Table(row, n);
             return;
         }
         int head = address & 3;
-        Table(head);
+        Table(row, head);
         n -= head;
         if ((address + d - start & 4) != 0)
         {
-            Dwords();
+            Dwords(row);
             n -= 4;
         }
         int a = blend.Alpha;
@@ -288,9 +278,9 @@ public sealed partial class ScnVm
         n &= 7;
         if (n >= 4)
         {
-            Dwords();
+            Dwords(row);
             n -= 4;
         }
-        Table(n);
+        Table(row, n);
     }
 }

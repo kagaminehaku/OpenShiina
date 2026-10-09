@@ -231,23 +231,11 @@ public sealed partial class ScnVm
             colShape[4 * c + 2] = colB[c];
             colShape[4 * c + 3] = cols[c].Flags & 0xC0;
         }
-        // The first source row of every destination row; the pages of all rows exist before the
-        // rows are shared out between threads (the page table makes pages on first use)
+        // The first source row of every destination row (the rows are shared out between threads)
         int nr = rows.Count;
         var rowY = new int[nr + 1];
         for (int r = 0; r < nr; r++)
             rowY[r + 1] = rowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
-        int sourceRows = rowY[nr] + 2;
-        for (int r = 0; r < sourceRows; r++)
-        {
-            ReadByte(srcX + r * srcPitch);
-            ReadByte(srcX + r * srcPitch + bytes - 1);
-        }
-        for (int r = 0; r < nr; r++)
-        {
-            ReadByte(dstRow + r * dstPitch);
-            ReadByte(dstRow + r * dstPitch + nc * 4 - 1);
-        }
         var timing = ChooseGpu("scale32", (long)nr * nc);
         if (timing.Gpu)
         {
@@ -263,18 +251,22 @@ public sealed partial class ScnVm
         int bands = (nr + Band - 1) / Band;
         void RunBand(int band)
         {
-            var line = new byte[bytes];
+            // The thread's buffers, kept from call to call while the sizes stay (a zoomed scene
+            // scales the same rectangles every frame: new ones were megabytes a call to collect)
+            if (t_scaleBuffers is not { } buffers || !buffers.Fits(bytes, width, nc))
+                t_scaleBuffers = buffers = new ScaleBuffers(bytes, width, nc);
+            var line = buffers.Line;
             // The whole source rows of a destination row: sums per channel (16 bits, as the MMX
             // sums wrap) and the AND of their bytes (byte 3 tells whether every one is opaque)
-            var sum = new ushort[bytes];
-            var and = new byte[bytes];
-            var first = new ScaleRow(width);
-            var whole = new ScaleRow(width);
-            var last = new ScaleRow(width);
-            var output = new byte[nc * 4];
-            var accLo = new ulong[nc];
-            var accHi = new ulong[nc];
-            var clear = new int[nc];
+            var sum = buffers.Sum;
+            var and = buffers.And;
+            var first = buffers.First;
+            var whole = buffers.Whole;
+            var last = buffers.Last;
+            var output = buffers.Output;
+            var accLo = buffers.AccLo;
+            var accHi = buffers.AccHi;
+            var clear = buffers.Clear;
             for (int r = band * Band, end = Math.Min(nr, r + Band); r < end; r++)
             {
                 var e = rows[r];
@@ -332,6 +324,21 @@ public sealed partial class ScnVm
                 RunBand(band);
         GpuDone("scale32", timing);
         return true;
+    }
+
+    [ThreadStatic]
+    private static ScaleBuffers? t_scaleBuffers;
+
+    /// <summary>The buffers of a band of scale32 rows (each row overwrites or clears what it uses).</summary>
+    private sealed class ScaleBuffers(int bytes, int width, int columns)
+    {
+        public readonly byte[] Line = new byte[bytes], And = new byte[bytes], Output = new byte[columns * 4];
+        public readonly ushort[] Sum = new ushort[bytes];
+        public readonly ScaleRow First = new(width), Whole = new(width), Last = new(width);
+        public readonly ulong[] AccLo = new ulong[columns], AccHi = new ulong[columns];
+        public readonly int[] Clear = new int[columns];
+
+        public bool Fits(int b, int w, int c) => b == bytes && w == width && c == columns;
     }
 
     /// <summary>

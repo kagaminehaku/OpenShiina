@@ -343,8 +343,20 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     /// <summary>A clock that moves 1/60 s a frame, so that runs are the same every time.</summary>
     public uint Clock { get; set; }
 
-    public byte[]? ReadFile(string name) => data.Read(name.Replace('/', '\\'));
-    public long? ArchiveFileSize(string name) => data.Size(name.Replace('/', '\\'));
+    // SCNBOOT_FILE="name=file;...": a file of the game's archives read from a file of the disk
+    // instead (a test scenario in place of one of the game's); the game folder is not touched
+    private static readonly (string Name, string File)[] s_swaps = (Environment.GetEnvironmentVariable("SCNBOOT_FILE") ?? "")
+        .Split(';', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Split('=', 2)).Where(p => p.Length == 2).Select(p => (p[0], p[1])).ToArray();
+
+    private static string? Swap(string name) =>
+        s_swaps.FirstOrDefault(s => name.EndsWith(s.Name, StringComparison.OrdinalIgnoreCase)).File;
+
+    public byte[]? ReadFile(string name) => Swap(name) is { } swap ? File.ReadAllBytes(swap) : data.Read(name.Replace('/', '\\'));
+    public long? ArchiveFileSize(string name) => Swap(name) is { } swap ? new FileInfo(swap).Length : data.Size(name.Replace('/', '\\'));
+
+    public long? LooseFileSize(string name) =>
+        name.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? ReadLooseFile(name)?.Length
+        : data.LooseFile(name) is { } path ? new FileInfo(path).Length : null;
 
     public byte[]? ReadLooseFile(string name)
     {

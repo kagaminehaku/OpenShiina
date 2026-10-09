@@ -280,6 +280,7 @@ public sealed class ScnWindow : Window
         public long? ArchiveFileSize(string name) => data.Size(name.Replace('/', '\\'));
 
         public byte[]? ReadLooseFile(string name) => data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
+        public long? LooseFileSize(string name) => data.LooseFile(name) is { } path ? new FileInfo(path).Length : null;
 
         public uint Milliseconds => (uint)m_clock.ElapsedMilliseconds;
 

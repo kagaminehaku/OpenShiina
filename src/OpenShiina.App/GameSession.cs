@@ -122,6 +122,7 @@ public sealed class GameSession : IDisposable
         public long? ArchiveFileSize(string name) => m_session.Data.Size(name);
 
         public byte[]? ReadLooseFile(string name) => m_session.Data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
+        public long? LooseFileSize(string name) => m_session.Data.LooseFile(name) is { } path ? new FileInfo(path).Length : null;
 
         public uint Milliseconds => (uint)m_clock.ElapsedMilliseconds;
 

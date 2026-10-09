@@ -1,6 +1,8 @@
 // Picture kernels of the executable, done the way it does them on a CPU with MMX (the path the
 // game takes on any current PC), so the pictures match it pixel for pixel.
 
+using System.Numerics;
+
 namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
@@ -40,19 +42,24 @@ public sealed partial class ScnVm
             m = (int)((ulong)(uint)a * 256 / (uint)sum);
         }
         int rowBytes = width * 3;
+        // A source row that starts inside the destination row (not on it) is copied first: the
+        // row is read whole before it is written, as the x86 code reads ahead
+        bool Shifted(int from) => from != dst && Math.Abs((long)from - dst) < rowBytes;
+        bool copyA = Shifted(source), copyB = !level && Shifted(source2);
         void Rows(int from, int to)
         {
-            var rowA = new byte[rowBytes];
-            var rowB = level ? null : new byte[rowBytes];
-            var output = new byte[rowBytes];
+            var bufferA = copyA ? new byte[rowBytes] : null;
+            var bufferB = copyB ? new byte[rowBytes] : null;
             for (int y = from; y < to; y++)
             {
                 int at = dst + y * pitch;
-                ReadBytes(source + y * pitch, rowA);
-                if (rowB != null)
-                    ReadBytes(source2 + y * pitch, rowB);
-                BlendRow(rowA, rowB, output, at, tableA, tableB, m, k);
-                WriteBytes(at, output);
+                ReadOnlySpan<byte> rowA = bufferA ?? Bytes(source + y * pitch, rowBytes);
+                if (bufferA != null)
+                    ReadBytes(source + y * pitch, bufferA);
+                ReadOnlySpan<byte> rowB = level ? default : bufferB ?? Bytes(source2 + y * pitch, rowBytes);
+                if (bufferB != null)
+                    ReadBytes(source2 + y * pitch, bufferB);
+                BlendRow(rowA, rowB, Bytes(at, rowBytes), at, tableA, tableB, m, k, level);
             }
         }
         // The rows go on all cores where no row reads what another writes: a source that is the
@@ -81,9 +88,10 @@ public sealed partial class ScnVm
     /// <summary>
     /// One row of BlendRows into <paramref name="output"/> (its destination at <paramref name="dst"/>):
     /// the tables for the bytes up to an 8-byte aligned address and the last 1-3, the MMX blocks
-    /// between. <paramref name="rowB"/> null: a grey level (tableA has it, m and k the blocks).
+    /// between. <paramref name="level"/>: a grey level (tableA has it, m and k the blocks), no rowB.
+    /// The rows may be the output itself: each byte is read before it is written.
     /// </summary>
-    private static void BlendRow(byte[] rowA, byte[]? rowB, byte[] output, int dst, byte[] tableA, byte[] tableB, int m, int k)
+    private static void BlendRow(ReadOnlySpan<byte> rowA, ReadOnlySpan<byte> rowB, Span<byte> output, int dst, byte[] tableA, byte[] tableB, int m, int k, bool level)
     {
         int n = output.Length, head = -dst & 7;
         // The x86 code's order: 1-3 bytes from the tables to a 4-byte boundary, a 4-byte block to
@@ -91,11 +99,22 @@ public sealed partial class ScnVm
         int start = Math.Min(head & 3, n), rest = n - start;
         int afterFour = rest - (rest >= 4 && (head & 4) != 0 ? 4 : 0);
         int end = n - afterFour % 4;
-        if (rowB == null)
+        int vectors = start + (end - start) / Vector<byte>.Count * Vector<byte>.Count;
+        if (level)
         {
             for (int i = 0; i < start; i++)
                 output[i] = tableA[rowA[i]];
-            for (int i = start; i < end; i++)
+            // the blocks in 16-bit lanes, as the MMX code: (v * m >> 8) + k, saturated
+            var vm = new Vector<ushort>((ushort)m);
+            var vk = new Vector<ushort>((ushort)k);
+            for (int i = start; i < vectors; i += Vector<byte>.Count)
+            {
+                Vector.Widen(new Vector<byte>(rowA[i..]), out var low, out var high);
+                low = Vector.Min(Vector.ShiftRightLogical(low * vm, 8) + vk, new Vector<ushort>(255));
+                high = Vector.Min(Vector.ShiftRightLogical(high * vm, 8) + vk, new Vector<ushort>(255));
+                Vector.Narrow(low, high).CopyTo(output[i..]);
+            }
+            for (int i = vectors; i < end; i++)
                 output[i] = (byte)Math.Min(255, ((rowA[i] * m) >> 8) + k);
             for (int i = end; i < n; i++)
                 output[i] = tableA[rowA[i]];
@@ -104,7 +123,18 @@ public sealed partial class ScnVm
         int w = 256 - m;
         for (int i = 0; i < start; i++)
             output[i] = (byte)(tableA[rowA[i]] + tableB[rowB[i]]);
-        for (int i = start; i < end; i++)
+        // (A * m + B * (256 - m)) >> 8 in 16-bit lanes (the products and their sum wrap)
+        var wa = new Vector<ushort>((ushort)m);
+        var wb = new Vector<ushort>((ushort)w);
+        for (int i = start; i < vectors; i += Vector<byte>.Count)
+        {
+            Vector.Widen(new Vector<byte>(rowA[i..]), out var aLow, out var aHigh);
+            Vector.Widen(new Vector<byte>(rowB[i..]), out var bLow, out var bHigh);
+            var low = Vector.ShiftRightLogical(aLow * wa + bLow * wb, 8);
+            var high = Vector.ShiftRightLogical(aHigh * wa + bHigh * wb, 8);
+            Vector.Narrow(low, high).CopyTo(output[i..]);
+        }
+        for (int i = vectors; i < end; i++)
             output[i] = (byte)Math.Min(255, (rowA[i] * m + rowB[i] * w & 0xFFFF) >> 8);
         for (int i = end; i < n; i++)
             output[i] = (byte)(tableA[rowA[i]] + tableB[rowB[i]]);

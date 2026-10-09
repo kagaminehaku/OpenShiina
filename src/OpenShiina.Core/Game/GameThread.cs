@@ -362,5 +362,9 @@ public sealed class GameThread : IDisposable
         {
             // Only for finding problems
         }
+        // The scripts' memory goes back now when the interpreter has stopped; a thread still
+        // held by a message box leaves it to the finalizer, once the thread is gone
+        if (!m_thread.IsAlive)
+            m_vm.Dispose();
     }
 }

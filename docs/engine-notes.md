@@ -256,7 +256,8 @@ Finding problems:
   SCNBOOT_WHEEL="frame[:-],..." (a notch away from / towards the user), SCNBOOT_CLOSE=frame
   (WM_CLOSE; presses and clicks are sent as window messages too), SCNBOOT_FOCUS="frame:0|1,..."
   (focus lost / back), SCNBOOT_HOT="from:to" (every instruction run in those frames, by module
-  and offset); frame_NNNN.png is the window's picture (ScnVm.Window), _sK the surfaces asked for,
+  and offset), SCNBOOT_FILE="name=file;..." (a file of the archives read from a file on disk
+  instead, e.g. a test scenario as REM00_00.TXT; the game folder is not touched); frame_NNNN.png is the window's picture (ScnVm.Window), _sK the surfaces asked for,
   SCNBOOT_VERIFY_NATIVE=1, SCNBOOT_PROFILE=1, SCNBOOT_STALL / SCNBOOT_STALL_REPORT (section 10),
   SCNBOOT_GPU=1 (the GPU mode; with SCNBOOT_VERIFY_NATIVE=1 the GPU's bytes are checked against
   the x86 code), SCNBOOT_GPUCHECK=cases (GpuCheck.cs: every GPU kernel against the CPU code on
@@ -281,7 +282,7 @@ Finding problems:
   0574 row by row as before when its source and destination share memory).
 - **The compositor on all cores** (04C4 / 04C5, ScnVm.Sprites.cs): the sprites stay in order,
   but each row of a frame goes into its own destination row, so a large frame's rows are shared
-  out between the cores (per-thread row buffers; the pages touched exist first). The pictures of
+  out between the cores (per-thread row buffers). The pictures of
   ScnBoot runs are the same as before (Re: Rem Plus's zoom, 109 frames; Oreimo's park route to
   frame 8000, 161 frames), the compositor's time 5.6 -> 2.1 s and 5.5 -> 3.1 s. The GPU would
   have to take whole surfaces there and back for each call, as the pictures live in the scripts'
@@ -742,7 +743,8 @@ the functions they call from the decompile. First findings:
   with its cached loader (callmod 215), `04B2`s them and frees them only with `04B1`, never
   `02BD` - `02BD` frees a block of `02BC` / `00C9` / `00CE` (slots showing it no longer own it,
   so it is not freed twice), `0547` and a surface made again free the surface's bitmap. Free ranges are
-  merged and used again (best fit) and kept zero (whole 64 KB pages dropped). Before, the heap
+  merged and used again (best fit) and kept zero (whole pages given back to the system). No
+  block crosses a 16 MB boundary (one over 16 MB starts on one; see "Flat memory"). Before, the heap
   only grew: after a long play it reached the modules' code at 0x40000000 and pictures were
   written over START.SCN (unknown opcodes in START). Running into the code now stops with "Out
   of script memory".
@@ -1041,8 +1043,52 @@ the functions they call from the decompile. First findings:
 - `0562` draws whole rows of 1684 x 1261 pictures in Sena (zoomed characters); its runs are
   read and written once a run and blended a pixel (dword) at a time: 40 ms -> 17 ms.
 - The compositor (04C4) gathers the shown entries once and sorts them by (priority, index), and
-  draws rows straight into the page that holds them; it costs about 1-2 ns a pixel, under 1 ms a
-  frame in the opening. VM memory pages are 64 KB.
+  draws rows straight into script memory; it costs about 1-2 ns a pixel, under 1 ms a frame in
+  the opening.
+- **Flat memory** (2026-10-09, branch flat-memory; Scripting/ScnAddressSpace.cs). The scripts'
+  memory was 64 KB pages made on first use, every read and write looking its page up and the C#
+  routines copying row by row across pages. It is now the whole 32-bit address space as one block
+  of virtual memory, a script address being base + address: `mmap` with `MAP_NORESERVE` (Linux,
+  Android, macOS: every address there at once, physical memory only for the pages written); on
+  Windows the 4 GB are reserved and each 16 MB part committed on its first use (commit counts
+  against RAM + page file, so not all 4 GB at once): every access tests a table of 256 flags,
+  and a part is committed with the first page of the next, so an access of up to 8 bytes needs
+  only its first byte's test. Memory freed reads as zero again: whole pages go back to the system
+  (`mmap` over them / decommit and commit again), the rest is cleared. `ScnVm.Bytes` gives a block
+  as a span to work on in place: the compositor draws its rows into it and reads the sprites'
+  runs from it (a frame row drawn over itself is copied first), BlendRows (`04F6` / `0500`) reads
+  and writes rows in place with `Vector<T>` for the MMX blocks (600 random cases against the
+  paged code, sources on the destination and a few rows off among them), copies are one memmove.
+  The translated x86 code goes through the same reads and writes (now a pointer and, on Windows,
+  the flag test). No heap block crosses a 16 MB boundary (one over 16 MB starts on one): a
+  32-bit process (32-bit Android, ScnBoot built for win-x86) has no 4 GB to spare, so there the
+  address space is 256 parts of 16 MB (`ScnAddressSpace.Segmented`, chosen by the process; the
+  64-bit code does not see the test), each mapped on its first use next to the part before when
+  that place is free: a script address is part[address >> 24] + (address & 0xFFFFFF), a heap
+  block is one piece of memory for the C# routines (the parts of a block over 16 MB are mapped
+  together when it is made), accesses of 2 and 4 bytes across a boundary go a byte at a time,
+  blocks a part at a time. The games touch a few dozen parts. Checked in ScnBoot: the pictures of
+  Re: Rem Plus's zoomed prologue (105, every 25 frames to 2600) and Oreimo's park route (61,
+  every 100 frames to 6000) are the same as with the paged memory, and SCNBOOT_VERIFY_NATIVE
+  agrees; whole runs (best of 3, Windows, 6 cores): Re: Rem Plus 6.9 -> 6.6 s, Oreimo 7.8 -> 6.7
+  s, the compositor about 13% less (Oreimo 04C4 1.79 -> 1.55 s), 04F6 0.54 -> 0.31 s. Memory,
+  after the two fixes below (paged -> flat, ScnBoot, working set): Oreimo's park route to frame
+  3500 peak 186 -> 175 MB, mean 155 -> 147 MB; Re: Rem Plus through its first route (風呂掃除,
+  frames 7000-14000, then its route menu) peak 807 -> 422 MB, mean over the route 535 -> 359 MB.
+  The scripts' memory in RAM is about the same (Re: Rem Plus 237-277 MB paged, 229-259 MB flat);
+  the paged memory's pages were on the GC heap, which kept garbage beside them. Commit is higher
+  flat (Re: Rem Plus about 700 MB): whole 16 MB parts are committed, RAM only for pages written.
+  Not yet run on Linux, macOS or Android (the `mmap` path), nor in a 32-bit process.
+- **Garbage that made the players big** (2026-10-09, found measuring the flat memory). START
+  asks whether the game's archives exist (`010E`; `0158` the same way): for a file that is not
+  in the archives `ScriptFileSize` read the loose file to know its length, so every start read
+  Re: Rem Plus's `REMPLUS_G.WAR` (678 MB) and `_V.WAR` (111 MB) into arrays; `IScnHost.LooseFileSize`
+  now takes the length from the folder (both players and ScnBoot). And scale32 made its band
+  buffers (rows, 16-bit sums, prefix sums) anew at every call, about 2 MB a call in zoomed
+  scenes, tens of GB over a route; each thread keeps them now while the sizes stay. Re: Rem Plus
+  through its first route allocated 69 GB before, 6.9 GB after (most of the rest is ScnBoot's own
+  input lists); its working set had reached 1.7 GB with the flat memory (the GC ran a full
+  collection four times in 30,000 frames) and 0.7 GB with the paged one.
 - ScnBoot stall detection: frames over 1 s are logged ([slow]); a frame over 5 s counts the
   instructions per script address and reports the top ones every SCNBOOT_STALL_REPORT seconds
   ([stall]); over SCNBOOT_STALL seconds (default 60) the run stops with a picture.

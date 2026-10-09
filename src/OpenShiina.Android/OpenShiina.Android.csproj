@@ -17,7 +17,8 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <!-- Phones and tablets of today, and the emulator -->
+    <!-- Phones and tablets of today, the emulator, and 32-bit Android (Android Go phones, TV
+         boxes), where the scripts' memory is mapped in 16 MB parts (Scripting/ScnAddressSpace.cs) -->
     <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Android\</OutputPath>

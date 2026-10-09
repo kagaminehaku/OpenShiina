@@ -11,24 +11,18 @@ README).
   Re:Rem Plus's prologue zoom (the original runs on Windows 10 through Locale Emulator), and
   record the time a frame and the processor used on both, before and after the items below, to
   know how far from the original the player still is.
-- [ ] **Flat memory for the scripts.** The VM's memory is in 64 KB pages, so every read and
-  write looks its page up and the C# routines copy row by row across pages. Decided
-  (2026-10-09): the whole 32-bit address space as one block of virtual memory, a script address
-  being `base + address`, so no page lookup, null or bounds check anywhere (every 32-bit address
-  is inside), the translated code reading and writing through the pointer, and pictures one
-  contiguous block for the C# routines.
-  - Reserve 4 GB of address space, physical memory only for the pages written: `mmap` with
-    `MAP_NORESERVE` (Linux, Android, macOS); on Windows reserve, then commit each 16 MB part on
-    first use (commit counts against RAM + page file). `Free` gives pages back and keeps them
-    zero (`madvise(MADV_DONTNEED)`, `VirtualFree(MEM_DECOMMIT)`).
-  - 64-bit only: Android drops `android-arm` (see the last item for bringing it back).
-  - Rule from the start: no heap block crosses a 16 MB boundary (blocks over 16 MB start on
-    one), so a table of 16 MB segments can be added later for 32-bit without touching the C#
-    routines.
-  - Steps: measure first (how much of a heavy scene's time is memory access); the backing
-    swapped under the same API (Read32, Write32, CopyMemory, TryDirect...), ScnBoot pictures the
-    same; then the translated code through the pointer (SCNBOOT_VERIFY_NATIVE); then the hot C#
-    routines on whole blocks; measure again. On a branch of its own.
+- [ ] **Flat memory: what is left** (the memory itself is done on the branch flat-memory,
+  engine-notes.md section 10, "Flat memory").
+  - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run), then
+    merge the branch.
+  - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`) is written but not built or run:
+    ScnBoot as a 32-bit program (`dotnet publish tests/OpenShiina.ScnBoot -c Release -r win-x86
+    --self-contained`) against the 64-bit one's pictures (Re: Rem Plus's zoom, Oreimo's park
+    route), then an `android-arm` APK on a 32-bit phone or TV box.
+  - The other hot C# routines on whole blocks (`ScnVm.Bytes` instead of rows copied in and out):
+    scale32, subpixel32, enlarge32, blend32, rule alpha, 0562, 0568.
+  - Commit: whole 16 MB parts are committed on Windows (about 700 MB in Re: Rem Plus against
+    350 MB of RAM); smaller parts (1 MB, a table of 4096 flags) would commit less.
 - [ ] **The translated x86 code itself.** Each x86 instruction becomes several .NET ones
   (flags, the page lookup, bounds): flags computed only where a later instruction reads them,
   and direct memory access once memory is flat, for the routines that keep running translated.
@@ -101,10 +95,3 @@ spaced as full-width.
 
 - [ ] iOS player on `OpenShiina.App`.
 - [ ] Run and record the games on Linux and macOS (compatibility.md, Platforms).
-- [ ] **Android 32-bit (last).** Once memory is flat the player is 64-bit only. 32-bit Android is
-  left on cheap Android Go phones, TV boxes and smart TVs (64-bit chips with a 32-bit system),
-  mostly too slow for the games anyway. To bring `android-arm` back: a table of 256 segments of
-  16 MB (`pointer = segment[address >> 24] + (address & 0xFFFFFF)`), each segment mapped on its
-  first use; the translated code looks the segment up (and maps it when missing) instead of
-  adding the base. The C# routines stay as they are (blocks never cross a segment). It can be
-  tried on a PC with ScnBoot built for win-x86.

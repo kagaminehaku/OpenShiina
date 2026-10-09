@@ -6,11 +6,14 @@
 // scheduler runs each running task until it yields ("op_0034", the per-frame instruction budget,
 // or an opcode that returns to the scheduler).
 //
-// Scripts use real pointers: variables, strings and code live in one flat 32-bit memory. Layout:
+// Scripts use real pointers: variables, strings and code live in one flat 32-bit memory (a 4 GB
+// block of virtual memory, or 16 MB parts in a 32-bit process: ScnAddressSpace). Layout:
 // g / b / a arrays, s flags, f (1,000 per slot), the stacks (1,000 dwords per slot, "l" variables
 // and salloc live on it), named variables, a heap for loaded files, and the module code.
 //
 // Opcodes outside the core (files, pictures, text, sound, input...) are added with Register.
+
+using System.Runtime.CompilerServices;
 
 namespace OpenShiina.Scripting;
 
@@ -25,6 +28,13 @@ public interface IScnHost
 
     /// <summary>A file of the game folder itself (RIO.INI, movies), or null.</summary>
     byte[]? ReadLooseFile(string name);
+
+    /// <summary>
+    /// The length ReadLooseFile gives, without reading the file; null when it is missing. START
+    /// asks whether the game's archives exist (010E): reading them for it read Re: Rem Plus's
+    /// 790 MB into memory at every start.
+    /// </summary>
+    long? LooseFileSize(string name) => ReadLooseFile(name)?.Length;
 
     /// <summary>Milliseconds since some fixed point (timeGetTime).</summary>
     uint Milliseconds { get; }
@@ -164,7 +174,7 @@ public sealed class ScnOpCounts : IReadOnlyDictionary<int, long>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed partial class ScnVm
+public sealed partial class ScnVm : IDisposable
 {
     public const int Slots = 1000, StackSize = 1000;
 
@@ -173,9 +183,10 @@ public sealed partial class ScnVm
     private const int FRegion = 0x05000000, StackRegion = 0x06000000, NamedRegion = 0x07000000;
     private const int HeapRegion = 0x10000000, CodeRegion = 0x40000000;
 
-    private const int PageBits = 16, PageSize = 1 << PageBits;
-    // Pages of the 32-bit address space (64 KB), made on first use (a direct table)
-    private readonly byte[]?[] m_pages = new byte[]?[1 << (32 - PageBits)];
+    // The 32-bit address space (ScnAddressSpace: one block of virtual memory, an address being
+    // Base + (uint)address; in a 32-bit process 16 MB parts mapped one at a time), physical
+    // memory only for the pages written
+    private readonly ScnAddressSpace m_memory = new();
     private int m_heapTop = HeapRegion, m_codeTop = CodeRegion, m_namedTop = NamedRegion;
 
     private readonly ScnOpcodes m_opcodes;
@@ -241,74 +252,94 @@ public sealed partial class ScnVm
 
     #region Memory
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private byte[] Page(int address) => m_pages[address >>> PageBits] ?? NewPage(address);
+    /// <summary>The script memory's pages go back to the system (the VM is not used any more).</summary>
+    public void Dispose() => m_memory.Dispose();
 
-    private byte[] NewPage(int address) => m_pages[address >>> PageBits] = new byte[PageSize];
+    // A pointer to script memory for an access of up to 8 bytes (in a 32-bit process, one that
+    // does not cross a 16 MB boundary: ScnAddressSpace.Crosses)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private unsafe byte* At(int address) => m_memory.At((uint)address);
 
     /// <summary>
-    /// The page array and offset that hold [address, address + length) when it does not cross
-    /// a page, for code that works on the bytes in place.
+    /// The bytes [address, address + length) of script memory, for code that works on them in
+    /// place: a block of the heap or a part of one (in a 32-bit process, a block that is not one
+    /// piece of memory throws; <see cref="IsContiguous"/>). It must not run past the top of the 4 GB.
     /// </summary>
-    public bool TryDirect(int address, int length, out byte[] page, out int offset)
+    public unsafe Span<byte> Bytes(int address, int length)
     {
-        offset = address & (PageSize - 1);
-        page = Page(address);
-        return offset + length <= PageSize;
+        if ((ulong)(uint)address + (ulong)length > (ulong)ScnAddressSpace.Size)
+            throw new ArgumentOutOfRangeException(nameof(length), $"{length} bytes at {address:X8} run past the top of script memory");
+        return new Span<byte>(m_memory.Block((uint)address, length), length);
     }
 
-    public byte ReadByte(int address) => Page(address)[address & (PageSize - 1)];
+    /// <summary>[address, address + length) is one piece of memory (always in a 64-bit process, below the top of the 4 GB).</summary>
+    public bool IsContiguous(int address, int length) => m_memory.Contiguous((uint)address, length) >= length;
 
-    public void WriteByte(int address, byte value) => Page(address)[address & (PageSize - 1)] = value;
+    /// <summary>The bytes from <paramref name="address"/> that are one piece of memory, at most <paramref name="length"/>.</summary>
+    private Span<byte> BytesInPiece(int address, int length) =>
+        Bytes(address, (int)m_memory.Contiguous((uint)address, length));
 
-    public ushort Read16(int address) => (ushort)(ReadByte(address) | ReadByte(address + 1) << 8);
+    public unsafe byte ReadByte(int address) => *At(address);
 
-    public void Write16(int address, int value)
+    public unsafe void WriteByte(int address, byte value) => *At(address) = value;
+
+    // Accesses of 2 and 4 bytes across a 16 MB boundary (32-bit process only) go a byte at a time
+
+    public unsafe ushort Read16(int address) =>
+        ScnAddressSpace.Crosses((uint)address, 2) ? (ushort)(ReadByte(address) | ReadByte(address + 1) << 8) : Unsafe.ReadUnaligned<ushort>(At(address));
+
+    public unsafe void Write16(int address, int value)
     {
-        WriteByte(address, (byte)value);
-        WriteByte(address + 1, (byte)(value >> 8));
-    }
-
-    public int Read32(int address)
-    {
-        int offset = address & (PageSize - 1);
-        if (offset <= PageSize - 4)
-            return BitConverter.ToInt32(Page(address), offset);
-        return ReadByte(address) | ReadByte(address + 1) << 8 | ReadByte(address + 2) << 16 | ReadByte(address + 3) << 24;
-    }
-
-    public void Write32(int address, int value)
-    {
-        int offset = address & (PageSize - 1);
-        if (offset <= PageSize - 4)
+        if (ScnAddressSpace.Crosses((uint)address, 2))
         {
-            BitConverter.TryWriteBytes(Page(address).AsSpan(offset), value);
+            WriteByte(address, (byte)value);
+            WriteByte(address + 1, (byte)(value >> 8));
             return;
         }
-        for (int i = 0; i < 4; i++)
-            WriteByte(address + i, (byte)(value >> (8 * i)));
+        Unsafe.WriteUnaligned(At(address), (ushort)value);
     }
+
+    public unsafe int Read32(int address)
+    {
+        if (ScnAddressSpace.Crosses((uint)address, 4))
+            return ReadByte(address) | ReadByte(address + 1) << 8 | ReadByte(address + 2) << 16 | ReadByte(address + 3) << 24;
+        return Unsafe.ReadUnaligned<int>(At(address));
+    }
+
+    public unsafe void Write32(int address, int value)
+    {
+        if (ScnAddressSpace.Crosses((uint)address, 4))
+        {
+            for (int i = 0; i < 4; i++)
+                WriteByte(address + i, (byte)(value >> (8 * i)));
+            return;
+        }
+        Unsafe.WriteUnaligned(At(address), value);
+    }
+
+    // Blocks go a piece of memory at a time (to the top of the 4 GB, or a 16 MB part in a 32-bit
+    // process); past the top they go on at address 0, as 32-bit addresses do
 
     public void WriteBytes(int address, ReadOnlySpan<byte> bytes)
     {
         while (bytes.Length > 0)
         {
-            int offset = address & (PageSize - 1), n = Math.Min(bytes.Length, PageSize - offset);
-            bytes[..n].CopyTo(Page(address).AsSpan(offset));
-            bytes = bytes[n..];
-            address += n;
+            var target = BytesInPiece(address, bytes.Length);
+            bytes[..target.Length].CopyTo(target);
+            bytes = bytes[target.Length..];
+            address += target.Length;
         }
     }
 
-    /// <summary>Copies memory into <paramref name="bytes"/>, a page at a time.</summary>
+    /// <summary>Copies memory into <paramref name="bytes"/>.</summary>
     public void ReadBytes(int address, Span<byte> bytes)
     {
         while (bytes.Length > 0)
         {
-            int offset = address & (PageSize - 1), n = Math.Min(bytes.Length, PageSize - offset);
-            Page(address).AsSpan(offset, n).CopyTo(bytes);
-            bytes = bytes[n..];
-            address += n;
+            var source = BytesInPiece(address, bytes.Length);
+            source.CopyTo(bytes);
+            bytes = bytes[source.Length..];
+            address += source.Length;
         }
     }
 
@@ -319,23 +350,21 @@ public sealed partial class ScnVm
         return bytes;
     }
 
-    /// <summary>memset, a page at a time.</summary>
+    /// <summary>memset.</summary>
     public void FillMemory(int dst, int count, byte value)
     {
         while (count > 0)
         {
-            int offset = dst & (PageSize - 1), n = Math.Min(count, PageSize - offset);
-            Page(dst).AsSpan(offset, n).Fill(value);
-            count -= n;
-            dst += n;
+            var target = BytesInPiece(dst, count);
+            target.Fill(value);
+            count -= target.Length;
+            dst += target.Length;
         }
     }
 
     /// <summary>
-    /// memmove (rep movsd / movsb on blocks that do not overlap), page to page with no buffer (a
-    /// buffer a call cost a phone's garbage collector more than the copy: 04E2 copies a row at a
-    /// time). Overlapping blocks of more than 1 MB are copied 64 KB at a time from the start, as
-    /// before.
+    /// memmove (rep movsd / movsb on blocks that do not overlap). Overlapping blocks of more than
+    /// 1 MB are copied 64 KB at a time from the start, as before.
     /// </summary>
     public void CopyMemory(int dst, int src, int count)
     {
@@ -355,35 +384,20 @@ public sealed partial class ScnVm
         }
     }
 
-    /// <summary>
-    /// memmove exactly (as if through a buffer), page to page: blocks that overlap with the
-    /// destination first are copied from the start, the others from the end.
-    /// </summary>
-    public void MoveMemory(int dst, int src, int count)
+    /// <summary>memmove exactly (as if through a buffer).</summary>
+    public unsafe void MoveMemory(int dst, int src, int count)
     {
         if (count <= 0 || dst == src)
             return;
-        if ((uint)dst < (uint)src || (long)dst >= (long)src + count)
+        if (IsContiguous(src, count) && IsContiguous(dst, count))
         {
-            for (int done = 0; done < count; )
-            {
-                int s = src + done, d = dst + done;
-                int so = s & (PageSize - 1), d0 = d & (PageSize - 1);
-                int n = Math.Min(count - done, Math.Min(PageSize - so, PageSize - d0));
-                Page(s).AsSpan(so, n).CopyTo(Page(d).AsSpan(d0, n));
-                done += n;
-            }
+            byte* from = m_memory.Block((uint)src, count);
+            byte* to = m_memory.Block((uint)dst, count);
+            Buffer.MemoryCopy(from, to, count, count);
             return;
         }
-        for (int left = count; left > 0; )
-        {
-            // The last bytes not yet copied: up to the start of the page each end is in
-            int s = src + left, d = dst + left;
-            int so = ((s - 1) & (PageSize - 1)) + 1, d0 = ((d - 1) & (PageSize - 1)) + 1;
-            int n = Math.Min(left, Math.Min(so, d0));
-            Page(s - n).AsSpan(so - n, n).CopyTo(Page(d - n).AsSpan(d0 - n, n));
-            left -= n;
-        }
+        // across the top of the 4 GB, or parts apart in a 32-bit process: through a buffer
+        WriteBytes(dst, ReadBytes(src, count));
     }
 
     /// <summary>A zero-terminated Shift-JIS string.</summary>
@@ -425,14 +439,15 @@ public sealed partial class ScnVm
     {
         int size = (Math.Max(bytes, 4) + 15) & ~15;
         // The smallest free range it fits in
-        int best = -1, bestSize = int.MaxValue;
+        int best = -1, bestSize = int.MaxValue, bestAt = 0;
         for (int i = 0; i < m_freeRanges.Count; i++)
         {
             int length = m_freeRanges.Values[i];
-            if (length >= size && length < bestSize)
+            if (length >= size && length < bestSize && Fit(m_freeRanges.Keys[i], size) is long fit && fit + size <= (long)m_freeRanges.Keys[i] + length)
             {
                 best = m_freeRanges.Keys[i];
                 bestSize = length;
+                bestAt = (int)fit;
                 if (length == size)
                     break;
             }
@@ -441,21 +456,42 @@ public sealed partial class ScnVm
         if (best >= 0)
         {
             m_freeRanges.Remove(best);
-            if (bestSize > size)
-                m_freeRanges.Add(best + size, bestSize - size);
-            at = best;
+            if (bestAt > best)
+                m_freeRanges.Add(best, bestAt - best);
+            if (best + bestSize > bestAt + size)
+                m_freeRanges.Add(bestAt + size, best + bestSize - (bestAt + size));
+            at = bestAt;
         }
         else
         {
+            long fit = Fit(m_heapTop, size);
             // The heap must not grow into the code of the modules
-            if ((long)m_heapTop + size > CodeRegion)
+            if (fit + size > CodeRegion)
                 throw new ScnException($"Out of script memory: {HeapInUse >> 20} MB in use, {size} bytes asked for", -1, 0, 0);
-            at = m_heapTop;
-            m_heapTop += size;
+            at = (int)fit;
+            if (at > m_heapTop)
+                m_freeRanges.Add(m_heapTop, at - m_heapTop);   // the gap to the boundary (zero, as above the top)
+            m_heapTop = at + size;
         }
         m_blocks[at] = size;
         HeapInUse += size;
+        m_memory.Prepare((uint)at, size);
         return at;
+    }
+
+    /// <summary>
+    /// Where a block of <paramref name="size"/> bytes goes from <paramref name="start"/> on: no
+    /// block crosses a 16 MB boundary (one over 16 MB starts on one), so that in a 32-bit process,
+    /// where the 16 MB parts of the address space are mapped one at a time (ScnAddressSpace), the
+    /// C# routines, which take a block as one piece of memory, need not know.
+    /// </summary>
+    private static long Fit(long start, int size)
+    {
+        const long Part = 1L << ScnAddressSpace.SegmentBits;
+        long end = start + size;
+        if (size > Part)
+            return (start + Part - 1) & ~(Part - 1);
+        return (start & ~(Part - 1)) == ((end - 1) & ~(Part - 1)) ? start : (start + Part - 1) & ~(Part - 1);
     }
 
     /// <summary>The address is the start of a block in use.</summary>
@@ -506,23 +542,8 @@ public sealed partial class ScnVm
         return found;
     }
 
-    /// <summary>Zeroes [start, end): pages wholly inside are dropped, the parts of others cleared.</summary>
-    private void ClearRange(int start, int end)
-    {
-        while (start < end)
-        {
-            int page = start >>> PageBits, offset = start & (PageSize - 1);
-            int n = Math.Min(end - start, PageSize - offset);
-            if (m_pages[page] is { } bytes)
-            {
-                if (n == PageSize)
-                    m_pages[page] = null;
-                else
-                    bytes.AsSpan(offset, n).Clear();
-            }
-            start += n;
-        }
-    }
+    /// <summary>Zeroes [start, end): whole pages go back to the system, the parts of others are cleared.</summary>
+    private void ClearRange(int start, int end) => m_memory.Discard((uint)start, (long)end - start);
 
     public int AllocateCopy(ReadOnlySpan<byte> data)
     {
