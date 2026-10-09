@@ -1,9 +1,10 @@
 // Machine code inside the SCN modules ("op_0276 label"): the engine calls x86 routines with a
 // pointer to {b, a, s, f of the slot, the stack top}; they read their arguments from l[0], l[1]...
 // and work on picture buffers in script memory. A routine runs, in order of preference:
-//   - as a C# version written by hand (ScnVm.NativeKernels.cs), found by the signature of the
-//     whole routine (X86Routine: every reachable instruction and its offset), or by its bytes
-//     with a constant left open (one routine whose builds differ only in it);
+//   - as a C# version written by hand (ScnVm.NativeKernels.cs, ScnVm.NativeRoutines.cs), found
+//     by the signature of the whole routine (X86Routine: every reachable instruction and its
+//     offset), or by its bytes with a constant left open (one routine whose builds differ only
+//     in it); cases a C# version does not take (blocks that overlap...) run as below (RunX86);
 //   - translated to .NET by X86Jit when it is first called (the translation is made in the
 //     background; the interpreter runs the routine until it is ready);
 //   - on X86Cpu, an interpreter working on the VM's flat memory (routines X86Jit does not take,
@@ -84,20 +85,36 @@ public sealed partial class ScnVm
             info.Native = found;
         else if (JitX86)
         {
-            var code = info.Code;
             info.Translation = JitInBackground
-                ? Task.Run(() => Translate(code, info))
-                : Task.FromResult(Translate(code, info));
+                ? Task.Run(() => Translate(info))
+                : Task.FromResult(Translate(info));
         }
         m_routines[address] = info;
         return info;
+    }
 
-        static X86Jit.Routine? Translate(X86Routine code, RoutineInfo info)
-        {
-            var routine = X86Jit.Compile(code, out string? reason);
-            info.NotTranslated = reason;
-            return routine;
-        }
+    private static X86Jit.Routine? Translate(RoutineInfo info)
+    {
+        var routine = X86Jit.Compile(info.Code, out string? reason);
+        info.NotTranslated = reason;
+        return routine;
+    }
+
+    /// <summary>
+    /// Runs the routine being called as x86 code: translated when X86Jit takes it (translated
+    /// now, on its first such call), else on the interpreter. For the cases a C# version leaves
+    /// to the x86 code (blocks that overlap, counts the x86 code would wrap around).
+    /// </summary>
+    private void RunX86(ScnContext c, ScnNativeArgs args)
+    {
+        int target = m_nativeTarget;
+        var info = RoutineAt(target);
+        if (JitX86 && info.Translation == null)
+            info.Translation = Task.FromResult(Translate(info));
+        if (info.Translated is { } translated)
+            RunTranslated(c, target, args, translated);
+        else
+            Interpret(c, target, args);
     }
 
     /// <summary>Code was loaded again: what was known of routines no longer applies.</summary>
@@ -154,20 +171,31 @@ public sealed partial class ScnVm
     /// [start, start + length), puts the old bytes back for the C# version, and afterwards
     /// compares. Call before the C# version; dispose after it.
     /// </summary>
-    private IDisposable? VerifyRegion(ScnContext c, ScnNativeArgs args, int start, int length)
+    private IDisposable? VerifyRegion(ScnContext c, ScnNativeArgs args, int start, int length) =>
+        VerifyRegions(c, args, (start, length));
+
+    /// <summary>VerifyRegion for a routine that writes to several places (regions may overlap).</summary>
+    private IDisposable? VerifyRegions(ScnContext c, ScnNativeArgs args, params (int Start, int Length)[] regions)
     {
-        if (!VerifyNatives || length <= 0)
+        if (!VerifyNatives)
             return null;
-        byte[] before = ReadBytes(start, length);
+        regions = regions.Where(r => r.Length > 0).ToArray();
+        if (regions.Length == 0)
+            return null;
+        var before = regions.Select(r => ReadBytes(r.Start, r.Length)).ToArray();
         Interpret(c, m_nativeTarget, args);
-        byte[] expected = ReadBytes(start, length);
-        WriteBytes(start, before);
+        var expected = regions.Select(r => ReadBytes(r.Start, r.Length)).ToArray();
+        for (int k = regions.Length - 1; k >= 0; k--)
+            WriteBytes(regions[k].Start, before[k]);
         return new Check(() =>
         {
-            byte[] actual = ReadBytes(start, length);
-            int at = actual.AsSpan().CommonPrefixLength(expected);
-            if (at < length)
-                throw Error(c, $"Native routine differs from the x86 code at +{at:X} ({actual[at]:X2} instead of {expected[at]:X2})");
+            for (int k = 0; k < regions.Length; k++)
+            {
+                byte[] actual = ReadBytes(regions[k].Start, regions[k].Length);
+                int at = actual.AsSpan().CommonPrefixLength(expected[k]);
+                if (at < actual.Length)
+                    throw Error(c, $"Native routine differs from the x86 code at {regions[k].Start:X8}+{at:X} ({actual[at]:X2} instead of {expected[k][at]:X2})");
+            }
         });
     }
 

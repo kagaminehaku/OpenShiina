@@ -1006,6 +1006,31 @@ the functions they call from the decompile. First findings:
     scaling), smaller only where it does not fit.
 - A routine with loops (a branch backwards) whose translation is not ready at its first call
   waits for it instead of running on the interpreter (Sena's 75FAF: 250 ms there).
+- **Every embedded routine as C#** (2026-10-09, ScnVm.NativeRoutines.cs). The 0276 targets of
+  the eleven games' SCN files (282 calls) are 230 routines, 74 builds (signatures) of about 35
+  different ones; the last 25 that ran translated or interpreted have C# versions now, so no
+  routine of the eleven games is translated in play. Offsets of Oreimo / Sena / Re: Rem Plus's START: the CPU check
+  (75A84 / 75EE4 / 85384: 0x11 into l[0] and the dword before the routine, as the interpreter's
+  CPU reports), the save thumbnail (75B51 / 75FAF: 8 x 8 averages of 800 x 600 BGR; Ero-On!
+  5D7A0: 16 x 12 from 50 x 50), copies of rows and blocks (75E25, 75EC3, Kuroneko Plus 7637C,
+  Ero-On! 5DB11, Re: Rem Plus 85674, the 32-bit rectangle 7963C / 79A8A / 88BDC), BGR to 32 bits
+  and back (85774 / 857DC), sepia (76042 / 76490 / 85920: y = (151 b0 + 77 b1 + 29 b2) >> 8, then
+  y * 145, 200, 240 >> 8), NOT of a block (75FEE), strnicmp (7633C), the first byte / word in a
+  string (75FAB / 75F62, into f[2]), EFCLIB's XOR fill and inversion (1E9E / 54A0), Ero-On!'s
+  same-size zoom (5DCCA: bilinear at 1/16 pixel, weights (16 - fx)(16 - fy) ... in 16 bits),
+  and Re: Rem Plus's own: half- to full-width Shift-JIS by the table inside the routine (88FEC),
+  a saturation change by the tables inside the routine (8911E), swap (8BB90), the montage table's
+  names in capitals and its bisection (8BC00 / 8BC4C), add / subtract a constant (8BD18 /
+  8BD38), a checksum (8BD58: dword added, rotated right by 3), a 28 x 28 mask (8BD9C) and the
+  matching of 48-byte records (904F4). Where the x86 code's result depends on how it goes
+  through memory (blocks that overlap other than in place) or its count would wrap round to 4
+  billion, a C# version leaves the call to the x86 code (`RunX86`: translated when X86Jit takes
+  the routine, else interpreted). Each build was compared with its x86 code on the interpreter on
+  random cases, the whole test memory after each (scratchpad nativetest: 54 builds and offsets, 3
+  to 300 cases each, overlapping blocks among them), and in ScnBoot with SCNBOOT_VERIFY_NATIVE
+  (which now checks every place a routine writes). Left to the x86 code: the SSE2 build of the
+  zoom (Oreimo 79A20, Sena 79E70, Re: Rem Plus 8BDE0), which START takes only when the CPU
+  check gives SSE2 (b[77]); the interpreter's CPU has none, so it never runs.
 - `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's
   index instead of decoding the file (checked: the index's unpacked size is the decoded length
   for every entry of the 11 games). `00CE` itself is the engine's background loader (START

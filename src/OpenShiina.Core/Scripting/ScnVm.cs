@@ -227,6 +227,7 @@ public sealed partial class ScnVm
         RegisterMisc();
         RegisterLayers();
         RegisterNativeKernels();
+        RegisterNativeRoutines();
         RegisterEffects();
         RegisterGdi();
         RegisterMenus();

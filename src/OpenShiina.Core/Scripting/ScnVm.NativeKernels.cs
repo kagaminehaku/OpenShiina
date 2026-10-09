@@ -143,7 +143,7 @@ public sealed partial class ScnVm
         // Maki Fes! 85B38; MMX): the enlarging case of the same copy, written out in
         // ScnVm.Enlarge32.cs (each build: 150 or more random cases the same as its x86 code; Re:
         // Rem Plus's 130 % zoom took 50 ms a frame translated, 4 ms as C#). Arguments as scale32's;
-        // rectangles the C# version does not take run on the interpreter
+        // rectangles the C# version does not take run as x86 code (RunX86)
         RegisterNative(["67FD294324E188D2D3891314AB51537274147A92", "5F055480EAF613D53B5AAF6EE2475EA9FF247A76",
                         "E17C33CA39A48D249E621A1EB13D0FBE757B99D8"], "enlarge32", (vm, c, a) =>
         {
@@ -153,7 +153,7 @@ public sealed partial class ScnVm
             using var verify = vm.VerifyRegion(c, a, dst, length);
             if (!vm.Enlarge32(dst, pitch, vm.NativeArg(a, 2), vm.NativeArg(a, 3), right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7),
                               vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11)))
-                vm.Interpret(c, vm.m_nativeTarget, a);
+                vm.RunX86(c, a);
         });
 
         // Oreimo START 78380 (Sena 787CE, Re: Rem Plus 87920; MMX, 0x1632C): the scaling case of the same copy (source and
@@ -223,7 +223,7 @@ public sealed partial class ScnVm
         // l[2..5] dst left, top, right, bottom, l[6] src, l[7] its stride, l[8..11] src left, top,
         // right, bottom (1/16 pixels), l[12] / l[13] the column / row weights, l[14] / l[15] the
         // column / row entries (24 bytes each). The x86 code makes the row entries before the
-        // column tables: where those run into them, it runs on the interpreter instead
+        // column tables: where those run into them, it runs as x86 code instead
         RegisterNative("31DAD459219DC78270C7147720CA1959DFEA5AFB", "scale16", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
@@ -235,7 +235,7 @@ public sealed partial class ScnVm
             bool Overlaps(long from, long length) => from < rowEnd && rowEntries < from + length;
             if (Overlaps(colWeights, ((long)(uint)(dr - dl) + 1) * 8) || Overlaps(colEntries, columns * 24))
             {
-                vm.Interpret(c, vm.m_nativeTarget, a);
+                vm.RunX86(c, a);
                 return;
             }
             int length = rows == 0 || columns == 0 ? 0 : (int)(pitch * (((uint)dt >> 4) + rows - 1) + (((uint)dl >> 4) + columns) * 4);
@@ -247,7 +247,7 @@ public sealed partial class ScnVm
         // Ero-On! START 5DFA5 (MMX, the enlarging case of 0x14BCE), written out in
         // ScnVm.Enlarge16.cs. l[0] dst, l[1] its stride, l[2..5] dst left, top, right, bottom,
         // l[6] src, l[7] its stride, l[8..11] src left, top, right, bottom (1/16 pixels), l[12] the
-        // weight table. Rectangles it does not enlarge run on the interpreter
+        // weight table. Rectangles it does not enlarge run as x86 code
         RegisterNative("27A535558D763B2B8F0008F2476F0FA14EB45AAB", "enlarge16", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
@@ -256,7 +256,7 @@ public sealed partial class ScnVm
             int sl = vm.NativeArg(a, 8), st = vm.NativeArg(a, 9), sr = vm.NativeArg(a, 10), sb = vm.NativeArg(a, 11);
             if (sr - sl < 0 || sb - st < 0 || dr - dl < sr - sl || db - dt < sb - st)
             {
-                vm.Interpret(c, vm.m_nativeTarget, a);
+                vm.RunX86(c, a);
                 return;
             }
             int length = rows == 0 || columns == 0 ? 0 : (int)(pitch * (((uint)dt >> 4) + rows - 1) + (((uint)dl >> 4) + columns) * 4);

@@ -11,11 +11,6 @@ README).
   Re:Rem Plus's prologue zoom (the original runs on Windows 10 through Locale Emulator), and
   record the time a frame and the processor used on both, before and after the items below, to
   know how far from the original the player still is.
-- [ ] **C# for the remaining embedded x86 routines.** About 25 distinct routines of the eleven
-  games still run translated (X86Jit) or interpreted. Each gets a C# version found by its
-  signature, as the zoom, compositor and blend routines have (ScnVm.NativeKernels.cs), and is
-  checked against the x86 code on random cases (SCNBOOT_VERIFY_NATIVE). X86Jit and the
-  interpreter stay as the fallback for any build no signature matches.
 - [ ] **Flat memory for the scripts.** The VM's memory is in 64 KB pages, so every read and
   write looks its page up and the C# routines copy row by row across pages. Decided
   (2026-10-09): the whole 32-bit address space as one block of virtual memory, a script address
