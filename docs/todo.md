@@ -17,9 +17,23 @@ README).
   checked against the x86 code on random cases (SCNBOOT_VERIFY_NATIVE). X86Jit and the
   interpreter stay as the fallback for any build no signature matches.
 - [ ] **Flat memory for the scripts.** The VM's memory is in 64 KB pages, so every read and
-  write looks its page up and the C# routines copy row by row across pages. One flat block
-  (or one block per surface) would make the C# routines and the translated code faster; the
-  largest win left on phones.
+  write looks its page up and the C# routines copy row by row across pages. Decided
+  (2026-10-09): the whole 32-bit address space as one block of virtual memory, a script address
+  being `base + address`, so no page lookup, null or bounds check anywhere (every 32-bit address
+  is inside), the translated code reading and writing through the pointer, and pictures one
+  contiguous block for the C# routines.
+  - Reserve 4 GB of address space, physical memory only for the pages written: `mmap` with
+    `MAP_NORESERVE` (Linux, Android, macOS); on Windows reserve, then commit each 16 MB part on
+    first use (commit counts against RAM + page file). `Free` gives pages back and keeps them
+    zero (`madvise(MADV_DONTNEED)`, `VirtualFree(MEM_DECOMMIT)`).
+  - 64-bit only: Android drops `android-arm` (see the last item for bringing it back).
+  - Rule from the start: no heap block crosses a 16 MB boundary (blocks over 16 MB start on
+    one), so a table of 16 MB segments can be added later for 32-bit without touching the C#
+    routines.
+  - Steps: measure first (how much of a heavy scene's time is memory access); the backing
+    swapped under the same API (Read32, Write32, CopyMemory, TryDirect...), ScnBoot pictures the
+    same; then the translated code through the pointer (SCNBOOT_VERIFY_NATIVE); then the hot C#
+    routines on whole blocks; measure again. On a branch of its own.
 - [ ] **The translated x86 code itself.** Each x86 instruction becomes several .NET ones
   (flags, the page lookup, bounds): flags computed only where a later instruction reads them,
   and direct memory access once memory is flat, for the routines that keep running translated.
@@ -92,3 +106,10 @@ spaced as full-width.
 
 - [ ] iOS player on `OpenShiina.App`.
 - [ ] Run and record the games on Linux and macOS (compatibility.md, Platforms).
+- [ ] **Android 32-bit (last).** Once memory is flat the player is 64-bit only. 32-bit Android is
+  left on cheap Android Go phones, TV boxes and smart TVs (64-bit chips with a 32-bit system),
+  mostly too slow for the games anyway. To bring `android-arm` back: a table of 256 segments of
+  16 MB (`pointer = segment[address >> 24] + (address & 0xFFFFFF)`), each segment mapped on its
+  first use; the translated code looks the segment up (and maps it when missing) instead of
+  adding the base. The C# routines stay as they are (blocks never cross a segment). It can be
+  tried on a PC with ScnBoot built for win-x86.
