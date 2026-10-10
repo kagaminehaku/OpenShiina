@@ -356,6 +356,46 @@ Finding problems:
   Paddw, Psrlw, Packuswb: four lanes by shifts and masks), tens of operations a pixel, about six
   times the MMX; Parallel.For in bands of 16 rows adds about 5 ms of processor a frame. The zoom
   itself (3 s from 100 to 130 %) is cheap (0.7 ms a frame).
+- **Vectors, fewer pieces, the changed part** (2026-10-10, after the measure above).
+  - enlarge32's pixels are Vector128 of 16-bit lanes (lanes 0-3 used): pmullw, paddw, psrlw are
+    one instruction each, and as the values packed never pass 255 packuswb is a narrowing. The
+    same numbers (enl32test: 1,195 random cases against the x86 code, none differ); a 1280 x 720
+    130 % zoom 12 -> 2.6 ms on one thread. subpixel32 already did its whole pixels on vectors;
+    only its two edge pixels a row use X86Ops.
+  - ParallelRows (Scripting/ParallelRows.cs) shares every pixel routine's rows (enlarge16/32,
+    scale16/32, subpixel32, the compositor, BlendRows, RuleBlend, rotatezoom, ToBgr24, the WPF
+    whole-number copy): equal pieces of at least 262,144 pixels, at most four, else the calling
+    thread. Bands of 16 rows on 12 threads cost more processor than they saved. On the held
+    zoom (ScnBoot, one frame): one thread 2.3 ms processor and wall, two or three pieces 2.4
+    for 1.3 ms, four 3.3 for 1.5 ms, twelve 4.1 for 0.9 ms. OPENSHIINA_THREADS sets the most
+    pieces (1: everything on the interpreter's thread). ScnBoot has the players'
+    UnfairSemaphoreSpinLimit 0 now, so cpuframe.ps1 measures what they spend.
+  - Held zoom, per frame in ScnBoot: 18 ms of processor for 2.6 ms wall -> 2.4 ms for 1.1-1.4.
+  - The compositor (Re: Rem Plus's first route, 12,000 frames, one thread: 04C4 24.4 -> 14.9 s,
+    about 1.1 ms a call for some 950,000 pixels): runs of one colour (method 3) are filled by
+    copying what is filled after itself; pixels with an alpha each (method 4, and blend
+    0x40000000's, alpha through T1) go four at a time: all 0xFF (88% of them in Re: Rem Plus)
+    copies the colours with one shuffle, all 0 leaves the picture, else d + ((s - d) a >> 8) on
+    twelve 32-bit lanes with the 0xFF ones copied. 200,000 random rows the same as the byte
+    formula (scratch drawtest). Runs average 25 pixels (copies), 148 (one colour), 637 (alpha).
+  - MPEG-1: the IDCT on Vector128<double>, two outputs a vector, each the sum of the same
+    products in the same order (no fused multiply-add), so the same rounding; prediction with
+    the formula chosen outside the loops; ToBgr24 four pixels at a time on 32-bit lanes. The
+    same bytes on every frame of four movies (Re: Rem Plus, Maki Fes!, Azu Plus; scratch
+    mpegbench), decoding 11.5 -> 7.1 ms a 1280 x 720 frame (ev02_mv1), 4.2 -> 2.0 (ed.mpg).
+  - The changed part only (ScreenArea): ScnVm.TakeChangedArea gives the bounding rectangle of
+    what WM_PAINT and BltToWindow changed since the last call (all of it at first). GameThread
+    converts to BGRA only that part and what its back buffer lacks (the area of the frame
+    before), and keeps what changed since the window took a picture; TakeFrame copies that
+    into the window's buffer and gives it; the WPF player writes and marks only that part of
+    its bitmap (and of the multiplied one), the Avalonia player skips frames that changed
+    nothing. SCNBOOT_AREAS=1 checks it: a copy updated only in the areas given is the picture
+    after every frame (Re: Rem Plus's first route and zoom, Oreimo's park route: no frame
+    missed). In Re: Rem Plus's first route a third of the frames change under a tenth of the
+    screen (the text), two thirds all of it (the scenes move).
+  - Checked: ScnBoot's pictures of Re: Rem Plus's zoom (105) and first route (121) and Oreimo's
+    park route (61) the same as before, and of all eleven games from their title for 6,000
+    frames (61 each, built from the commit before; scratch allgames.sh) the same.
 - **enlarge32** (ScnVm.Enlarge32.cs, 2026-10-08): the enlarging case of the zoom and pan, Oreimo
   START 77108 / Re: Rem Plus 866A8, in 10 of the 11 games (not Ero-On!, which has enlarge16), three
   builds (v2.47, v2.49, v2.50 signatures). A table of the destination columns that mix two source

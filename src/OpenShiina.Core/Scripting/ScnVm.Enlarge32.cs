@@ -12,41 +12,55 @@
 // one source row, or two mixed. Every formula is the MMX one in 16-bit lanes (pmullw, paddw, >> 8,
 // packuswb), quirks kept: after a partly covered first column that used up its source pixel the
 // rows from one source row take that pixel again (the next is read only after the pointer moved).
-// The rows are drawn on all cores where the destination is apart from the source.
+// A pixel is a Vector128 of 16-bit lanes (0-3 used), so each MMX step is one vector instruction
+// (pmullw, paddw, psrlw; the values packed never pass 255, so packuswb is a plain narrowing).
+// The rows are drawn on several cores (ParallelRows) where the destination is apart from the source.
 
-using static OpenShiina.Scripting.X86Ops;
+using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 
 namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
 {
     /// <summary>An entry of the column table: the weights of the current and the next source pixel, and the accumulator after it.</summary>
-    private readonly record struct Enlarge32Column(ulong W0, ulong W1, int Count);
+    private readonly record struct Enlarge32Column(Vector128<ushort> W0, Vector128<ushort> W1, int Count);
 
     private enum Enlarge32Row { Single, Two, WholeSingle, WholeTwo }
 
     /// <summary>A row of the destination: its kind, its first source row (and the next for two), its weights.</summary>
-    private readonly record struct Enlarge32RowWork(Enlarge32Row Kind, int Source, ulong Weight, ulong Upper, ulong Lower, int Target);
+    private readonly record struct Enlarge32RowWork(Enlarge32Row Kind, int Source, Vector128<ushort> Weight, Vector128<ushort> Upper, Vector128<ushort> Lower, int Target);
 
     private const ulong Lanes0x101 = 0x0000_0101_0101_0101;
 
-    private static ulong Broadcast(uint v)
+    /// <summary>Four 16-bit MMX lanes as the low half of a vector.</summary>
+    private static Vector128<ushort> Lanes(ulong v) => Vector128.CreateScalar(v).AsUInt16();
+
+    private static Vector128<ushort> Broadcast(uint v)
     {
         ulong w = v & 0xFFFF;
-        return w | w << 16 | w << 32 | w << 48;
+        return Lanes(w | w << 16 | w << 32 | w << 48);
     }
+
+    /// <summary>punpcklbw with 0: a pixel's four bytes as 16-bit lanes.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<ushort> Unpack(uint pixel) => Vector128.WidenLower(Vector128.CreateScalar(pixel).AsByte());
+
+    /// <summary>packuswb of lanes that are at most 255: the low bytes.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint Pack(Vector128<ushort> v) => Vector128.Narrow(v, v).AsUInt32().ToScalar();
 
     /// <summary>
     /// The weights of a partly covered column or row that mixes two pixels: lanes 0-2 part * 257 / whole,
     /// lane 3 that times <paramref name="covered"/> (sixteenths) / whole >> 4, as the x86 code
     /// divides (64-bit dividends, 32-bit quotients).
     /// </summary>
-    private static ulong PartWeight(uint part, uint whole, uint covered)
+    private static Vector128<ushort> PartWeight(uint part, uint whole, uint covered)
     {
         ulong product = (ulong)part * 257;
         uint q = (uint)(product / whole);
         uint alpha = (uint)((ulong)(uint)product * covered / whole) >> 4;
-        return (q & 0xFFFFul) * 0x0000_0001_0001_0001 | (ulong)(alpha & 0xFFFF) << 48;
+        return Lanes((q & 0xFFFFul) * 0x0000_0001_0001_0001 | (ulong)(alpha & 0xFFFF) << 48);
     }
 
     /// <summary>
@@ -79,7 +93,7 @@ public sealed partial class ScnVm
             uint covered = (uint)(left * sW) >> 4;
             if ((uint)ebp >= covered)
             {
-                leftColumn = new Enlarge32Column(Lanes0x101 | (ulong)(((257 * left) >> 4) & 0xFFFF) << 48, 0, (int)covered);
+                leftColumn = new Enlarge32Column(Lanes(Lanes0x101 | (ulong)(((257 * left) >> 4) & 0xFFFF) << 48), default, (int)covered);
                 ebp -= (int)covered;
                 if (ebp == 0)
                     ebp = dW;
@@ -89,7 +103,8 @@ public sealed partial class ScnVm
                 leftTwo = true;
                 if (covered == 0)
                     return false;
-                ulong w1 = PartWeight(covered - (uint)ebp, covered, left), w0 = PartWeight((uint)ebp, covered, left);
+                var w1 = PartWeight(covered - (uint)ebp, covered, left);
+                var w0 = PartWeight((uint)ebp, covered, left);
                 ebp = ebp + dW - (int)covered;
                 leftColumn = new Enlarge32Column(w0, w1, ebp);
             }
@@ -110,7 +125,7 @@ public sealed partial class ScnVm
         {
             uint covered = (uint)(right * sW) >> 4;
             if ((uint)ebp >= covered)
-                rightColumn = new Enlarge32Column(Lanes0x101 | (ulong)(((257 * right) >> 4) & 0xFFFF) << 48, 0, 0);
+                rightColumn = new Enlarge32Column(Lanes(Lanes0x101 | (ulong)(((257 * right) >> 4) & 0xFFFF) << 48), default, 0);
             else
             {
                 rightTwo = true;
@@ -131,7 +146,7 @@ public sealed partial class ScnVm
             uint covered = (uint)(part * sH) >> 4;
             if ((uint)acc >= covered)
             {
-                rows.Add(new Enlarge32RowWork(Enlarge32Row.Single, srcRow, Lanes0x101 | (ulong)(((257 * part) >> 4) & 0xFFFF) << 48, 0, 0, dstRow));
+                rows.Add(new Enlarge32RowWork(Enlarge32Row.Single, srcRow, Lanes(Lanes0x101 | (ulong)(((257 * part) >> 4) & 0xFFFF) << 48), default, default, dstRow));
                 if (!last)
                 {
                     acc -= (int)covered;
@@ -146,7 +161,7 @@ public sealed partial class ScnVm
             {
                 if (covered == 0)
                     return false;
-                rows.Add(new Enlarge32RowWork(Enlarge32Row.Two, srcRow, 0, PartWeight((uint)acc, covered, part), PartWeight(covered - (uint)acc, covered, part), dstRow));
+                rows.Add(new Enlarge32RowWork(Enlarge32Row.Two, srcRow, default, PartWeight((uint)acc, covered, part), PartWeight(covered - (uint)acc, covered, part), dstRow));
                 if (!last)
                 {
                     srcRow += srcPitch;
@@ -163,7 +178,7 @@ public sealed partial class ScnVm
             if (acc >= sH)
             {
                 acc -= sH;
-                rows.Add(new Enlarge32RowWork(Enlarge32Row.WholeSingle, srcRow, 0, 0, 0, dstRow));
+                rows.Add(new Enlarge32RowWork(Enlarge32Row.WholeSingle, srcRow, default, default, default, dstRow));
                 if (acc == 0)
                 {
                     srcRow += srcPitch;
@@ -172,7 +187,7 @@ public sealed partial class ScnVm
             }
             else
             {
-                rows.Add(new Enlarge32RowWork(Enlarge32Row.WholeTwo, srcRow, 0,
+                rows.Add(new Enlarge32RowWork(Enlarge32Row.WholeTwo, srcRow, default,
                     Broadcast(rowsDivider.Divide((uint)acc)), Broadcast(rowsDivider.Divide((uint)(sH - acc))), dstRow));
                 srcRow += srcPitch;
                 acc += dH - sH;
@@ -211,11 +226,8 @@ public sealed partial class ScnVm
                 WriteBytes(row.Target, System.Runtime.InteropServices.MemoryMarshal.AsBytes(output.AsSpan()));
             }
         }
-        if (apart && rows.Count >= 16 && (long)rows.Count * outPixels >= 20000 && srcPitch > 0 && dstPitch > 0)
-        {
-            const int Band = 16;
-            Parallel.For(0, (rows.Count + Band - 1) / Band, band => Rows(band * Band, Math.Min(rows.Count, (band + 1) * Band)));
-        }
+        if (apart && srcPitch > 0 && dstPitch > 0)
+            ParallelRows.For(rows.Count, (long)rows.Count * outPixels, Rows);
         else
             Rows(0, rows.Count);
         return true;
@@ -227,60 +239,72 @@ public sealed partial class ScnVm
     private sealed record Enlarge32Table(Enlarge32Column? Left, bool LeftTwo, Enlarge32Column[] Middle, Enlarge32Column? Right, bool RightTwo,
                                          int Start, int DW, int SW, int WholeColumns);
 
+    /// <summary>A source pixel as the row sees it: one row unpacked, or the two rows mixed (>> 8).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<ushort> Enlarge32Pixel(uint[] upper, uint[] lower, int x, bool two, Vector128<ushort> wUpper, Vector128<ushort> wLower) => two
+        ? Vector128.ShiftRightLogical(Unpack(upper[x]) * wUpper + Unpack(lower[x]) * wLower, 8)
+        : Unpack(upper[x]);
+
+    /// <summary>A mix of weighted pixels (>> 8), then the row's weight for the partly covered rows.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint Enlarge32Out(Vector128<ushort> sum, bool weighted, Vector128<ushort> rowWeight)
+    {
+        var v = Vector128.ShiftRightLogical(sum, 8);
+        if (weighted)
+            v = Vector128.ShiftRightLogical(v * rowWeight, 8);
+        return Pack(v);
+    }
+
+    /// <summary>A source pixel used whole (and the row's weight for the partly covered rows).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint Enlarge32Full(Vector128<ushort> p, bool weighted, Vector128<ushort> rowWeight) =>
+        Pack(weighted ? Vector128.ShiftRightLogical(p * rowWeight, 8) : p);
+
     /// <summary>A destination row of Enlarge32: the walk across, as each kind of row of the x86 code goes.</summary>
     private static void Enlarge32Walk(Enlarge32Table t, Enlarge32RowWork row, uint[] upper, uint[] lower, uint[] output)
     {
         bool two = row.Kind is Enlarge32Row.Two or Enlarge32Row.WholeTwo;
         bool weighted = row.Kind == Enlarge32Row.Single;       // the partly covered rows from one source row
-        ulong rowWeight = row.Weight, wUpper = row.Upper, wLower = row.Lower;
-        // A source pixel as the row sees it: one row unpacked, or the two rows mixed (>> 8)
-        ulong Pixel(int x) => two
-            ? Psrlw(Paddw(Pmullw(Punpcklbw(upper[x], 0), wUpper), Pmullw(Punpcklbw(lower[x], 0), wLower)), 8)
-            : Punpcklbw(upper[x], 0);
-        // A mix of weighted pixels (>> 8), then the row's weight for the partly covered rows
-        uint Out(ulong sum)
-        {
-            ulong v = Psrlw(sum, 8);
-            if (weighted)
-                v = Psrlw(Pmullw(v, rowWeight), 8);
-            return (uint)Packuswb(v, 0);
-        }
-        uint Full(ulong p) => weighted ? (uint)Packuswb(Psrlw(Pmullw(p, rowWeight), 8), 0) : (uint)Packuswb(p, 0);
+        var rowWeight = row.Weight;
+        var wUpper = row.Upper;
+        var wLower = row.Lower;
 
         int x = 0, o = 0, ebp = t.Start, m = 0;
-        ulong cur = Pixel(0);
+        var cur = Enlarge32Pixel(upper, lower, 0, two, wUpper, wLower);
         if (t.Left is { } left)
         {
             if (!t.LeftTwo)
             {
-                output[o++] = Out(Pmullw(left.W0, cur));
+                output[o++] = Enlarge32Out(left.W0 * cur, weighted, rowWeight);
                 ebp -= left.Count;
                 if (ebp == 0)
                 {
                     // the rows from one source row take the same pixel again, the mixed rows the next
                     if (two)
-                        cur = Pixel(++x);
+                        cur = Enlarge32Pixel(upper, lower, ++x, two, wUpper, wLower);
                     else
-                        cur = Pixel(x++);
+                        cur = Enlarge32Pixel(upper, lower, x++, two, wUpper, wLower);
                     ebp = t.DW;
                 }
             }
             else
             {
-                ulong next = Pixel(x + 1);
-                output[o++] = Out(Paddw(Pmullw(left.W0, cur), Pmullw(left.W1, next)));
+                var next = Enlarge32Pixel(upper, lower, x + 1, two, wUpper, wLower);
+                output[o++] = Enlarge32Out(left.W0 * cur + left.W1 * next, weighted, rowWeight);
                 cur = next;
                 x++;
                 ebp = left.Count;
             }
         }
         bool reload = false;
+        var middle = t.Middle;
+        int sw = t.SW, dwSw = t.DW - t.SW;
         for (int c = t.WholeColumns; ; )
         {
-            if (ebp >= t.SW)
+            if (ebp >= sw)
             {
-                output[o++] = Full(cur);
-                ebp -= t.SW;
+                output[o++] = Enlarge32Full(cur, weighted, rowWeight);
+                ebp -= sw;
                 if (ebp == 0)
                 {
                     ebp = t.DW;
@@ -290,30 +314,30 @@ public sealed partial class ScnVm
                         reload = true;
                         break;
                     }
-                    cur = Pixel(x);
+                    cur = Enlarge32Pixel(upper, lower, x, two, wUpper, wLower);
                     continue;
                 }
                 if (--c == 0)
                     break;
                 continue;
             }
-            var e = t.Middle[m++];
-            ulong next2 = Pixel(x + 1);
-            output[o++] = Out(Paddw(Pmullw(e.W0, cur), Pmullw(e.W1, next2)));
+            var e = middle[m++];
+            var next2 = Enlarge32Pixel(upper, lower, x + 1, two, wUpper, wLower);
+            output[o++] = Enlarge32Out(e.W0 * cur + e.W1 * next2, weighted, rowWeight);
             cur = next2;
             x++;
-            ebp += t.DW - t.SW;
+            ebp += dwSw;
             if (--c == 0)
                 break;
         }
         if (t.Right is { } right)
         {
             if (reload)
-                cur = Pixel(x);
+                cur = Enlarge32Pixel(upper, lower, x, two, wUpper, wLower);
             if (!t.RightTwo)
-                output[o] = Out(Pmullw(cur, right.W0));
+                output[o] = Enlarge32Out(cur * right.W0, weighted, rowWeight);
             else
-                output[o] = Out(Paddw(Pmullw(cur, right.W0), Pmullw(Pixel(x + 1), right.W1)));
+                output[o] = Enlarge32Out(cur * right.W0 + Enlarge32Pixel(upper, lower, x + 1, two, wUpper, wLower) * right.W1, weighted, rowWeight);
         }
     }
 }

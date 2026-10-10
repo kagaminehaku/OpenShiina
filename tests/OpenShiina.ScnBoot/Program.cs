@@ -17,6 +17,8 @@
 // mouse wheel one notch away from the user (":-" towards) at those frames. Presses and clicks are
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
+// SCNBOOT_AREAS=1 checks ScnVm.TakeChangedArea: a copy of the window's picture updated only in the
+// areas it gives must be the picture after every frame (the players copy only those).
 // SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames; a game
 // that stands still behind (ScnVm.Paused) gets it back in the same frame, the time until then
 // passing on the clock alone. SCNBOOT_PAUSE=1 pauses every game behind (PlayerSettings.PauseInBackground).
@@ -121,6 +123,10 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_HOT") is { } hotRange && hotRang
 int closeAt = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_CLOSE"), out int ca) ? ca : -1;
 int frame = 0;
 uint pausedFor = 0;
+byte[]? areaCopy = Environment.GetEnvironmentVariable("SCNBOOT_AREAS") == "1" ? new byte[vm.ScreenWidth * vm.ScreenHeight * 3] : null;
+long areaPixels = 0, areaFrames = 0;
+int areaMisses = 0;
+var areaSizes = new int[10];
 if (Environment.GetEnvironmentVariable("SCNBOOT_PAUSE") == "1")
     vm.PauseInBackground = true;
 StartWatchdog();
@@ -179,6 +185,27 @@ try
             Console.WriteLine($"The scripts quit after {frame} frames.");
             break;
         }
+        if (areaCopy != null)
+        {
+            var area = vm.TakeChangedArea();
+            int stride = vm.ScreenWidth * 3;
+            for (int y = area.T; y < area.B; y++)
+                vm.Window.Slice(y * stride + area.L * 3, area.Width * 3).CopyTo(areaCopy.AsSpan(y * stride + area.L * 3));
+            if (!area.IsEmpty)
+            {
+                areaPixels += (long)area.Width * area.Height;
+                areaFrames++;
+            }
+            if (!area.IsEmpty)
+                areaSizes[Math.Min(9, (int)((long)area.Width * area.Height * 10 / (vm.ScreenWidth * vm.ScreenHeight)))]++;
+            if (!vm.Window.SequenceEqual(areaCopy))
+            {
+                int at = vm.Window.CommonPrefixLength(areaCopy);
+                if (++areaMisses <= 5)
+                    Console.WriteLine($"  [areas] frame {frame}: the copy differs at {at % stride / 3},{at / stride} (area {area})");
+                vm.Window.CopyTo(areaCopy);
+            }
+        }
         if (frame == profileFrame)
         {
             Console.WriteLine($"  [profile] frame {frame}: {frameTime.Elapsed.TotalMilliseconds:F1} ms");
@@ -223,6 +250,8 @@ catch (Exception ex)
 
 if (pictures != null)
     SaveScreen(frame);
+if (areaCopy != null)
+    Console.WriteLine($"  [areas] tenths of the screen: {string.Join(" ", areaSizes)}; {areaMisses} frames missed; {areaFrames} frames changed, {(areaFrames == 0 ? 0 : areaPixels / areaFrames)} pixels a changed frame on average ({vm.ScreenWidth * vm.ScreenHeight} in all)");
 Console.WriteLine($"gCPUID = {vm.Read32(vm.GlobalAddress("gCPUID")):X}, x86 instructions run: {vm.Cpu.Executed}");
 if (vm.OpTimes != null)
     foreach (var (op, ticks) in vm.OpTimes.OrderByDescending(t => t.Value).Take(12))

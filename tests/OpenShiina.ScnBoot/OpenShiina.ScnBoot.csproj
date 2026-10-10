@@ -15,4 +15,10 @@
     <ProjectReference Include="..\..\src\OpenShiina.Gpu\OpenShiina.Gpu.csproj" />
   </ItemGroup>
 
+  <!-- As the players: pool threads with nothing to do sleep at once, so the processor it uses
+       is the players' -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Threading.ThreadPool.UnfairSemaphoreSpinLimit" Value="0" />
+  </ItemGroup>
+
 </Project>

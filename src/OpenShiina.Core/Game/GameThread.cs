@@ -7,7 +7,9 @@
 //     game that waits for a key costs next to nothing, as the original does;
 //   - the screen's: each frame the window shows lets the interpreter run one frame, topped up
 //     after 1/60 s when the window draws fewer (or none, minimised).
-// A picture the scripts showed is copied, as 32-bit BGRA, into a buffer the window takes. Window events and messages (focus,
+// A picture the scripts showed is copied, as 32-bit BGRA, into a buffer the window takes - only
+// the part that changed (ScnVm.TakeChangedArea), and the window takes only what changed since it
+// last took a picture. Window events and messages (focus,
 // Alt+Enter, keys, mouse buttons, the wheel, closing) are queued for the interpreter's thread; the
 // title, the answer to closing and the end of the game are posted to the window's thread (the
 // SynchronizationContext Start is called on). Used by both players.
@@ -31,10 +33,13 @@ public sealed class GameThread : IDisposable
     private SynchronizationContext? m_window;
     private volatile bool m_stop, m_finished, m_closed;
 
-    // The latest picture (BGRA, Width x Height) and whether the window has taken it
+    // The latest picture (BGRA, Width x Height) and whether the window has taken it; what the
+    // back buffer lacks of the latest picture (it is a picture behind), and what changed since
+    // the window took one
     private readonly object m_frameLock = new();
     private byte[] m_front, m_back;
     private bool m_frameNew;
+    private ScreenArea m_backStale, m_untaken;
 
     // Frames a second and the slowest frame in the title, perf.log with OPENSHIINA_PERF=log
     private readonly PerfMeter? m_perf;
@@ -193,20 +198,29 @@ public sealed class GameThread : IDisposable
         m_window!.Post(_ => CloseAnswered?.Invoke(close), null);
     });
 
-    /// <summary>Copies the latest picture into <paramref name="target"/> when there is a new one.</summary>
-    public bool TakeFrame(Span<byte> target, int stride)
+    /// <summary>
+    /// When there is a new picture, copies into <paramref name="target"/> (which keeps the last
+    /// one taken) the part that changed since then: <paramref name="area"/>, maybe empty.
+    /// </summary>
+    public bool TakeFrame(Span<byte> target, int stride, out ScreenArea area)
     {
         lock (m_frameLock)
         {
+            area = default;
             if (!m_frameNew)
                 return false;
             m_frameNew = false;
-            int row = Width * 4;
-            for (int y = 0; y < Height; y++)
-                m_front.AsSpan(y * row, row).CopyTo(target.Slice(y * stride, row));
+            area = m_untaken;
+            m_untaken = default;
+            int row = Width * 4, from = area.L * 4, bytes = area.Width * 4;
+            for (int y = area.T; y < area.B; y++)
+                m_front.AsSpan(y * row + from, bytes).CopyTo(target.Slice(y * stride + from, bytes));
             return true;
         }
     }
+
+    /// <summary>Copies the part of the latest picture that changed into <paramref name="target"/> (which keeps the last one taken).</summary>
+    public bool TakeFrame(Span<byte> target, int stride) => TakeFrame(target, stride, out _);
 
     [System.Runtime.InteropServices.DllImport("winmm.dll")]
     private static extern uint timeBeginPeriod(uint period);
@@ -297,21 +311,29 @@ public sealed class GameThread : IDisposable
         }
     }
 
-    /// <summary>The window's picture (ScnVm.Window), as BGRA, into the back buffer; then the buffers swap.</summary>
+    /// <summary>
+    /// The part of the window's picture (ScnVm.Window) that changed, as BGRA, into the back buffer
+    /// (with what it lacked: what changed the picture before); then the buffers swap.
+    /// </summary>
     private void CopyFrame()
     {
+        ScreenArea changed;
         if (m_showSurface)
+        {
             CopySurface();
+            changed = new ScreenArea(0, 0, Width, Height);
+        }
         else
         {
+            changed = m_vm.TakeChangedArea().Clip(Width, Height);
+            var copy = changed.Union(m_backStale).Clip(Math.Min(m_vm.ScreenWidth, Width), Math.Min(m_vm.ScreenHeight, Height));
             var window = m_vm.Window;
             int stride = m_vm.ScreenWidth * 3;
-            int w = Math.Min(m_vm.ScreenWidth, Width), h = Math.Min(m_vm.ScreenHeight, Height);
-            // A pixel a store (BGR to BGRA with A = FF): the copy runs every new picture
-            for (int y = 0; y < h; y++)
+            // A pixel a store (BGR to BGRA with A = FF)
+            for (int y = copy.T; y < copy.B; y++)
             {
-                var row = window.Slice(y * stride, w * 3);
-                var dst = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(m_back.AsSpan(y * Width * 4, w * 4));
+                var row = window.Slice(y * stride + copy.L * 3, copy.Width * 3);
+                var dst = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(m_back.AsSpan((y * Width + copy.L) * 4, copy.Width * 4));
                 for (int x = 0, s = 0; x < dst.Length; x++, s += 3)
                     dst[x] = row[s] | (uint)row[s + 1] << 8 | (uint)row[s + 2] << 16 | 0xFF000000;
             }
@@ -319,6 +341,8 @@ public sealed class GameThread : IDisposable
         lock (m_frameLock)
         {
             (m_front, m_back) = (m_back, m_front);
+            m_backStale = changed;
+            m_untaken = m_untaken.Union(changed);
             m_frameNew = true;
         }
         if (m_gamePace && m_window != null && Interlocked.Exchange(ref m_readyPosted, 1) == 0)

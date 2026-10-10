@@ -688,12 +688,7 @@ public sealed partial class ScnVm
                 WriteBytes(at, row);
             }
         }
-        const int Band = 16;
-        int bands = (height + Band - 1) / Band;
-        if (bands > 1 && (long)width * height >= 20000)
-            Parallel.For(0, bands, i => Rows(a.T + i * Band, Math.Min(a.B, a.T + (i + 1) * Band)));
-        else
-            Rows(a.T, a.B);
+        ParallelRows.For(a.B - a.T, (long)width * height, (first, last) => Rows(a.T + first, a.T + last));
         GpuDone("rotatezoom", timing);
     }
 

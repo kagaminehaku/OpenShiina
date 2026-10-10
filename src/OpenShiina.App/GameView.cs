@@ -364,7 +364,7 @@ public sealed partial class GameView : UserControl, IGameWindow
     {
         if (m_session == null || m_frame == null)
             return;
-        if (m_session.TakeFrame(m_frame, m_session.Width * 4))
+        if (m_session.TakeFrame(m_frame, m_session.Width * 4, out var area) && !area.IsEmpty)
             m_image.SetFrame(m_frame, m_session.Width, m_session.Height, m_session.Width * 4);
     }
 

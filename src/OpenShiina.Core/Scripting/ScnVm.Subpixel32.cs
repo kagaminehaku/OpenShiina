@@ -95,16 +95,14 @@ public sealed partial class ScnVm
             }
             timing = GpuFailed("subpixel32");
         }
-        int band = Math.Max(8, (rows.Count + 2 * Environment.ProcessorCount - 1) / (2 * Environment.ProcessorCount));
-        int bands = (rows.Count + band - 1) / band;
         int outBytes = outPixels * 4;
-        void RunBand(int index)
+        void RunRows(int from, int to)
         {
             // Source rows are read in place (copied when they share bytes with the destination
             // row, which is written as the row is made, or are not one piece of memory) and the
             // destination row is written in place
             byte[]? spareP = null, spareQ = null;
-            for (int r = index * band, end = Math.Min(rows.Count, r + band); r < end; r++)
+            for (int r = from; r < to; r++)
             {
                 var (kind, s, d) = rows[r];
                 var p = ReadView(s, inBytes, ref spareP, d, outBytes);
@@ -113,11 +111,7 @@ public sealed partial class ScnVm
                 SubpixelRowPixels(kind, k, p, q, Bytes(d, outBytes), (int)middle);
             }
         }
-        if (bands > 1 && (long)rows.Count * outPixels >= 20000)
-            Parallel.For(0, bands, RunBand);
-        else
-            for (int i = 0; i < bands; i++)
-                RunBand(i);
+        ParallelRows.For(rows.Count, (long)rows.Count * outPixels, RunRows);
         GpuDone("subpixel32", timing);
         return true;
     }

@@ -6,15 +6,15 @@ README).
 
 ## Speed
 
-- [ ] **The pixel routines on real vector instructions.** Measured against the original
-  (engine-notes.md section 7, "Against the original in a heavy scene"): in Re:Rem Plus's held
-  kiss zoom the players use 12% of the machine, the original 1%. enlarge32 does the MMX code on
-  64-bit integers (X86Ops), about six times the MMX; the same goes for scale32, subpixel32,
-  blend32 and the others built on X86Ops. Vector128 (SSE2 / AdvSimd: 16-bit lanes, pmullw,
-  packuswb) gives the same numbers with an instruction for each step, all four channels at once.
-  Then fewer, larger bands for Parallel.For (or none below a few milliseconds of work): it adds
-  about 5 ms of processor a frame. Measure again with zoom.ps1 / cpuframe.ps1 (scratch
-  sessions/2026-10-10-measure); check every routine against its x86 code (nativetest).
+- [ ] **Measure the players again in Re:Rem Plus's held kiss zoom** (zoom.ps1 in scratch
+  sessions/2026-10-10-measure; needs the screen unlocked) after the vector routines, the fewer
+  pieces and the copy of the changed part only (engine-notes.md section 7, "Vectors, fewer
+  pieces, the changed part"): ScnBoot went from 18 to 2.4 ms of processor a frame there; the
+  players were at 12% of the machine, the original at 1%.
+- [ ] **The Avalonia player's picture**: each new frame is copied whole into a new SKImage (the
+  render thread draws the one it holds while the next is made). Keep two or three pixel buffers
+  and wrap them (SKImage.FromPixels with a release), or keep a texture and update only the
+  changed part (GameSession.TakeFrame gives it).
 - [ ] **Flat memory: what is left** (engine-notes.md section 10, "Flat memory").
   - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run).
   - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`) builds but has not run: ScnBoot
@@ -32,8 +32,6 @@ README).
 - [ ] **Load files in the background.** Pictures and sounds are read and decoded on the
   interpreter's thread, so a scene change waits for them. `ArcView` is not thread-safe: a
   loader thread needs its own view of the archives.
-- [ ] **Copy only what changed to the window.** Each new frame copies the whole picture; most
-  frames change only the text box or a sprite.
 - [ ] **`00A1`** (the incremental redraw of the message text, a character at a time as it
   fades in): still on the list of slow spots; profile it and make it cheaper.
 - [ ] **Older phones.** Zooms and transitions still drop frames on a Galaxy S7 (Vulkan 1.0);

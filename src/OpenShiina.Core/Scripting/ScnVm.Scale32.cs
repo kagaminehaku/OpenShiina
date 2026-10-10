@@ -252,10 +252,7 @@ public sealed partial class ScnVm
             }
             timing = GpuFailed("scale32");
         }
-        // About two bands a core
-        int Band = Math.Max(8, (nr + 2 * Environment.ProcessorCount - 1) / (2 * Environment.ProcessorCount));
-        int bands = (nr + Band - 1) / Band;
-        void RunBand(int band)
+        void RunRows(int from, int to)
         {
             // The thread's buffers, kept from call to call while the sizes stay (a zoomed scene
             // scales the same rectangles every frame: new ones were megabytes a call to collect)
@@ -271,7 +268,7 @@ public sealed partial class ScnVm
             var accLo = buffers.AccLo;
             var accHi = buffers.AccHi;
             var clear = buffers.Clear;
-            for (int r = band * Band, end = Math.Min(nr, r + Band); r < end; r++)
+            for (int r = from; r < to; r++)
             {
                 var e = rows[r];
                 bool hasFirst = (e.Flags & 0x80) != 0, hasLast = (e.Flags & 0x40) != 0;
@@ -312,12 +309,8 @@ public sealed partial class ScnVm
                 }
             }
         }
-        // Rows are independent: bands of them run on all cores (the result does not depend on it)
-        if (bands > 1 && (long)nr * nc >= 20000)
-            Parallel.For(0, bands, RunBand);
-        else
-            for (int band = 0; band < bands; band++)
-                RunBand(band);
+        // Rows are independent: they run on several cores (the result does not depend on it)
+        ParallelRows.For(nr, (long)nr * nc, RunRows);
         GpuDone("scale32", timing);
         return true;
     }

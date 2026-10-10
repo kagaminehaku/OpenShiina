@@ -7,18 +7,49 @@
 // between BeginPaint and EndPaint, so only the invalid region changes). Everything else drawn
 // into the display surface stays unseen until a repaint covers it - the save screen's cursor
 // (START 0x2BE6C) is drawn beyond the slot it belongs to and only the slot is invalidated.
-// The hosts show this picture (Window), not the display surface.
+// The hosts show this picture (Window), not the display surface, and copy only the part of it
+// that changed (TakeChangedArea: the rectangles repainted since they last asked).
 
 namespace OpenShiina.Scripting;
+
+/// <summary>A rectangle of the screen, (L, T) included to (R, B) excluded; empty when R <= L or B <= T.</summary>
+public readonly record struct ScreenArea(int L, int T, int R, int B)
+{
+    public bool IsEmpty => R <= L || B <= T;
+
+    public int Width => R - L;
+
+    public int Height => B - T;
+
+    /// <summary>The smallest rectangle holding both.</summary>
+    public ScreenArea Union(ScreenArea other) =>
+        IsEmpty ? other : other.IsEmpty ? this : new(Math.Min(L, other.L), Math.Min(T, other.T), Math.Max(R, other.R), Math.Max(B, other.B));
+
+    /// <summary>The part inside (0, 0)-(width, height).</summary>
+    public ScreenArea Clip(int width, int height) => new(Math.Max(L, 0), Math.Max(T, 0), Math.Min(R, width), Math.Min(B, height));
+}
 
 public sealed partial class ScnVm
 {
     // The window's picture (24-bit, ScreenWidth x ScreenHeight) and its invalid rectangles
     private byte[]? m_window;
     private readonly List<(int L, int T, int R, int B)> m_invalid = [];
+    // What changed in the window's picture since TakeChangedArea; all of it at first
+    private ScreenArea m_changed = new(0, 0, int.MaxValue, int.MaxValue);
 
     /// <summary>The window's picture: 24-bit BGR rows of <see cref="ScreenWidth"/> pixels (stride ScreenWidth * 3).</summary>
     public ReadOnlySpan<byte> Window => m_window ??= new byte[ScreenWidth * ScreenHeight * 3];
+
+    /// <summary>
+    /// The part of the window's picture that changed since the last call (the whole picture the
+    /// first time), for the hosts to copy only that.
+    /// </summary>
+    public ScreenArea TakeChangedArea()
+    {
+        var area = m_changed.Clip(ScreenWidth, ScreenHeight);
+        m_changed = default;
+        return area;
+    }
 
     /// <summary>InvalidateRect: the rectangle (clipped to the window) is repainted from the display surface by the next WM_PAINT.</summary>
     public void InvalidateWindow(int l, int t, int r, int b)
@@ -67,6 +98,7 @@ public sealed partial class ScnVm
             foreach (var (l, t, r0, b0) in m_invalid)
             {
                 int r = Math.Min(r0, width), b = Math.Min(b0, height);
+                m_changed = m_changed.Union(new ScreenArea(l, t, r, b));
                 for (int y = t; y < b && l < r; y++)
                 {
                     var src = row.AsSpan(0, (r - l) * bytes);
@@ -102,6 +134,7 @@ public sealed partial class ScnVm
         if (pixels == 0 || bytes is not (3 or 4) || r <= l || b <= t || sr <= sl || sb <= st)
             return;
         var window = m_window ??= new byte[ScreenWidth * ScreenHeight * 3];
+        m_changed = m_changed.Union(new ScreenArea(l, t, r, b).Clip(ScreenWidth, ScreenHeight));
         var row = new byte[(sr - sl) * bytes];
         for (int y = Math.Max(t, 0); y < Math.Min(b, ScreenHeight); y++)
         {

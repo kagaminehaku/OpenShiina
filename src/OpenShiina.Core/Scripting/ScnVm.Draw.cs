@@ -62,20 +62,17 @@ public sealed partial class ScnVm
                 BlendRow(rowA, rowB, Bytes(at, rowBytes), at, tableA, tableB, m, k, level);
             }
         }
-        // The rows go on all cores where no row reads what another writes: a source that is the
+        // The rows go on several cores where no row reads what another writes: a source that is the
         // destination itself or apart from it (a source a few rows off the destination is read
         // after the rows above were written, so those are drawn in turn)
         long Region(int start) => start + (long)(height - 1) * pitch + rowBytes;
         bool Apart(int from) => from == dst || Region(from) <= dst || Region(dst) <= from;
-        if (height >= 2 * BlendBand && pitch >= rowBytes && (long)width * height >= 20000 && Apart(source) && (level || Apart(source2)))
-        {
-            Parallel.For(0, (height + BlendBand - 1) / BlendBand, band => Rows(band * BlendBand, Math.Min(height, (band + 1) * BlendBand)));
-        }
+        if (pitch >= rowBytes && Apart(source) && (level || Apart(source2)))
+            ParallelRows.For(height, (long)width * height, Rows);
         else
             Rows(0, height);
     }
 
-    private const int BlendBand = 16;
 
     /// <summary>
     /// One row of BlendRows into <paramref name="output"/> (its destination at <paramref name="dst"/>):
@@ -213,10 +210,9 @@ public sealed partial class ScnVm
         {
             // in place (a byte is read before it is written)
             const int Chunk = 1 << 16;
-            int parts = (bytes + Chunk - 1) / Chunk;
-            Parallel.For(0, parts, part =>
+            ParallelRows.For((bytes + Chunk - 1) / Chunk, bytes / 4, (first, last) =>
             {
-                int from = part * Chunk, count = Math.Min(Chunk, bytes - from);
+                int from = first * Chunk, count = Math.Min(last * Chunk, bytes) - from;
                 Part(count, Bytes(rule + from, count), Bytes(a + from, count), b != 0 ? Bytes(b + from, count) : default,
                      Bytes(dst + from, count));
             });

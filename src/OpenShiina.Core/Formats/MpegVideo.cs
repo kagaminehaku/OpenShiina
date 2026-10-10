@@ -5,6 +5,8 @@
 //   MpegSystemStream - splits a system stream into its first video and first audio stream
 //   Mpeg1Video       - decodes the video stream into YCbCr frames in display order
 
+using System.Runtime.Intrinsics;
+
 namespace OpenShiina.Formats;
 
 /// <summary>The elementary streams of an MPEG-1 (or MPEG-2 program) system stream.</summary>
@@ -124,7 +126,8 @@ public sealed class MpegFrame
                 {
                     var row = new Span<byte>((byte*)at + (nint)y * pitch, width * 3);
                     int yi = y * Stride, ci = (y >> 1) * ChromaStride;
-                    for (int x = 0; x < width; x++)
+                    int x = Vector128.IsHardwareAccelerated ? RowOnVectors(row, yi, ci, width) : 0;
+                    for (; x < width; x++)
                     {
                         int c = ci + (x >> 1);
                         int l = (Y[yi + x] - 16) * 76309;
@@ -135,16 +138,50 @@ public sealed class MpegFrame
                     }
                 }
             }
-            // The rows on all cores (half of a 1280 x 720 movie's time on one)
-            const int Band = 32;
-            if (height >= 2 * Band && pitch >= width * 3)
-                Parallel.For(0, (height + Band - 1) / Band, band => Rows(band * Band, Math.Min(height, (band + 1) * Band)));
+            // The rows on several cores (half of a 1280 x 720 movie's time on one)
+            if (pitch >= width * 3)
+                ParallelRows.For(height, (long)width * height, Rows);
             else
                 Rows(0, height);
         }
     }
 
     private static byte Clamp(int v) => (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
+
+    // B, G and R of four pixels (lanes 0-3, 4-7, 8-11 after the two narrowings) in pixel order
+    private static readonly Vector128<byte> s_bgrOrder = Vector128.Create((byte)0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11, 12, 13, 14, 15);
+
+    /// <summary>
+    /// The pixels of a row four at a time, as the formula of ToBgr24 on 32-bit lanes; returns
+    /// how many it did (it leaves at least the last four bytes of the row to the formula, as it
+    /// stores twelve bytes of sixteen).
+    /// </summary>
+    private int RowOnVectors(Span<byte> row, int yi, int ci, int width)
+    {
+        var sixteen = Vector128.Create(16);
+        var round = Vector128.Create(32768);
+        var zero = Vector128<int>.Zero;
+        var max = Vector128.Create(255);
+        int x = 0;
+        for (; x + 4 <= width && x * 3 + 16 <= row.Length; x += 4)
+        {
+            int c = ci + (x >> 1);
+            var luma = Vector128.Create((int)Y[yi + x], Y[yi + x + 1], Y[yi + x + 2], Y[yi + x + 3]);
+            var cb = Vector128.Create(Cb[c] - 128, Cb[c] - 128, Cb[c + 1] - 128, Cb[c + 1] - 128);
+            var cr = Vector128.Create(Cr[c] - 128, Cr[c] - 128, Cr[c + 1] - 128, Cr[c + 1] - 128);
+            var l = (luma - sixteen) * Vector128.Create(76309);
+            var b = Vector128.ShiftRightArithmetic(l + cb * Vector128.Create(132201) + round, 16);
+            var g = Vector128.ShiftRightArithmetic(l - cb * Vector128.Create(25675) - cr * Vector128.Create(53279) + round, 16);
+            var r = Vector128.ShiftRightArithmetic(l + cr * Vector128.Create(104597) + round, 16);
+            b = Vector128.Min(Vector128.Max(b, zero), max);
+            g = Vector128.Min(Vector128.Max(g, zero), max);
+            r = Vector128.Min(Vector128.Max(r, zero), max);
+            var bytes = Vector128.Shuffle(Vector128.Narrow(Vector128.Narrow(b, g).AsUInt16(), Vector128.Narrow(r, zero).AsUInt16()), s_bgrOrder);
+            System.Runtime.InteropServices.MemoryMarshal.Write(row[(x * 3)..], bytes.AsUInt64().ToScalar());
+            System.Runtime.InteropServices.MemoryMarshal.Write(row[(x * 3 + 8)..], bytes.AsUInt32().GetElement(2));
+        }
+        return x;
+    }
 }
 
 /// <summary>An MPEG-1 video stream decoder (ISO/IEC 11172-2); frames come out in display order.</summary>
@@ -663,6 +700,52 @@ public sealed class Mpeg1Video
             bool hx = (h & 1) != 0, hy = (v & 1) != 0;
             int maxX = stride - 1, maxY = rows - 1;
             bool inside = sx >= 0 && sy >= 0 && sx + size + (hx ? 1 : 0) <= stride && sy + size + (hy ? 1 : 0) <= rows;
+            if (inside)
+            {
+                // The common case, a formula a loop
+                for (int y = 0; y < size; y++)
+                {
+                    int d = (y0 + y) * stride + x0, s = (sy + y) * stride + sx;
+                    var to = dst.AsSpan(d, size);
+                    var a = src.AsSpan(s, hx ? size + 1 : size);
+                    if (!hx && !hy)
+                    {
+                        if (!average)
+                        {
+                            a[..size].CopyTo(to);
+                            continue;
+                        }
+                        for (int x = 0; x < size; x++)
+                            to[x] = (byte)((to[x] + a[x] + 1) >> 1);
+                        continue;
+                    }
+                    if (!hy)
+                    {
+                        for (int x = 0; x < size; x++)
+                        {
+                            int p = (a[x] + a[x + 1] + 1) >> 1;
+                            to[x] = average ? (byte)((to[x] + p + 1) >> 1) : (byte)p;
+                        }
+                        continue;
+                    }
+                    var b = src.AsSpan(s + stride, hx ? size + 1 : size);
+                    if (!hx)
+                    {
+                        for (int x = 0; x < size; x++)
+                        {
+                            int p = (a[x] + b[x] + 1) >> 1;
+                            to[x] = average ? (byte)((to[x] + p + 1) >> 1) : (byte)p;
+                        }
+                        continue;
+                    }
+                    for (int x = 0; x < size; x++)
+                    {
+                        int p = (a[x] + a[x + 1] + b[x] + b[x + 1] + 2) >> 2;
+                        to[x] = average ? (byte)((to[x] + p + 1) >> 1) : (byte)p;
+                    }
+                }
+                return;
+            }
             for (int y = 0; y < size; y++)
             {
                 int d = (y0 + y) * stride + x0;
@@ -794,11 +877,19 @@ public sealed class Mpeg1Video
             Idct(block);
             for (int y = 0; y < 8; y++, offset += stride)
             {
-                for (int x = 0; x < 8; x++)
-                {
-                    int v = block[y * 8 + x] + (intra ? 0 : plane[offset + x]);
-                    plane[offset + x] = (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
-                }
+                var row = plane.AsSpan(offset, 8);
+                if (intra)
+                    for (int x = 0; x < 8; x++)
+                    {
+                        int v = block[y * 8 + x];
+                        row[x] = (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
+                    }
+                else
+                    for (int x = 0; x < 8; x++)
+                    {
+                        int v = block[y * 8 + x] + row[x];
+                        row[x] = (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
+                    }
             }
         }
     }
@@ -815,9 +906,26 @@ public sealed class Mpeg1Video
         return t;
     }
 
-    [ThreadStatic] private static double[]? t_rows;
+    // The same coefficients for the rows on vectors: [u * 4 + k] = (c(2k, u), c(2k + 1, u))
+    private static readonly Vector128<double>[] s_idctAcross = MakeIdctAcross();
 
-    /// <summary>The inverse DCT of an 8 x 8 block in place, rounded to the nearest integer.</summary>
+    private static Vector128<double>[] MakeIdctAcross()
+    {
+        var t = new Vector128<double>[32];
+        for (int u = 0; u < 8; u++)
+            for (int k = 0; k < 4; k++)
+                t[u * 4 + k] = Vector128.Create(s_idct[2 * k * 8 + u], s_idct[(2 * k + 1) * 8 + u]);
+        return t;
+    }
+
+    // A block after the rows: [v * 4 + k] = (tmp[v][2k], tmp[v][2k + 1])
+    [ThreadStatic] private static Vector128<double>[]? t_rows;
+
+    /// <summary>
+    /// The inverse DCT of an 8 x 8 block in place, rounded to the nearest integer. Each output is
+    /// the sum of the same products in the same order as the definition (sum over u, then over
+    /// v), two outputs a vector and no fused multiply-add, so the rounding is the definition's.
+    /// </summary>
     private static void Idct(int[] block)
     {
         bool dcOnly = true;
@@ -829,38 +937,56 @@ public sealed class Mpeg1Video
             Array.Fill(block, v);
             return;
         }
-        var tmp = t_rows ??= new double[64];
-        // Rows: tmp[v * 8 + x] = sum_u F[v][u] c(x, u)
+        var tmp = t_rows ??= new Vector128<double>[32];
+        var across = s_idctAcross;
+        // Rows: tmp[v][x] = sum_u F[v][u] c(x, u)
         for (int v = 0; v < 8; v++)
         {
             int r = v * 8;
             bool zero = true;
             for (int u = 0; u < 8 && zero; u++)
                 zero = block[r + u] == 0;
-            if (zero)
-            {
-                for (int x = 0; x < 8; x++)
-                    tmp[r + x] = 0;
-                continue;
-            }
-            for (int x = 0; x < 8; x++)
-            {
-                double s = 0;
+            Vector128<double> s0 = Vector128<double>.Zero, s1 = s0, s2 = s0, s3 = s0;
+            if (!zero)
                 for (int u = 0; u < 8; u++)
-                    s += block[r + u] * s_idct[x * 8 + u];
-                tmp[r + x] = s;
-            }
+                {
+                    var f = Vector128.Create((double)block[r + u]);
+                    s0 += f * across[u * 4];
+                    s1 += f * across[u * 4 + 1];
+                    s2 += f * across[u * 4 + 2];
+                    s3 += f * across[u * 4 + 3];
+                }
+            tmp[v * 4] = s0;
+            tmp[v * 4 + 1] = s1;
+            tmp[v * 4 + 2] = s2;
+            tmp[v * 4 + 3] = s3;
         }
-        // Columns
-        for (int x = 0; x < 8; x++)
+        // Columns: f[y][x] = sum_v tmp[v][x] c(y, v), eight across at once
+        var half = Vector128.Create(0.5);
+        for (int y = 0; y < 8; y++)
         {
-            for (int y = 0; y < 8; y++)
+            Vector128<double> s0 = Vector128<double>.Zero, s1 = s0, s2 = s0, s3 = s0;
+            for (int v = 0; v < 8; v++)
             {
-                double s = 0;
-                for (int v = 0; v < 8; v++)
-                    s += tmp[v * 8 + x] * s_idct[y * 8 + v];
-                block[y * 8 + x] = (int)Math.Floor(s + 0.5);
+                var c = Vector128.Create(s_idct[y * 8 + v]);
+                s0 += tmp[v * 4] * c;
+                s1 += tmp[v * 4 + 1] * c;
+                s2 += tmp[v * 4 + 2] * c;
+                s3 += tmp[v * 4 + 3] * c;
             }
+            int o = y * 8;
+            s0 = Vector128.Floor(s0 + half);
+            s1 = Vector128.Floor(s1 + half);
+            s2 = Vector128.Floor(s2 + half);
+            s3 = Vector128.Floor(s3 + half);
+            block[o] = (int)s0.GetElement(0);
+            block[o + 1] = (int)s0.GetElement(1);
+            block[o + 2] = (int)s1.GetElement(0);
+            block[o + 3] = (int)s1.GetElement(1);
+            block[o + 4] = (int)s2.GetElement(0);
+            block[o + 5] = (int)s2.GetElement(1);
+            block[o + 6] = (int)s3.GetElement(0);
+            block[o + 7] = (int)s3.GetElement(1);
         }
     }
 

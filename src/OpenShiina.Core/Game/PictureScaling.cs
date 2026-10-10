@@ -56,7 +56,7 @@ public static class PictureScaling
     /// <summary>
     /// Nearest-neighbour by a whole number: each 4-byte pixel of <paramref name="source"/>
     /// (width x height, rows sourceStride bytes apart) becomes factor x factor pixels of
-    /// <paramref name="target"/> (rows targetStride apart). Rows on all cores.
+    /// <paramref name="target"/> (rows targetStride apart). Rows on several cores (ParallelRows).
     /// </summary>
     public static unsafe void Multiply(byte* source, int width, int height, int sourceStride, byte* target, int targetStride, int factor)
     {
@@ -70,10 +70,10 @@ public static class PictureScaling
             for (int k = 1; k < factor; k++)
                 first.CopyTo(new Span<uint>((byte*)to + ((long)y * factor + k) * targetStride, width * factor));
         }
-        if ((long)width * height * factor * factor >= 1 << 18)
-            Parallel.For(0, height, Row);
-        else
-            for (int y = 0; y < height; y++)
+        ParallelRows.For(height, (long)width * height * factor * factor, (first, last) =>
+        {
+            for (int y = first; y < last; y++)
                 Row(y);
+        });
     }
 }

@@ -122,13 +122,13 @@ public sealed partial class ScnVm
             }
             timing = GpuFailed("enlarge16");
         }
-        void RunBand(int band)
+        void RunRows(int first, int last)
         {
             var upper = new byte[width * 4];
             var lower = new byte[width * 4];
             var mixed = new int[width * 4];
             var output = new byte[columns * 4];
-            for (int r = band * Enlarge16Band, end = Math.Min(rows.Length, r + Enlarge16Band); r < end; r++)
+            for (int r = first; r < last; r++)
             {
                 var row = rows[r];
                 ReadBytes(srcBase + row.Source * srcPitch, upper);
@@ -165,15 +165,8 @@ public sealed partial class ScnVm
             }
         }
         // Rows are independent: bands of them run on all cores
-        int bands = (rows.Length + Enlarge16Band - 1) / Enlarge16Band;
-        if (bands > 1 && (long)rows.Length * columns >= 20000)
-            Parallel.For(0, bands, RunBand);
-        else
-            for (int band = 0; band < bands; band++)
-                RunBand(band);
+        ParallelRows.For(rows.Length, (long)rows.Length * columns, RunRows);
         GpuDone("enlarge16", timing);
         return true;
     }
-
-    private const int Enlarge16Band = 16;
 }

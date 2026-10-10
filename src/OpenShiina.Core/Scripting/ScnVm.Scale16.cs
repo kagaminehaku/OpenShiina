@@ -142,7 +142,7 @@ public sealed partial class ScnVm
             timing = GpuFailed("scale16");
         }
 
-        void RunBand(int band)
+        void RunRows(int from, int to)
         {
             var line = new byte[bytes];
             // A kind of source row of the destination row: per channel the sum of its bytes (the
@@ -153,7 +153,7 @@ public sealed partial class ScnVm
             var acc = new int[nc * 4];
             var clear = new bool[nc];
             var output = new byte[nc * 4];
-            for (int r = band * Scale16Band, end = Math.Min(nr, r + Scale16Band); r < end; r++)
+            for (int r = from; r < to; r++)
             {
                 var row = rows[r];
                 Array.Clear(acc);
@@ -191,17 +191,10 @@ public sealed partial class ScnVm
             }
         }
         // Rows are independent: bands of them run on all cores (the result does not depend on it)
-        int bands = (nr + Scale16Band - 1) / Scale16Band;
-        if (bands > 1 && (long)nr * nc >= 20000)
-            Parallel.For(0, bands, RunBand);
-        else
-            for (int band = 0; band < bands; band++)
-                RunBand(band);
+        ParallelRows.For(nr, (long)nr * nc, RunRows);
         GpuDone("scale16", timing);
         return true;
     }
-
-    private const int Scale16Band = 16;
 
     /// <summary>A source row into the sums (or added to them) and the opaque flags.</summary>
     private static void Scale16Load(byte[] line, int[] sum, bool[] opaque, bool add)

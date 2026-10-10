@@ -84,8 +84,11 @@ public sealed class GameSession : IDisposable
     /// <summary>A window message for the scripts (ScnMessage: keys, mouse buttons, the wheel).</summary>
     public void PostMessage(int message, int wParam, int lParam) => m_thread.PostMessage(message, wParam, lParam);
 
-    /// <summary>Copies the latest picture into <paramref name="target"/> when there is a new one.</summary>
-    public bool TakeFrame(Span<byte> target, int stride) => m_thread.TakeFrame(target, stride);
+    /// <summary>
+    /// When there is a new picture, copies into <paramref name="target"/> (which keeps the last
+    /// one taken) the part that changed: <paramref name="area"/>, maybe empty.
+    /// </summary>
+    public bool TakeFrame(Span<byte> target, int stride, out ScreenArea area) => m_thread.TakeFrame(target, stride, out area);
 
     private bool m_disposed;
 

@@ -264,24 +264,28 @@ public sealed class ScnWindow : Window
 
     private void Present()
     {
-        if (m_game.TakeFrame(m_frame, m_bitmap.PixelWidth * 4))
-            ShowFrame();
+        if (m_game.TakeFrame(m_frame, m_bitmap.PixelWidth * 4, out var area) && !area.IsEmpty)
+            ShowFrame(area);
     }
 
-    /// <summary>The latest picture into the bitmap the image shows.</summary>
-    private unsafe void ShowFrame()
+    /// <summary>
+    /// The part of the latest picture that changed into the bitmap, and into the multiplied one
+    /// while the image shows that (it is filled again when it is shown again).
+    /// </summary>
+    private unsafe void ShowFrame(ScreenArea area)
     {
-        int width = m_bitmap.PixelWidth, height = m_bitmap.PixelHeight;
+        int width = m_bitmap.PixelWidth;
+        var rect = new Int32Rect(area.L, area.T, area.Width, area.Height);
+        m_bitmap.WritePixels(rect, m_frame, width * 4, area.L, area.T);
         if (m_scaled != null && m_image.Source == m_scaled)
         {
             m_scaled.Lock();
             fixed (byte* frame = m_frame)
-                PictureScaling.Multiply(frame, width, height, width * 4, (byte*)m_scaled.BackBuffer, m_scaled.BackBufferStride, m_factor);
-            m_scaled.AddDirtyRect(new Int32Rect(0, 0, m_scaled.PixelWidth, m_scaled.PixelHeight));
+                PictureScaling.Multiply(frame + (area.T * width + area.L) * 4, area.Width, area.Height, width * 4,
+                    (byte*)m_scaled.BackBuffer + area.T * m_factor * m_scaled.BackBufferStride + area.L * m_factor * 4, m_scaled.BackBufferStride, m_factor);
+            m_scaled.AddDirtyRect(new Int32Rect(area.L * m_factor, area.T * m_factor, area.Width * m_factor, area.Height * m_factor));
             m_scaled.Unlock();
-            return;
         }
-        m_bitmap.WritePixels(new Int32Rect(0, 0, width, height), m_frame, width * 4, 0);
     }
 
     /// <summary>
@@ -330,7 +334,7 @@ public sealed class ScnWindow : Window
         if (m_image.Source != source)
         {
             m_image.Source = source;
-            ShowFrame();
+            ShowFrame(new ScreenArea(0, 0, width, height));
         }
     }
 

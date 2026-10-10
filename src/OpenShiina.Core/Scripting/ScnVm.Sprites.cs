@@ -7,6 +7,8 @@
 // increasing priority (unsigned), each one row by row through its S25 runs (FUN_0043A040 and the
 // path for CPUs with MMX and SSE, 0x4409E0 - the one every current PC takes).
 
+using System.Runtime.Intrinsics;
+
 namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
@@ -163,14 +165,14 @@ public sealed partial class ScnVm
         }
         // Each row of a frame goes into its own destination row, so a large frame's rows are
         // shared out between the cores (the sprites themselves stay in order)
-        if (rows >= 2 * ComposeBand && visible > 0 && target.Pitch >= visible * 3 && (long)rows * visible >= 20000)
+        if (visible > 0 && target.Pitch >= visible * 3 && ParallelRows.Parts(rows, (long)rows * visible) > 1)
         {
             var pointers = new int[rows];
             for (int i = 0; i < rows; i++)
                 pointers[i] = Read32(row + i * 4);
-            Parallel.For(0, (rows + ComposeBand - 1) / ComposeBand, band =>
+            ParallelRows.For(rows, (long)rows * visible, (first, last) =>
             {
-                for (int i = band * ComposeBand, last = Math.Min(rows, i + ComposeBand); i < last; i++)
+                for (int i = first; i < last; i++)
                     DrawRow(pointers[i], dst + i * target.Pitch);
             });
             return;
@@ -179,7 +181,6 @@ public sealed partial class ScnVm
             DrawRow(Read32(row), dst);
     }
 
-    private const int ComposeBand = 16;
 
     private enum BlendKind { Alpha, Tint, Add, Silhouette, Opaque, Mask }
 
@@ -425,6 +426,87 @@ public sealed partial class ScnVm
         row[at] = (byte)(((source - d) * alpha >> 8) + d);
     }
 
+    /// <summary>A run of one colour (method 3): the first pixel, then what is filled copied after itself.</summary>
+    private static void Fill24(Span<byte> target, byte b, byte g, byte r)
+    {
+        if (target.Length < 3)
+            return;
+        target[0] = b;
+        target[1] = g;
+        target[2] = r;
+        for (int done = 3; done < target.Length; done *= 2)
+            target[..Math.Min(done, target.Length - done)].CopyTo(target[done..]);
+    }
+
+    // The colour bytes of four (alpha, b, g, r) pixels, and each pixel's alpha for its three bytes
+    private static readonly Vector128<byte> s_colourBytes = Vector128.Create((byte)1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 0, 0, 0, 0);
+    private static readonly Vector128<byte> s_alphaBytes = Vector128.Create((byte)0, 0, 0, 4, 4, 4, 8, 8, 8, 12, 12, 12, 0, 0, 0, 0);
+
+    /// <summary>
+    /// Pixels with an alpha each (method 4; the alpha through <paramref name="table"/> for blend
+    /// 0x40000000): 0xFF copies the colour, 0 leaves the picture, else d + ((s - d) a >> 8). Four
+    /// pixels at a time with vectors: all opaque or all clear at once, else the formula on twelve
+    /// 32-bit lanes, opaque ones copied.
+    /// </summary>
+    private static void DrawAlphaPixels(int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, byte[]? table)
+    {
+        int i = 0;
+        if (Vector128.IsHardwareAccelerated)
+        {
+            for (; i + 4 <= n && s + 16 <= src.Length && d + 16 <= row.Length; i += 4, s += 16, d += 12)
+            {
+                var v = Vector128.Create(src.Slice(s, 16));
+                var alpha = table == null ? v : Vector128.Create(table[v[0]], 0, 0, 0, table[v[4]], 0, 0, 0, table[v[8]], 0, 0, 0, table[v[12]], 0, 0, 0);
+                var lanes = alpha.AsUInt32() & Vector128.Create(0xFFu);
+                if (Vector128.EqualsAll(lanes, Vector128<uint>.Zero))
+                    continue;
+                var colours = Vector128.Shuffle(v, s_colourBytes);
+                if (!Vector128.EqualsAll(lanes, Vector128.Create(0xFFu)))
+                {
+                    var a = Vector128.Shuffle(alpha, s_alphaBytes);
+                    var mixed = Mix(colours, Vector128.Create(row.Slice(d, 16)), a);
+                    colours = Vector128.ConditionalSelect(Vector128.Equals(a, Vector128.Create((byte)0xFF)), colours, mixed);
+                }
+                System.Runtime.InteropServices.MemoryMarshal.Write(row[d..], colours.AsUInt64().ToScalar());
+                System.Runtime.InteropServices.MemoryMarshal.Write(row[(d + 8)..], colours.AsUInt32().GetElement(2));
+            }
+        }
+        for (; i < n; i++, s += 4, d += 3)
+        {
+            int alpha = table == null ? src[s] : table[src[s]];
+            if (alpha == 0xFF)
+            {
+                row[d] = src[s + 1];
+                row[d + 1] = src[s + 2];
+                row[d + 2] = src[s + 3];
+            }
+            else if (alpha != 0)
+            {
+                BlendByte(row, d, src[s + 1], alpha);
+                BlendByte(row, d + 1, src[s + 2], alpha);
+                BlendByte(row, d + 2, src[s + 3], alpha);
+            }
+        }
+    }
+
+    /// <summary>d + ((s - d) a >> 8) on each byte (BlendByte), in 32-bit lanes.</summary>
+    private static Vector128<byte> Mix(Vector128<byte> source, Vector128<byte> picture, Vector128<byte> alpha)
+    {
+        var (sLow, sHigh) = Vector128.Widen(source);
+        var (dLow, dHigh) = Vector128.Widen(picture);
+        var (aLow, aHigh) = Vector128.Widen(alpha);
+        return Vector128.Narrow(Mix(sLow, dLow, aLow), Mix(sHigh, dHigh, aHigh));
+    }
+
+    private static Vector128<ushort> Mix(Vector128<ushort> source, Vector128<ushort> picture, Vector128<ushort> alpha)
+    {
+        var (diffLow, diffHigh) = Vector128.Widen((source - picture).AsInt16());
+        var (aLow, aHigh) = Vector128.Widen(alpha);
+        var low = Vector128.ShiftRightArithmetic(diffLow * aLow.AsInt32(), 8);
+        var high = Vector128.ShiftRightArithmetic(diffHigh * aHigh.AsInt32(), 8);
+        return Vector128.Narrow(low, high).AsUInt16() + picture;
+    }
+
     /// <summary>A run into the row: n pixels from src[s] to row[d] (row[d] is at memory address <paramref name="address"/>).</summary>
     private static void DrawRun(int method, int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, int address, SpriteBlend? blend)
     {
@@ -452,33 +534,10 @@ public sealed partial class ScnVm
                 src.Slice(s, n * 3).CopyTo(row[d..]);
                 return;
             case 3:
-            {
-                byte b = src[s], g = src[s + 1], r = src[s + 2];
-                for (int i = 0; i < n; i++, d += 3)
-                {
-                    row[d] = b;
-                    row[d + 1] = g;
-                    row[d + 2] = r;
-                }
+                Fill24(row.Slice(d, n * 3), src[s], src[s + 1], src[s + 2]);
                 return;
-            }
             case 4:
-                for (int i = 0; i < n; i++, s += 4, d += 3)
-                {
-                    int a = src[s];
-                    if (a == 0xFF)
-                    {
-                        row[d] = src[s + 1];
-                        row[d + 1] = src[s + 2];
-                        row[d + 2] = src[s + 3];
-                    }
-                    else if (a != 0)
-                    {
-                        BlendByte(row, d, src[s + 1], a);
-                        BlendByte(row, d + 1, src[s + 2], a);
-                        BlendByte(row, d + 2, src[s + 3], a);
-                    }
-                }
+                DrawAlphaPixels(n, src, s, row, d, null);
                 return;
             default:
             {
@@ -570,22 +629,7 @@ public sealed partial class ScnVm
                 return;
             }
             case 4:
-                for (int i = 0; i < n; i++, s += 4, d += 3)
-                {
-                    int alpha = blend.T1[src[s]];
-                    if (alpha == 0xFF)
-                    {
-                        row[d] = src[s + 1];
-                        row[d + 1] = src[s + 2];
-                        row[d + 2] = src[s + 3];
-                    }
-                    else if (alpha != 0)
-                    {
-                        BlendByte(row, d, src[s + 1], alpha);
-                        BlendByte(row, d + 1, src[s + 2], alpha);
-                        BlendByte(row, d + 2, src[s + 3], alpha);
-                    }
-                }
+                DrawAlphaPixels(n, src, s, row, d, blend.T1);
                 return;
             default:
             {
