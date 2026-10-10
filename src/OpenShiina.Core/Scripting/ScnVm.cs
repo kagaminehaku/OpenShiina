@@ -275,6 +275,23 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>[address, address + length) is one piece of memory (always in a 64-bit process, below the top of the 4 GB).</summary>
     public bool IsContiguous(int address, int length) => m_memory.Contiguous((uint)address, length) >= length;
 
+    /// <summary>
+    /// The bytes [address, address + length) to read: in place, or copied into
+    /// <paramref name="spare"/> (made larger when it is short) when they are not one piece of
+    /// memory or share bytes with [avoid, avoid + avoidLength), a block the reader writes.
+    /// </summary>
+    public ReadOnlySpan<byte> ReadView(int address, int length, ref byte[]? spare, int avoid = 0, int avoidLength = 0)
+    {
+        bool apart = avoidLength <= 0 || (long)address + length <= avoid || (long)avoid + avoidLength <= address;
+        if (apart && IsContiguous(address, length))
+            return Bytes(address, length);
+        if (spare == null || spare.Length < length)
+            spare = new byte[length];
+        var copy = spare.AsSpan(0, length);
+        ReadBytes(address, copy);
+        return copy;
+    }
+
     /// <summary>The bytes from <paramref name="address"/> that are one piece of memory, at most <paramref name="length"/>.</summary>
     private Span<byte> BytesInPiece(int address, int length) =>
         Bytes(address, (int)m_memory.Contiguous((uint)address, length));

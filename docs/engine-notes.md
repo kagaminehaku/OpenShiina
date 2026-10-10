@@ -1050,10 +1050,10 @@ the functions they call from the decompile. First findings:
   routines copying row by row across pages. It is now the whole 32-bit address space as one block
   of virtual memory, a script address being base + address: `mmap` with `MAP_NORESERVE` (Linux,
   Android, macOS: every address there at once, physical memory only for the pages written); on
-  Windows the 4 GB are reserved and each 16 MB part committed on its first use (commit counts
-  against RAM + page file, so not all 4 GB at once): every access tests a table of 256 flags,
-  and a part is committed with the first page of the next, so an access of up to 8 bytes needs
-  only its first byte's test. Memory freed reads as zero again: whole pages go back to the system
+  Windows the 4 GB are reserved and each 1 MB part committed on its first use (commit counts
+  against RAM + page file, so not all 4 GB at once; 16 MB parts committed about twice the RAM
+  used): every access tests a table of 4096 flags, and a part is committed with the first page
+  of the next, so an access of up to 8 bytes needs only its first byte's test. Memory freed reads as zero again: whole pages go back to the system
   (`mmap` over them / decommit and commit again), the rest is cleared. `ScnVm.Bytes` gives a block
   as a span to work on in place: the compositor draws its rows into it and reads the sprites'
   runs from it (a frame row drawn over itself is copied first), BlendRows (`04F6` / `0500`) reads
@@ -1076,9 +1076,23 @@ the functions they call from the decompile. First findings:
   3500 peak 186 -> 175 MB, mean 155 -> 147 MB; Re: Rem Plus through its first route (風呂掃除,
   frames 7000-14000, then its route menu) peak 807 -> 422 MB, mean over the route 535 -> 359 MB.
   The scripts' memory in RAM is about the same (Re: Rem Plus 237-277 MB paged, 229-259 MB flat);
-  the paged memory's pages were on the GC heap, which kept garbage beside them. Commit is higher
-  flat (Re: Rem Plus about 700 MB): whole 16 MB parts are committed, RAM only for pages written.
+  the paged memory's pages were on the GC heap, which kept garbage beside them. Commit with 1 MB
+  parts: Re: Rem Plus 514 MB at frame 12000 of that route (753 MB with 16 MB parts).
   Not yet run on Linux, macOS or Android (the `mmap` path), nor in a 32-bit process.
+- **The hot C# routines on script memory in place** (2026-10-10): scale32 reads its source rows
+  and writes its destination rows in place; subpixel32, blend32 and rule alpha too, a source row
+  being copied first when it shares bytes with the row written (as the x86 code reads a row
+  before writing it) or is not one piece of memory (`ScnVm.ReadView`); 0562 draws a run in place
+  (dwords read and written unaligned, so ARM 32-bit is safe); 0568 works in place where its
+  inputs are the output or apart from it (in parts of 64 KB on all cores, as before). enlarge32
+  keeps copying its rows (it works on them as dword arrays; one memcpy each now) in buffers its
+  threads keep. The page-touching loops before rows are shared out between threads are gone
+  (nothing to make first). Fewer allocations a frame: scale32 keeps its tables and work arrays
+  from call to call, the scopes of named variables (`03CF`) are used again. Re: Rem Plus to frame
+  15000 of its first route: about 1.7 -> 1.26 GB allocated by the engine. ScnBoot's pictures
+  (Re: Rem Plus's zoom and first route, Oreimo's park route: 183) are the same as before, and
+  SCNBOOT_VERIFY_NATIVE agrees on Oreimo's route (rule alpha, blend32, subpixel32) and Re: Rem
+  Plus's zoom (scale32).
 - **Garbage that made the players big** (2026-10-09, found measuring the flat memory). START
   asks whether the game's archives exist (`010E`; `0158` the same way): for a file that is not
   in the archives `ScriptFileSize` read the loose file to know its length, so every start read

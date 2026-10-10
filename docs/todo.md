@@ -11,18 +11,12 @@ README).
   Re:Rem Plus's prologue zoom (the original runs on Windows 10 through Locale Emulator), and
   record the time a frame and the processor used on both, before and after the items below, to
   know how far from the original the player still is.
-- [ ] **Flat memory: what is left** (the memory itself is done on the branch flat-memory,
-  engine-notes.md section 10, "Flat memory").
-  - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run), then
-    merge the branch.
-  - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`) is written but not built or run:
-    ScnBoot as a 32-bit program (`dotnet publish tests/OpenShiina.ScnBoot -c Release -r win-x86
+- [ ] **Flat memory: what is left** (engine-notes.md section 10, "Flat memory").
+  - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run).
+  - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`) builds but has not run: ScnBoot
+    as a 32-bit program (`dotnet publish tests/OpenShiina.ScnBoot -c Release -r win-x86
     --self-contained`) against the 64-bit one's pictures (Re: Rem Plus's zoom, Oreimo's park
     route), then an `android-arm` APK on a 32-bit phone or TV box.
-  - The other hot C# routines on whole blocks (`ScnVm.Bytes` instead of rows copied in and out):
-    scale32, subpixel32, enlarge32, blend32, rule alpha, 0562, 0568.
-  - Commit: whole 16 MB parts are committed on Windows (about 700 MB in Re: Rem Plus against
-    350 MB of RAM); smaller parts (1 MB, a table of 4096 flags) would commit less.
 - [ ] **The translated x86 code itself.** Each x86 instruction becomes several .NET ones
   (flags, the page lookup, bounds): flags computed only where a later instruction reads them,
   and direct memory access once memory is flat, for the routines that keep running translated.

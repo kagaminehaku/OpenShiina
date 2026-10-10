@@ -69,14 +69,6 @@ public sealed partial class ScnVm
         bool Apart(int from) => from == dst || Region(from) <= dst || Region(dst) <= from;
         if (height >= 2 * BlendBand && pitch >= rowBytes && (long)width * height >= 20000 && Apart(source) && (level || Apart(source2)))
         {
-            for (int y = 0; y < height; y++)
-            {
-                foreach (int start in level ? [dst, source] : new[] { dst, source, source2 })
-                {
-                    ReadByte(start + y * pitch);
-                    ReadByte(start + y * pitch + rowBytes - 1);
-                }
-            }
             Parallel.For(0, (height + BlendBand - 1) / BlendBand, band => Rows(band * BlendBand, Math.Min(height, (band + 1) * BlendBand)));
         }
         else
@@ -196,12 +188,8 @@ public sealed partial class ScnVm
         // where every input is the output itself or apart from it (else all is read first, as
         // the engine reads it)
         bool Apart(int from) => from == dst || (long)from + bytes <= dst || (long)dst + bytes <= from;
-        void Part(int from, int count, byte[] ra, byte[] sa, byte[] sb, byte[] o)
+        void Part(int count, ReadOnlySpan<byte> ra, ReadOnlySpan<byte> sa, ReadOnlySpan<byte> sb, Span<byte> o)
         {
-            ReadBytes(rule + from, ra.AsSpan(0, count));
-            ReadBytes(a + from, sa.AsSpan(0, count));
-            if (b != 0)
-                ReadBytes(b + from, sb.AsSpan(0, count));
             for (int i = 0; i < count; i++)
             {
                 int r = invert ? ra[i] ^ 0xFF : ra[i];
@@ -220,32 +208,22 @@ public sealed partial class ScnVm
                     : (byte)Math.Min(255, Math.Min(0xFFFF, sa[i] * k + sb[i] * (256 - k)) >> 8);
             }
         }
-        if (Apart(rule) && Apart(a) && (b == 0 || Apart(b)))
+        if (Apart(rule) && Apart(a) && (b == 0 || Apart(b)) && IsContiguous(dst, bytes) && IsContiguous(rule, bytes)
+            && IsContiguous(a, bytes) && (b == 0 || IsContiguous(b, bytes)))
         {
+            // in place (a byte is read before it is written)
             const int Chunk = 1 << 16;
             int parts = (bytes + Chunk - 1) / Chunk;
-            // the pages exist before the parts are shared out
-            for (int at = 0; at < bytes; at += Chunk / 2)
-            {
-                ReadByte(dst + at);
-                ReadByte(rule + at);
-                ReadByte(a + at);
-                if (b != 0)
-                    ReadByte(b + at);
-            }
-            ReadByte(dst + bytes - 1);
-            Parallel.For(0, parts, () => (new byte[Chunk], new byte[Chunk], new byte[b != 0 ? Chunk : 0], new byte[Chunk]), (part, _, buffers) =>
+            Parallel.For(0, parts, part =>
             {
                 int from = part * Chunk, count = Math.Min(Chunk, bytes - from);
-                Part(from, count, buffers.Item1, buffers.Item2, buffers.Item3, buffers.Item4);
-                WriteBytes(dst + from, buffers.Item4.AsSpan(0, count));
-                return buffers;
-            }, _ => { });
+                Part(count, Bytes(rule + from, count), Bytes(a + from, count), b != 0 ? Bytes(b + from, count) : default,
+                     Bytes(dst + from, count));
+            });
             return;
         }
         var all = new byte[bytes];
-        var whole = (new byte[bytes], new byte[bytes], new byte[b != 0 ? bytes : 0]);
-        Part(0, bytes, whole.Item1, whole.Item2, whole.Item3, all);
+        Part(bytes, ReadBytes(rule, bytes), ReadBytes(a, bytes), b != 0 ? ReadBytes(b, bytes) : default, all);
         WriteBytes(dst, all);
     }
 

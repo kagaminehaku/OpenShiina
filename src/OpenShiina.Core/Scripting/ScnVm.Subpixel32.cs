@@ -81,16 +81,6 @@ public sealed partial class ScnVm
 
         int outPixels = (ax != 0 ? 1 : 0) + (int)middle + (tailX != 0 ? 1 : 0);
         int inBytes = ((int)middle + 3) * 4;
-        // The pages exist before the rows are shared out between threads
-        foreach (var (_, s, d) in rows)
-        {
-            ReadByte(s);
-            ReadByte(s + inBytes - 1);
-            ReadByte(s + srcPitch);
-            ReadByte(s + srcPitch + inBytes - 1);
-            ReadByte(d);
-            ReadByte(d + outPixels * 4 - 1);
-        }
         var timing = ChooseGpu("subpixel32", (long)rows.Count * outPixels);
         if (timing.Gpu)
         {
@@ -107,19 +97,20 @@ public sealed partial class ScnVm
         }
         int band = Math.Max(8, (rows.Count + 2 * Environment.ProcessorCount - 1) / (2 * Environment.ProcessorCount));
         int bands = (rows.Count + band - 1) / band;
+        int outBytes = outPixels * 4;
         void RunBand(int index)
         {
-            var p = new byte[inBytes];
-            var q = new byte[inBytes];
-            var output = new byte[outPixels * 4];
+            // Source rows are read in place (copied when they share bytes with the destination
+            // row, which is written as the row is made, or are not one piece of memory) and the
+            // destination row is written in place
+            byte[]? spareP = null, spareQ = null;
             for (int r = index * band, end = Math.Min(rows.Count, r + band); r < end; r++)
             {
                 var (kind, s, d) = rows[r];
-                ReadBytes(s, p);
-                if (kind is SubpixelRow.TopTwo or SubpixelRow.MiddleTwo or SubpixelRow.BottomTwo)
-                    ReadBytes(s + srcPitch, q);
-                SubpixelRowPixels(kind, k, p, q, output, (int)middle);
-                WriteBytes(d, output);
+                var p = ReadView(s, inBytes, ref spareP, d, outBytes);
+                var q = kind is SubpixelRow.TopTwo or SubpixelRow.MiddleTwo or SubpixelRow.BottomTwo
+                    ? ReadView(s + srcPitch, inBytes, ref spareQ, d, outBytes) : default;
+                SubpixelRowPixels(kind, k, p, q, Bytes(d, outBytes), (int)middle);
             }
         }
         if (bands > 1 && (long)rows.Count * outPixels >= 20000)
@@ -141,21 +132,21 @@ public sealed partial class ScnVm
         public ushort D0, D4, D8, DC;
     }
 
-    private static ulong Px(byte[] row, int at) => X86Ops.Punpcklbw(BitConverter.ToUInt32(row, at), 0);
+    private static ulong Px(ReadOnlySpan<byte> row, int at) => X86Ops.Punpcklbw(BitConverter.ToUInt32(row[at..]), 0);
 
     private static ulong Mul(ulong a, ulong b) => X86Ops.Pmullw(a, b);
 
     private static ulong Add(ulong a, ulong b) => X86Ops.Paddw(a, b);
 
-    private static void StorePacked(byte[] output, int at, ulong v) =>
-        BitConverter.TryWriteBytes(output.AsSpan(at), (uint)X86Ops.Packuswb(v, 0));
+    private static void StorePacked(Span<byte> output, int at, ulong v) =>
+        BitConverter.TryWriteBytes(output[at..], (uint)X86Ops.Packuswb(v, 0));
 
     /// <summary>movd without packuswb: lanes 0 and 1 as two 16-bit words.</summary>
-    private static void StoreWords(byte[] output, int at, ulong v) =>
-        BitConverter.TryWriteBytes(output.AsSpan(at), (uint)v);
+    private static void StoreWords(Span<byte> output, int at, ulong v) =>
+        BitConverter.TryWriteBytes(output[at..], (uint)v);
 
     /// <summary>One destination row: left edge, whole pixels, right edge.</summary>
-    private static void SubpixelRowPixels(SubpixelRow kind, SubpixelWeights k, byte[] p, byte[] q, byte[] output, int middle)
+    private static void SubpixelRowPixels(SubpixelRow kind, SubpixelWeights k, ReadOnlySpan<byte> p, ReadOnlySpan<byte> q, Span<byte> output, int middle)
     {
         bool two = kind is SubpixelRow.TopTwo or SubpixelRow.MiddleTwo or SubpixelRow.BottomTwo;
         // Vertical weights of the edges of rows from two source rows; lane weight of one-row edges
@@ -205,7 +196,7 @@ public sealed partial class ScnVm
                 MiddleBilinear(p, q, s, output, o, middle, k);
         }
         else if (k.Copy)
-            Array.Copy(p, s, output, o, middle * 4);
+            p.Slice(s, middle * 4).CopyTo(output[o..]);
         else
             MiddleAcross(p, s, output, o, middle, k.D0, k.D4);
         s += middle * 4;
@@ -240,20 +231,20 @@ public sealed partial class ScnVm
 
     // The whole pixels with SIMD: 16-bit lanes, products wrap like pmullw, two pixels at a time.
 
-    private static Vector128<ushort> Load2(byte[] row, int at) =>
-        Vector128.WidenLower(Vector128.CreateScalar(BitConverter.ToUInt64(row, at)).AsByte());
+    private static Vector128<ushort> Load2(ReadOnlySpan<byte> row, int at) =>
+        Vector128.WidenLower(Vector128.CreateScalar(BitConverter.ToUInt64(row[at..])).AsByte());
 
-    private static void Store2(byte[] output, int at, Vector128<ushort> v, int shift)
+    private static void Store2(Span<byte> output, int at, Vector128<ushort> v, int shift)
     {
         v = Vector128.ShiftRightLogical(v, shift);
         if (shift < 8)
             v = Vector128.Min(v, Vector128.Create((ushort)255));
         ulong bytes = Vector128.Narrow(v, v).AsUInt64().ToScalar();
-        BitConverter.TryWriteBytes(output.AsSpan(at), bytes);
+        BitConverter.TryWriteBytes(output[at..], bytes);
     }
 
     /// <summary>(p[i] D0 + p[i+1] D4) >> 4, packed (one source row).</summary>
-    private static void MiddleAcross(byte[] p, int s, byte[] output, int o, int n, ushort d0, ushort d4)
+    private static void MiddleAcross(ReadOnlySpan<byte> p, int s, Span<byte> output, int o, int n, ushort d0, ushort d4)
     {
         var w0 = Vector128.Create(d0);
         var w1 = Vector128.Create(d4);
@@ -268,7 +259,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>(p[i] D8 + q[i] DC) >> 4, packed (two source rows lined up across).</summary>
-    private static void MiddleVertical(byte[] p, byte[] q, int s, byte[] output, int o, int n, ushort d8, ushort dc)
+    private static void MiddleVertical(ReadOnlySpan<byte> p, ReadOnlySpan<byte> q, int s, Span<byte> output, int o, int n, ushort d8, ushort dc)
     {
         var w0 = Vector128.Create(d8);
         var w1 = Vector128.Create(dc);
@@ -283,7 +274,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>(p[i] D0 D8 + p[i+1] D4 D8 + q[i] D0 DC + q[i+1] D4 DC) >> 8, packed.</summary>
-    private static void MiddleBilinear(byte[] p, byte[] q, int s, byte[] output, int o, int n, SubpixelWeights k)
+    private static void MiddleBilinear(ReadOnlySpan<byte> p, ReadOnlySpan<byte> q, int s, Span<byte> output, int o, int n, SubpixelWeights k)
     {
         // The weights are products in 16 bits too (pmullw of the broadcast fractions)
         ushort a = (ushort)(k.D0 * k.D8), b = (ushort)(k.D4 * k.D8), c = (ushort)(k.D0 * k.DC), d = (ushort)(k.D4 * k.DC);

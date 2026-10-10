@@ -54,10 +54,16 @@ public sealed partial class ScnVm
         int drop = n < 0 ? scopes.Count : Math.Min(n, scopes.Count);
         for (int k = 0; k < drop; k++)
         {
-            ReleaseScope(scopes[^1]);
+            var scope = scopes[^1];
+            ReleaseScope(scope);
             scopes.RemoveAt(scopes.Count - 1);
+            scope.Clear();
+            m_freeScopes.Push(scope);
         }
     }
+
+    // Scopes left, used again by the next declaration (START declares thousands a second)
+    private readonly Stack<Dictionary<string, (int Address, int Count)>> m_freeScopes = new();
 
     /// <summary>"name" or "name[n]" of a declaration: the name and its element count.</summary>
     private (string Name, int Count) Declared(ScnContext c, string text)
@@ -317,7 +323,8 @@ public sealed partial class ScnVm
                 vm.LeaveScopes(c.Slot, 1);
                 return 0;
             }
-            var scope = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
+            if (!vm.m_freeScopes.TryPop(out var scope))
+                scope = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
             foreach (var name in i.Args)
             {
                 var (n, count) = vm.Declared(c, name.Text ?? "");

@@ -88,13 +88,13 @@ public sealed partial class ScnVm
             uint w = (uint)((ulong)rb * 0x101 / (ra + rb)), w2 = 0x101 - w;
             using var verify = vm.VerifyRegion(c, a, dst, sd * (height - 1) + width * 4);
             int bytes = width * 4;
-            var rowA = new byte[bytes];
-            var rowB = new byte[bytes];
-            var output = new byte[bytes];
+            byte[]? spareA = null, spareB = null;
             for (int y = 0; y < height; y++, dst += sd, pa += sa, pb += sb)
             {
-                vm.ReadBytes(pa, rowA);
-                vm.ReadBytes(pb, rowB);
+                // the rows in place (copied when they share bytes with the row written)
+                var rowA = vm.ReadView(pa, bytes, ref spareA, dst, bytes);
+                var rowB = vm.ReadView(pb, bytes, ref spareB, dst, bytes);
+                var output = vm.Bytes(dst, bytes);
                 for (int p = 0; p < bytes; p += 4)
                 {
                     bool aClear = rowA[p] == 0, bClear = rowB[p] == 0;
@@ -106,7 +106,6 @@ public sealed partial class ScnVm
                         output[p + k] = (byte)Math.Min(255u, sum >> 8);
                     }
                 }
-                vm.WriteBytes(dst, output);
             }
         });
 
@@ -198,12 +197,15 @@ public sealed partial class ScnVm
             short max = (short)imax, min = (short)imin;
             using var verify = vm.VerifyRegion(c, a, dst, sd * (height - 1) + width * 4);
             int bytes = width * 4;
-            var rowS = new byte[bytes];
-            var rowM = new byte[bytes];
+            byte[]? spareS = null, spareM = null;
             for (int y = 0; y < height; y++, dst += sd, ps += ss, pm += sm)
             {
-                vm.ReadBytes(ps, rowS);
-                vm.ReadBytes(pm, rowM);
+                // S's row into the destination row, then its alpha bytes from the mask (the rows
+                // in place; copied when they share bytes with the row written)
+                var rowS = vm.ReadView(ps, bytes, ref spareS, dst, bytes);
+                var rowM = vm.ReadView(pm, bytes, ref spareM, dst, bytes);
+                var output = vm.Bytes(dst, bytes);
+                rowS.CopyTo(output);
                 for (int p = 0; p < bytes; p += 4)
                 {
                     short m = (short)(invert ? 255 - rowM[p + 3] : rowM[p + 3]);
@@ -212,9 +214,8 @@ public sealed partial class ScnVm
                     ushort w = inside ? (ushort)(m - bias) : (ushort)0;
                     int product = (short)(ushort)(w * q) * s;
                     uint v = (uint)product >> 15;
-                    rowS[p] = (byte)(v | (belowMax ? 0u : (uint)s));
+                    output[p] = (byte)(v | (belowMax ? 0u : (uint)s));
                 }
-                vm.WriteBytes(dst, rowS);
             }
         });
 

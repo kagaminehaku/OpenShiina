@@ -59,19 +59,21 @@ public sealed partial class ScnVm
     }
 
     /// <summary>
-    /// The table of one axis (0x78380-0x78748 for rows, 0x78748-0x78AA9 for columns); null when
-    /// the x86 code would not end (no destination pixel, or a destination pixel smaller than a
-    /// source pixel: the routine only scales down).
+    /// The table of one axis (0x78380-0x78748 for rows, 0x78748-0x78AA9 for columns) into
+    /// <paramref name="table"/>; false when the x86 code would not end (no destination pixel, or a
+    /// destination pixel smaller than a source pixel: the routine only scales down).
     /// </summary>
-    private static List<ScaleEntry>? ScaleTable(uint s, uint d, uint sourceStart, uint destinationStart, uint destinationEnd, uint k, bool columns)
+    private static bool ScaleTable(uint s, uint d, uint sourceStart, uint destinationStart, uint destinationEnd, uint k, bool columns,
+                                   List<ScaleEntry> table)
     {
+        table.Clear();
         var divider = new ScaleDivider(s, k);
         uint esi = (sourceStart & 15) * d >> 4;
         uint lead = (0 - destinationStart) & 15;
         uint n = ((d - lead) >> 4) + (lead != 0 ? 1u : 0);
         if (n == 0 || n > 0x10000)
-            return null;
-        var table = new List<ScaleEntry>((int)n + 1);
+            return false;
+        table.EnsureCapacity((int)n + 1);
         bool first = lead != 0;
         for (uint i = 0; i < n; i++)
         {
@@ -136,7 +138,7 @@ public sealed partial class ScnVm
         Store:
             // Upscaling makes the unsigned steps above wrap (the x86 code then runs away)
             if (count > (s >> 4) + 2)
-                return null;
+                return false;
             table.Add(new ScaleEntry((int)flags, (int)count, wFirst, wLast));
         }
         uint end = destinationEnd & 15;
@@ -168,10 +170,10 @@ public sealed partial class ScnVm
                 flags |= 0x40;
             }
             if (count > (s >> 4) + 2)
-                return null;
+                return false;
             table.Add(new ScaleEntry((int)flags, (int)count, wFirst, wLast));
         }
-        return table;
+        return true;
     }
 
     /// <summary>pmaddwd of two [w, w] pairs, >>> 21 (packssdw cannot saturate 0-2047).</summary>
@@ -192,9 +194,12 @@ public sealed partial class ScnVm
         uint dw = (uint)(dr - dl), dh = (uint)(db - dt), sw = (uint)(sr - sl), sh = (uint)(sb - st);
         if (dw == 0 || dh == 0 || sw == 0 || sh == 0)
             return true;
-        var rows = ScaleTable(sh, dh, (uint)st, (uint)dt, (uint)db, 0x5ADC, columns: false);
-        var cols = ScaleTable(sw, dw, (uint)sl, (uint)dl, (uint)dr, 0x5ADD, columns: true);
-        if (rows == null || cols == null)
+        // The tables and work arrays are kept from call to call (only the interpreter's thread
+        // calls this; a zoomed scene made new ones every frame)
+        var rows = m_scale32Rows;
+        var cols = m_scale32Columns;
+        if (!ScaleTable(sh, dh, (uint)st, (uint)dt, (uint)db, 0x5ADC, columns: false, rows)
+            || !ScaleTable(sw, dw, (uint)sl, (uint)dl, (uint)dr, 0x5ADD, columns: true, cols))
             return false;
         var divRows = new ScaleDivider(sh, 0x5ADC);
         var divCols = new ScaleDivider(sw, 0x5ADD);
@@ -203,9 +208,9 @@ public sealed partial class ScnVm
         // The source pixels of each destination column: from colFrom (the partial first one
         // when 0x80), whole ones in [colA, colB), the partial last one at colB when 0x40
         int nc = cols.Count;
-        var colFrom = new int[nc];
-        var colA = new int[nc];
-        var colB = new int[nc];
+        var colFrom = Scratch(ref m_scale32ColFrom, nc);
+        var colA = Scratch(ref m_scale32ColA, nc);
+        var colB = Scratch(ref m_scale32ColB, nc);
         int x = 0, width = 0;
         for (int c = 0; c < nc; c++)
         {
@@ -220,8 +225,8 @@ public sealed partial class ScnVm
         int srcX = src + (int)((uint)st >> 4) * srcPitch + (int)((uint)sl >> 4) * 4;
         int dstRow = dst + (int)((uint)dt >> 4) * dstPitch + (int)((uint)dl >> 4) * 4;
         int bytes = width * 4;
-        var colWx = new uint[nc * 2];
-        var colShape = new int[nc * 4];
+        var colWx = Scratch(ref m_scale32ColWx, nc * 2);
+        var colShape = Scratch(ref m_scale32ColShape, nc * 4);
         for (int c = 0; c < nc; c++)
         {
             colWx[2 * c] = cols[c].First;
@@ -233,7 +238,8 @@ public sealed partial class ScnVm
         }
         // The first source row of every destination row (the rows are shared out between threads)
         int nr = rows.Count;
-        var rowY = new int[nr + 1];
+        var rowY = Scratch(ref m_scale32RowY, nr + 1);
+        rowY[0] = 0;
         for (int r = 0; r < nr; r++)
             rowY[r + 1] = rowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
         var timing = ChooseGpu("scale32", (long)nr * nc);
@@ -255,7 +261,6 @@ public sealed partial class ScnVm
             // scales the same rectangles every frame: new ones were megabytes a call to collect)
             if (t_scaleBuffers is not { } buffers || !buffers.Fits(bytes, width, nc))
                 t_scaleBuffers = buffers = new ScaleBuffers(bytes, width, nc);
-            var line = buffers.Line;
             // The whole source rows of a destination row: sums per channel (16 bits, as the MMX
             // sums wrap) and the AND of their bytes (byte 3 tells whether every one is opaque)
             var sum = buffers.Sum;
@@ -263,7 +268,6 @@ public sealed partial class ScnVm
             var first = buffers.First;
             var whole = buffers.Whole;
             var last = buffers.Last;
-            var output = buffers.Output;
             var accLo = buffers.AccLo;
             var accHi = buffers.AccHi;
             var clear = buffers.Clear;
@@ -272,27 +276,19 @@ public sealed partial class ScnVm
                 var e = rows[r];
                 bool hasFirst = (e.Flags & 0x80) != 0, hasLast = (e.Flags & 0x40) != 0;
                 int p = rowY[r];
+                // the source rows are read in place, then the destination row written
                 if (hasFirst)
-                {
-                    ReadBytes(srcX + p++ * srcPitch, line);
-                    first.Set(line);
-                }
+                    first.Set(Bytes(srcX + p++ * srcPitch, bytes));
                 if (e.Count > 0)
                 {
                     Array.Clear(sum);
                     Array.Fill(and, (byte)0xFF);
                     for (int k = 0; k < e.Count; k++)
-                    {
-                        ReadBytes(srcX + p++ * srcPitch, line);
-                        AddRow(line, sum, and);
-                    }
+                        AddRow(Bytes(srcX + p++ * srcPitch, bytes), sum, and);
                     whole.Set(sum, and);
                 }
                 if (hasLast)
-                {
-                    ReadBytes(srcX + p * srcPitch, line);
-                    last.Set(line);
-                }
+                    last.Set(Bytes(srcX + p * srcPitch, bytes));
 
                 // the general loop's register copy of the shared first column (see the top)
                 bool ownLoop = e.Flags == 0xC0 && e.Count <= 1;
@@ -305,6 +301,7 @@ public sealed partial class ScnVm
                     whole.AddTo(fullRow, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: false);
                 if (hasLast)
                     last.AddTo(e.Last, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop);
+                var output = Bytes(dstRow + r * dstPitch, nc * 4);
                 for (int c = 0; c < nc; c++)
                 {
                     ulong lo = accLo[c], hi = accHi[c];
@@ -313,7 +310,6 @@ public sealed partial class ScnVm
                     output[c * 4 + 2] = (byte)(lo >> 40);
                     output[c * 4 + 3] = clear[c] == 0 ? (byte)0xFF : (byte)(hi >> 40);
                 }
-                WriteBytes(dstRow + r * dstPitch, output);
             }
         }
         // Rows are independent: bands of them run on all cores (the result does not depend on it)
@@ -329,10 +325,22 @@ public sealed partial class ScnVm
     [ThreadStatic]
     private static ScaleBuffers? t_scaleBuffers;
 
+    private readonly List<ScaleEntry> m_scale32Rows = new(), m_scale32Columns = new();
+    private int[] m_scale32ColFrom = [], m_scale32ColA = [], m_scale32ColB = [], m_scale32ColShape = [], m_scale32RowY = [];
+    private uint[] m_scale32ColWx = [];
+
+    /// <summary>An array of at least <paramref name="length"/> kept in <paramref name="array"/> (its content left as it was).</summary>
+    private static T[] Scratch<T>(ref T[] array, int length)
+    {
+        if (array.Length < length)
+            array = new T[Math.Max(length, array.Length * 2)];
+        return array;
+    }
+
     /// <summary>The buffers of a band of scale32 rows (each row overwrites or clears what it uses).</summary>
     private sealed class ScaleBuffers(int bytes, int width, int columns)
     {
-        public readonly byte[] Line = new byte[bytes], And = new byte[bytes], Output = new byte[columns * 4];
+        public readonly byte[] And = new byte[bytes];
         public readonly ushort[] Sum = new ushort[bytes];
         public readonly ScaleRow First = new(width), Whole = new(width), Last = new(width);
         public readonly ulong[] AccLo = new ulong[columns], AccHi = new ulong[columns];
@@ -353,7 +361,7 @@ public sealed partial class ScnVm
         private readonly ulong[] m_lo = new ulong[width + 1], m_hi = new ulong[width + 1];
         private readonly int[] m_clear = new int[width + 1];
 
-        public void Set(byte[] row)
+        public void Set(ReadOnlySpan<byte> row)
         {
             ulong lo = 0, hi = 0;
             int clear = 0;
@@ -428,7 +436,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>Adds a row of bytes to 16-bit sums (wrapping) and ANDs it into a mask, with SIMD.</summary>
-    private static void AddRow(byte[] row, ushort[] sum, byte[] and)
+    private static void AddRow(ReadOnlySpan<byte> row, ushort[] sum, byte[] and)
     {
         int i = 0;
         int n = System.Numerics.Vector<byte>.Count;
@@ -436,7 +444,7 @@ public sealed partial class ScnVm
         {
             for (; i + n <= row.Length; i += n)
             {
-                var v = new System.Numerics.Vector<byte>(row, i);
+                var v = new System.Numerics.Vector<byte>(row[i..]);
                 System.Numerics.Vector.Widen(v, out var lo, out var hi);
                 (new System.Numerics.Vector<ushort>(sum, i) + lo).CopyTo(sum, i);
                 (new System.Numerics.Vector<ushort>(sum, i + n / 2) + hi).CopyTo(sum, i + n / 2);

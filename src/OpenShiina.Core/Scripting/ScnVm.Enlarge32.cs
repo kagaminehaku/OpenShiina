@@ -194,9 +194,11 @@ public sealed partial class ScnVm
         bool apart = srcTo <= dstFrom || dstTo <= srcFrom;
         void Rows(int from, int to)
         {
-            var upper = new uint[sourcePixels];
-            var lower = new uint[sourcePixels];
-            var output = new uint[outPixels];
+            // The thread's row buffers, kept while the sizes stay (the pixels are worked on as
+            // dwords, so the rows are copied in and out: unaligned in script memory)
+            if (t_enlarge32Rows is not { } buffers || buffers.Upper.Length != sourcePixels || buffers.Output.Length != outPixels)
+                t_enlarge32Rows = buffers = (new uint[sourcePixels], new uint[sourcePixels], new uint[outPixels]);
+            var (upper, lower, output) = buffers;
             var upperBytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(upper.AsSpan());
             var lowerBytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(lower.AsSpan());
             for (int r = from; r < to; r++)
@@ -211,16 +213,6 @@ public sealed partial class ScnVm
         }
         if (apart && rows.Count >= 16 && (long)rows.Count * outPixels >= 20000 && srcPitch > 0 && dstPitch > 0)
         {
-            foreach (var row in rows)
-            {
-                for (int k = 0; k < (row.Kind is Enlarge32Row.Two or Enlarge32Row.WholeTwo ? 2 : 1); k++)
-                {
-                    ReadByte(row.Source + k * srcPitch);
-                    ReadByte(row.Source + k * srcPitch + sourcePixels * 4 - 1);
-                }
-                ReadByte(row.Target);
-                ReadByte(row.Target + outPixels * 4 - 1);
-            }
             const int Band = 16;
             Parallel.For(0, (rows.Count + Band - 1) / Band, band => Rows(band * Band, Math.Min(rows.Count, (band + 1) * Band)));
         }
@@ -228,6 +220,9 @@ public sealed partial class ScnVm
             Rows(0, rows.Count);
         return true;
     }
+
+    [ThreadStatic]
+    private static (uint[] Upper, uint[] Lower, uint[] Output)? t_enlarge32Rows;
 
     private sealed record Enlarge32Table(Enlarge32Column? Left, bool LeftTwo, Enlarge32Column[] Middle, Enlarge32Column? Right, bool RightTwo,
                                          int Start, int DW, int SW, int WholeColumns);

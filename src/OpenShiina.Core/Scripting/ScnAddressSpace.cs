@@ -2,9 +2,9 @@
 // only for the pages written. Two ways, chosen by the process:
 //   - 64-bit: the whole 32-bit address space as one block of virtual memory, a script address
 //     being Base + address. Linux, Android, macOS: mmap with MAP_NORESERVE, every address
-//     readable and writable at once; Windows: the 4 GB reserved, each 16 MB part committed on
+//     readable and writable at once; Windows: the 4 GB reserved, each 1 MB part committed on
 //     first use (commit counts against RAM + page file), which every access checks - a table of
-//     256 flags.
+//     4096 flags.
 //   - 32-bit (Segmented): a process has no 4 GB to spare, so the address space is 256 parts of
 //     16 MB, each mapped on its first use wherever the system puts it (next to the part before
 //     when it can): a script address is part[address >> 24] + (address & 0xFFFFFF). Heap blocks
@@ -25,8 +25,13 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
     /// <summary>Bytes past the 4 GB (64-bit), so that an access of a few bytes at the top stays inside.</summary>
     private const long Guard = 1 << 16;
 
-    /// <summary>The parts: committed one at a time on Windows (64-bit), mapped one at a time in 32-bit.</summary>
+    /// <summary>The parts mapped one at a time in 32-bit (16 MB); heap blocks never cross their boundaries.</summary>
     public const int SegmentBits = 24;
+
+    /// <summary>The parts committed one at a time on 64-bit Windows: 1 MB (16 MB committed about twice the RAM used).</summary>
+    private const int CommitBits = 20;
+
+    private const long CommitSize = 1L << CommitBits;
 
     public const long SegmentSize = 1L << SegmentBits;
 
@@ -41,7 +46,7 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
     private static readonly bool LazyCommit = OperatingSystem.IsWindows() && !Segmented;
 
     private byte* m_base;
-    private readonly byte[] m_committed = new byte[1 << (32 - SegmentBits)];
+    private readonly byte[] m_committed = new byte[1 << (32 - CommitBits)];
     private readonly nint[] m_segments = new nint[1 << (32 - SegmentBits)];
     private readonly List<(nint Start, long Length)> m_mappings = new();
     private readonly Lock m_commitLock = new();
@@ -110,7 +115,7 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
             nint part = Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(m_segments), (int)(address >> SegmentBits));
             return (byte*)(part != 0 ? part : MapSegment(address >> SegmentBits)) + (address & SegmentMask);
         }
-        if (LazyCommit && Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(m_committed), (int)(address >> SegmentBits)) == 0)
+        if (LazyCommit && Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(m_committed), (int)(address >> CommitBits)) == 0)
             CommitParts(address, 1);
         return m_base + address;
     }
@@ -173,7 +178,7 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
     private void CommitParts(uint address, long length)
     {
         long end = Math.Min((long)address + length, Size);
-        for (long part = address >> SegmentBits; part << SegmentBits < end; part++)
+        for (long part = address >> CommitBits; part << CommitBits < end; part++)
         {
             if (Volatile.Read(ref m_committed[part]) != 0)
                 continue;
@@ -181,8 +186,8 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
             {
                 if (m_committed[part] != 0)
                     continue;
-                long start = part << SegmentBits;
-                long bytes = Math.Min(SegmentSize + OsPage, Size - start);
+                long start = part << CommitBits;
+                long bytes = Math.Min(CommitSize + OsPage, Size - start);
                 if (VirtualAlloc(m_base + start, (nuint)bytes, MemCommit, PageReadWrite) == null)
                     throw new OutOfMemoryException($"Could not commit script memory at {start:X8} (error {Marshal.GetLastPInvokeError()})");
                 Volatile.Write(ref m_committed[part], 1);
@@ -271,7 +276,7 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
             // hold anything (committed with the part before)
             for (long at = first; at < last; )
             {
-                long part = at >> SegmentBits, partEnd = Math.Min((part + 1) << SegmentBits, last);
+                long part = at >> CommitBits, partEnd = Math.Min((part + 1) << CommitBits, last);
                 if (m_committed[part] != 0)
                     GiveBack(m_base + at, partEnd - at);
                 else
@@ -317,8 +322,8 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
         long end = start + length;
         while (start < end)
         {
-            long part = start >> SegmentBits, partStart = part << SegmentBits;
-            long n = Math.Min(end, partStart + SegmentSize) - start;
+            long part = start >> CommitBits, partStart = part << CommitBits;
+            long n = Math.Min(end, partStart + CommitSize) - start;
             long clear = n;
             if (LazyCommit && m_committed[part] == 0)
                 // only the first page, when the part before is committed
