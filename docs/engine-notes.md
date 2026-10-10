@@ -371,6 +371,10 @@ Finding problems:
     pieces (1: everything on the interpreter's thread). ScnBoot has the players'
     UnfairSemaphoreSpinLimit 0 now, so cpuframe.ps1 measures what they spend.
   - Held zoom, per frame in ScnBoot: 18 ms of processor for 2.6 ms wall -> 2.4 ms for 1.1-1.4.
+    The players (zoom.ps1, two runs each): WPF 12.0% of the machine / 145% of one core ->
+    2.2-2.4% / 26-29%, Avalonia 12.6% / 151% -> 3.1-3.3% / 37-40%, both 60 fps, slowest frame
+    3.0-4.3 ms; the original 1.0% / 12%. Of the WPF player's 26-29%, about 14 is the frame
+    (2.4 ms at 60 a second), the rest showing it (the whole picture changes every frame there).
   - The compositor (Re: Rem Plus's first route, 12,000 frames, one thread: 04C4 24.4 -> 14.9 s,
     about 1.1 ms a call for some 950,000 pixels): runs of one colour (method 3) are filled by
     copying what is filled after itself; pixels with an alpha each (method 4, and blend

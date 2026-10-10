@@ -6,11 +6,10 @@ README).
 
 ## Speed
 
-- [ ] **Measure the players again in Re:Rem Plus's held kiss zoom** (zoom.ps1 in scratch
-  sessions/2026-10-10-measure; needs the screen unlocked) after the vector routines, the fewer
-  pieces and the copy of the changed part only (engine-notes.md section 7, "Vectors, fewer
-  pieces, the changed part"): ScnBoot went from 18 to 2.4 ms of processor a frame there; the
-  players were at 12% of the machine, the original at 1%.
+- [ ] **Still two to three times the original** in Re:Rem Plus's held kiss zoom (engine-notes.md
+  section 7, "Vectors, fewer pieces, the changed part": WPF 2.2-2.4% of the machine, Avalonia
+  3.1-3.3%, the original 1.0%); about half is the frame (2.4 ms), half showing it. Measure
+  with zoom.ps1 / cpuframe.ps1 (scratch sessions/2026-10-10-measure).
 - [ ] **The Avalonia player's picture**: each new frame is copied whole into a new SKImage (the
   render thread draws the one it holds while the next is made). Keep two or three pixel buffers
   and wrap them (SKImage.FromPixels with a release), or keep a texture and update only the
