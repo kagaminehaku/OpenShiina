@@ -6,7 +6,9 @@
 // calls the engine makes (GetAsyncKeyState, joyGetPosEx) when the scripts ask, and passed on as
 // the window messages the engine's window procedure gives the scripts (keys, mouse buttons, the
 // wheel). Closing the window asks the scripts first, as WM_CLOSE does. Save data goes to
-// %AppData%\OpenShiina\scn\<game>, never the game folder.
+// %AppData%\OpenShiina\scn\<game>, never the game folder. The picture is scaled to the window as
+// the setting "Scaling" says (Core Game/PictureScaling.cs): sharp is the picture multiplied by a
+// whole number on the CPU, drawn the rest of the way with linear filtering.
 
 using System.Diagnostics;
 using System.IO;
@@ -29,6 +31,14 @@ public sealed class ScnWindow : Window
     private readonly GameThread m_game;
     private readonly WriteableBitmap m_bitmap;
     private readonly byte[] m_frame;
+    // How the picture is scaled (the settings as the game started), the image showing it, and
+    // for sharp scaling the picture multiplied by m_factor
+    private readonly Scaling m_scaling;
+    private readonly Image m_image;
+    private readonly Grid m_view = new() { Background = Brushes.Black };
+    private WriteableBitmap? m_scaled;
+    private int m_factor = 1;
+    private bool m_sized;
     private bool m_stopped;
     // Closing: asked the scripts and waiting for their answer / they let the window close
     private bool m_closeAsked, m_closeAllowed;
@@ -40,6 +50,8 @@ public sealed class ScnWindow : Window
         int width = setup.Width, height = setup.Height;
         m_bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
         m_frame = new byte[width * height * 4];
+        m_scaling = setup.Settings.Scaling;
+        m_image = new Image { Source = m_bitmap, Stretch = Stretch.Uniform };
         m_host = new Host(this, data, setup.SaveFolder);
         m_game = new GameThread(setup.CreateVm(m_host), setup, data.SchemeName);
         m_game.TitleChanged += title => Title = title;
@@ -56,18 +68,25 @@ public sealed class ScnWindow : Window
 
         Title = data.SchemeName;
         Background = Brushes.Black;
-        Content = new Image { Source = m_bitmap, Stretch = Stretch.Uniform };
-        RenderOptions.SetBitmapScalingMode((Image)Content, BitmapScalingMode.NearestNeighbor);
+        // Layout on whole device pixels: the picture's place follows them (whole-number scaling)
+        UseLayoutRounding = true;
+        m_view.Children.Add(m_image);
+        Content = m_view;
+        RenderOptions.SetBitmapScalingMode(m_image, BitmapScalingMode.NearestNeighbor);
         SizeToContent = SizeToContent.WidthAndHeight;
-        ((Image)Content).Width = width;
-        ((Image)Content).Height = height;
+        m_image.Width = width;
+        m_image.Height = height;
         Loaded += (_, _) =>
         {
             // From here the window can be resized; the picture keeps its proportions
             SizeToContent = SizeToContent.Manual;
-            ((Image)Content).Width = double.NaN;
-            ((Image)Content).Height = double.NaN;
+            m_image.Width = double.NaN;
+            m_image.Height = double.NaN;
+            m_sized = true;
+            UpdateScaling();
         };
+        m_view.SizeChanged += (_, _) => UpdateScaling();
+        DpiChanged += (_, _) => UpdateScaling();
         SourceInitialized += (_, _) =>
         {
             // The picture opens a game pixel to a screen pixel: WPF sizes in 1/96 inch, so a
@@ -83,8 +102,8 @@ public sealed class ScnWindow : Window
                 w *= room;
                 h *= room;
             }
-            ((Image)Content).Width = w;
-            ((Image)Content).Height = h;
+            m_image.Width = w;
+            m_image.Height = h;
             m_host.Window = new WindowInteropHelper(this).Handle;
             m_game.Start();
             // At the game's pace the window draws a new picture when there is one; at the
@@ -232,9 +251,74 @@ public sealed class ScnWindow : Window
 
     private void Present()
     {
-        int stride = m_bitmap.PixelWidth * 4;
-        if (m_game.TakeFrame(m_frame, stride))
-            m_bitmap.WritePixels(new Int32Rect(0, 0, m_bitmap.PixelWidth, m_bitmap.PixelHeight), m_frame, stride, 0);
+        if (m_game.TakeFrame(m_frame, m_bitmap.PixelWidth * 4))
+            ShowFrame();
+    }
+
+    /// <summary>The latest picture into the bitmap the image shows.</summary>
+    private unsafe void ShowFrame()
+    {
+        int width = m_bitmap.PixelWidth, height = m_bitmap.PixelHeight;
+        if (m_scaled != null && m_image.Source == m_scaled)
+        {
+            m_scaled.Lock();
+            fixed (byte* frame = m_frame)
+                PictureScaling.Multiply(frame, width, height, width * 4, (byte*)m_scaled.BackBuffer, m_scaled.BackBufferStride, m_factor);
+            m_scaled.AddDirtyRect(new Int32Rect(0, 0, m_scaled.PixelWidth, m_scaled.PixelHeight));
+            m_scaled.Unlock();
+            return;
+        }
+        m_bitmap.WritePixels(new Int32Rect(0, 0, width, height), m_frame, width * 4, 0);
+    }
+
+    /// <summary>
+    /// The image for the window's size in device pixels and the setting: whole numbers draw the
+    /// picture at its whole scale, centred (nearest-neighbour); sharp shows it multiplied by the
+    /// whole part of its scale and lets WPF filter the rest linearly; smooth filters it (WPF's
+    /// high quality, Fant); nearest stretches it.
+    /// </summary>
+    private void UpdateScaling()
+    {
+        if (!m_sized)
+            return;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        int width = m_bitmap.PixelWidth, height = m_bitmap.PixelHeight;
+        double viewWidth = m_view.ActualWidth * dpi.DpiScaleX, viewHeight = m_view.ActualHeight * dpi.DpiScaleY;
+        var (scale, _, _) = PictureScaling.Placement(m_scaling, width, height, viewWidth, viewHeight);
+        if (scale <= 0)
+            return;
+        var source = m_bitmap;
+        var mode = BitmapScalingMode.NearestNeighbor;
+        m_image.Stretch = Stretch.Uniform;
+        m_image.Width = m_image.Height = double.NaN;
+        switch (m_scaling)
+        {
+            case Scaling.WholeNumbers when scale >= 1:
+                m_image.Stretch = Stretch.Fill;
+                m_image.Width = width * scale / dpi.DpiScaleX;
+                m_image.Height = height * scale / dpi.DpiScaleY;
+                break;
+            case Scaling.WholeNumbers:
+            case Scaling.Smooth:
+                mode = BitmapScalingMode.HighQuality;
+                break;
+            case Scaling.Sharp:
+                m_factor = PictureScaling.SharpFactor(scale);
+                mode = BitmapScalingMode.Linear;
+                if (m_factor > 1)
+                {
+                    if (m_scaled == null || m_scaled.PixelWidth != width * m_factor)
+                        m_scaled = new WriteableBitmap(width * m_factor, height * m_factor, 96, 96, PixelFormats.Bgr32, null);
+                    source = m_scaled;
+                }
+                break;
+        }
+        RenderOptions.SetBitmapScalingMode(m_image, mode);
+        if (m_image.Source != source)
+        {
+            m_image.Source = source;
+            ShowFrame();
+        }
     }
 
     /// <summary>The scripts ended the game (the window closes), or reached something the interpreter does not do yet.</summary>
@@ -356,16 +440,14 @@ public sealed class ScnWindow : Window
         }
 
         /// <summary>
-        /// The picture is scaled uniformly into the client area and centred (Stretch.Uniform):
-        /// its scale and offset in device pixels.
+        /// Where the picture is in the client area, as the setting places it (centred, its
+        /// proportions kept; whole numbers at its whole scale): its scale and offset in device pixels.
         /// </summary>
         private (double Scale, double Left, double Top) Placement()
         {
             if (!GetClientRect(Window, out var client))
                 return (0, 0, 0);
-            int cw = client.Right - client.Left, ch = client.Bottom - client.Top;
-            double scale = Math.Min((double)cw / m_width, (double)ch / m_height);
-            return (scale, (cw - m_width * scale) / 2, (ch - m_height * scale) / 2);
+            return PictureScaling.Placement(window.m_scaling, m_width, m_height, client.Right - client.Left, client.Bottom - client.Top);
         }
 
         public (int X, int Y) MousePosition

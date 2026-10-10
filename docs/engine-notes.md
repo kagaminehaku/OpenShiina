@@ -206,6 +206,20 @@ game's own. It is split in two projects:
   with GetCursorPos / ScreenToClient against the picture's place in the client area. Keys, mouse
   buttons, the wheel and Alt+Enter also go to the scripts as window messages. (Before the thread, WPF's key events and `Mouse.LeftButton`
   changed only after the frame, so with slow frames a released Ctrl stayed held.)
+- **Scaling** (2026-10-10; Core `Game/PictureScaling.cs`, setting "Scaling" in settings.json).
+  At a scale that is not a whole number (x1.77 in a 1684 x 1061 window, x3.6 full screen on 4K)
+  nearest-neighbour makes some game pixels one screen pixel wider than others (uneven strokes),
+  bilinear blurs. Sharp (the default): whole game pixels as far as they fit, the rest bilinear.
+  The Avalonia player (`GamePicture`, its own control drawing with SkiaSharp) runs the "sharp
+  bilinear" shader (SkSL: within each game pixel the sampling point is its middle, on its edges
+  it slides towards the next one over 1 / scale of a pixel, so only the screen pixels on an edge
+  are mixed; Skia runs it on the GPU, or the CPU); the WPF player multiplies the picture by the
+  whole part of its scale on the CPU (at least 2 above x1, so the bilinear rest makes it
+  smaller) and lets WPF draw it with linear filtering. Whole numbers: x1, x2... centred with
+  black around (nearest). Smooth: Catmull-Rom (Avalonia), WPF's high quality (Fant). Nearest:
+  as before. The pointer follows the picture's place (`PictureScaling.Placement`, in screen
+  pixels). The WPF player is per-monitor DPI aware (app.manifest, PerMonitorV2): it was system
+  aware, so Windows stretched its window again on a screen with another scale.
 - Both players start on a home screen of the games added (Core `Game/GameLibrary.cs`:
   library.json in the player folder with each game's folder, scheme name, .exe and when it was
   played; the .exe's icon read by `Formats/ExeIcon.cs` from its PE resources, without Windows):

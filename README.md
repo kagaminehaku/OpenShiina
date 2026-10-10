@@ -80,8 +80,10 @@ rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and t
 faster on its first large calls, with the same pictures; without a Vulkan driver the games run on the CPU), the frame
 rate (the game's own pace, up to 60 frames a second with the window drawing only new pictures,
 as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
-scripts run as often: four times as much processor on a 240 Hz one), the game
-controller, showing the frame rate (in the title; on phones over the game), and for bug reports
+scripts run as often: four times as much processor on a 240 Hz one), the scaling of the
+picture to the window (sharp: whole game pixels as far as they fit and the rest smooth, so text
+and lines stay even at any size; whole numbers only, with black around; smooth; or nearest), the
+game controller, showing the frame rate (in the title; on phones over the game), and for bug reports
 writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
 `draw-trace.log` (both logs go to the game's save folder).
 

@@ -131,6 +131,24 @@ public sealed class LibraryView : UserControl
             };
             page.Children.Add(choice);
         }
+        page.Children.Add(Heading("Scaling"));
+        page.Children.Add(Help("How the game's picture is scaled to the window.", 0));
+        foreach (var (scaling, label) in PictureScaling.Choices)
+        {
+            var choice = new RadioButton
+            {
+                Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
+                GroupName = "scaling", IsChecked = settings.Scaling == scaling,
+            };
+            choice.IsCheckedChanged += (_, _) =>
+            {
+                if (choice.IsChecked != true)
+                    return;
+                settings.Scaling = scaling;
+                settings.Save();
+            };
+            page.Children.Add(choice);
+        }
         string? section = null;
         foreach (var item in PlayerSettings.Switches)
         {

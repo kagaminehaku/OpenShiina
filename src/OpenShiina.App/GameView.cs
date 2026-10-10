@@ -1,6 +1,6 @@
 // The player's one view, on every platform: first the home screen with the games of the library
 // (LibraryView; or the folder given on the command line), then the game's picture, scaled to the view with its
-// proportions kept, black around it. Keyboard, mouse, touch and joystick go to the game's
+// proportions kept as the setting "Scaling" says (GamePicture), black around it. Keyboard, mouse, touch and joystick go to the game's
 // InputState (fingers as GameView.Touch.cs makes them a mouse), and keys, buttons and the wheel to
 // the scripts as the window messages of the engine. Closing asks the scripts first, as WM_CLOSE does. Each frame the view draws,
 // it reads the joystick, takes the game's latest picture and lets the interpreter run its next frame.
@@ -23,13 +23,14 @@ namespace OpenShiina.App;
 
 public sealed partial class GameView : UserControl, IGameWindow
 {
-    private readonly Image m_image = new() { Stretch = Stretch.Uniform, IsVisible = false };
+    private readonly GamePicture m_image = new() { IsVisible = false };
     private readonly LibraryView m_library = new();
     private GameSession? m_session;
     private IPlayerJoystick? m_joystick;
     // Closing: asked the scripts and waiting for their answer / they let the window close
     private bool m_closeAsked, m_closeAllowed;
-    private WriteableBitmap? m_bitmap;
+    // The game's latest picture (BGRA), handed to the GamePicture when it changes
+    private byte[]? m_frame;
     private bool m_animating;
 
     /// <summary>The window title the game asks for (the desktop window shows it).</summary>
@@ -48,7 +49,6 @@ public sealed partial class GameView : UserControl, IGameWindow
     {
         Background = Brushes.Black;
         Focusable = true;
-        RenderOptions.SetBitmapInterpolationMode(m_image, BitmapInterpolationMode.None);
         m_library.Play += async folder => await OpenAsync(folder);
         m_library.AddRequested += async () => await AddGameAsync();
         Content = new Grid { Children = { m_image, m_frameRate, TouchBar(), m_library } };
@@ -171,7 +171,7 @@ public sealed partial class GameView : UserControl, IGameWindow
 
     private void Pointer(PointerEventArgs e)
     {
-        if (m_session == null || m_bitmap == null)
+        if (m_session == null || m_frame == null)
             return;
         // Fingers are a mouse of their own (GameView.Touch.cs); a pen is a mouse
         if (e.Pointer.Type == PointerType.Touch)
@@ -219,13 +219,8 @@ public sealed partial class GameView : UserControl, IGameWindow
         }
     }
 
-    /// <summary>The picture is scaled uniformly into the image's bounds, centred.</summary>
-    private (double Scale, double Left, double Top) Placement(GameSession session)
-    {
-        var size = m_image.Bounds.Size;
-        double scale = Math.Min(size.Width / session.Width, size.Height / session.Height);
-        return (scale, (size.Width - session.Width * scale) / 2, (size.Height - session.Height * scale) / 2);
-    }
+    /// <summary>Where the picture is in the view, as the setting places it (GamePicture.Placement).</summary>
+    private (double Scale, double Left, double Top) Placement(GameSession session) => m_image.Placement();
 
     /// <summary>Asks for a game's folder (starting next to the game played last); null when none was chosen.</summary>
     private async Task<string?> ChooseFolderAsync()
@@ -321,8 +316,9 @@ public sealed partial class GameView : UserControl, IGameWindow
     private void Start(GameSession session)
     {
         m_session = session;
-        m_bitmap = new WriteableBitmap(new PixelSize(session.Width, session.Height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
-        m_image.Source = m_bitmap;
+        m_frame = new byte[session.Width * session.Height * 4];
+        m_image.Scaling = session.Setup.Settings.Scaling;
+        m_image.SetFrame(m_frame, session.Width, session.Height, session.Width * 4);
         m_image.IsVisible = true;
         m_library.IsVisible = false;
         TitleChanged?.Invoke(session.Data.SchemeName);
@@ -363,17 +359,13 @@ public sealed partial class GameView : UserControl, IGameWindow
 
     private DispatcherTimer? m_joystickTimer;
 
-    /// <summary>The game's pace: the interpreter's new picture into the bitmap.</summary>
-    private unsafe void TakeNewFrame()
+    /// <summary>The game's pace: the interpreter's new picture into the view.</summary>
+    private void TakeNewFrame()
     {
-        if (m_session == null || m_bitmap == null)
+        if (m_session == null || m_frame == null)
             return;
-        using (var buffer = m_bitmap.Lock())
-        {
-            var target = new Span<byte>((void*)buffer.Address, buffer.RowBytes * m_session.Height);
-            if (m_session.TakeFrame(target, buffer.RowBytes))
-                m_image.InvalidateVisual();
-        }
+        if (m_session.TakeFrame(m_frame, m_session.Width * 4))
+            m_image.SetFrame(m_frame, m_session.Width, m_session.Height, m_session.Width * 4);
     }
 
     private void RequestFrame()
@@ -383,18 +375,13 @@ public sealed partial class GameView : UserControl, IGameWindow
     }
 
     /// <summary>A frame of the window: the game's latest picture, and the interpreter's next frame.</summary>
-    private unsafe void OnFrame()
+    private void OnFrame()
     {
-        if (m_session == null || m_bitmap == null)
+        if (m_session == null || m_frame == null)
             return;
         if (m_joystick != null)
             m_session.Input.Joystick = m_joystick.Poll();
-        using (var buffer = m_bitmap.Lock())
-        {
-            var target = new Span<byte>((void*)buffer.Address, buffer.RowBytes * m_session.Height);
-            if (m_session.TakeFrame(target, buffer.RowBytes))
-                m_image.InvalidateVisual();
-        }
+        TakeNewFrame();
         m_session.FrameTick();
         RequestFrame();
     }
@@ -476,9 +463,8 @@ public sealed partial class GameView : UserControl, IGameWindow
         Close();
         m_closeAsked = m_closeAllowed = false;
         m_image.IsVisible = false;
-        m_image.Source = null;
-        m_bitmap?.Dispose();
-        m_bitmap = null;
+        m_image.Clear();
+        m_frame = null;
         m_library.IsVisible = true;
         m_library.Refresh();
         m_frameRate.IsVisible = false;

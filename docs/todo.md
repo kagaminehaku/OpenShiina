@@ -17,11 +17,13 @@ README).
     as a 32-bit program (`dotnet publish tests/OpenShiina.ScnBoot -c Release -r win-x86
     --self-contained`) against the 64-bit one's pictures (Re: Rem Plus's zoom, Oreimo's park
     route), then an `android-arm` APK on a 32-bit phone or TV box.
-- [ ] **The translated x86 code itself.** Each x86 instruction becomes several .NET ones
-  (flags, the page lookup, bounds): flags computed only where a later instruction reads them,
-  and direct memory access once memory is flat, for the routines that keep running translated.
+- [ ] **The x86 translation, for games beyond the eleven.** No routine of the eleven games runs
+  translated any more (each has a C# version); X86Jit and the interpreter stay for builds no
+  signature matches. Only worth it if other ShiinaRio games come: flags computed only where a
+  later instruction reads them (each x86 instruction becomes several .NET ones now).
 - [ ] **The SCN interpreter.** The engine's interpreter is compiled C++; ours dispatches each
-  opcode in C# and reads its operands through the paged memory. Script logic is rarely where the
+  opcode in C# and works its operands out (variables, named ones by name) every time it runs
+  (the instructions themselves are decoded once). Script logic is rarely where the
   time goes, but profile the dispatch (SCNBOOT_PROFILE) on a busy scene and trim what shows up.
 - [ ] **Load files in the background.** Pictures and sounds are read and decoded on the
   interpreter's thread, so a scene change waits for them. `ArcView` is not thread-safe: a
@@ -35,26 +37,17 @@ README).
 
 ## The picture on large screens
 
-Both players scale the game's picture (800 x 600, 1280 x 720 for v2.50) to the window with
-nearest-neighbour (ScnWindow.cs, GameView.cs). At a scale that is not a whole number (x2.4 on a
-1440p screen, x3.6 full screen on 4K) some game pixels become 3 screen pixels and some 4, so
-text and outlines come out uneven; bilinear alone blurs instead. A setting "Scaling" with:
+The setting "Scaling" (sharp, whole numbers, smooth, nearest) is done (engine-notes.md section 6,
+"Scaling"). Left:
 
-- [ ] **Sharp** (the default): the picture multiplied by the largest whole number that fits
-  (nearest-neighbour), the rest of the way bilinear. One pass on the GPU where the picture is
-  shown: the texture coordinate snapped within each game pixel so that only the last screen
-  pixel of its edge mixes with the next (the "sharp bilinear" shader). Avalonia: a Skia runtime
-  shader (SkSL) drawing the image; WPF: a pixel shader effect (`ShaderEffect`, HLSL) on the
-  image. Not in the Vulkan mode's compute path: that works on the picture in the scripts' memory
-  and would read the large picture back. Without a GPU: the whole-number copy on the CPU and the
-  image drawn with linear filtering.
-- [ ] **Whole numbers only**: x2, x3... and black around, sharp and exact.
-- [ ] **Smooth**: bicubic (Catmull-Rom) or Lanczos, for those who like CG soft.
 - [ ] **Upscaler** on the GPU: FSR 1 (EASU + RCAS) or an anime-art upscaler (Anime4K, xBRZ);
-  heavier, an option for desktop GPUs, maybe too slow for old phones.
-- [ ] **Nearest**: as now.
-- [ ] Check the WPF player's DPI awareness (per-monitor): a window on a second screen with
-  another scale could be stretched once more by Windows.
+  heavier, an option for desktop GPUs, maybe too slow for old phones. Avalonia could run it as
+  SkSL like the sharp shader; WPF has no shader path yet (its sharp scaling is a CPU copy).
+- [ ] WPF's sharp scaling on the GPU (a `ShaderEffect`, or the picture drawn through Direct3D),
+  as the Avalonia player does it: now the picture multiplied by a whole number on the CPU, which
+  uploads a picture up to the window's size each frame.
+- [ ] Check on an unlocked screen that the WPF player's picture fills the window after a resize
+  (captured while the PC was locked, the bottom 52 pixels stayed black in the stretched modes).
 
 Text cannot be drawn at the screen's resolution: the engine draws it into the game's surfaces,
 which the scripts then copy and blend.

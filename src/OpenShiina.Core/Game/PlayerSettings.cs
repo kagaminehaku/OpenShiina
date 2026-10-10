@@ -1,7 +1,8 @@
 // The players' settings: settings.json in the player folder (PlayerFolders.Root), shared by both
 // players, each counting from the next game started: where the interpreter's pixel work runs
 // (the CPU or the GPU through Vulkan, OpenShiina.Gpu), how often it runs a frame (the game's pace
-// or the screen's), the game controller, the frame rate, and
+// or the screen's), how the picture is scaled to the window (PictureScaling), the game controller,
+// the frame rate, and
 // for bug reports perf.log, the x86 translation and draw-trace.log. The environment variables
 // of earlier versions (OPENSHIINA_GPU, _JOYPAD, _PERF, _X86JIT, _TRACE) still win over them,
 // for tests.
@@ -37,6 +38,10 @@ public sealed class PlayerSettings
 
     [JsonConverter(typeof(JsonStringEnumConverter<FramePacing>))]
     public FramePacing FramePacing { get; set; } = FramePacing.Game;
+
+    /// <summary>How the game's picture is scaled to the window (PictureScaling).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<Scaling>))]
+    public Scaling Scaling { get; set; } = Scaling.Sharp;
 
     /// <summary>The scripts see the first joystick or gamepad (the games' own RIO.INI turns it off).</summary>
     public bool GameController { get; set; } = true;

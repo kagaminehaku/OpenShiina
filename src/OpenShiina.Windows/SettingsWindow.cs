@@ -1,6 +1,6 @@
 // The settings of the Windows player (Core Game/PlayerSettings.cs, shared with the Avalonia
 // player): where the interpreter's pixel work runs (the CPU or the GPU through Vulkan), how often
-// it runs a frame, then the on / off settings (PlayerSettings.Switches) in their sections. Saved at once; each counts from
+// it runs a frame, how the picture is scaled to the window, then the on / off settings (PlayerSettings.Switches) in their sections. Saved at once; each counts from
 // the next game started.
 
 using System.Windows;
@@ -45,6 +45,23 @@ public sealed class SettingsWindow : Window
             choice.Checked += (_, _) =>
             {
                 m_settings.FramePacing = pacing;
+                m_settings.Save();
+            };
+            page.Children.Add(choice);
+        }
+
+        page.Children.Add(Heading("Scaling"));
+        page.Children.Add(Help("How the game's picture is scaled to the window."));
+        foreach (var (scaling, label) in PictureScaling.Choices)
+        {
+            var choice = new RadioButton
+            {
+                Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
+                GroupName = "scaling", IsChecked = m_settings.Scaling == scaling, Margin = new Thickness(0, 6, 0, 0),
+            };
+            choice.Checked += (_, _) =>
+            {
+                m_settings.Scaling = scaling;
                 m_settings.Save();
             };
             page.Children.Add(choice);
