@@ -84,6 +84,9 @@ public sealed class GameSession : IDisposable
     /// <summary>A window message for the scripts (ScnMessage: keys, mouse buttons, the wheel).</summary>
     public void PostMessage(int message, int wParam, int lParam) => m_thread.PostMessage(message, wParam, lParam);
 
+    /// <summary>Steps run on the game's thread before frames to come (GameThread.Schedule): frame 0 is the next one.</summary>
+    public void Schedule(params (int Frame, Action<ScnVm> Do)[] steps) => m_thread.Schedule(steps);
+
     /// <summary>
     /// When there is a new picture, copies into <paramref name="target"/> (which keeps the last
     /// one taken) the part that changed: <paramref name="area"/>, maybe empty.

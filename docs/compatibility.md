@@ -55,7 +55,7 @@ those GameMap names for the game (how the players tell it).
 | Cleavage |  | v2.33 | — | ⚪ Not tried |
 | Death☆Meta |  | v2.33 | — | ⚪ Not tried |
 | Vanquish |  | v2.33 | `VANQ.EXE` | ⚪ Not tried |
-| Ao no Juuai | 青の獣愛 | v2.34 | `aoj.EXE` | 🟡 Starts (story: first line, clicks do not go on yet) |
+| Ao no Juuai | 青の獣愛 | v2.34 | `aoj.EXE` | 🟡 Starts (ScnBoot: the story to frame 30,000, choices; not tried in the players yet) |
 | ShiinaRio v2.34 and older |  | v2.34 | — | ⚪ Not tried |
 | ONE☆BOKU Faraway so close! |  | v2.35 | — | ⚪ Not tried |
 | CC Hospital | CCホスピタル | v2.36 | `CCH.EXE` | ⚪ Not tried |
@@ -133,7 +133,7 @@ those GameMap names for the game (how the players tell it).
 | Onegan! | おねガン！ | v2.48 | `ONEGAN.exe` | ⚪ Not tried |
 | Sensei! Shite Ageru | 先生っ！ シてあげる | v2.48 | `SHITEAGE.exe` | ⚪ Not tried |
 | Tanetsuke Mura | 種憑け村 ～白濁神、念仏講ノ儀～ | v2.48 | `tane.exe` | ⚪ Not tried |
-| Aneiro | アネイロ | v2.49 | `ANEIRO.exe` | ⚪ Not tried |
+| Aneiro | アネイロ | v2.49 | `ANEIRO.exe` | ✅ Plays through (ver 1.03a; skipped to the end by the user, 2026-10-10) |
 | Boku Igai no Otoko o Shiranai Kanojo | 僕以外の男を知らない彼女が他の男に抱かれていた | v2.49 | `MATNTR.exe` | ⚪ Not tried |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | v2.49 | — | ⚪ Not tried |
 | Doushite Daite Kurenai no!? | どうして抱いてくれないのっ!?～女の子だってヤりたいの！～ | v2.49 | `DODAKURE.exe` | ⚪ Not tried |
@@ -149,7 +149,7 @@ those GameMap names for the game (how the players tell it).
 | Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | v2.49 | `TORIGIRI.exe` | ⚪ Not tried |
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | v2.49 | `ZZS.exe` | ⚪ Not tried |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | v2.50 | `BITCHES3.exe` | ⚪ Not tried |
-| Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | v2.50 | — | ⚪ Not tried |
+| Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | v2.50 | `BITCHES.EXE` | 🟡 Starts (ver 1.02; ScnBoot: title, the story to frame 30,000; to test more in the players) |
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | v2.50 | `BITCHES2.exe` | ⚪ Not tried |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | v2.50 | `CHIPPANA.exe` | ⚪ Not tried |
 | Chuuni Hime no Teikoku | 厨二姫の帝国 | v2.50 | `CHU2HIME.exe` | ⚪ Not tried |

@@ -474,6 +474,18 @@ public sealed partial class ScnVm
                 vm.WriteByte(dst + k, b);
             return 0;
         });
+        // 02CB a, b, n, v (aoj.EXE 0x416180 -> FUN_00416130): v = 0 when the n bytes at a and b
+        // are the same, else what was left to compare (dwords, then the last 1-3 bytes)
+        Register(0x02CB, (vm, c, i) =>
+        {
+            int a = vm.Value(c, i.Args[0]), b = vm.Value(c, i.Args[1]), n = vm.Value(c, i.Args[2]);
+            int left = (int)((uint)n >> 2);
+            for (; left > 0 && vm.Read32(a) == vm.Read32(b); left--, a += 4, b += 4) { }
+            if (left == 0)
+                for (left = n & 3; left > 0 && vm.ReadByte(a) == vm.ReadByte(b); left--, a++, b++) { }
+            vm.Store(c, i.Args[3], left);
+            return 0;
+        });
         // 02E4 p: the slot's data pointer; 02E5 v: read a dword from it; 02E8 v: its module offset
         Register(0x02E4, (vm, c, i) => { c.DataPointer = vm.Value(c, i.Args[0]); return 0; });
         Register(0x02E5, (vm, c, i) =>

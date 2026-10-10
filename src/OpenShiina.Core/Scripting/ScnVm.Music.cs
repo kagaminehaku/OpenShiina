@@ -42,6 +42,7 @@ public sealed partial class ScnVm
         public bool Looping;
         public bool Compressed;
         public int StartMs, LoopMs = -1;
+        public int SampleRate;
     }
 
     // 0x4A15E0: volume 0-100 -> DirectSound volume
@@ -75,7 +76,11 @@ public sealed partial class ScnVm
             byte[]? data;
             if ((flags & 1) != 0)
             {
+                // A file loaded there, or one copied (Bitch Nee-chan's START copies its music
+                // into a buffer of its own): the length from its header, as FUN_004778c0 reads it
                 int size = vm.LoadedFileSize(source);
+                if (size <= 0)
+                    size = vm.MusicLength(source);
                 data = size > 0 ? vm.ReadBytes(source, size) : null;
             }
             else
@@ -92,6 +97,7 @@ public sealed partial class ScnVm
             {
                 Handle = platform,
                 Compressed = magic == 0x5367674F || (magic & 0xFFFFFF) == 0x56474F,
+                SampleRate = MusicSampleRate(data),
             };
             if (slot >= 0)
                 vm.m_musicTable[slot] = handle;
@@ -174,6 +180,21 @@ public sealed partial class ScnVm
             }
             return 0;
         });
+        // 06E3 s, v (aoj.EXE 0x41D460 -> FUN_0043f860): v = the volume (0-100; -1 without a stream)
+        Register(0x06E3, (vm, c, i) =>
+        {
+            var s = vm.Stream(vm.Value(c, i.Args[0]));
+            vm.Store(c, i.Args[1], s?.Volume ?? -1);
+            return 0;
+        });
+        // 06E6 s, v (aoj.EXE 0x41D520 -> FUN_0043f7d0): v = the stream's sample rate (its sound
+        // buffer's GetFrequency; 0 without a stream) - Aneiro's START turns loop points into ms
+        Register(0x06E6, (vm, c, i) =>
+        {
+            var s = vm.Stream(vm.Value(c, i.Args[0]));
+            vm.Store(c, i.Args[1], s?.SampleRate ?? 0);
+            return 0;
+        });
         // 06E8 s, v: v = status (1 playing, 4 paused)
         Register(0x06E8, (vm, c, i) =>
         {
@@ -198,6 +219,59 @@ public sealed partial class ScnVm
                 s.LoopCount = count;
             return 0;
         });
+    }
+
+    /// <summary>
+    /// A music file's sample rate: a RIFF WAVE's "fmt " chunk, an Ogg stream's Vorbis
+    /// identification header; 44100 for the others (OGV, PAD).
+    /// </summary>
+    private static int MusicSampleRate(byte[] data)
+    {
+        var span = data.AsSpan();
+        if (BitConverter.ToUInt32(data, 0) == 0x46464952)
+        {
+            for (int p = 12; p + 16 <= span.Length;)
+            {
+                int size = BitConverter.ToInt32(data, p + 4);
+                if (span.Slice(p, 4).SequenceEqual("fmt "u8))
+                    return BitConverter.ToInt32(data, p + 12);
+                if (size < 0)
+                    break;
+                p += 8 + size + (size & 1);
+            }
+        }
+        else if (BitConverter.ToUInt32(data, 0) == 0x5367674F)
+        {
+            int at = span[..Math.Min(span.Length, 4096)].IndexOf("\u0001vorbis"u8);
+            if (at >= 0 && at + 16 <= span.Length)
+                return BitConverter.ToInt32(data, at + 12);
+        }
+        return 44100;
+    }
+
+    /// <summary>
+    /// The length of the music file at <paramref name="address"/> from its header: a RIFF's
+    /// size, or an Ogg stream's pages up to the one that ends it; 0 for anything else.
+    /// </summary>
+    private int MusicLength(int address)
+    {
+        uint magic = (uint)Read32(address);
+        if (magic == 0x46464952)
+            return Read32(address + 4) + 8;
+        if (magic != 0x5367674F)
+            return 0;
+        int at = address;
+        for (int pages = 0; pages < 1 << 20 && (uint)Read32(at) == 0x5367674F; pages++)
+        {
+            // The page header (27 bytes), its segment table, then the segments
+            int type = ReadByte(at + 5), segments = ReadByte(at + 26), length = 27 + segments;
+            for (int k = 0; k < segments; k++)
+                length += ReadByte(at + 27 + k);
+            at += length;
+            if ((type & 4) != 0)
+                return at - address;
+        }
+        return at - address;
     }
 
     private static bool IsMusicFile(byte[] data)

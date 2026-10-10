@@ -522,9 +522,15 @@ sealed class TestMusic : IScnMusic
     {
         uint magic = BitConverter.ToUInt32(file, 0);
         byte[]? ogg = (magic & 0xFFFFFF) == 0x56474F ? OpenShiina.Formats.AudioDecoder.DecodeOgv(file) : magic == 0x5367674F ? file : null;
+        if (ogg == null && magic == 0x46464952)
+        {
+            using var wave = new NAudio.Wave.WaveFileReader(new MemoryStream(file));
+            Console.WriteLine($"  [music] {file.Length} bytes, WAVE: {wave.WaveFormat.SampleRate} Hz, {wave.WaveFormat.Channels} ch, {wave.TotalTime.TotalSeconds:F1} s");
+            return m_next++;
+        }
         if (ogg == null)
         {
-            Console.WriteLine($"  [music] {file.Length} bytes, not Ogg");
+            Console.WriteLine($"  [music] {file.Length} bytes, not Ogg (starts {Convert.ToHexString(file, 0, Math.Min(16, file.Length))})");
             return m_next++;
         }
         using var reader = new NVorbis.VorbisReader(new MemoryStream(ogg), true);

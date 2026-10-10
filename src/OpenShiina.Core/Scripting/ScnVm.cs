@@ -668,6 +668,7 @@ public sealed partial class ScnVm : IDisposable
             InvalidateWindow();
         PumpMessages();
         FrameShown = false;
+        m_taskWaited = false;
         FrameRounds = 0;
         SleepRequested = 0;
         for (int round = 0; round < maxRounds && !QuitRequested; round++)
@@ -677,7 +678,9 @@ public sealed partial class ScnVm : IDisposable
             RunRound();
             FireTimers();
             PumpMessages();
-            if (FrameShown && !m_textWentOn)
+            // 2.34 shows its pictures as it goes and takes time only where a task waits (0028, 03BE,
+            // the mouse read again): a frame ends there, not at the first picture
+            if ((EngineVersion < 240 ? m_taskWaited : FrameShown) && !m_textWentOn)
                 break;
         }
         return !QuitRequested;
@@ -719,9 +722,13 @@ public sealed partial class ScnVm : IDisposable
             }
             if ((c.Flags & 1) == 0)
                 continue;
-            Run(c);
+            if (Run(c) == 3)
+                m_taskWaited = true;
         }
     }
+
+    // A task waited in this frame (an opcode gave 3): where a frame of 2.34 ends
+    private bool m_taskWaited;
 
     // Slots up to the last running one (DAT_00488084), kept until a task starts or stops
     private int m_activeCount = -1;

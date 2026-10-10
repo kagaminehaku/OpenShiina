@@ -37,13 +37,17 @@ public sealed partial class ScnVm
     {
         // START 75A84 / 75EE4 / 85384: the CPU's features (CPUID: 1 Intel, 2 AMD, 10h MMX, 20h SSE,
         // 40h SSE2, 80h SSE3...) into l[0] and into the dword before the routine (gCPUID). The
-        // CPU the interpreter reports (X86Cpu.Cpuid: an Intel with MMX, no SSE) gives 0x11
+        // CPU the interpreter reports (X86Cpu.Cpuid: an Intel with MMX, no SSE) gives 0x11, so
+        // START takes its routines without SSE2 (Re: Rem Plus's own SSE2 zoom too). A START that
+        // will not run without SSE2 (Bitch Nee-chan's "SSE2 をサポートしていません") is told
+        // SSE and SSE2 as well (0x71)
         RegisterNative(["B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F"], "cpuid", (vm, c, a) =>
         {
-            const int Features = 0x11;
-            using var verify = vm.VerifyRegions(c, a, (a.Stack, 4), (vm.m_nativeTarget - 4, 4));
-            vm.SetL(a, 0, Features);
-            vm.Write32(vm.m_nativeTarget - 4, Features);
+            int features = vm.ReadBytes(c.CodeBase, c.CodeSize).AsSpan().IndexOf(Encodings.cp932.GetBytes("SSE2 をサポートしていません")) >= 0 ? 0x71 : 0x11;
+            // The interpreter's CPUID has no SSE: nothing to verify the SSE2 answer with
+            using var verify = features == 0x11 ? vm.VerifyRegions(c, a, (a.Stack, 4), (vm.m_nativeTarget - 4, 4)) : null;
+            vm.SetL(a, 0, features);
+            vm.Write32(vm.m_nativeTarget - 4, features);
         });
 
         // START 75B51 / 75FAF: the save thumbnail, 100 x 75 from an 800 x 600 BGR picture: each

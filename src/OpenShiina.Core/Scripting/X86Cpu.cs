@@ -3,13 +3,14 @@
 // run here on the interpreter's flat memory, so every byte they write is the byte the game's
 // own code writes. Decoding is Iced's; execution covers the integer, string and MMX instructions
 // the 11 games use. CPUID reports an Intel CPU with MMX and without SSE, so the scripts choose
-// their MMX paths (their SSE paths are never run).
+// their MMX paths (their SSE paths are never run); the SSE2 a START that needs it uses is in
+// X86Cpu.Sse.cs.
 
 using Iced.Intel;
 
 namespace OpenShiina.Scripting;
 
-public sealed class X86Cpu
+public sealed partial class X86Cpu
 {
     private readonly ScnVm m_vm;
     private readonly Dictionary<uint, Instruction> m_code = new();
@@ -520,7 +521,7 @@ public sealed class X86Cpu
                     Set(ins, 0, Condition(ins.ConditionCode) ? 1u : 0);
                     break;
                 }
-                if (!Mmx(ins))
+                if (!Sse(ins) && !Mmx(ins))
                     throw new NotSupportedException($"x86 instruction {ins} at {ins.IP32:X8} is not supported");
                 break;
         }
@@ -778,6 +779,7 @@ public sealed class X86Cpu
             case Mnemonic.Psubusw: r = Lanes(a, b, 16, (x, y) => Saturate(x - y, 0, 65535), false); break;
             case Mnemonic.Pmullw: r = Lanes(a, b, 16, (x, y) => x * y, true); break;
             case Mnemonic.Pmulhw: r = Lanes(a, b, 16, (x, y) => (x * y) >> 16, true); break;
+            case Mnemonic.Pmulhuw: r = Lanes(a, b, 16, (x, y) => (x * y) >> 16, false); break;
             case Mnemonic.Pmaddwd:
             {
                 long w(ulong v, int k) => (short)(v >> (16 * k));

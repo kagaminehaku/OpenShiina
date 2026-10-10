@@ -26,7 +26,8 @@ public sealed partial class ScnVm
 
     /// <summary>
     /// InstMode as the installer wrote it: the last install choice of SETUP.INI (InstallFiles0,
-    /// InstallFiles1, ...) whose files are all in the game's folder; 0 without one. The
+    /// InstallFiles1, ...) whose files beyond the earlier choices' are all in the game's folder;
+    /// 0 without one. The
     /// GRAND†CROSS games have one choice; Ao no Juuai's 1 is the full install (voices, music and
     /// movies on the disk too, so START does not ask for the disc).
     /// </summary>
@@ -37,13 +38,19 @@ public sealed partial class ScnVm
     {
         if (m_host.ReadLooseFile("SETUP.INI") is not { } bytes)
             return 0;
-        int best = 0;
+        var choices = new SortedDictionary<int, string[]>();
         foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(Encodings.cp932.GetString(bytes), @"(?im)^InstallFiles(\d+)=(.*)$"))
+            choices[int.Parse(m.Groups[1].Value)] = m.Groups[2].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        // A choice counts by the files it adds to the ones before it (Ao no Juuai's full install:
+        // the voices, the music and the movies): a copied game may lack the others (guilty.url)
+        int best = 0;
+        var before = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (choice, files) in choices)
         {
-            int choice = int.Parse(m.Groups[1].Value);
-            var files = m.Groups[2].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (choice > best && files.Length > 0 && files.All(f => m_host.LooseFileSize(f) != null))
+            var added = files.Where(f => !before.Contains(f)).ToList();
+            if (choice > best && added.Count > 0 && added.All(f => m_host.LooseFileSize(f) != null))
                 best = choice;
+            before.UnionWith(files);
         }
         return best;
     }

@@ -6,19 +6,17 @@ namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
 {
-    /// <summary>0A28's name (0x722B5C): looked in first when a file is opened (FUN_00403xxx); here every archive is.</summary>
-    public string ExtraFileSource { get; private set; } = "";
-
     // 0502's fades: by task, when they started, from and to which level
     private readonly Dictionary<int, (uint Start, int From, int To)> m_fades234 = new();
 
     private void RegisterEngine234()
     {
-        // 0A28 s (0x41AB10, in every version): a name for the file lookups to try first
+        // 0A28 buffer (0x41AB10: lstrcpyA(buffer, 0x722B5C)): the game's folder, '\' at its end -
+        // Ao no Juuai's START adds "save\system.bin" and the like for its save files; here the
+        // save folder (DataPath), so that they go to the host's
         Register(0x0A28, (vm, c, i) =>
         {
-            vm.ExtraFileSource = vm.ReadString(vm.Value(c, i.Args[0]));
-            vm.Trace?.Add($"f{vm.m_frameNumber} 0A28 \"{vm.ExtraFileSource}\"");
+            vm.WriteString(vm.Value(c, i.Args[0]), vm.DataPath);
             return 0;
         });
         // 0A5C v (0x41BA50): v = the engine draws with MMX (0x723910: cpuid says MMX and the
@@ -103,30 +101,32 @@ public sealed partial class ScnVm
             }
             return 0;
         });
-        // The mouse (0456 position, 0458 buttons): the menus of 2.34 poll it in a loop that shows
-        // nothing until it changes - the engine runs it as fast as it can (its main loop takes a
-        // step of every task and pumps the window's messages only after 0033). The mouse moves
-        // between frames here, so a task that reads it again in a frame waits for the next one
-        foreach (int op in new[] { 0x0456, 0x0458 })
+        // The mouse (0456 position, 0458 buttons) and the time (03BD, 03BC): 2.34's menus and
+        // transitions poll them in a loop until they change - the engine runs it as fast as it
+        // can (its main loop takes a step of every task and pumps the window's messages only
+        // after 0033) and a frame ends only where a task waits (RunFrame). Both change between
+        // frames here, so a task that reads one again in a frame waits for the next one
+        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC })
         {
             var later = m_handlers[op];
             Register234(op, (vm, c, i) =>
             {
-                if (vm.m_inputPolled234.GetValueOrDefault(c.Slot) == vm.m_frameNumber)
+                if (vm.m_polled234.GetValueOrDefault((c.Slot, i.Op)) == vm.m_frameNumber)
                 {
                     c.Pc = c.Current;
                     vm.FrameShown = true;
                     return 3;
                 }
-                vm.m_inputPolled234[c.Slot] = vm.m_frameNumber;
+                vm.m_polled234[(c.Slot, i.Op)] = vm.m_frameNumber;
                 return later(vm, c, i);
             });
         }
     }
 
-    // 0028's waits by task (when they started), and the frame each task last read the mouse in
+    // 0028's waits by task (when they started), and the frame each task last read the mouse or
+    // the time in (by task and opcode)
     private readonly Dictionary<int, uint> m_sleeps234 = new();
-    private readonly Dictionary<int, int> m_inputPolled234 = new();
+    private readonly Dictionary<(int Slot, int Op), int> m_polled234 = new();
 
     // 03BB's stopwatch: when it started
     private uint m_stopwatch;

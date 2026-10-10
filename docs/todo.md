@@ -62,13 +62,14 @@ which the scripts then copy and blend.
 
 ## Touch
 
-- [ ] **Taps count in the game's frames, not milliseconds.** A tap is now the button down when
-  the finger lifts and up 70 ms later; on a phone whose frames take 55-100 ms the scripts (which
-  read the buttons once a frame) can miss it, and the first tap on a button only lights it.
-  Instead: the pointer over the place for 2 frames before the button goes down, the button down
-  for 2 frames (GameThread running window messages at a given frame).
-- [ ] **Holding a finger still holds the left button** (after about 0.3 s, until it lifts);
-  now only a drag holds it.
+- [x] **Taps count in the game's frames, not milliseconds** (2026-10-10). A tap was the button
+  down when the finger lifted and up 70 ms later; on a phone whose frames take 55-100 ms the
+  scripts (which read the buttons once a frame) could miss it (Ao no Juuai's opening movie was
+  not skipped by a tap), and the first tap on a button only lit it. Now the pointer is over the
+  place for 2 frames before the button goes down, and the button is down for 2 frames
+  (GameThread.Schedule: steps run before a given frame); the Menu button and Auto's key too.
+- [x] **Holding a finger still holds the left button** (after 0.3 s, until it lifts; moving it
+  then drags) (2026-10-10).
 
 ## Translations
 
@@ -92,15 +93,42 @@ spaced as full-width.
 
 - [ ] Run one of each era with ScnBoot (a 2.49 / 2.50 game first: they are closest to ours) and
   write down what it stops on.
+- [ ] Bitch Nee-chan ga Seijun na Hazu ga Nai! (v2.50, ver 1.02, D:\SusGame\ｏｎｏｍａｔｏｐｅ＊\ here).
+  2026-10-11 in ScnBoot (START at (130, 680) at frame 5000, then (640, 300) every 40 frames): the
+  caution, the opening movie, the title and the story to frame 30,000 with text and music. It
+  needed: BITCHES.EXE in GameMap (GARbro's has only BITCHES2/3); a DecodeBin for its scheme
+  (GARbro-Mod's has none, so Decrypt2 was skipped: start.scn came out with garbage at 0x200); its
+  date at 0x1020 is guessed (0x20150818, the exe's build date) - every one of its 1,029 S25
+  pictures decodes either way, so check a file that uses that slot if one comes out wrong; 0410
+  (GetKeyboardState mode: 0); kernel32 GetVersionExA, LoadLibraryA and HID_ONAHOLE.dll (its USB
+  device, as it is without one), user32 GetMessageExtraInfo; 06D6 of a music file copied into a
+  buffer (the length from its header); SSE2: its START will not run without it, so cpuid says
+  SSE2 for a START with that refusal, the interpreter runs SSE / SSE2 (X86Cpu.Sse.cs), its SSE2
+  scale32 runs as the MMX build's C# version and its blur as C# (ScnVm.Blur32.cs, the same bytes
+  as its x86 code in both calls checked); glyphs drawn into a layer are clipped to the frame
+  (each character goes into a 28 x 29 frame; the overflow broke the next row's header). Next:
+  play it on in the players.
+- [x] Aneiro (v2.49, D:\SusGame\ALcot Honey Comb\アネイロ here, updated to 1.03a). 2026-10-10 in
+  ScnBoot (START at (705, 338) at frame 1100, then the middle every 40 frames): the title
+  ("Version 1.03") and the story to frame 9,000 with text and music. It needed: 010E finding
+  the save folder itself (START checks DataPath with it, and has kernel32 CreateDirectoryA
+  make it), 06E6 (a music stream's sample rate, for its loop points in ms), and kernel32
+  MultiByteToWideChar / WideCharToMultiByte (its UTF-8 .wav.sli files into Shift-JIS), and
+  02CB (memcmp, at the end). The user skipped it to the end with no error (2026-10-10).
+  ALcot's updaters (aneiro_UPDATE_0101.exe, aneiro_update_103a.exe) find the game by the
+  registry key the installer writes (Software\ALcot Honey Comb\アネイロ, InstPath): a copied
+  game has none. Their files are an FA2 archive in the resource "UPDATE" (records of 0x118
+  bytes: name 260, flags 2 = packed with GARbro's Fa2 LZ, file time, unpacked size, size);
+  1.03a has all of 1.01's, newer (ANEIRO.EXE, ANEIRO_S / _T / _U1.WAR, SETUP.INI). Taken out
+  with a script (scratchpad aneiro_update_103a) and copied into the game.
 - [ ] Try a real WARC 1.0-1.6 game (1.0 / 1.1 only on archives made for the test, 1.2-1.6's
   range decoder only against GARbro's on random input).
 - [ ] Ao no Juuai (engine v2.34, D:\SusGame\Guilty\青の獣愛 here; aoj.EXE, not packed). State
-  2026-10-10 (not committed yet; ScnBoot: skip the movie with a click at frame 600, INITIAL START
-  at (365, 213) at frame 760): the logo, the opening movie, the title menu, then the first scene
-  with its first line of text. **Next: a click does not take the text on** (the line at frame 1300
-  is still there at 2400, clicks at (400, 500) every 100 frames); trace where slot 1 waits
-  (SCNBOOT_HOT / SCNBOOT_TRACE around a click: in 9 frames it ran 0458 once and 0456 twice, its
-  most run code the 02C6 loop at +169E1).
+  2026-10-10 (ScnBoot: skip the movie with a click at frame 600, INITIAL START at (365, 213) at
+  frame 760, then a click at (400, 228) every 30 frames: the first choice's first answer and
+  the text): the logo, the opening movie, the title menu and the story to frame 30,000 (1,202
+  lines, choices) with no opcode missing. Next: play on (later chapters, saves, the system
+  screens) in the players, and the opcodes it reaches.
   Done so far (ScnVm.Engine234.cs unless named; Register234 = for EngineVersion < 240 only):
   - ops_v234.tsv (543 opcodes; ScnOpcodes "2.34", SPRITE234 layout of 04BD) and Register234 /
     HandlerFor in ScnVm.cs.
@@ -112,16 +140,22 @@ spaced as full-width.
   - The menus of 2.34 poll the mouse in a loop that draws nothing (the engine's main loop runs one
     instruction of each task a round and pumps messages only after 0033: it spins): a task that
     reads 0456 / 0458 a second time in a frame waits for the next one (Register234).
+  - A frame of 2.34 ends where a task waits (an opcode gave 3), not at the first picture
+    (RunFrame): its text loop draws the CLICK mark every round, and a frame ended there
+    never reached the mouse. The time (03BD, 03BC) read again in a frame waits as the mouse
+    does (a transition polls the clock in a loop).
+  - 06E3 s, v (Music.cs): the stream's volume, -1 without one.
   - A named operand in 2.34 is read up to its 0 and named up to the first '}' (the local
     "{ret_flag}" is "{ret_flag"; ReadOperand in ScnVm.cs).
   - aoj.EXE: dispatcher 0x41E5C0, GetVar 0x40D700, SetVar 0x40D000, GetVarAdr 0x40D520 (they
     match ours: 0x80 adds the module base to the value, kind 4 is base + value), main loop
     0x4207B0, message pump 0x40B9E0 (only while 0x468DF8, 0033's flag, is set).
-  Still to do: the first music file (19,842,092 bytes) is "not Ogg" (find its format); the 11
+  - The first music file (19,842,092 bytes) is a RIFF WAVE (the players read it; ScnBoot's
+    TestMusic now does too).
+  Still to do: the 11
   opcodes that take other operands than v2.47's (music with one stream: 0686-068B; 055A, 055B,
   04EC, 0B7D) and the 9 new ones (007D-0080, 060E-0610, 0614, 077B) as the game reaches them;
-  03BF; then run verify.sh / allgames.sh (02EE / 02EF, instmode and 0458 touch every version)
-  before committing.
+  03BF.
 - [ ] Opcode tables for the other engine versions (2.35-2.46, 2.48; opscan on the game's
   executable, the aoj preset as an example of an old build).
 - [ ] The ExtraCrypts ported for those games (PostAdler, PreAdler, Binbo, Count, AltCount,

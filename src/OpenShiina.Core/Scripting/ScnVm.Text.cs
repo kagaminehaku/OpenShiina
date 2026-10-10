@@ -1426,7 +1426,7 @@ public sealed partial class ScnVm
         int f = Read32(picture + 8 + 4 * frameIndex);
         if (f == 0)
             return;
-        int height = Read32(f + 4);
+        int width = Read32(f), height = Read32(f + 4);
         uint r = (uint)G(rec, RTextR), g = (uint)G(rec, RTextG), b = (uint)G(rec, RTextB);
         uint opaque = r << 24 | g << 16 | b << 8 | 0xFF;
         for (uint gy = firstRow; gy < endRow; gy++, src += glyph.Pitch, top++)
@@ -1436,6 +1436,10 @@ public sealed partial class ScnVm
             int p = PicturePixel(picture, frameIndex, left, top, 4);
             for (uint col = 0; col < endCol - firstCol; col++, p += 4)
             {
+                // The glyph was clipped to the text's surface; a column outside the frame would
+                // write into a row header (Bitch Nee-chan draws each character into a 28 x 29 frame)
+                if (left + (int)col < 0 || left + (int)col >= width)
+                    continue;
                 byte v = glyph.Bits.Length > src + col ? glyph.Bits[src + (int)col] : (byte)0;
                 if (v == 0)
                     continue;

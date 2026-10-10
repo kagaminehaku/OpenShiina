@@ -40,6 +40,11 @@ public sealed partial class ScnVm
 
     private void RegisterEngine250()
     {
+        // 0410 v (REMPLUS.EXE 0x42B137): v = RIO.INI's GetKeyboardState (0xD09E68; also set when
+        // DirectInput fails): the keys are read with GetKeyboardState, by virtual key, instead of
+        // DirectInput's scan codes. 03EC takes scan codes here (0): Bitch Nee-chan's START reads
+        // its keys with 03EC as they are, and turns them into virtual keys first otherwise
+        Register(0x0410, (vm, c, i) => { vm.Store(c, i.Args[0], 0); return 0; });
         // 077A w, h
         Register(0x077A, (vm, c, i) =>
         {

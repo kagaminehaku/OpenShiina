@@ -172,6 +172,28 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
         });
 
+        // Bitch Nee-chan START C7C70: the SSE2 build of the same scaling copy (Re: Rem Plus's
+        // 8BDE0, which its START takes in place of 87920 when b[77] says SSE2; this START cannot
+        // do without SSE2). Its arithmetic is in floats, so a pixel may come out a step off the MMX
+        // build's that ScnVm.Scale32 gives; the interpreter has no SSE, so nothing to verify with
+        RegisterNative("A3DCAB9DFB6CC480BF9F3995AEC7212737E5EB95", "scale32 (SSE2 build)", (vm, c, a) =>
+        {
+            if (!vm.Scale32(vm.NativeArg(a, 0), vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 3), vm.NativeArg(a, 4), vm.NativeArg(a, 5),
+                            vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11)))
+                throw vm.Error(c, "Embedded x86 routine (scale32, SSE2 build): rectangles it cannot scale (the x86 code would not end)");
+        });
+
+        // Bitch Nee-chan START 9F5E6 (SSE2): the blur of ScnVm.Blur32.cs (15 s a call on the
+        // interpreter). l[0] dst, l[1] its stride, l[2] width, l[3] height, l[4] src, l[5] its
+        // stride, l[6] / l[7] the radii across and down
+        RegisterNative("1276382986E6312B58F7F1B31302308A07B97B92", "blur32", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), stride = vm.NativeArg(a, 1), w = vm.NativeArg(a, 2), h = vm.NativeArg(a, 3);
+            using var verify = vm.VerifyRegion(c, a, dst, w <= 0 || h <= 0 ? 0 : stride * (h - 1) + w * 4);
+            if (!vm.Blur32(dst, stride, w, h, vm.NativeArg(a, 4), vm.NativeArg(a, 5), vm.NativeArg(a, 6), vm.NativeArg(a, 7)))
+                vm.RunX86(c, a);
+        });
+
         // Oreimo START 796E5 (Sena 79B33; MMX, the rule fade of 0x16EB3): dst = S with its alpha byte made
         // from the rule mask M (the mask's top byte m, or 255 - m when dir is set): m <= imin
         // gives 0, m >= imax keeps S's alpha s, between them ((m - imin') * q in 16 bits, signed)

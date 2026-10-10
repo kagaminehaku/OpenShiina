@@ -10,7 +10,9 @@
 // A picture the scripts showed is copied, as 32-bit BGRA, into a buffer the window takes - only
 // the part that changed (ScnVm.TakeChangedArea), and the window takes only what changed since it
 // last took a picture. Window events and messages (focus,
-// Alt+Enter, keys, mouse buttons, the wheel, closing) are queued for the interpreter's thread; the
+// Alt+Enter, keys, mouse buttons, the wheel, closing) are queued for the interpreter's thread, or
+// put off to later frames (Schedule: a tap on a phone, so that scripts reading the buttons once a
+// frame see each step however long a frame takes); the
 // title, the answer to closing and the end of the game are posted to the window's thread (the
 // SynchronizationContext Start is called on). Used by both players.
 
@@ -30,6 +32,8 @@ public sealed class GameThread : IDisposable
     // A FrameReady posted to the window and not run yet
     private int m_readyPosted;
     private readonly ConcurrentQueue<Action<ScnVm>> m_events = new();
+    // Schedule's steps not due yet: the frame (m_frames) each runs before, in the order given
+    private readonly List<(int Frame, Action<ScnVm> Do)> m_scheduled = new();
     private SynchronizationContext? m_window;
     private volatile bool m_stop, m_finished, m_closed;
 
@@ -186,6 +190,32 @@ public sealed class GameThread : IDisposable
     public void PostMessage(int message, int wParam, int lParam) => m_events.Enqueue(vm => vm.WindowMessage(message, wParam, lParam));
 
     /// <summary>
+    /// Steps run on the interpreter's thread before frames to come: frame 0 is the next one it
+    /// runs, frame 1 the one after it, and so on (a step of a later frame never runs before one
+    /// of an earlier frame, and steps of one frame run in the order given).
+    /// </summary>
+    public void Schedule(params (int Frame, Action<ScnVm> Do)[] steps) => m_events.Enqueue(_ =>
+    {
+        int now = m_frames;
+        foreach (var (frame, step) in steps)
+            m_scheduled.Add((now + Math.Max(frame, 0), step));
+    });
+
+    /// <summary>Runs the scheduled steps due by this frame.</summary>
+    private void RunScheduled()
+    {
+        if (m_scheduled.Count == 0)
+            return;
+        // Stable: in frame order, the order given within a frame
+        var due = m_scheduled.Where(s => s.Frame <= m_frames).OrderBy(s => s.Frame).ToList();
+        if (due.Count == 0)
+            return;
+        m_scheduled.RemoveAll(s => s.Frame <= m_frames);
+        foreach (var (_, step) in due)
+            step(m_vm);
+    }
+
+    /// <summary>
     /// The player closes the window (WM_CLOSE): the scripts run what they do on closing (START
     /// saves what it keeps) and answer with <see cref="CloseAnswered"/>; when they let the window
     /// close, no more frames run.
@@ -250,6 +280,8 @@ public sealed class GameThread : IDisposable
                 long started = Stopwatch.GetTimestamp();
                 while (!m_closed && m_events.TryDequeue(out var e))
                     e(m_vm);
+                if (!m_closed)
+                    RunScheduled();
                 if (m_closed)
                     continue;
                 if (m_vm.Paused)

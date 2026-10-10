@@ -57,14 +57,15 @@ public sealed partial class ScnVm
     private int m_nextHandle = 0x100;
 
     /// <summary>
-    /// A path of the scripts: under DataPath it is a save file (the host's save folder), any
-    /// other absolute path is refused, and a relative name is a file of the game.
+    /// A path of the scripts: under DataPath it is a save file (the host's save folder; one in a
+    /// folder of it, as Ao no Juuai's save\, goes there too), any other absolute path is
+    /// refused, and a relative name is a file of the game.
     /// </summary>
     private (bool Save, string Name)? ResolvePath(string path)
     {
         string data = DataPath;
         if (path.StartsWith(data, StringComparison.OrdinalIgnoreCase))
-            return (true, path[data.Length..]);
+            return (true, path[(path.LastIndexOfAny(['\\', '/']) + 1)..]);
         if (path.Contains(':'))
             return null;
         return (false, path);
@@ -101,6 +102,20 @@ public sealed partial class ScnVm
         return true;
     }
 
+    /// <summary>
+    /// The save folder (DataPath) or a folder in it: there, as the engine's GetFileAttributes
+    /// finds it (Aneiro's START checks DataPath with 010E, Ao no Juuai's its save\, and they have
+    /// kernel32 CreateDirectoryA make it when it is not). A name with a '.' is a file.
+    /// </summary>
+    private bool IsSaveFolder(string path)
+    {
+        string folder = DataPath.TrimEnd('\\', '/');
+        if (!path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+            return false;
+        string rest = path[folder.Length..].TrimEnd('\\', '/');
+        return rest.Length == 0 || path[folder.Length] is '\\' or '/' && !Path.GetFileName(rest).Contains('.');
+    }
+
     private void RegisterFiles()
     {
         // 010E file, v: whether the file exists - for a file of the archives from their index
@@ -108,7 +123,7 @@ public sealed partial class ScnVm
         Register(0x010E, (vm, c, i) =>
         {
             string path = vm.ReadString(vm.Value(c, i.Args[0]));
-            vm.Store(c, i.Args[1], vm.ScriptFileSize(path) != null ? 1 : 0);
+            vm.Store(c, i.Args[1], vm.ScriptFileSize(path) != null || vm.IsSaveFolder(path) ? 1 : 0);
             return 0;
         });
         // 0158 file, size, packed size: from the archive's index, as the engine does (START reads

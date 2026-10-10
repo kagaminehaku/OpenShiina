@@ -112,10 +112,88 @@ public sealed partial class ScnVm
                 Write64(p + 56, 0);
                 return 1;
             }
+            case ("user32", "GetMessageExtraInfo"):
+                // The message came from a mouse, not from a pen or a finger (Windows marks those
+                // 0xFF5157xx; Bitch Nee-chan's hook reads it for RIO.INI's TabletShortcut)
+                return 0;
+            case ("kernel32", "LoadLibraryA"):
+            {
+                // No library loads; one in the game's folder seems to (a handle), so that its
+                // functions below answer: Bitch Nee-chan's HID_ONAHOLE.dll (a USB device sold
+                // with the game; START says the DLL is missing when it does not load)
+                string name = ReadString(Arg(0));
+                Trace?.Add($"f{m_frameNumber} LoadLibraryA \"{name}\"");
+                return m_host.LooseFileSize(name) != null ? 0x10000000 : 0;
+            }
+            // HID_ONAHOLE.dll as it is without its device: version 1.0, onahoInit finds none
+            case ("hid_onahole", "onahoDLLVer"):
+                return 0x10000;
+            case ("hid_onahole", "onahoInit" or "onahoEnd" or "onahoSetLevel" or "onahoSetPattern"):
+                return 0;
+            case ("kernel32", "GetVersionExA"):
+            {
+                // OSVERSIONINFOA as Windows 8 and later give a program without a manifest: 6.2,
+                // build 9200, NT (Bitch Nee-chan's START reads the major and minor version)
+                int p = Arg(0);
+                int size = Read32(p);
+                for (int k = 4; k < Math.Min(size, 156); k++)
+                    WriteByte(p + k, 0);
+                Write32(p + 4, 6);
+                Write32(p + 8, 2);
+                Write32(p + 12, 9200);
+                Write32(p + 16, 2);
+                return 1;
+            }
+            case ("kernel32", "MultiByteToWideChar"):
+            {
+                // Aneiro's START turns its UTF-8 .wav.sli files into Shift-JIS through UTF-16:
+                // code page, flags, string, bytes (-1: up to its 0, which counts), out, out size
+                int length = Arg(3);
+                if (length < 0)
+                    for (length = 0; ReadByte(Arg(2) + length) != 0; length++) { }
+                string text = CodePage(Arg(0)).GetString(ReadBytes(Arg(2), length)) + (Arg(3) < 0 ? "\0" : "");
+                if (Arg(5) == 0)
+                    return text.Length;
+                if (Arg(5) < text.Length)
+                    return 0;
+                for (int k = 0; k < text.Length; k++)
+                    Write16(Arg(4) + 2 * k, text[k]);
+                return text.Length;
+            }
+            case ("kernel32", "WideCharToMultiByte"):
+            {
+                // code page, flags, string, characters (-1: up to its 0), out, out size, default
+                // character, whether it was used
+                int length = Arg(3);
+                if (length < 0)
+                    for (length = 0; Read16(Arg(2) + 2 * length) != 0; length++) { }
+                var chars = new char[length];
+                for (int k = 0; k < length; k++)
+                    chars[k] = (char)Read16(Arg(2) + 2 * k);
+                byte[] bytes = CodePage(Arg(0)).GetBytes(chars);
+                if (Arg(3) < 0)
+                    bytes = [.. bytes, 0];
+                if (Arg(5) == 0)
+                    return bytes.Length;
+                if (Arg(5) < bytes.Length)
+                    return 0;
+                WriteBytes(Arg(4), bytes);
+                if (Arg(7) != 0)
+                    Write32(Arg(7), 0);
+                return bytes.Length;
+            }
             default:
                 return null;
         }
     }
+
+    /// <summary>A Windows code page: the system's ones (0 ANSI, 1 OEM, 3 the thread's) are Japanese, 932.</summary>
+    private static System.Text.Encoding CodePage(int codePage) => codePage switch
+    {
+        0 or 1 or 3 or 932 => Encodings.cp932,
+        65001 => System.Text.Encoding.UTF8,
+        _ => System.Text.Encoding.GetEncoding(codePage),
+    };
 
     private void Write64(int address, long value)
     {

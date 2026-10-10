@@ -144,7 +144,7 @@ public sealed partial class ScnVm
         }
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or ArithmeticException)
         {
-            throw Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5}: {ex.Message}");
+            throw Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5} (signature {NativeSignature(target)}): {ex.Message}");
         }
     }
 
@@ -162,7 +162,7 @@ public sealed partial class ScnVm
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArithmeticException)
         {
-            throw Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5}: {ex.Message}");
+            throw Error(c, $"Embedded x86 routine at module offset {target - c.Base:X5} (signature {NativeSignature(target)}): {ex.Message}");
         }
     }
 

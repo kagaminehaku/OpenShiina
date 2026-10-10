@@ -1,9 +1,12 @@
 // The game with fingers (phones and tablets): the games are made for a mouse and a keyboard, so a
 // finger stands in for both.
 //   - Touching moves the pointer there without pressing (the menus light the item under it);
-//     lifting the finger soon after, where it went down, clicks there (left button down, then up a
-//     few frames later, so scripts that read the button between frames see it). Two taps close
-//     together are a double click.
+//     lifting the finger soon after, where it went down, clicks there. The click is counted in
+//     the game's frames, not in time, since the scripts read the buttons once a frame and a
+//     phone's frame may take 100 ms: the pointer stays there 2 frames, then the left button is
+//     down for 2 frames (GameThread.Schedule). Two taps close together are a double click.
+//   - Holding the finger still for 0.3 s presses the left button there until it is lifted (a
+//     movie skipped by holding the button, text that goes on while it is held).
 //   - Moving the finger further than a few pixels presses the left button where it went down and
 //     drags (sliders, scroll bars) until it is lifted.
 //   - Two fingers moved up or down turn the wheel: down is a turn away (the backlog opens), up a
@@ -30,17 +33,23 @@ namespace OpenShiina.App;
 
 public sealed partial class GameView
 {
-    // How far a finger may wander and still tap (device independent pixels), how long a click
-    // holds the button, how close two taps make a double click, and how far two fingers go for a
-    // turn of the wheel
+    // How far a finger may wander and still tap (device independent pixels), how close two taps
+    // make a double click, and how far two fingers go for a turn of the wheel
     private const double TouchSlop = 12, DoubleTapSlop = 24, WheelStep = 48;
-    private static readonly TimeSpan ClickTime = TimeSpan.FromMilliseconds(70);
     private const long DoubleTapMilliseconds = 400;
+    // A click in the game's frames: the pointer there before the button goes down, the button down
+    private const int HoverFrames = 2, ClickFrames = 2;
+    // How long a finger held still waits before it holds the left button
+    private static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(300);
 
-    // The finger that leads (and a second one), where it went down, and what it is doing
+    // The finger that leads (and a second one), where it went down, and what it is doing (a
+    // drag or a hold keeps the left button down; the game's thread reads them for a click's end)
     private IPointer? m_finger, m_secondFinger;
     private Point m_fingerStart, m_fingerLast;
-    private bool m_dragging, m_twoFingers;
+    private volatile bool m_dragging, m_holding;
+    private bool m_twoFingers;
+    // Which press a hold's timer belongs to (a lift or a second finger makes it stale)
+    private int m_holdPress;
     private double m_wheelRest;
     private long m_lastTapTime = long.MinValue;
     private Point m_lastTap;
@@ -227,12 +236,19 @@ public sealed partial class GameView
                 m_wheelRest = 0;
                 e.Pointer.Capture(m_image);
                 MoveTo(p);
+                int press = ++m_holdPress;
+                DispatcherTimer.RunOnce(() =>
+                {
+                    if (press == m_holdPress && m_finger != null && !m_dragging && !m_twoFingers)
+                        Hold();
+                }, HoldTime);
             }
-            else if (m_secondFinger == null && !m_dragging)
+            else if (m_secondFinger == null && !m_dragging && !m_holding)
             {
                 // Two fingers: the wheel when they move, nothing (no click either) when they lift
                 m_secondFinger = e.Pointer;
                 m_twoFingers = true;
+                m_holdPress++;
                 e.Pointer.Capture(m_image);
             }
         }
@@ -255,11 +271,13 @@ public sealed partial class GameView
                 MoveTo(p);
             else if (Distance(p, m_fingerStart) > TouchSlop)
             {
-                // A drag: the button goes down where the finger did, then follows it
+                // A drag: the button goes down where the finger did (a hold has it down already),
+                // then follows it
+                m_holdPress++;
+                if (!m_holding)
+                    LeftButton(m_session, true, MoveTo(m_fingerStart));
                 m_dragging = true;
-                int start = MoveTo(m_fingerStart);
-                m_session.Input.Buttons = 1;
-                m_session.PostMessage(ScnMessage.LButtonDown, 1, start);
+                m_holding = false;
                 MoveTo(p);
             }
             m_fingerLast = p;
@@ -273,18 +291,35 @@ public sealed partial class GameView
             }
             if (e.Pointer != m_finger)
                 return;
+            m_holdPress++;
             if (m_dragging)
-            {
-                int point = MoveTo(p);
-                m_session.Input.Buttons = 0;
-                m_session.PostMessage(ScnMessage.LButtonUp, 0, point);
-            }
+                LeftButton(m_session, false, MoveTo(p));
+            else if (m_holding)
+                LeftButton(m_session, false, CurrentPoint());
             else if (!m_twoFingers)
                 Tap(m_fingerStart);
             m_finger = null;
-            m_dragging = false;
+            m_dragging = m_holding = false;
         }
     }
+
+    /// <summary>A finger held still: the left button down where it is, until it lifts or drags.</summary>
+    private void Hold()
+    {
+        if (m_session is not { } session)
+            return;
+        m_holding = true;
+        // The pointer has been there since the finger went down
+        LeftButton(session, true, CurrentPoint());
+    }
+
+    /// <summary>The left button down or up at <paramref name="point"/>, before the game's next frame.</summary>
+    private static void LeftButton(GameSession session, bool down, int point) =>
+        session.Schedule((0, vm =>
+        {
+            session.Input.Buttons = down ? 1 : 0;
+            vm.WindowMessage(down ? ScnMessage.LButtonDown : ScnMessage.LButtonUp, down ? 1 : 0, point);
+        }));
 
     /// <summary>The system took the finger away (a gesture of its own): a drag lets go.</summary>
     private void TouchLost(IPointer pointer)
@@ -293,26 +328,28 @@ public sealed partial class GameView
             m_secondFinger = null;
         if (pointer != m_finger)
             return;
-        if (m_dragging && m_session != null)
-        {
-            m_session.Input.Buttons = 0;
-            m_session.PostMessage(ScnMessage.LButtonUp, 0, CurrentPoint());
-        }
+        m_holdPress++;
+        if ((m_dragging || m_holding) && m_session != null)
+            LeftButton(m_session, false, CurrentPoint());
         m_finger = null;
-        m_dragging = false;
+        m_dragging = m_holding = false;
     }
 
     private void ResetTouch()
     {
         m_finger = m_secondFinger = null;
-        m_dragging = m_twoFingers = false;
+        m_dragging = m_holding = m_twoFingers = false;
+        m_holdPress++;
         m_lastTapTime = long.MinValue;
     }
 
-    /// <summary>A left click at <paramref name="p"/> (of the image): down now, up a few frames later.</summary>
+    /// <summary>
+    /// A left click at <paramref name="p"/> (of the image): the pointer there now, the button down
+    /// <see cref="HoverFrames"/> frames later and up <see cref="ClickFrames"/> frames after that.
+    /// </summary>
     private void Tap(Point p)
     {
-        if (m_session is not { } session)
+        if (m_session is not { } session || GamePoint(p) is not { } at)
             return;
         int point = MoveTo(p);
         long now = Environment.TickCount64;
@@ -320,56 +357,64 @@ public sealed partial class GameView
         // A double click is the second of two clicks (as Windows sends it); a third starts again
         m_lastTapTime = second ? long.MinValue : now;
         m_lastTap = p;
-        session.Input.Buttons = 1;
-        session.PostMessage(second ? ScnMessage.LButtonDoubleClick : ScnMessage.LButtonDown, 1, point);
-        DispatcherTimer.RunOnce(() =>
-        {
-            if (m_session != session)
-                return;
-            // A drag that started since keeps its button
-            if (!m_dragging)
-                session.Input.Buttons = 0;
-            session.PostMessage(ScnMessage.LButtonUp, 0, point);
-        }, ClickTime);
+        session.Schedule(
+            (HoverFrames, vm =>
+            {
+                // Where the finger tapped, should another finger have moved the pointer since
+                session.Input.Position = at;
+                session.Input.Buttons = 1;
+                vm.WindowMessage(second ? ScnMessage.LButtonDoubleClick : ScnMessage.LButtonDown, 1, point);
+            }),
+            (HoverFrames + ClickFrames, vm =>
+            {
+                // A drag or a hold that started since keeps its button
+                if (!m_dragging && !m_holding)
+                    session.Input.Buttons = 0;
+                vm.WindowMessage(ScnMessage.LButtonUp, 0, point);
+            }));
     }
 
-    /// <summary>A right click where the pointer is.</summary>
+    /// <summary>A right click where the pointer is: the button down for <see cref="ClickFrames"/> frames.</summary>
     private void RightClick()
     {
         if (m_session is not { } session)
             return;
         int point = CurrentPoint();
-        session.Input.Buttons = 2;
-        session.PostMessage(ScnMessage.RButtonDown, 2, point);
-        DispatcherTimer.RunOnce(() =>
-        {
-            if (m_session != session)
-                return;
-            if (!m_dragging)
-                session.Input.Buttons = 0;
-            session.PostMessage(ScnMessage.RButtonUp, 0, point);
-        }, ClickTime);
+        session.Schedule(
+            (0, vm =>
+            {
+                session.Input.Buttons = 2;
+                vm.WindowMessage(ScnMessage.RButtonDown, 2, point);
+            }),
+            (ClickFrames, vm =>
+            {
+                if (!m_dragging && !m_holding)
+                    session.Input.Buttons = 0;
+                vm.WindowMessage(ScnMessage.RButtonUp, 0, point);
+            }));
     }
 
     /// <summary>Turns of the wheel where the pointer is: 1 away from the user, -1 towards.</summary>
     private void Wheel(int turns) =>
         m_session?.PostMessage(ScnMessage.MouseWheel, turns * 120 << 16, CurrentPoint());
 
-    /// <summary>A key pressed and let go, as the keyboard would.</summary>
+    /// <summary>A key pressed and let go, as the keyboard would: down for <see cref="ClickFrames"/> frames.</summary>
     private void TypeKey(Key key)
     {
         if (m_session is not { } session)
             return;
         int vk = VirtualKeys.From(key);
-        session.Input.Press(key, true);
-        session.PostMessage(ScnMessage.KeyDown, vk, ScnMessage.Key(0, true, false));
-        DispatcherTimer.RunOnce(() =>
-        {
-            if (m_session != session)
-                return;
-            session.Input.Press(key, false);
-            session.PostMessage(ScnMessage.KeyUp, vk, ScnMessage.Key(0, false, false));
-        }, ClickTime);
+        session.Schedule(
+            (0, vm =>
+            {
+                session.Input.Press(key, true);
+                vm.WindowMessage(ScnMessage.KeyDown, vk, ScnMessage.Key(0, true, false));
+            }),
+            (ClickFrames, vm =>
+            {
+                session.Input.Press(key, false);
+                vm.WindowMessage(ScnMessage.KeyUp, vk, ScnMessage.Key(0, false, false));
+            }));
     }
 
     private static double Distance(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
