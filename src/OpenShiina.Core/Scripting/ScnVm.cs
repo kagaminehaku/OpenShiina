@@ -246,12 +246,23 @@ public sealed partial class ScnVm : IDisposable
         RegisterGdi();
         RegisterMenus();
         RegisterEngine250();
+        RegisterEngine234();
     }
 
     public ScnContext Slot(int index) => m_slots[index];
 
     /// <summary>Adds (or replaces) an opcode outside the core.</summary>
     public void Register(int op, OpHandler handler) => m_handlers[op] = handler;
+
+    // Handlers of the engines before 2.40 (v2.34) where theirs differ from the later ones'
+    private readonly Dictionary<int, OpHandler> m_handlers234 = new();
+
+    /// <summary>A handler for engines before 2.40 only (EngineVersion below 240), in place of the later one.</summary>
+    public void Register234(int op, OpHandler handler) => m_handlers234[op] = handler;
+
+    /// <summary>The handler of an opcode for this engine version.</summary>
+    private OpHandler? HandlerFor(int op) =>
+        EngineVersion < 240 && m_handlers234.TryGetValue(op, out var old) ? old : m_handlers.GetValueOrDefault(op);
 
     #region Memory
 
@@ -787,10 +798,32 @@ public sealed partial class ScnVm : IDisposable
         var raw = new List<int>();
         var targets = new List<int>();
         var caseValues = new List<int>();
+        bool cache = true;
         foreach (var item in layout)
         {
             switch (item)
             {
+                case "SPRITE234":
+                {
+                    // The engine reads the flags first and then as many more as they ask for: a
+                    // constant decides once, a variable as it is now (and the instruction is
+                    // decoded again next time)
+                    for (int k = 0; k < 7; k++)
+                        args.Add(ReadOperand(ref p));
+                    var f = args[2];
+                    bool constant = f.Kind == 4 && !f.Relative && !f.AddressOf;
+                    cache = constant;
+                    int flags = constant ? f.Value : Value(c, f);
+                    bool alpha = (flags & 0x60000000) != 0, tint = (flags & 0x20000000) != 0;
+                    raw.Add(alpha ? 1 : 0);
+                    raw.Add(tint ? 1 : 0);
+                    if (alpha)
+                        args.Add(ReadOperand(ref p));
+                    if (tint)
+                        for (int k = 0; k < 3; k++)
+                            args.Add(ReadOperand(ref p));
+                    break;
+                }
                 case "V":
                     args.Add(ReadOperand(ref p));
                     break;
@@ -856,9 +889,10 @@ public sealed partial class ScnVm : IDisposable
         }
         var ins = new ScnInstruction(op, at, p - at, args.ToArray(), raw.ToArray(), targets.ToArray(), caseValues.ToArray())
         {
-            Handler = m_handlers.GetValueOrDefault(op),
+            Handler = HandlerFor(op),
         };
-        m_decoded[at] = ins;
+        if (cache)
+            m_decoded[at] = ins;
         return ins;
     }
 
@@ -911,6 +945,11 @@ public sealed partial class ScnVm : IDisposable
                 while (ReadByte(p) != 0 && ReadByte(p) != (byte)'}')
                     p++;
                 string name = Encodings.cp932.GetString(ReadBytes(start, p - start));
+                // 2.34 (aoj.EXE 0x40D635) goes on to the 0 and names it up to the first '}' (the
+                // local "{ret_flag}" is "{ret_flag")
+                if (EngineVersion < 240)
+                    while (ReadByte(p) != 0)
+                        p++;
                 p++;
                 return new ScnOperand(kind, relative, addressOf, 0, name);
             }

@@ -93,6 +93,11 @@ public sealed partial class ScnVm
             case ("user32", "AdjustWindowRect"):
                 // The host makes the window around the picture; the rectangle stays as it is
                 return 1;
+            case ("kernel32", "CreateDirectoryA"):
+                // Ao no Juuai's save folder ("save" in the game's folder): the host keeps its
+                // saves in a folder of its own and never writes into the game's
+                Trace?.Add($"f{m_frameNumber} CreateDirectoryA \"{ReadString(Arg(0))}\"");
+                return 1;
             case ("kernel32", "GlobalMemoryStatusEx"):
             {
                 // MEMORYSTATUSEX of a PC with 8 GB, as a 32-bit program sees it

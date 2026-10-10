@@ -17,6 +17,8 @@
 // mouse wheel one notch away from the user (":-" towards) at those frames. Presses and clicks are
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
+// SCNBOOT_DUMP="frame:address:length:file,..." writes the scripts' memory (hex address) to a file
+// after that frame.
 // SCNBOOT_AREAS=1 checks ScnVm.TakeChangedArea: a copy of the window's picture updated only in the
 // areas it gives must be the picture after every frame (the players copy only those).
 // SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames; a game
@@ -122,6 +124,9 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_HOT") is { } hotRange && hotRang
 int closeAt = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_CLOSE"), out int ca) ? ca : -1;
 int frame = 0;
 uint pausedFor = 0;
+var dumps = (Environment.GetEnvironmentVariable("SCNBOOT_DUMP") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+    .Select(d => d.Split(':', 4)).Where(d => d.Length == 4)
+    .Select(d => (Frame: int.Parse(d[0]), Address: Convert.ToInt32(d[1], 16), Length: int.Parse(d[2]), File: d[3])).ToList();
 byte[]? areaCopy = Environment.GetEnvironmentVariable("SCNBOOT_AREAS") == "1" ? new byte[vm.ScreenWidth * vm.ScreenHeight * 3] : null;
 long areaPixels = 0, areaFrames = 0;
 int areaMisses = 0;
@@ -184,6 +189,8 @@ try
             Console.WriteLine($"The scripts quit after {frame} frames.");
             break;
         }
+        foreach (var d in dumps.Where(d => d.Frame == frame))
+            File.WriteAllBytes(d.File, vm.ReadBytes(d.Address, d.Length));
         if (areaCopy != null)
         {
             var area = vm.TakeChangedArea();

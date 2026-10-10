@@ -20,9 +20,33 @@ public sealed partial class ScnVm
     private object? RegistryValue(string name) => name.ToLowerInvariant() switch
     {
         "datapath" => DataPath,
-        "instmode" => 0,     // SETUP.INI has one install choice (DefaultSelect=0)
+        "instmode" => InstallMode,
         _ => null,
     };
+
+    /// <summary>
+    /// InstMode as the installer wrote it: the last install choice of SETUP.INI (InstallFiles0,
+    /// InstallFiles1, ...) whose files are all in the game's folder; 0 without one. The
+    /// GRAND†CROSS games have one choice; Ao no Juuai's 1 is the full install (voices, music and
+    /// movies on the disk too, so START does not ask for the disc).
+    /// </summary>
+    private int InstallMode => m_installMode ??= FindInstallMode();
+    private int? m_installMode;
+
+    private int FindInstallMode()
+    {
+        if (m_host.ReadLooseFile("SETUP.INI") is not { } bytes)
+            return 0;
+        int best = 0;
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(Encodings.cp932.GetString(bytes), @"(?im)^InstallFiles(\d+)=(.*)$"))
+        {
+            int choice = int.Parse(m.Groups[1].Value);
+            var files = m.Groups[2].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (choice > best && files.Length > 0 && files.All(f => m_host.LooseFileSize(f) != null))
+                best = choice;
+        }
+        return best;
+    }
 
     /// <summary>The save folder as the scripts see it: a path ending with '\'.</summary>
     public string DataPath => m_host.SaveFolder.TrimEnd('\\', '/') + "\\";

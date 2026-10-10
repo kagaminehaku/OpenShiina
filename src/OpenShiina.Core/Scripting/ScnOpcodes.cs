@@ -32,7 +32,15 @@ public sealed class ScnOpcodes
         [0x039D] = ["V", "V"],          // which the table took for a third operand
     };
 
-    private ScnOpcodes(string table)
+    // Layouts of one engine version only. SPRITE234 = 04BD of v2.34: seven operands, then one more
+    // (an alpha ORed into the flags) when the third has bits 0x60000000, three more (the tint's
+    // red, green, blue) when it has 0x20000000
+    private static readonly Dictionary<string, Dictionary<int, string[]>> s_versionOverrides = new()
+    {
+        ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
+    };
+
+    private ScnOpcodes(string table, string name)
     {
         foreach (var line in table.Split('\n').Skip(1))
         {
@@ -46,6 +54,8 @@ public sealed class ScnOpcodes
             m_layouts[Convert.ToInt32(f[0], 16)] = sig.ToArray();
         }
         foreach (var (op, layout) in s_overrides)
+            m_layouts[op] = layout;
+        foreach (var (op, layout) in s_versionOverrides.GetValueOrDefault(name) ?? [])
             m_layouts[op] = layout;
     }
 
@@ -73,7 +83,7 @@ public sealed class ScnOpcodes
                 using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"OpenShiina.ScnOps.{name}.tsv")
                     ?? throw new InvalidOperationException($"The opcode table {name} is missing.");
                 using var reader = new StreamReader(stream);
-                s_loaded[name] = table = new ScnOpcodes(reader.ReadToEnd());
+                s_loaded[name] = table = new ScnOpcodes(reader.ReadToEnd(), name);
             }
             return table;
         }

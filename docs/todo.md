@@ -94,10 +94,34 @@ spaced as full-width.
   write down what it stops on.
 - [ ] Try a real WARC 1.0-1.6 game (1.0 / 1.1 only on archives made for the test, 1.2-1.6's
   range decoder only against GARbro's on random input).
-- [ ] Ao no Juuai (engine v2.34, D:\SusGame\Guilty\青の獣愛 here): its opcode table is done
-  (ops_v234.tsv, engine-notes.md section 4 "Engine builds"); next its opcodes the players lack
-  (0A28 first), the 11 that take other operands than v2.47's (music with one stream: 0686-068B;
-  055A, 055B, 04BD, 04EC, 0B7D) and the 9 new ones (007D-0080, 060E-0610, 0614, 077B).
+- [ ] Ao no Juuai (engine v2.34, D:\SusGame\Guilty\青の獣愛 here; aoj.EXE, not packed). State
+  2026-10-10 (not committed yet; ScnBoot: skip the movie with a click at frame 600, INITIAL START
+  at (365, 213) at frame 760): the logo, the opening movie, the title menu, then the first scene
+  with its first line of text. **Next: a click does not take the text on** (the line at frame 1300
+  is still there at 2400, clicks at (400, 500) every 100 frames); trace where slot 1 waits
+  (SCNBOOT_HOT / SCNBOOT_TRACE around a click: in 9 frames it ran 0458 once and 0456 twice, its
+  most run code the 02C6 loop at +169E1).
+  Done so far (ScnVm.Engine234.cs unless named; Register234 = for EngineVersion < 240 only):
+  - ops_v234.tsv (543 opcodes; ScnOpcodes "2.34", SPRITE234 layout of 04BD) and Register234 /
+    HandlerFor in ScnVm.cs.
+  - 0A28 (extra file source), 0A5C (MMX = 1), 0502 (timed fade), 04BD (7-dword entry, alpha and
+    tint), 0028 ms (wait, a frame at a time), 03BB / 03BC / 03BE (stopwatch: start, ms since,
+    wait until), 0458 l, r (Input.cs), kernel32 CreateDirectoryA (Gdi.cs, returns 1).
+  - 02EE / 02EF fixed for all versions (Core.cs); "instmode" from SETUP.INI's InstallFilesN
+    (System.cs); 051E onto the display surface invalidates the window in 2.34 (Sprites.cs).
+  - The menus of 2.34 poll the mouse in a loop that draws nothing (the engine's main loop runs one
+    instruction of each task a round and pumps messages only after 0033: it spins): a task that
+    reads 0456 / 0458 a second time in a frame waits for the next one (Register234).
+  - A named operand in 2.34 is read up to its 0 and named up to the first '}' (the local
+    "{ret_flag}" is "{ret_flag"; ReadOperand in ScnVm.cs).
+  - aoj.EXE: dispatcher 0x41E5C0, GetVar 0x40D700, SetVar 0x40D000, GetVarAdr 0x40D520 (they
+    match ours: 0x80 adds the module base to the value, kind 4 is base + value), main loop
+    0x4207B0, message pump 0x40B9E0 (only while 0x468DF8, 0033's flag, is set).
+  Still to do: the first music file (19,842,092 bytes) is "not Ogg" (find its format); the 11
+  opcodes that take other operands than v2.47's (music with one stream: 0686-068B; 055A, 055B,
+  04EC, 0B7D) and the 9 new ones (007D-0080, 060E-0610, 0614, 077B) as the game reaches them;
+  03BF; then run verify.sh / allgames.sh (02EE / 02EF, instmode and 0458 touch every version)
+  before committing.
 - [ ] Opcode tables for the other engine versions (2.35-2.46, 2.48; opscan on the game's
   executable, the aoj preset as an example of an old build).
 - [ ] The ExtraCrypts ported for those games (PostAdler, PreAdler, Binbo, Count, AltCount,

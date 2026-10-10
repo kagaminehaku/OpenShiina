@@ -196,19 +196,28 @@ public sealed partial class ScnVm
         // 0032 / 0033: stop / start yielding after every instruction
         Register(0x0032, (vm, c, i) => { vm.YieldEveryInstruction = false; return 0; });
         Register(0x0033, (vm, c, i) => { vm.YieldEveryInstruction = true; return 0; });
-        // 02EE mode: 1 = push that flag
+        // 02EE mode (Oreimo 0x425FE3, aoj.EXE 0x416400): push a flag - 0 the task's flag 4 (001E /
+        // 001F), 1 0033's yield flag, any other a 0 (it always pushes)
         Register(0x02EE, (vm, c, i) =>
         {
-            if (vm.Value(c, i.Args[0]) == 1)
-                vm.Push(c, vm.YieldEveryInstruction ? 1 : 0);
+            int mode = vm.Value(c, i.Args[0]);
+            vm.Push(c, mode switch { 0 => c.Flags & 4, 1 => vm.YieldEveryInstruction ? 1 : 0, _ => 0 });
             return 0;
         });
-        // 02EF mode: pop the flag pushed by 02EE; 1 = put it back
+        // 02EF mode: pop what 02EE pushed and put it back - 0 ORed into the task's flags, 1 the
+        // yield flag, any other dropped
         Register(0x02EF, (vm, c, i) =>
         {
             int saved = vm.Pop(c);
-            if (vm.Value(c, i.Args[0]) == 1)
-                vm.YieldEveryInstruction = saved != 0;
+            switch (vm.Value(c, i.Args[0]))
+            {
+                case 0:
+                    c.Flags |= saved;
+                    break;
+                case 1:
+                    vm.YieldEveryInstruction = saved != 0;
+                    break;
+            }
             return 0;
         });
 
@@ -635,8 +644,8 @@ public sealed partial class ScnVm
 
     private int Execute(ScnContext c, ScnInstruction ins)
     {
-        var handler = ins.Handler;
-        if (handler == null && !m_handlers.TryGetValue(ins.Op, out handler))
+        var handler = ins.Handler ?? HandlerFor(ins.Op);
+        if (handler == null)
             throw Error(c, $"Opcode {ins.Op:X4} is not supported yet");
         return handler(this, c, ins);
     }

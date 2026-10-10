@@ -164,6 +164,15 @@ public sealed partial class ScnVm
             vm.m_host.SetMousePosition(x, y);
             return 0;
         });
+        // 0458 l, r: the left and right mouse buttons held, 1 or 0 (aoj.EXE 0x417BF0: bits 0 and 1
+        // of the buttons the window procedure keeps, 0x7238CC)
+        Register(0x0458, (vm, c, i) =>
+        {
+            int mouse = vm.m_host.Active ? vm.m_host.MouseButtons : 0;
+            vm.Store(c, i.Args[0], mouse & 1);
+            vm.Store(c, i.Args[1], (mouse >> 1) & 1);
+            return 0;
+        });
         // 0459 v: mouse buttons held (DirectInput: 1 left, 2 right, 4 middle; 0x13B52BC swaps
         // left and right)
         Register(0x0459, (vm, c, i) =>

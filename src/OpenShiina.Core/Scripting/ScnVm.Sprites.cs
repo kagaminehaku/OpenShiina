@@ -935,6 +935,9 @@ public sealed partial class ScnVm
             if (dst == vm.DisplaySurface)
             {
                 vm.PresentedByDirect3D(v[1], v[2], v[1] + v[3], v[2] + v[4]);
+                // v2.34's 051E (aoj.EXE 0x418BF0) invalidates what it drew into surface 0 itself
+                if (vm.EngineVersion < 240)
+                    vm.InvalidateWindow(Math.Min(v[1], v[1] + v[3]), Math.Min(v[2], v[2] + v[4]), Math.Max(v[1], v[1] + v[3]), Math.Max(v[2], v[2] + v[4]));
                 vm.FrameShown = true;
             }
             return 0;
