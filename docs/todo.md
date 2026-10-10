@@ -6,6 +6,10 @@ README).
 
 ## Speed
 
+On a PC the heaviest scene measured (Re:Rem Plus's held zoom) takes 2-3% of the machine at 60
+frames a second: more work there is not worth it for now. What is left is for slow phones, and
+should follow what their perf.log shows.
+
 - [ ] **Still two to three times the original** in Re:Rem Plus's held kiss zoom (engine-notes.md
   section 7, "Vectors, fewer pieces, the changed part": WPF 2.2-2.4% of the machine, Avalonia
   3.1-3.3%, the original 1.0%); about half is the frame (2.4 ms), half showing it. Measure
@@ -33,8 +37,11 @@ README).
   loader thread needs its own view of the archives.
 - [ ] **`00A1`** (the incremental redraw of the message text, a character at a time as it
   fades in): still on the list of slow spots; profile it and make it cheaper.
-- [ ] **Older phones.** Zooms and transitions still drop frames on a Galaxy S7 (Vulkan 1.0);
-  read its perf.log again once the items above are done.
+- [ ] **Older phones, first.** Zooms and transitions dropped frames on a Galaxy S7 (Vulkan 1.0)
+  before the vector routines and ParallelRows (2026-10-10, not built for Android yet). Build the
+  APK, play Re:Rem Plus's prologue zoom, a scene change and a movie with perf.log on, and work
+  on what it shows (the same vector code runs on NEON there; ParallelRows' piece size and
+  MaxParts were measured on a PC only).
 
 ## The picture on large screens
 
