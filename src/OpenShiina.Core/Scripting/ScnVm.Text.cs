@@ -466,7 +466,7 @@ public sealed partial class ScnVm
                 return;
             case (byte)'W':
                 S(rec, RWait, ParseNumber(rec));
-                S(rec, RWaitStart, (int)m_host.Milliseconds);
+                S(rec, RWaitStart, (int)Clock);
                 return;
             case (byte)'X':
                 if (next == 'Z')
@@ -657,7 +657,7 @@ public sealed partial class ScnVm
             }
             case (byte)'w':
                 S(rec, RCharDelay, ParseNumber(rec));
-                S(rec, RCharTime, (int)m_host.Milliseconds);
+                S(rec, RCharTime, (int)Clock);
                 return;
             case (byte)'x':
                 if (next is (byte)'-' or (byte)'+')
@@ -925,7 +925,7 @@ public sealed partial class ScnVm
         }
         if (G(rec, RWaits) != 0 && G(rec, RWait) != 0)
         {
-            if ((uint)((int)m_host.Milliseconds - G(rec, RWaitStart)) < (uint)G(rec, RWait))
+            if ((uint)((int)Clock - G(rec, RWaitStart)) < (uint)G(rec, RWait))
             {
                 Thread.Sleep(1);
                 return;
@@ -1008,12 +1008,12 @@ public sealed partial class ScnVm
     /// <summary>The character part of FUN_00432F00; false when the step ends after it (a wait).</summary>
     private bool DrawChar(int rec, int surface, bool invalidate)
     {
-        uint now = m_host.Milliseconds;
+        uint now = Clock;
         if (G(rec, RWaits) != 0 && G(rec, RCharDelay) != 0)
         {
             if ((uint)((int)now - G(rec, RCharTime)) < (uint)G(rec, RCharDelay))
                 return false;
-            S(rec, RCharTime, (int)m_host.Milliseconds);
+            S(rec, RCharTime, (int)Clock);
         }
         bool dc = surface != -1;
         if (dc && G(rec, RFontDirty) != 0)

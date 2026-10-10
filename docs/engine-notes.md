@@ -714,6 +714,27 @@ the functions they call from the decompile. First findings:
   `CloseWindow`; WM_PAINT is sent at the start of the frame after `07D0`, WM_TIMER before the
   timer slot. Checked in ScnBoot: a turn away opens the backlog, 'S' skips to the first choice,
   'A' turns AUTO on, closing writes the save file (it did not before).
+- **Focus** (2026-10-10). RIO.INI's `Background` (read at start into 0x13B43D0, then `07E5` /
+  `07E6`) is what `07E8` gives; START puts it in b[17] bit 1 (Re:Rem Plus 0x00B08; bit 2: in
+  front). The focus slots (Re:Rem Plus 0x04B75 back, 0x04BFE lost; Oreimo Plus 0x01289 /
+  0x012F0) do nothing when it is set; when it is not, losing the focus pauses the music (`06DB`)
+  and the movie (`callmod 364`), takes the time from b[52] (the scripts' clock is now - b[52]) and
+  empties the file cache (Re:Rem Plus L_24EF1, Oreimo Plus L_1F30C); getting it back adds the
+  time to b[52] and resumes music and movie. The scripts count on the engine standing still
+  meanwhile: on WM_ACTIVATEAPP the window procedure (0x435858) keeps "in front" in 0x13B43C8
+  and, with Background 0, in 0x13B43CC, and the main loop (FUN_00412880) waits for messages
+  while 0x13B43CC is 0. `07E8` gave the never-set 0x13B43D0 and nothing stood still, so every
+  game ran the slots while going on: animations jumped by the time behind, a movie went black.
+  Background is 1 in eight games, 0 in Ero-On, Azu Plus and Oreimo Plus. ScnVm.Paused: behind,
+  with Background 0 or the setting "Pause behind other windows" (on by default), GameThread runs
+  no frames, the scripts' clock (ScnVm.Clock, 03BD and every timing) stands still and the mixer
+  is silent without reading its voices, so the game goes on where it was (b[52] moves by
+  nothing). Checked in ScnBoot (SCNBOOT_FOCUS, SCNBOOT_PAUSE): Re:Rem Plus's first route and
+  Oreimo Plus's park route with the focus lost for 5-8 s at a time give the pictures of a run
+  without (Oreimo: a line's text appearing a frame or two later, the cache read again). The mouse buttons the engine reads
+  (FUN_00413630) come from WM_xBUTTONDOWN / UP (0x13B52AC), not GetAsyncKeyState: the press on
+  the title bar that brings the window back is no click (the WPF player counts a button only
+  when it went down in the window; it skipped a line).
 - **The window's picture** (ScnVm.Paint.cs): the engine draws into the display surface
   (0x13B43E4, a DIB) and the window shows it only where it is repainted. With RIO.INI's `Render`
   unset (all eleven games; 0x487F30 = -1) WM_PAINT is GDI (FUN_0040DB10: BeginPaint, the

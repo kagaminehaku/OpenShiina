@@ -238,6 +238,14 @@ public sealed class GameThread : IDisposable
                     e(m_vm);
                 if (m_closed)
                     continue;
+                if (m_vm.Paused)
+                {
+                    // Behind another window, standing still (ScnVm.Paused): only its events, and
+                    // no stall for the watch
+                    m_frames++;
+                    next = Stopwatch.GetTimestamp() + interval;
+                    continue;
+                }
                 bool running = m_vm.RunFrame();
                 m_frames++;
                 if (!running)

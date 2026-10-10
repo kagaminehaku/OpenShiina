@@ -82,8 +82,9 @@ rate (the game's own pace, up to 60 frames a second with the window drawing only
 as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
 scripts run as often: four times as much processor on a 240 Hz one), the scaling of the
 picture to the window (sharp: whole game pixels as far as they fit and the rest smooth, so text
-and lines stay even at any size; whole numbers only, with black around; smooth; or nearest), the
-game controller, showing the frame rate (in the title; on phones over the game), and for bug reports
+and lines stay even at any size; whole numbers only, with black around; smooth; or nearest),
+pausing the game while another window is in front (on by default; off, the game does as its
+RIO.INI says: most go on, sound included), the game controller, showing the frame rate (in the title; on phones over the game), and for bug reports
 writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
 `draw-trace.log` (both logs go to the game's save folder).
 

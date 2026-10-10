@@ -14,8 +14,13 @@ public sealed class ScnMixer : IDisposable
     public const int Rate = 44100;
     private readonly MixingSampleProvider m_mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(Rate, 2)) { ReadFully = true };
 
+    public ScnMixer() => Output = new Gate(this);
+
     /// <summary>The mix: 44.1 kHz stereo float samples, silence when nothing plays (never ends).</summary>
-    public ISampleProvider Output => m_mixer;
+    public ISampleProvider Output { get; }
+
+    /// <summary>Every voice stands still (silence out) and goes on where it was when this is cleared.</summary>
+    public volatile bool Paused;
 
     /// <summary>Plays samples (any rate, mono or stereo); the voice ends at their end or when stopped.</summary>
     public ScnVoice Start(ISampleProvider source, float gain, IDisposable? owner = null)
@@ -33,6 +38,20 @@ public sealed class ScnMixer : IDisposable
     }
 
     public void Dispose() => m_mixer.RemoveAllMixerInputs();
+
+    // The mix, or silence without reading the voices while paused
+    private sealed class Gate(ScnMixer mixer) : ISampleProvider
+    {
+        public WaveFormat WaveFormat => mixer.m_mixer.WaveFormat;
+
+        public int Read(float[] buffer, int offset, int count)
+        {
+            if (!mixer.Paused)
+                return mixer.m_mixer.Read(buffer, offset, count);
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
+    }
 }
 
 /// <summary>A sound playing in the mixer: volume, pause and stop from any thread.</summary>

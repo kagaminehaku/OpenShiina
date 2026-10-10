@@ -396,7 +396,7 @@ public sealed partial class ScnVm
         // 03AE seed: srand
         Register(0x03AE, (vm, c, i) => { vm.SeedRand(vm.Value(c, i.Args[0])); return 0; });
         // 03BD v: the time in ms
-        Register(0x03BD, (vm, c, i) => { vm.Store(c, i.Args[0], (int)vm.m_host.Milliseconds); return 0; });
+        Register(0x03BD, (vm, c, i) => { vm.Store(c, i.Args[0], (int)vm.Clock); return 0; });
         // 03B7 year, month, day, day of week / 03B8 hour, minute, second, ms (local time)
         Register(0x03B7, (vm, c, i) =>
         {

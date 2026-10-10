@@ -150,6 +150,8 @@ public sealed class GameSession : IDisposable
 
         public IScnMusic? Music => m_music;
 
+        public void PauseSound(bool paused) => m_mixer.Paused = paused;
+
         public bool KeyDown(int virtualKey) => m_session.Input.IsDown(virtualKey);
 
         public int MouseButtons => m_session.Input.Buttons;

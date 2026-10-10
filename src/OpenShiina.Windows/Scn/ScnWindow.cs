@@ -195,7 +195,10 @@ public sealed class ScnWindow : Window
             _ => 0,
         };
         if (message != 0)
+        {
+            m_host.ButtonDown(MouseBit(e.ChangedButton));
             m_game.PostMessage(message, MouseKeys(), MousePoint());
+        }
         base.OnMouseDown(e);
     }
 
@@ -209,9 +212,19 @@ public sealed class ScnWindow : Window
             _ => 0,
         };
         if (message != 0)
+        {
+            m_host.ButtonUp(MouseBit(e.ChangedButton));
             m_game.PostMessage(message, MouseKeys(), MousePoint());
+        }
         base.OnMouseUp(e);
     }
+
+    private static int MouseBit(MouseButton button) => button switch
+    {
+        MouseButton.Left => 1,
+        MouseButton.Right => 2,
+        _ => 4,
+    };
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
@@ -413,9 +426,20 @@ public sealed class ScnWindow : Window
 
         public IScnMusic? Music => m_audio.Music;
 
+        public void PauseSound(bool paused) => m_audio.Mixer.Paused = paused;
+
         // Keys and mouse buttons as they are at the moment the scripts ask, like the engine reads
         // them (GetAsyncKeyState, DirectInput), not from WPF's events.
         public bool KeyDown(int virtualKey) => m_active && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
+        // The buttons pressed in the window's picture (WM_xBUTTONDOWN; the engine keeps its mouse
+        // buttons from those messages, 0x13B52AC): the press on the title bar that brings the
+        // window back to the front is no click for the game
+        private int m_clientButtons;
+
+        public void ButtonDown(int button) => Interlocked.Or(ref m_clientButtons, button);
+
+        public void ButtonUp(int button) => Interlocked.And(ref m_clientButtons, ~button);
 
         public int MouseButtons
         {
@@ -426,9 +450,13 @@ public sealed class ScnWindow : Window
                 // GetAsyncKeyState gives the physical buttons; the logical ones follow the system's swap
                 bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
                 bool Down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
-                return (Down(swapped ? VK_RBUTTON : VK_LBUTTON) ? 1 : 0) |
-                       (Down(swapped ? VK_LBUTTON : VK_RBUTTON) ? 2 : 0) |
-                       (Down(VK_MBUTTON) ? 4 : 0);
+                int held = (Down(swapped ? VK_RBUTTON : VK_LBUTTON) ? 1 : 0) |
+                           (Down(swapped ? VK_LBUTTON : VK_RBUTTON) ? 2 : 0) |
+                           (Down(VK_MBUTTON) ? 4 : 0);
+                // A button let go outside the window sends it no WM_xBUTTONUP
+                if ((m_clientButtons & ~held) != 0)
+                    Interlocked.And(ref m_clientButtons, held);
+                return held & m_clientButtons;
             }
         }
 
@@ -436,7 +464,12 @@ public sealed class ScnWindow : Window
         public bool Active
         {
             get => m_active;
-            set => m_active = value;
+            set
+            {
+                m_active = value;
+                if (!value)
+                    m_clientButtons = 0;
+            }
         }
 
         /// <summary>

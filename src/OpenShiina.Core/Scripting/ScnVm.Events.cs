@@ -94,6 +94,11 @@ public sealed partial class ScnVm
     /// </summary>
     public void Notify(ScnEvent e)
     {
+        if (e is ScnEvent.Activate or ScnEvent.Deactivate)
+        {
+            m_inFront = e == ScnEvent.Activate;
+            UpdatePause();
+        }
         bool taken = e switch
         {
             ScnEvent.ToggleFullScreen => MessageHook(ScnMessage.SysKeyDown, 0x0D, ScnMessage.Key(0x1C, true, false) | 1 << 29),
@@ -170,7 +175,7 @@ public sealed partial class ScnVm
     {
         if (m_timers.Count == 0)
             return;
-        uint now = m_host.Milliseconds;
+        uint now = Clock;
         foreach (var (id, timer) in m_timers.ToList())
         {
             if ((int)(now - timer.Next) < 0)
@@ -187,6 +192,53 @@ public sealed partial class ScnVm
         }
     }
 
+    // WM_ACTIVATEAPP (0x13B43C8): the window is in front
+    private bool m_inFront = true;
+    // Paused: since when (the host's clock) and for how long in all
+    private bool m_paused;
+    private uint m_pausedAt, m_pausedFor;
+
+    /// <summary>
+    /// Stop also the games that RIO.INI's Background lets run behind other windows
+    /// (PlayerSettings.PauseInBackground).
+    /// </summary>
+    public bool PauseInBackground
+    {
+        get;
+        set
+        {
+            field = value;
+            UpdatePause();
+        }
+    }
+
+    /// <summary>
+    /// The game stands still: its window is behind another and RIO.INI's Background is 0 (on
+    /// WM_ACTIVATEAPP the engine copies "in front" into 0x13B43CC, and its loop, FUN_00412880,
+    /// waits for messages while that is 0), or the player asks it of every game. No frames run
+    /// (GameThread), the scripts' clock stands still and every sound with it (IScnHost.PauseSound),
+    /// so the game goes on where it was. The engine's clock (timeGetTime) went on: the scripts'
+    /// focus slots move their own clock (b[52]) back by the time behind, which now is none.
+    /// </summary>
+    public bool Paused => m_paused;
+
+    /// <summary>The scripts' clock (timeGetTime, 03BD): the host's, less the time paused.</summary>
+    private uint Clock => (m_paused ? m_pausedAt : m_host.Milliseconds) - m_pausedFor;
+
+    private void UpdatePause()
+    {
+        bool paused = !m_inFront && (!RunsInBackground || PauseInBackground);
+        if (paused == m_paused)
+            return;
+        uint now = m_host.Milliseconds;
+        if (paused)
+            m_pausedAt = now;
+        else
+            m_pausedFor += now - m_pausedAt;
+        m_paused = paused;
+        m_host.PauseSound(paused);
+    }
+
     private void RegisterEvents()
     {
         // 0AF0 slot: the slot run on WM_TIMER
@@ -195,7 +247,7 @@ public sealed partial class ScnVm
         Register(0x0AFA, (vm, c, i) =>
         {
             int id = vm.Value(c, i.Args[0]), ms = Math.Max(1, vm.Value(c, i.Args[1]));
-            vm.m_timers[id] = (ms, vm.m_host.Milliseconds + (uint)ms);
+            vm.m_timers[id] = (ms, vm.Clock + (uint)ms);
             vm.Store(c, i.Args[2], id);
             return 0;
         });

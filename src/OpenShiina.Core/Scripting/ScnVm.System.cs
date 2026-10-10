@@ -69,8 +69,8 @@ public sealed partial class ScnVm
         // 06BA flags / 06BB v: DirectSound flags (0x13B52F0)
         Register(0x06BA, (vm, c, i) => vm.SetGlobal(0x13B52F0, c, i));
         Register(0x06BB, (vm, c, i) => { vm.Store(c, i.Args[0], vm.EngineGlobal(0x13B52F0)); return 0; });
-        // 07E8 v: engine flag 0x13B43D0
-        Register(0x07E8, (vm, c, i) => { vm.Store(c, i.Args[0], vm.EngineGlobal(0x13B43D0)); return 0; });
+        // 07E8 v: v = RIO.INI's Background (0x13B43D0), as 07E5 / 07E6 last set it
+        Register(0x07E8, (vm, c, i) => { vm.Store(c, i.Args[0], vm.RunsInBackground ? 1 : 0); return 0; });
         // 073F v: the COM objects for movies were created
         Register(0x073F, (vm, c, i) => { vm.Store(c, i.Args[0], 1); return 0; });
         // 0780 text, caption, type, v: MessageBox

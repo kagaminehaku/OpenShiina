@@ -43,6 +43,12 @@ public sealed class PlayerSettings
     [JsonConverter(typeof(JsonStringEnumConverter<Scaling>))]
     public Scaling Scaling { get; set; } = Scaling.Sharp;
 
+    /// <summary>
+    /// Every game stands still while its window is behind another (ScnVm.PauseInBackground); off,
+    /// as its RIO.INI says (Background=1: it goes on, sound included; eight of the eleven).
+    /// </summary>
+    public bool PauseInBackground { get; set; } = true;
+
     /// <summary>The scripts see the first joystick or gamepad (the games' own RIO.INI turns it off).</summary>
     public bool GameController { get; set; } = true;
 
@@ -153,6 +159,9 @@ public sealed class PlayerSettings
         new("Game", "Game controller",
             "The first joystick or gamepad plays: the stick moves, button 1 decides, button 2 cancels.",
             s => s.GameController, (s, on) => s.GameController = on),
+        new("Game", "Pause behind other windows",
+            "The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).",
+            s => s.PauseInBackground, (s, on) => s.PauseInBackground = on),
         new("Performance", "Show the frame rate",
             "Frames a second and the slowest frame, in the window's title (on phones and tablets over the game).",
             s => s.ShowFrameRate, (s, on) => s.ShowFrameRate = on),

@@ -38,7 +38,7 @@ public sealed partial class ScnVm
     {
         if (movie.State != 3 || movie.Video is not { } video)
             return false;
-        uint now = m_host.Milliseconds;
+        uint now = Clock;
         long due = (long)((now - movie.Start) * video.FrameRate / 1000);
         MpegFrame? frame = null;
         while (movie.Decoded <= due)
@@ -182,9 +182,9 @@ public sealed partial class ScnVm
                 {
                     movie.Video?.Rewind();
                     movie.Decoded = 0;
-                    movie.Start = vm.m_host.Milliseconds;
+                    movie.Start = vm.Clock;
                 }
-                movie.PausedAt = vm.m_host.Milliseconds;
+                movie.PausedAt = vm.Clock;
                 movie.State = 2;
                 vm.MovieSoundPause(movie);
             }
@@ -218,7 +218,7 @@ public sealed partial class ScnVm
             vm.AdvanceGraphMovie(movie);
             int position = movie.State switch
             {
-                3 => (int)(vm.m_host.Milliseconds - movie.Start),
+                3 => (int)(vm.Clock - movie.Start),
                 2 => (int)(movie.PausedAt - movie.Start),
                 _ => -1,
             };
@@ -234,7 +234,7 @@ public sealed partial class ScnVm
                 return 2;
             if (movie.State is 2 or 3 && movie.Video is { } video)
             {
-                uint now = vm.m_host.Milliseconds;
+                uint now = vm.Clock;
                 video.Rewind();
                 movie.Decoded = 0;
                 movie.Start = (movie.State == 2 ? movie.PausedAt : now) - seconds * 1000;

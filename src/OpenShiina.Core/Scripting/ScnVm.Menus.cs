@@ -10,10 +10,22 @@ namespace OpenShiina.Scripting;
 public sealed partial class ScnVm
 {
     /// <summary>
-    /// 07E5 / 07E6: RIO.INI's Background (0xC51060) as the scripts set it: the game goes on, sound
-    /// included, while another window is in front (the players go on in the background anyway).
+    /// RIO.INI's Background (0xC51060; Oreimo Plus 0x13B43D0), read at start, then as 07E5 / 07E6
+    /// set it: the game goes on, sound included, while another window is in front; without it the
+    /// game stands still (Paused). START reads it with 07E8 into b[17] bit 1; without it the
+    /// scripts' focus slots pause the music and movies and empty the file cache each time the
+    /// window loses the focus.
     /// </summary>
-    public bool RunsInBackground { get; private set; }
+    public bool RunsInBackground
+    {
+        get => m_background ??= IniInt("RIO.INI", RioSection(), "Background", 0) != 0;
+        private set
+        {
+            m_background = value;
+            UpdatePause();
+        }
+    }
+    private bool? m_background;
 
     // Handles of the menus 0898 made
     private int m_nextMenu = 0x00510000;

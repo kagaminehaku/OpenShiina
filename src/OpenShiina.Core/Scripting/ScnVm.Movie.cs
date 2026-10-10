@@ -90,7 +90,7 @@ public sealed partial class ScnVm
     {
         if (movie.Video == null && !OpenMovie(movie))
             return false;
-        uint now = m_host.Milliseconds;
+        uint now = Clock;
         if (movie.State == 1)
         {
             movie.Video!.Rewind();
@@ -145,7 +145,7 @@ public sealed partial class ScnVm
         if (movie.Sound != 0)
             Music?.Resume(movie.Sound);
         else
-            MovieSoundStart(movie, m_host.Milliseconds - movie.Start);
+            MovieSoundStart(movie, Clock - movie.Start);
     }
 
     private void MovieSoundVolume(Movie movie, int volume)
@@ -160,7 +160,7 @@ public sealed partial class ScnVm
     {
         if (movie.State != 3 || movie.Video is not { } video)
             return;
-        uint now = m_host.Milliseconds;
+        uint now = Clock;
         long due = (long)((now - movie.Start) * video.FrameRate / 1000);
         MpegFrame? frame = null;
         while (movie.Decoded <= due)
@@ -274,9 +274,9 @@ public sealed partial class ScnVm
                 {
                     movie.Video?.Rewind();
                     movie.Decoded = 0;
-                    movie.Start = vm.m_host.Milliseconds;
+                    movie.Start = vm.Clock;
                 }
-                movie.PausedAt = vm.m_host.Milliseconds;
+                movie.PausedAt = vm.Clock;
                 movie.State = 2;
                 vm.MovieSoundPause(movie);
             }

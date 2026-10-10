@@ -68,6 +68,7 @@ public sealed class GameSetup
             ScreenHeight = Height,
             Joypad = Joypad,
             Accelerator = Settings.AcceleratorForGame(),
+            PauseInBackground = Settings.PauseInBackground,
         };
         if (!Settings.X86JitForGame())
             vm.JitX86 = false;

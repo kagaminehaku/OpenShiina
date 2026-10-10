@@ -68,6 +68,9 @@ public interface IScnHost
     /// <summary>The music streams, or null to keep music silent.</summary>
     IScnMusic? Music => null;
 
+    /// <summary>Every sound (buffers, music, movies) stands still, or goes on where it was (ScnVm.Paused).</summary>
+    void PauseSound(bool paused) { }
+
     /// <summary>GetAsyncKeyState: a virtual key is held down.</summary>
     bool KeyDown(int virtualKey) => false;
 

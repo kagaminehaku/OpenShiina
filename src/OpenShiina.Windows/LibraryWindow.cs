@@ -149,7 +149,12 @@ public sealed class LibraryWindow : Window
         {
             if (game.Exe is { } exe && File.Exists(exe) && ExeIcon.Read(exe) is { } ico)
             {
-                var frame = BitmapFrame.Create(new MemoryStream(ico), BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                // A PNG image in the icon is read as the PNG it is: WPF's icon decoder takes only
+                // 32-bit RGBA ones (Re: Rem Plus's is RGB)
+                int size = BitConverter.ToInt32(ico, 14), offset = BitConverter.ToInt32(ico, 18);
+                bool png = offset >= 0 && size > 8 && offset + size <= ico.Length && ico[offset] == 0x89 && ico[offset + 1] == (byte)'P';
+                var stream = png ? new MemoryStream(ico, offset, size) : new MemoryStream(ico);
+                var frame = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
                 frame.Freeze();
                 return frame;
             }

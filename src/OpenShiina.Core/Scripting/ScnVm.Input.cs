@@ -98,7 +98,7 @@ public sealed partial class ScnVm
             return 0;
         }
         var state = m_repeat.GetValueOrDefault(caller);
-        uint now = m_host.Milliseconds;
+        uint now = Clock;
         int delay;
         if ((state.Last & buttons) == buttons && state.Phase != 0)
         {

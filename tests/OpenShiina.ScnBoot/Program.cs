@@ -17,7 +17,9 @@
 // mouse wheel one notch away from the user (":-" towards) at those frames. Presses and clicks are
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
-// SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames.
+// SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames; a game
+// that stands still behind (ScnVm.Paused) gets it back in the same frame, the time until then
+// passing on the clock alone. SCNBOOT_PAUSE=1 pauses every game behind (PlayerSettings.PauseInBackground).
 // The game folder defaults to games\GrandCross\俺妹プラス (or games\GrandCross\Done\俺妹プラス, where
 // the games that play through are kept) in a folder above this program.
 
@@ -118,13 +120,16 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_HOT") is { } hotRange && hotRang
     (hotFrom, hotTo) = (int.Parse(hf), int.Parse(ht));
 int closeAt = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_CLOSE"), out int ca) ? ca : -1;
 int frame = 0;
+uint pausedFor = 0;
+if (Environment.GetEnvironmentVariable("SCNBOOT_PAUSE") == "1")
+    vm.PauseInBackground = true;
 StartWatchdog();
 try
 {
     var frameTime = new System.Diagnostics.Stopwatch();
     for (; frame < frames; frame++)
     {
-        host.Clock = (uint)(frame * 1000L / 60);
+        host.Clock = (uint)(frame * 1000L / 60) + pausedFor;
         host.Frame = frame;
         frameTime.Restart();
         foreach (var (message, wParam) in host.Messages())
@@ -142,6 +147,14 @@ try
         {
             Console.WriteLine($"  [focus] frame {frame}: {(active ? "got" : "lost")}");
             vm.Notify(active ? ScnEvent.Activate : ScnEvent.Deactivate);
+            if (!active && vm.Paused && focus.Where(f => f.Key > frame && f.Value).Select(f => f.Key).DefaultIfEmpty(-1).Min() is int back and > 0)
+            {
+                pausedFor += (uint)((back - frame) * 1000L / 60);
+                host.Clock = (uint)(frame * 1000L / 60) + pausedFor;
+                focus.Remove(back);
+                Console.WriteLine($"  [focus] paused until frame {back}: got");
+                vm.Notify(ScnEvent.Activate);
+            }
         }
         if (wheel.TryGetValue(frame, out int delta))
             vm.WindowMessage(ScnMessage.MouseWheel, delta << 16, ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y));
