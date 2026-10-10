@@ -1,5 +1,11 @@
 // Archive opener for ShiinaRio WAR/WARC archives
-// Ported from GARbro ArcFormats/ShiinaRio/ArcWARC.cs
+// Ported from GARbro ArcFormats/ShiinaRio/ArcWARC.cs and ArcWARC1.0.cs (morkt, MIT).
+//   WARC 1.7: the index zlib-packed, keys of the game's scheme
+//   WARC 1.2-1.6: the index packed with a range coder (WarcRangeDecoder, our own: GARbro's,
+//                 KogadoCocotte.cs, is under the GPL v2), keys of the game's scheme
+//   WARC 1.1: the index as it is, 16-byte names, no keys (EncryptionScheme.Warc110)
+//   WARC 1.0: Forest's archives, ShiinaRio's predecessor: the index XORed with FE E5, 16-byte
+//             names, entries "Ylz" packed with the 16-bit-control LZ (Ylz16Reader), XOR E6
 
 using System.IO;
 using System.IO.Compression;
@@ -37,22 +43,42 @@ public class WarcOpener
         return file.MaxOffset >= 16 && file.View.AsciiEqual(4, " 1.");
     }
 
+    /// <summary>The WARC version of the archive at <paramref name="path"/> (100 for 1.0 ... 170 for 1.7), or null.</summary>
+    public static int? ArchiveVersion(string path)
+    {
+        try
+        {
+            using var file = File.OpenRead(path);
+            var head = new byte[8];
+            if (file.Read(head, 0, 8) != 8 || System.Text.Encoding.ASCII.GetString(head, 0, 7) != "WARC 1.")
+                return null;
+            int minor = head[7] - '0';
+            return minor is >= 0 and <= 7 ? 100 + minor * 10 : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Archives older than WARC 1.2 have no keys: any scheme opens them, none is needed.</summary>
+    public static bool NeedsNoScheme(int version) => version <= 110;
+
     public static WarcArchive? TryOpen(ArcView file, EncryptionScheme? selectedScheme = null)
     {
         if (!IsWarc(file))
             return null;
         int version = file.View.ReadByte(7) - 0x30;
-        if (version < 1 || version > 7)
+        if (version < 0 || version > 7)
             return null;
         version = 100 + version * 10;
-        // Only WARC 1.7 (zlib-compressed index) is supported: every GRAND†CROSS archive uses it.
-        if (version != 170)
-            throw new NotSupportedException($"WARC 1.{version / 10 % 10} archives are not supported; only WARC 1.7 (GRAND†CROSS games) can be opened.");
+        if (version == 100)
+            return TryOpenForest(file, selectedScheme?.Name ?? "");
         uint index_offset = 0xF182AD82u ^ file.View.ReadUInt32(8);
         if (index_offset >= file.MaxOffset)
             return null;
 
-        EncryptionScheme? scheme = selectedScheme;
+        EncryptionScheme? scheme = version == 110 ? EncryptionScheme.Warc110(selectedScheme?.Name ?? "") : selectedScheme;
         if (scheme == null)
         {
             string? detectedTitle = FormatManager.Instance.LookupGame(file.Name);
@@ -76,15 +102,29 @@ public class WarcOpener
 
         decoder.DecryptIndex(index_offset, enc_index);
 
-        if (0x78 != enc_index[8]) // not a zlib stream: wrong scheme
-            return null;
-        // Inflate fully up front: ZLibStream.Read may return short counts, which the
-        // fixed-size record loop below would mistake for the end of the index.
-        var zindex = new MemoryStream(enc_index, 8, (int)index_length - 8);
-        var index = new MemoryStream();
-        using (var zlib = new ZLibStream(zindex, CompressionMode.Decompress))
-            zlib.CopyTo(index);
-        index.Position = 0;
+        MemoryStream index;
+        if (version == 110)
+            index = new MemoryStream(enc_index, 0, (int)index_length);
+        else if (version < 170)
+        {
+            var unpacked = new byte[max_index_len];
+            int length = WarcRangeDecoder.Decode(enc_index.AsSpan(0, (int)index_length), unpacked);
+            if (length == 0)
+                return null;
+            index = new MemoryStream(unpacked, 0, length);
+        }
+        else
+        {
+            if (0x78 != enc_index[8]) // not a zlib stream: wrong scheme
+                return null;
+            // Inflate fully up front: ZLibStream.Read may return short counts, which the
+            // fixed-size record loop below would mistake for the end of the index.
+            var zindex = new MemoryStream(enc_index, 8, (int)index_length - 8);
+            index = new MemoryStream();
+            using (var zlib = new ZLibStream(zindex, CompressionMode.Decompress))
+                zlib.CopyTo(index);
+            index.Position = 0;
+        }
 
         using (var header = new BinaryReader(index))
         {
@@ -119,8 +159,51 @@ public class WarcOpener
         }
     }
 
+    /// <summary>
+    /// WARC 1.0 (GARbro's War0Opener): the index at the dword at 8, up to 0xC000 bytes XORed with
+    /// FE E5, records of a 16-byte name, offset and size.
+    /// </summary>
+    private static WarcArchive? TryOpenForest(ArcView file, string name)
+    {
+        uint index_offset = file.View.ReadUInt32(8);
+        if (index_offset >= file.MaxOffset)
+            return null;
+        var index = file.View.ReadBytes(index_offset, (uint)Math.Min(0xC000, file.MaxOffset - index_offset));
+        int count = index.Length / 0x18;
+        if (count <= 0 || count > 0x800)
+            return null;
+        for (int i = 0; i + 1 < index.Length; i += 2)
+        {
+            index[i] ^= 0xFE;
+            index[i + 1] ^= 0xE5;
+        }
+        var dir = new List<Entry>(count);
+        var unique_names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0, pos = 0; i < count; ++i, pos += 0x18)
+        {
+            var entry = new Entry
+            {
+                Name = Binary.GetCString(index, pos, 0x10),
+                Offset = LittleEndian.ToUInt32(index, pos + 0x10),
+                Size = LittleEndian.ToUInt32(index, pos + 0x14),
+            };
+            if (!entry.CheckPlacement(file.MaxOffset))
+                return null;
+            entry.UnpackedSize = entry.Size;
+            entry.Type = GuessType(entry.Name);
+            if (entry.Name.Length != 0 && unique_names.Add(entry.Name))
+                dir.Add(entry);
+        }
+        if (dir.Count == 0)
+            return null;
+        return new WarcArchive(file, dir, new Decoder(100, EncryptionScheme.Warc110(name)), name);
+    }
+
     public static byte[] OpenEntry(WarcArchive warc, Entry entry)
     {
+        if (warc.Decoder.WarcVersion == 100)
+            return OpenForestEntry(warc, entry);
+
         // Both ArcView.Frame (a single remappable window) and Decoder (keeps its PRNG state in
         // a field) are shared per archive, so background extraction and UI preview must not
         // run this stage concurrently.
@@ -178,6 +261,18 @@ public class WarcOpener
         }
 
         return unpacked;
+    }
+
+    /// <summary>A WARC 1.0 entry: as it is, or "Ylz" + its unpacked size + Ylz16 data.</summary>
+    private static byte[] OpenForestEntry(WarcArchive warc, Entry entry)
+    {
+        byte[] data;
+        lock (warc)
+            data = warc.File.View.ReadBytes(entry.Offset, entry.Size);
+        if (data.Length < 8 || data[0] != 'Y' || data[1] != 'l' || data[2] != 'z')
+            return data;
+        int unpacked = LittleEndian.ToInt32(data, 4);
+        return new Ylz16Reader(data.AsSpan(8).ToArray()).Unpack(unpacked);
     }
 
     private static void UnpackYH1(byte[] input, byte[] output)
@@ -382,6 +477,79 @@ internal class YlzReader
             Binary.CopyOverlapped(m_output, dst + offset, dst, count);
             dst += count;
         }
+    }
+}
+
+/// <summary>WARC 1.0's LZ (GARbro's Ylz16Reader): the input XORed with E6, 16-bit control words.</summary>
+internal sealed class Ylz16Reader
+{
+    private readonly byte[] m_input;
+    private int m_ctl;
+    private int m_bitCount;
+    private int m_src;
+
+    public Ylz16Reader(byte[] input)
+    {
+        m_input = input;
+        for (int i = 0; i < m_input.Length; ++i)
+            m_input[i] ^= 0xE6;
+    }
+
+    private int GetCtlBit()
+    {
+        int bit = m_ctl & 1;
+        m_ctl >>= 1;
+        if (--m_bitCount <= 0)
+        {
+            m_ctl = LittleEndian.ToUInt16(m_input, m_src);
+            m_src += 2;
+            m_bitCount = 16;
+        }
+        return bit;
+    }
+
+    public byte[] Unpack(int unpackedSize)
+    {
+        m_src = 0;
+        m_bitCount = 0;
+        GetCtlBit();
+        var output = new byte[unpackedSize];
+        int dst = 0;
+        while (dst < unpackedSize)
+        {
+            if (GetCtlBit() != 0)
+            {
+                output[dst++] = m_input[m_src++];
+                continue;
+            }
+            int offset, count;
+            if (GetCtlBit() == 0)
+            {
+                count = GetCtlBit() << 1;
+                count |= GetCtlBit();
+                count += 2;
+                offset = m_input[m_src++] | -0x100;
+            }
+            else
+            {
+                byte lo = m_input[m_src++];
+                byte hi = m_input[m_src++];
+                offset = lo | (hi & ~7) << 5 | -0x2000;
+                count = hi & 7;
+                if (count == 0)
+                {
+                    count = m_input[m_src++];
+                    if (count == 0)
+                        break;
+                    count += 9;
+                }
+                else
+                    count += 2;
+            }
+            Binary.CopyOverlapped(output, dst + offset, dst, count);
+            dst += count;
+        }
+        return output;
     }
 }
 

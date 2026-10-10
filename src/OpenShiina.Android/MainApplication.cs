@@ -1,4 +1,4 @@
-// The Android application: before Avalonia starts, the schemes (Formats.Json, ShiinaImage) are
+// The Android application: before Avalonia starts, the schemes (Formats.Json) are
 // copied out of the package to the app's folder, where FormatManager reads them; the player's own
 // folder (library.json, saves, logs) is the app's folder on the shared storage
 // (Android/data/com.kagaminehaku.openshiina/files), which a computer can reach over USB; and the
@@ -46,15 +46,13 @@ public sealed class MainApplication : AvaloniaAndroidApplication<OpenShiinaAppli
 
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder) => base.CustomizeAppBuilder(builder).LogToTrace();
 
-    /// <summary>The package's Formats.Json and ShiinaImage files in a folder of the app: its path.</summary>
+    /// <summary>The package's Formats.Json in a folder of the app: its path.</summary>
     private string CopyData()
     {
         var assets = Assets ?? throw new InvalidOperationException("The package has no assets.");
-        // Copied at each start (half a megabyte), so a new version of the app brings its own
+        // Copied at each start (under two megabytes), so a new version of the app brings its own
         string target = Path.Combine(FilesDir!.AbsolutePath, "schemes");
         Copy(FormatManager.SchemeFileName);
-        foreach (string name in assets.List("ShiinaImage") ?? [])
-            Copy($"ShiinaImage/{name}");
         return target;
 
         void Copy(string name)

@@ -1,6 +1,11 @@
-// FormatManager: loads the per-game encryption schemes from Formats.Json together with the
-// ShiinaImage files they reference (the shared ShiinaImage/Common.bin plus optional per-game
-// ShiinaImage/*.tail), and maps game executables to schemes for auto-detection.
+// FormatManager: loads the per-game encryption schemes from Formats.Json and maps game
+// executables to schemes for auto-detection. Formats.Json is GARbro's scheme database (its
+// ShiinaRio part, Formats.dat as JSON) with what it shares kept once, as Formats.dat does:
+//   "SharedData":   byte arrays several schemes use (Region, DecodeBins, a CryptKey), as hex;
+//                   a scheme's field names one as "@name" instead of giving its hex
+//   "CommonImages": the parts of the ShiinaImage that games share, as base64; a scheme's
+//                   ShiinaImage is the first "CommonLength" bytes of its "Common" and its own
+//                   "Tail" (base64), checked by "Length" and "Sha256"
 
 using System.Globalization;
 using System.IO;
@@ -60,8 +65,8 @@ public class FormatManager
     }
 
     /// <summary>
-    /// Where Formats.Json and ShiinaImage are when they are not next to the program (Android keeps
-    /// them in its package: the app copies them out to a folder first); set it before
+    /// Where Formats.Json is when it is not next to the program (Android keeps it in its package:
+    /// the app copies it out to a folder first); set it before
     /// <see cref="Instance"/> is first used.
     /// </summary>
     public static string? DataFolder { get; set; }
@@ -80,9 +85,15 @@ public class FormatManager
 
     private void Load(string jsonPath)
     {
-        string baseDir = Path.GetDirectoryName(jsonPath)!;
         using var doc = JsonDocument.Parse(File.ReadAllBytes(jsonPath));
         var root = doc.RootElement;
+
+        if (root.TryGetProperty("SharedData", out var shared))
+            foreach (var kv in shared.EnumerateObject())
+                m_shared[kv.Name] = kv.Value.GetString() ?? "";
+        if (root.TryGetProperty("CommonImages", out var commons))
+            foreach (var kv in commons.EnumerateObject())
+                m_commonImages[kv.Name] = Convert.FromBase64String(kv.Value.GetString() ?? "");
 
         if (root.TryGetProperty("GameMap", out var gameMap))
         {
@@ -102,7 +113,7 @@ public class FormatManager
                 string name = GetString(item, "Name");
                 try
                 {
-                    var scheme = ParseScheme(item, baseDir);
+                    var scheme = ParseScheme(item);
                     Schemes[scheme.Name] = scheme;
                     KnownSchemes.Add(scheme);
                 }
@@ -114,10 +125,11 @@ public class FormatManager
         }
     }
 
-    // Shared ShiinaImage arrays (e.g. ShiinaImage/Common.bin), loaded once and reused by every scheme
-    private readonly Dictionary<string, byte[]> m_commonImages = new(StringComparer.OrdinalIgnoreCase);
+    // What the schemes share: hex byte arrays by name, and the common parts of their ShiinaImage
+    private readonly Dictionary<string, string> m_shared = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, byte[]> m_commonImages = new(StringComparer.Ordinal);
 
-    private EncryptionScheme ParseScheme(JsonElement e, string baseDir)
+    private EncryptionScheme ParseScheme(JsonElement e)
     {
         return new EncryptionScheme
         {
@@ -129,44 +141,26 @@ public class FormatManager
             HelperKey = GetHexUInts(e, "HelperKey"),
             Region = GetHex(e, "Region"),
             DecodeBin = GetHex(e, "DecodeBin"),
-            ShiinaImage = LoadShiinaImage(e, baseDir),
+            ShiinaImage = LoadShiinaImage(e),
             ExtraCrypt = CreateExtraCrypt(e),
         };
     }
 
     /// <summary>
-    /// ShiinaImage = first "CommonLength" bytes of the shared "Common" file + optional per-game "Tail"
-    /// (GARbro's ImageArray layout). The legacy single-file form { "File": ... } is still accepted.
-    /// "Length" and "Sha256" always describe the assembled image.
+    /// ShiinaImage = the first "CommonLength" bytes of a common part (CommonImages) + the scheme's
+    /// own "Tail" (GARbro's ImageArray); "Length" and "Sha256" describe the image put together.
     /// </summary>
-    private IByteArray? LoadShiinaImage(JsonElement scheme, string baseDir)
+    private IByteArray? LoadShiinaImage(JsonElement scheme)
     {
         if (!scheme.TryGetProperty("ShiinaImage", out var img) || img.ValueKind == JsonValueKind.Null)
             return null;
-
-        byte[] common;
-        int commonLength;
-        byte[] tail = Array.Empty<byte>();
-        if (img.TryGetProperty("Common", out var commonProp))
-        {
-            string commonPath = ResolveDataFile(baseDir, commonProp.GetString()!);
-            if (!m_commonImages.TryGetValue(commonPath, out common!))
-                m_commonImages[commonPath] = common = File.ReadAllBytes(commonPath);
-            commonLength = img.TryGetProperty("CommonLength", out var cl) ? cl.GetInt32() : common.Length;
-            if (commonLength > common.Length)
-                throw new InvalidDataException($"{Path.GetFileName(commonPath)} is {common.Length} bytes, CommonLength is {commonLength}");
-            if (img.TryGetProperty("Tail", out var tailProp))
-                tail = File.ReadAllBytes(ResolveDataFile(baseDir, tailProp.GetString()!));
-        }
-        else if (img.TryGetProperty("File", out var fileProp))
-        {
-            common = File.ReadAllBytes(ResolveDataFile(baseDir, fileProp.GetString()!));
-            commonLength = common.Length;
-        }
-        else
-        {
-            throw new InvalidDataException("ShiinaImage has neither 'Common' nor 'File'");
-        }
+        string commonName = GetString(img, "Common");
+        if (!m_commonImages.TryGetValue(commonName, out var common))
+            throw new InvalidDataException($"ShiinaImage names the common part '{commonName}', which CommonImages does not have");
+        int commonLength = img.TryGetProperty("CommonLength", out var cl) ? cl.GetInt32() : common.Length;
+        if (commonLength > common.Length)
+            throw new InvalidDataException($"the common part '{commonName}' is {common.Length} bytes, CommonLength is {commonLength}");
+        byte[] tail = img.TryGetProperty("Tail", out var tailProp) ? Convert.FromBase64String(tailProp.GetString() ?? "") : [];
 
         var image = new ImageArray(common, commonLength, tail);
         if (img.TryGetProperty("Length", out var len) && len.GetInt32() != image.Length)
@@ -182,15 +176,7 @@ public class FormatManager
         return image;
     }
 
-    private static string ResolveDataFile(string baseDir, string relative)
-    {
-        string path = Path.GetFullPath(Path.Combine(baseDir, relative.Replace('/', Path.DirectorySeparatorChar)));
-        if (!File.Exists(path))
-            throw new FileNotFoundException($"ShiinaImage file not found: {path}");
-        return path;
-    }
-
-    private static IDecryptExtra? CreateExtraCrypt(JsonElement scheme)
+    private IDecryptExtra? CreateExtraCrypt(JsonElement scheme)
     {
         if (!scheme.TryGetProperty("ExtraCrypt", out var x) || x.ValueKind == JsonValueKind.Null)
             return null;
@@ -199,6 +185,7 @@ public class FormatManager
         string type = fullType.Substring(fullType.LastIndexOf('.') + 1);
         uint Seed() => x.GetProperty("Seed").GetUInt32();
         byte[] Table() => GetHex(x, "DecodeTable") ?? throw new InvalidDataException($"{type} has no DecodeTable");
+        byte[] KeyBytes() => GetHex(x, "Key") ?? throw new InvalidDataException($"{type} has no Key");
 
         return type switch
         {
@@ -212,6 +199,14 @@ public class FormatManager
             nameof(JokersCrypt)    => new JokersCrypt(),
             nameof(AlcotCrypt)     => new AlcotCrypt(),
             nameof(DodakureCrypt)  => new DodakureCrypt(),
+            nameof(PostAdlerCrypt) => new PostAdlerCrypt(),
+            nameof(PreAdlerCrypt)  => new PreAdlerCrypt(),
+            nameof(BinboCrypt)     => new BinboCrypt(),
+            nameof(CountCrypt)     => new CountCrypt(),
+            nameof(AltCountCrypt)  => new AltCountCrypt(),
+            nameof(UshimitsuCrypt) => new UshimitsuCrypt(x.GetProperty("Key").GetUInt32()),
+            nameof(Nukitashi2Crypt) => new Nukitashi2Crypt(KeyBytes()),
+            nameof(SaiminCrypt)    => new SaiminCrypt(KeyBytes()),
             _ => throw new NotSupportedException($"ExtraCrypt type '{fullType}' is not implemented"),
         };
     }
@@ -221,6 +216,20 @@ public class FormatManager
         if (Schemes.TryGetValue(name, out var s))
             return s;
         return Schemes.Values.FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The scheme for the game the archive at <paramref name="arcPath"/> belongs to: the one its
+    /// folder's .exe (or the archive's name) tells; for WARC 1.0 / 1.1 archives, which have no
+    /// keys, one without keys named after the folder when nothing tells. Null when none fits.
+    /// </summary>
+    public EncryptionScheme? SchemeForArchive(string arcPath)
+    {
+        if (LookupGame(arcPath) is { } title && GetScheme(title) is { } scheme)
+            return scheme;
+        if (WarcOpener.ArchiveVersion(arcPath) is { } version && WarcOpener.NeedsNoScheme(version))
+            return EncryptionScheme.Warc110(Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(arcPath))) ?? "ShiinaRio");
+        return null;
     }
 
     public string? LookupGame(string arcPath)
@@ -260,11 +269,15 @@ public class FormatManager
         return e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
     }
 
-    private static byte[]? GetHex(JsonElement e, string name)
+    /// <summary>A byte array as hex, or "@name" of one in SharedData.</summary>
+    private byte[]? GetHex(JsonElement e, string name)
     {
         if (!e.TryGetProperty(name, out var v) || v.ValueKind != JsonValueKind.String)
             return null;
-        return Convert.FromHexString(v.GetString()!);
+        string hex = v.GetString()!;
+        if (hex.StartsWith('@') && !m_shared.TryGetValue(hex[1..], out hex!))
+            throw new InvalidDataException($"{name} names '{v.GetString()}', which SharedData does not have");
+        return Convert.FromHexString(hex);
     }
 
     private static uint[]? GetHexUInts(JsonElement e, string name)

@@ -133,7 +133,45 @@ public sealed class GameData : IDisposable
     public long? Size(string path, params string[] extensions) => Find(path, extensions)?.Entry.UnpackedSize;
 
     /// <summary>Full path of a loose file of the game folder (movies: "mv\ev03a.mpg"), or null.</summary>
-    public string? LooseFile(string path) => ResolvePath(Folder, path);
+    public string? LooseFile(string path) =>
+        ResolvePath(Folder, path) ?? (path.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? EngineIni(Folder) : null);
+
+    /// <summary>
+    /// The engine's settings in <paramref name="folder"/>: RIO.INI, or for older builds the .INI
+    /// named as their .exe (Ao no Juuai's aoj.EXE reads aoj.INI): the .INI whose first section is
+    /// the engine's ("[椎名里緒 v2.34]"), one named as an .exe first. Asked for as RIO.INI.
+    /// </summary>
+    public static string? EngineIni(string folder)
+    {
+        if (ResolvePath(folder, "RIO.INI") is { } rio)
+            return rio;
+        if (!Directory.Exists(folder))
+            return null;
+        var exes = Directory.GetFiles(folder, "*.exe", s_anyCase).Select(Path.GetFileNameWithoutExtension).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return Directory.GetFiles(folder, "*.ini", s_anyCase)
+            .Where(IsEngineIni)
+            .OrderBy(p => exes.Contains(Path.GetFileNameWithoutExtension(p)) ? 0 : 1)
+            .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+    }
+
+    private static bool IsEngineIni(string path)
+    {
+        try
+        {
+            using var reader = new StreamReader(path, Encodings.cp932);
+            for (string? line; (line = reader.ReadLine()) != null; )
+            {
+                line = line.Trim();
+                if (line.Length != 0 && !line.StartsWith(';'))
+                    return line.StartsWith("[椎名里緒", StringComparison.Ordinal);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        return false;
+    }
 
     public void Dispose()
     {

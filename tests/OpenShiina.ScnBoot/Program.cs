@@ -47,11 +47,10 @@ if (folder == null)
 }
 
 // RIO.INI: engine version and the first script
-var ini = File.ReadAllText(Path.Combine(folder, "RIO.INI"), Encoding.GetEncoding(932));
+var ini = GameData.EngineIni(folder) is { } iniPath ? File.ReadAllText(iniPath, Encoding.GetEncoding(932)) : "";
 string version = System.Text.RegularExpressions.Regex.Match(ini, @"v(\d+\.\d+)").Groups[1].Value;
 string start = System.Text.RegularExpressions.Regex.Match(ini, @"(?im)^Scn=(.+)$").Groups[1].Value.Trim();
-var formats = FormatManager.Instance;
-var scheme = formats.LookupGame(Directory.GetFiles(folder, "*.war").First()) is { } name ? formats.GetScheme(name) : null;
+var scheme = GameData.FindArchive(folder) is { } archive ? FormatManager.Instance.SchemeForArchive(archive) : null;
 if (scheme == null)
 {
     Console.WriteLine("The game was not recognised.");

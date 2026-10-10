@@ -57,11 +57,14 @@ public sealed class ScnOpcodes
     /// The table for an engine version as RIO.INI names it ("2.47"): v2.47 has its own table (a
     /// subset of v2.49's), v2.49 its own, and v2.50 its own (read from Re:Rem Plus's executable:
     /// the numbers below 0C30 are v2.49's but for 0C30's operands and 11 new ones, and the block
-    /// v2.49 numbers from 0C31 comes from 1069 on).
+    /// v2.49 numbers from 0C31 comes from 1069 on). v2.34 has its own (read from Ao no Juuai's
+    /// aoj.EXE: 543 opcodes, 534 of them numbered as in v2.47 and 523 of those with v2.47's
+    /// operands; its music has one stream, so 0686-068B take no stream).
     /// </summary>
     public static ScnOpcodes ForVersion(string version)
     {
         string name = version.StartsWith("2.47") || version.StartsWith("2.36") ? "ops_v247"
+            : version.StartsWith("2.34") ? "ops_v234"
             : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
         lock (s_loaded)
         {

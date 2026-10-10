@@ -31,6 +31,14 @@ ShiinaRio is the engine version START.SCN checks (`03C0`, as in RIO.INI's sectio
 of one version share most of their START.SCN; see
 [engine-notes.md, section 9](engine-notes.md#9-the-other-games-survey-of-all-11-2026-10-03).
 
+## Other ShiinaRio games
+
+`Formats.Json` has the keys of 127 more ShiinaRio games (GARbro-Mod's scheme database; list:
+its `KnownSchemes`). None was run yet. Their archives open (every WARC version, 1.0 to 1.7;
+1.0 and 1.1 need no keys), but the interpreter knows engine versions 2.47, 2.49 and 2.50 only
+(engine-notes.md section 1, "The schemes" and "WARC versions"). Try one with ScnBoot first: it
+says the first opcode it does not run.
+
 ## Platforms
 
 | Platform | Player | Status | Checked |

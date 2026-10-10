@@ -35,7 +35,7 @@ dotnet build -c Release
 
 The players are written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
 `dotnet OpenShiina.dll`) and `bin/Release/OpenShiina.Windows/`, with the scheme data
-(`Formats.Json` and `ShiinaImage/`) next to them. The WPF player builds on Windows only.
+(`Formats.Json`) next to them. The WPF player builds on Windows only.
 
 The Android player is not in the solution (it needs the .NET Android workload and the Android
 SDK); build it on its own:
@@ -114,12 +114,15 @@ players share them.
   images, scenario commands, SCN bytecode and screens.
 - `tools/ScnTools`: disassembler for SCN bytecode.
 - `tools/GdiEllipseCheck`: compares the players' own ellipses with GDI's (run it on Windows).
+- `tools/SchemeImport`: brings the ShiinaRio schemes of GARbro's `Formats.dat` into
+  `Formats.Json` (keeps ours, adds the others; see docs/engine-notes.md section 1).
 - `tests/OpenShiina.ScnBoot`: runs a game's scripts without a screen, presses keys and clicks
   at given frames, saves screenshots, and reports what the engine ran.
 
 ## Credits
 
-- Archive formats and encryption schemes are based on [GARbro](https://github.com/morkt/GARbro) by morkt.
+- Archive formats and encryption schemes are based on [GARbro](https://github.com/morkt/GARbro) by morkt;
+  the schemes of the other ShiinaRio games come from GARbro-Mod's scheme database.
 - Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor).
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
 - The Avalonia player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)

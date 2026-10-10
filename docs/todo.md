@@ -86,6 +86,25 @@ spaced as full-width.
 - [ ] Pictures with Japanese text (menus, buttons, titles): GrandCrossExtractor can repack an
   archive's files but has no S25 encoder yet.
 
+## Other ShiinaRio games
+
+`Formats.Json` has the keys of 138 ShiinaRio games now (engine-notes.md section 1, "The schemes").
+
+- [ ] Run one of each era with ScnBoot (a 2.49 / 2.50 game first: they are closest to ours) and
+  write down what it stops on.
+- [ ] Try a real WARC 1.0-1.6 game (1.0 / 1.1 only on archives made for the test, 1.2-1.6's
+  range decoder only against GARbro's on random input).
+- [ ] Ao no Juuai (engine v2.34, D:\SusGame\Guilty\青の獣愛 here): its opcode table is done
+  (ops_v234.tsv, engine-notes.md section 4 "Engine builds"); next its opcodes the players lack
+  (0A28 first), the 11 that take other operands than v2.47's (music with one stream: 0686-068B;
+  055A, 055B, 04BD, 04EC, 0B7D) and the 9 new ones (007D-0080, 060E-0610, 0614, 077B).
+- [ ] Opcode tables for the other engine versions (2.35-2.46, 2.48; opscan on the game's
+  executable, the aoj preset as an example of an old build).
+- [ ] The ExtraCrypts ported for those games (PostAdler, PreAdler, Binbo, Count, AltCount,
+  Ushimitsu, Nukitashi2, Saimin) against their archives.
+- [ ] A scheme chooser in the players for a game whose .exe is not in GameMap (renamed, or a
+  version GARbro does not list).
+
 ## Platforms
 
 - [ ] iOS player on `OpenShiina.App`.

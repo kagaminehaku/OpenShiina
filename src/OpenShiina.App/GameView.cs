@@ -287,8 +287,7 @@ public sealed partial class GameView : UserControl, IGameWindow
             var data = await Task.Run(() =>
             {
                 string archive = GameData.FindArchive(folder) ?? throw new InvalidDataException("The folder has no .WAR archives.");
-                var formats = FormatManager.Instance;
-                var scheme = formats.LookupGame(archive) is { } name ? formats.GetScheme(name) : null;
+                var scheme = FormatManager.Instance.SchemeForArchive(archive);
                 if (scheme == null)
                     throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder.");
                 return GameData.Open(folder, scheme);

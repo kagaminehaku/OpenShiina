@@ -12,6 +12,43 @@ keeps voice/BGM here), `*_M.WAR` (BGM, SE), `*_S.WAR` (compiled scripts `.SCN`),
 Script paths use prefixes: `e\` and `b\` and `c\` = images in `_G`, `v\` = voice, `m\` = BGM,
 `se\` = sound effects, `mv\` = movies, `d\` = `_D`, `p\` = scenario TXT, `t\` = SCN.
 
+**The schemes** (Core `Data/Formats.Json`, read by `Archives/FormatManager.cs`): each game's keys
+of its archives (CryptKey, HelperKey, Region, DecodeBin, ShiinaImage, its ExtraCrypt) and the
+.exe names that tell the game (GameMap). It is the ShiinaRio part of GARbro's scheme database
+(`Formats.dat`, BinaryFormatter) as JSON, with what the games share kept once, as Formats.dat
+keeps it: `SharedData` (byte arrays of several schemes, hex; a scheme's field says `"@name"`:
+one Region for all, three DecodeBins, three DecodeTables, a CryptKey) and `CommonImages` (the
+parts of the ShiinaImage games share, base64: a 33,438-byte one, and a 49,790-byte one of older
+games); a scheme's ShiinaImage is the first `CommonLength` bytes of its `Common` and its own
+`Tail` (base64), checked against `Length` and `Sha256` as it loads (there were ShiinaImage/*.bin
+and *.tail files next to it before). 138 schemes (2026-10-10): the eleven GRAND†CROSS games as
+we have them (Ero-On!, Homu Plus, Sena Plus and Rikka Plus recovered from their executables;
+Nyaru Plus with the DecodeBin GARbro gets wrong) and 127 more from GARbro-Mod's Formats.dat v148
+(`tools/SchemeImport merge`: its schemes we do not have; read with System.Formats.Nrbf, no
+GARbro build; a merge of its own result gives the same file). Their extra ciphers: all of
+GARbro-Mod's, PostAdler / PreAdler / Binbo / Count / AltCount / Ushimitsu / Nukitashi2 / Saimin
+ported for them (not checked against those games' archives: none is here). 102 GameMap entries.
+By engine version: 30 below 2.39, 26 from 2.39 to 2.46, 35 2.47-2.48, 18 2.49, 29 2.50 and
+later. The interpreter knows the opcodes of 2.47, 2.49 and 2.50 (ScnOpcodes picks 2.47's for
+2.36 too): the others need more (todo.md).
+
+**WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
+eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a
+range coder), 1.1 (the index as it is, 16-byte names, no keys: EncryptionScheme.Warc110) and 1.0
+(Forest's archives, ShiinaRio's predecessor: the index at the dword at 8, XORed with FE E5,
+records of a 16-byte name, offset and size; "Ylz" entries packed with a 16-bit-control LZ, XOR
+E6). The range coder of 1.2-1.6 is Schindler's (32-bit, a byte at a time) over 257 symbols (the
+bytes and an end mark) with a quasistatic model (totals of 4096, counts halved at rescales 36
+symbols apart at first, twice as far each time, up to 2000): Archives/WarcRangeDecoder.cs,
+written for OpenShiina from that description, not from GARbro's port (KogadoCocotte.cs, under
+the GPL v2; OpenShiina is MIT). Checked against GARbro's decoder run as a program (its built
+ArcFormats.dll through reflection, scratch rangetest): 3,600 random inputs of 2 to 60,000
+bytes, 5.6 MB out, every output the same, also where it does not fit (0). Archives
+of 1.0 and 1.1 need no scheme: a game with no GameMap entry gets one without keys named after
+its folder (FormatManager.SchemeForArchive, used by the library, both players and ScnBoot), so
+its saves have a folder of their own. 1.0 and 1.1 checked on archives made as the formats are
+(scratch oldwarc: both versions, a Ylz entry); none of those games is here, nor one of 1.2-1.6.
+
 ## 2. S25 layered images *(verified)*
 
 Frames are grouped by their slot number in the S25 header:
@@ -146,6 +183,22 @@ the script pointer `[ctx+10h]` along each handler.
 | GetVar / SetVar / GetVarAdr | 416000 / 415ab0 / 415e60 | 414e30 / 4148e0 / 414ca0 |
 | Context register in handlers | EBP | EBX (EDI = &ctx->pc) |
 | Valid opcodes | 1,658 | 704 |
+
+**v2.34** (Ao no Juuai's aoj.EXE, 2005, not packed; `ScnTools opscan aoj`, table Data/ScnOps/ops_v234.tsv):
+the tasks are a global array, not a context register: FUN_0041e5c0 takes a slot, its script
+pointer is at 71E0E4 + slot * 0x44 (the current slot at 7237B8), the opcode is read at 41E5E2
+and dispatched from 41E5F5 through compares and byte-indexed jump tables to `jmp` into handlers
+that are functions of their own; GetVar 40D700, SetVar 40D000 and GetVarAdr 40D520 take &pc on
+the stack; an invalid opcode returns 2 (41F32B). opscan follows that with a new mode, the
+script pointer's global address (PcGlobal): any access at that displacement, and [r] for a
+register lea'd from it, is the script pointer, and a function given &pc reads through its
+first argument. 543 opcodes, 526 handlers; 534 of them numbered as in v2.47, 523 of those with
+v2.47's operands (the variable-length ones as ScnOpcodes' overrides read them). The 11 that
+differ do: music has one stream (0686 file, 0687, 0688 none, 0689, 068A, 068B: one operand
+fewer, no stream handle), 055A takes one operand and 055B none, 04BD 11, 04EC 9 and 0B7D 13.
+New in v2.34 only: 007D-0080 (3 operands each), 060E-0610 (none), 0614 (one), 077B (four).
+Ao no Juuai boots with it and stops at 0A28 (frame 0): an opcode every version has (one
+operand, a string copied to 722B5C) that the GRAND†CROSS games never use.
 
 Of the 704 opcodes both builds know, 699 have the same signature; 0x02DB (varargs, overridden),
 0x04E7, 0x05D5, 0x05D6, 0x0C30 differ (Oreimo is the older engine). Either table decodes Oreimo's

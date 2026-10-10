@@ -39,11 +39,10 @@
     <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
   </PropertyGroup>
 
-  <!-- The schemes and their ShiinaImage, which the desktop players keep next to the program: in
-       the package, copied out to the app's folder at start (MainApplication) -->
+  <!-- The schemes, which the desktop players keep next to the program: in the package, copied
+       out to the app's folder at start (MainApplication) -->
   <ItemGroup>
     <AndroidAsset Include="..\OpenShiina.Core\Data\Formats.Json" Link="Assets\Formats.Json" />
-    <AndroidAsset Include="..\OpenShiina.Core\Data\ShiinaImage\*" Link="Assets\ShiinaImage\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

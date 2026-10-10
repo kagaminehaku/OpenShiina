@@ -21,10 +21,9 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
-  <!-- Scheme data (keys of each game), copied next to the program that uses the engine -->
+  <!-- Scheme data (keys of each game, their ShiinaImage inside), copied next to the program that uses the engine -->
   <ItemGroup>
     <None Update="Data\Formats.Json" CopyToOutputDirectory="PreserveNewest" TargetPath="Formats.Json" />
-    <None Update="Data\ShiinaImage\*" CopyToOutputDirectory="PreserveNewest" TargetPath="ShiinaImage\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- SCN opcode operand layouts per engine version (ScnOpcodes) -->

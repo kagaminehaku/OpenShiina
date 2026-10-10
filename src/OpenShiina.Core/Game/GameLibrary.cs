@@ -57,15 +57,17 @@ public static class GameLibrary
 
     /// <summary>
     /// The game in <paramref name="folder"/>: the name of its scheme and its .exe, or null when it
-    /// is not one the players know (no .WAR archives, or no .exe they recognise).
+    /// is not one the players know (no .WAR archives, or no .exe they recognise for archives with
+    /// keys; WARC 1.0 / 1.1 games are named after their folder).
     /// </summary>
     public static (string Name, string? Exe)? Identify(string folder)
     {
         if (GameData.FindArchive(folder) is not { } archive)
             return null;
         var formats = FormatManager.Instance;
-        if (formats.LookupGame(archive) is not { } name || formats.GetScheme(name) == null)
+        if (formats.SchemeForArchive(archive) is not { } found)
             return null;
+        string name = found.Name;
         string? exe = null;
         foreach (var (file, scheme) in formats.GameMap)
             if (scheme == name && GameData.ResolvePath(folder, file) is { } path)

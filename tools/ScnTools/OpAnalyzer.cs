@@ -8,6 +8,11 @@ static class OpAnalyzer
 {
     static byte[] mem = null!; static uint ib;
     static uint GetVar, SetVar, GetVarAdr, Interp, LoopHead, DispStart, DispEnd, Invalid;
+    // Older builds (v2.34) keep the tasks in a global array: the script pointer of the current one
+    // is at PcGlobal + slot * size, and its address (&pc) is what GetVar / SetVar and helpers get
+    static uint PcGlobal;
+    // The registers of the walk at hand that hold &pc ("lea r, [... + PcGlobal]"): [r] is the script pointer
+    [ThreadStatic] static HashSet<Register>? s_pcAddress;
     static readonly Dictionary<uint, Instruction> insCache = new();
 
     static void LoadImage(string exe)
@@ -66,7 +71,7 @@ static class OpAnalyzer
                 case Mnemonic.Mov or Mnemonic.Movzx when ins.Op0Kind == OpKind.Register:
                     {
                         long? v;
-                        if (ins.Op1Kind == OpKind.Memory) { var m = Mem(); if (m == null) return ip; v = ins.MemorySize == MemorySize.UInt8 ? U8((uint)m) : ins.MemorySize == MemorySize.UInt16 ? BitConverter.ToUInt16(mem, (int)((uint)m - ib)) : U32((uint)m); }
+                        if (ins.Op1Kind == OpKind.Memory) { var m = Mem(); if (m == null || (uint)m < ib || (uint)m - ib + 4 > mem.Length) return ip; v = ins.MemorySize == MemorySize.UInt8 ? U8((uint)m) : ins.MemorySize == MemorySize.UInt16 ? BitConverter.ToUInt16(mem, (int)((uint)m - ib)) : U32((uint)m); }
                         else v = Op(1);
                         if (v == null) return ip;
                         var full = ins.Op0Register.GetFullRegister32();
@@ -74,6 +79,8 @@ static class OpAnalyzer
                         regs[full] = v.Value; break;
                     }
                 case Mnemonic.Jmp:
+                    // PcGlobal builds: the jump tables lead to "jmp handler", a function outside the dispatcher
+                    if (ins.Op0Kind == OpKind.NearBranch32 && PcGlobal != 0 && (ins.NearBranch32 < Interp || ins.NearBranch32 > Invalid)) return ins.NearBranch32;
                     if (ins.Op0Kind == OpKind.NearBranch32) { next = ins.NearBranch32; break; }
                     if (ins.Op0Kind == OpKind.Memory) { var m = Mem(); if (m == null) return ip; next = U32((uint)m); break; }
                     return ip;
@@ -117,6 +124,9 @@ static class OpAnalyzer
     static Register HandlerCtx = Register.EBP, HandlerPcPtr = Register.None;
 
     static bool IsPcMem(in Instruction ins) =>
+        (PcGlobal != 0 && ins.MemoryDisplacement32 == PcGlobal) ||
+        (PcGlobal != 0 && ins.MemoryIndex == Register.None && ins.MemoryDisplacement32 == 0 && ctxRegs != null && ctxRegs.Contains(ins.MemoryBase)) ||
+        (PcGlobal != 0 && ins.MemoryIndex == Register.None && ins.MemoryDisplacement32 == 0 && s_pcAddress != null && s_pcAddress.Contains(ins.MemoryBase)) ||
         ins.MemoryIndex == Register.None &&
         ((ins.MemoryDisplacement32 == 0x10 && ctxRegs != null && ctxRegs.Contains(ins.MemoryBase)) ||
          (inHandlerNow && HandlerPcPtr != Register.None && ins.MemoryBase == HandlerPcPtr && ins.MemoryDisplacement32 == 0));
@@ -124,6 +134,9 @@ static class OpAnalyzer
     static HashSet<Register> FindCtxRegs(uint start, bool inHandler)
     {
         var set = new HashSet<Register>(); if (inHandler) set.Add(HandlerCtx);
+        // PcGlobal builds pass &pc on the stack, never a context in ECX
+        if (PcGlobal != 0)
+            return set;
         var seen = new HashSet<uint>(); var q = new Queue<uint>(); q.Enqueue(start);
         Register lastEcxSrc = Register.None;
         while (q.Count > 0 && seen.Count < 20000)
@@ -188,9 +201,11 @@ static class OpAnalyzer
             var acc = new List<string>(); List<string> result; uint cur = ip;
             var pcRegs = new Dictionary<Register, (int snap, int off)>();   // register = script pointer + off
             bool ctxPushed = false;
+            var pcAddressRegs = new HashSet<Register>();   // PcGlobal: registers holding &pc
             var spills = new Dictionary<(Register, uint), (int snap, int off)>();
             while (true)
             {
+                s_pcAddress = pcAddressRegs;
                 if (inHandler && ((cur >= LoopHead && cur < DispEnd) || cur == Invalid)) { result = acc; break; }
                 var ins = Ins(cur);
                 if (ins.Code == Code.INVALID) { unknown = true; result = acc; break; }
@@ -236,6 +251,16 @@ static class OpAnalyzer
                 // "push ctx; call f": f receives the context as its first argument
                 if (ins.Mnemonic == Mnemonic.Push && ins.Op0Kind == OpKind.Register && ctxRegs!.Contains(ins.Op0Register))
                     ctxPushed = true;
+                // PcGlobal: "lea r, [... + PcGlobal]; push r; call f": f receives &pc
+                if (PcGlobal != 0)
+                {
+                    if (ins.Mnemonic == Mnemonic.Lea && r0 != Register.None && ins.MemoryDisplacement32 == PcGlobal)
+                        pcAddressRegs.Add(r0);
+                    else if (ins.Mnemonic == Mnemonic.Push && ins.Op0Kind == OpKind.Register && pcAddressRegs.Contains(ins.Op0Register.GetFullRegister32()))
+                        ctxPushed = true;
+                    else if (r0 != Register.None && ins.Mnemonic != Mnemonic.Push && ins.Mnemonic != Mnemonic.Cmp && ins.Mnemonic != Mnemonic.Test)
+                        pcAddressRegs.Remove(r0);
+                }
 
                 if (ins.FlowControl == FlowControl.Call)
                 {
@@ -247,6 +272,7 @@ static class OpAnalyzer
                     }
                     ctxPushed = false;
                     pcRegs.Remove(Register.EAX); pcRegs.Remove(Register.ECX); pcRegs.Remove(Register.EDX);
+                    pcAddressRegs.Remove(Register.EAX); pcAddressRegs.Remove(Register.ECX); pcAddressRegs.Remove(Register.EDX);
                     cur = (uint)ins.NextIP; continue;
                 }
                 if (ins.FlowControl == FlowControl.Return) { result = acc; break; }
@@ -294,7 +320,7 @@ static class OpAnalyzer
         return s;
     }
 
-    // --opscan <exe> <interp> <dispStart> <loopHead> <invalid> <getvar> <setvar> <getvaradr> <out.tsv> <dispEnd>
+    // --opscan <exe> <interp> <dispStart> <loopHead> <invalid> <getvar> <setvar> <getvaradr> <out.tsv> <dispEnd> [ctxReg] [pcPtrReg] [pcGlobal]
     public static void Run(string[] a)
     {
         LoadImage(a[0]);
@@ -302,6 +328,7 @@ static class OpAnalyzer
         Invalid = Convert.ToUInt32(a[4], 16); GetVar = Convert.ToUInt32(a[5], 16); SetVar = Convert.ToUInt32(a[6], 16); GetVarAdr = Convert.ToUInt32(a[7], 16); DispEnd = Convert.ToUInt32(a[9], 16);
         if (a.Length > 10) HandlerCtx = Enum.Parse<Register>(a[10], true);
         if (a.Length > 11) HandlerPcPtr = Enum.Parse<Register>(a[11], true);
+        if (a.Length > 12) PcGlobal = Convert.ToUInt32(a[12], 16);
         var handlers = new Dictionary<uint, List<uint>>();
         for (uint op = 0; op <= 0xFFFF; op++)
         {

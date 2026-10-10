@@ -16,6 +16,12 @@ public class EncryptionScheme
     public byte[]? DecodeBin { get; set; }
     public IByteArray? ShiinaImage { get; set; }
     public IDecryptExtra? ExtraCrypt { get; set; }
+
+    /// <summary>
+    /// WARC 1.0 and 1.1 archives: 16-byte names and no keys (GARbro's EncryptionScheme.Warc110),
+    /// named as the game it opens is (its folder, for a game no GameMap entry tells).
+    /// </summary>
+    public static EncryptionScheme Warc110(string name) => new() { Name = name, EntryNameSize = 0x10 };
 }
 
 public interface IDecryptExtra
@@ -404,4 +410,242 @@ public class DodakureCrypt : IDecryptExtra
     {
         throw new NotImplementedException();
     }
+}
+
+/// <summary>XORs the dword at +0x200 with the Adler-32 of the first 0xFF bytes.</summary>
+public static class AdlerCrypt
+{
+    internal static void Transform(byte[] data, int index, int length)
+    {
+        uint key = Adler32.Compute(data, index, length);
+        data[index + 0x200] ^= (byte)key;
+        data[index + 0x201] ^= (byte)(key >> 8);
+        data[index + 0x202] ^= (byte)(key >> 16);
+        data[index + 0x203] ^= (byte)(key >> 24);
+    }
+}
+
+/// <summary>AdlerCrypt after unpacking (flags 0x204).</summary>
+public class PostAdlerCrypt : IDecryptExtra
+{
+    public void Decrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length >= 0x400 && (flags & 0x204) == 0x204)
+            AdlerCrypt.Transform(data, index, 0xFF);
+    }
+
+    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length >= 0x400 && (flags & 0x104) == 0x104)
+            AdlerCrypt.Transform(data, index, 0xFF);
+    }
+}
+
+/// <summary>AdlerCrypt before unpacking (flags 0x202).</summary>
+public class PreAdlerCrypt : IDecryptExtra
+{
+    public void Decrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length >= 0x400 && (flags & 0x202) == 0x202)
+            AdlerCrypt.Transform(data, index, 0xFF);
+    }
+
+    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length >= 0x400 && (flags & 0x102) == 0x102)
+            AdlerCrypt.Transform(data, index, 0xFF);
+    }
+}
+
+/// <summary>
+/// Hin wa Bokura no Fuku no Kami: the first 0x200 bytes LZ-packed (signature 0x718E958D), then
+/// the length XORed into the dword at +0x200.
+/// </summary>
+public class BinboCrypt : IDecryptExtra
+{
+    public void Decrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length < 0x200)
+            return;
+        if ((flags & 0x204) == 0x204)
+        {
+            if (0x718E958D == LittleEndian.ToUInt32(data, index))
+            {
+                var input = new byte[0x200];
+                Buffer.BlockCopy(data, index, input, 0, 0x200);
+                new LzComp(input, 8).Unpack(data, index);
+            }
+            if (length > 0x200)
+                data[index + 0x200] ^= (byte)length;
+            if (length > 0x201)
+                data[index + 0x201] ^= (byte)(length >> 8);
+            if (length > 0x202)
+                data[index + 0x202] ^= (byte)(length >> 16);
+            if (length > 0x203)
+                data[index + 0x203] ^= (byte)(length >> 24);
+        }
+    }
+
+    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length >= 0x200 && (flags & 0x104) == 0x104)
+            throw new NotImplementedException();
+    }
+
+    private sealed class LzComp(byte[] input, int index)
+    {
+        private int m_src = index;
+        private uint m_bits;
+        private int m_bitsCount;
+
+        public void Unpack(byte[] output, int dst)
+        {
+            FillBitCache();
+            while (m_src < input.Length)
+            {
+                if (GetBit() != 0)
+                {
+                    output[dst++] = input[m_src++];
+                    continue;
+                }
+                int count, offset;
+                if (GetBit() != 0)
+                {
+                    count = LittleEndian.ToUInt16(input, m_src);
+                    m_src += 2;
+                    offset = count >> 3 | -0x2000;
+                    count &= 7;
+                    if (count > 0)
+                        count += 2;
+                    else
+                    {
+                        count = input[m_src++];
+                        if (count == 0)
+                            break;
+                        count += 9;
+                    }
+                }
+                else
+                {
+                    count = GetBit() << 1;
+                    count |= GetBit();
+                    count += 2;
+                    offset = input[m_src++] | -0x100;
+                }
+                Binary.CopyOverlapped(output, dst + offset, dst, count);
+                dst += count;
+            }
+        }
+
+        private int GetBit()
+        {
+            uint v = m_bits >> --m_bitsCount;
+            if (m_bitsCount <= 0)
+                FillBitCache();
+            return (int)(v & 1);
+        }
+
+        private void FillBitCache()
+        {
+            m_bits = LittleEndian.ToUInt32(input, m_src);
+            m_src += 4;
+            m_bitsCount = 32;
+        }
+    }
+}
+
+/// <summary>The counts of 0x00 and of 0xFF bytes in the first (length and 0x7E) | 1 XORed at +0x100 and +0x104 (from 0x200 bytes).</summary>
+public class CountCrypt : IDecryptExtra
+{
+    // AltCountCrypt: from 0x400 bytes, the two counts the other way round
+    protected virtual int MinLength => 0x200;
+    protected virtual bool Swapped => false;
+
+    public void Decrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if ((flags & 0x204) == 0x204)
+            Transform(data, index, (int)length);
+    }
+
+    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if ((flags & 0x104) == 0x104)
+            Transform(data, index, (int)length);
+    }
+
+    private void Transform(byte[] data, int index, int length)
+    {
+        if (length < MinLength)
+            return;
+        length = (length & 0x7E) | 1;
+        byte count00 = 0, countFF = 0;
+        for (int i = 0; i < length; ++i)
+        {
+            if (data[index + i] == 0xFF)
+                countFF++;
+            else if (data[index + i] == 0)
+                count00++;
+        }
+        data[index + 0x100] ^= Swapped ? countFF : count00;
+        data[index + 0x104] ^= Swapped ? count00 : countFF;
+    }
+}
+
+/// <summary>CountCrypt from 0x400 bytes, the 0xFF count at +0x100 and the 0x00 count at +0x104.</summary>
+public class AltCountCrypt : CountCrypt
+{
+    protected override int MinLength => 0x400;
+    protected override bool Swapped => true;
+}
+
+/// <summary>The first 0x40 dwords XORed with a key (flags 0x204).</summary>
+public class UshimitsuCrypt(uint key) : IDecryptExtra
+{
+    public void Decrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if ((flags & 0x204) == 0x204)
+            Transform(data, index, length);
+    }
+
+    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if ((flags & 0x104) == 0x104)
+            Transform(data, index, length);
+    }
+
+    private void Transform(byte[] data, int index, uint length)
+    {
+        if (length < 0x100)
+            return;
+        var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(data.AsSpan(index, 0x100));
+        for (int i = 0; i < 0x40; ++i)
+            words[i] ^= key;
+    }
+}
+
+/// <summary>
+/// The first (length and 0x7E) | 1 bytes XORed with a 0x40-byte key, and the length XORed into
+/// the dword at LengthAt (flags 0x202): Nukige Mitai na Shima ni Sunderu... 2 (+0x100).
+/// </summary>
+public class Nukitashi2Crypt(byte[] key) : IDecryptExtra
+{
+    protected virtual int LengthAt => 0x100;
+
+    public void Decrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if (length < 0x200 || (flags & 0x202) != 0x202)
+            return;
+        for (int i = 0; i < ((length & 0x7E) | 1); i++)
+            data[index + i] ^= key[i % 0x40];
+        var at = data.AsSpan(index + LengthAt, 4);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(at, System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(at) ^ length);
+    }
+
+    public void Encrypt(byte[] data, int index, uint length, uint flags) => throw new NotImplementedException();
+}
+
+/// <summary>Nukitashi2Crypt with the length at +0x104: Chou Saiminjutsu Gakuen.</summary>
+public class SaiminCrypt(byte[] key) : Nukitashi2Crypt(key)
+{
+    protected override int LengthAt => 0x104;
 }
