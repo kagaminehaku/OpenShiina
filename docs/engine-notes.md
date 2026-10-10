@@ -340,6 +340,22 @@ Finding problems:
   Re: Rem Plus's title (animated, 60 new pictures a second), whole machine (12 threads): Avalonia
   11.4% -> about 3%, WPF about 3% (it was 2.7-6.6% depending on the moment).
   The original REMPLUS.EXE (through Locale Emulator) at the same title: 2.9-3.0%.
+- **Against the original in a heavy scene** (2026-10-10; i7-10750H, 12 threads, 1920 x 1080 at
+  96 dpi). Re: Rem Plus's prologue kiss (REM00_00 text 114: `$A_CHR,50,2,640,360,130,3000,1`)
+  held at 130 %: the scripts enlarge the picture every frame (enlarge32, START 866A8). Save slot 1
+  made in ScnBoot (scratch sessions/2026-10-10-measure: savedata, zoom.ps1 loads it from the title
+  and clicks once, then measures the process 10 s; the original reads the save through its
+  registry DataPath pointed to a temporary folder for the run). The original runs as
+  administrator (no clicks or closing from another program): zoom.ps1 -Manual watches the
+  window until its picture is the held zoom and counts only the seconds it stays.
+  Whole machine / one core: original 1.0% / 12%; WPF 12.0-12.1% / 145%; Avalonia 12.6% / 151%
+  (both 60 fps, slowest frame 6.5-8.2 ms; working sets 297-339 MB alike). Per frame in ScnBoot
+  (cpuframe.ps1): 18 ms of processor for 2.6 ms of wall time; on two threads (thread pool forced
+  to one worker) 13.5 ms of processor, 7 ms wall, 6 of them enlarge32 (op 0276). The original
+  spends about 2 ms a frame. enlarge32 is the MMX code done on 64-bit integers (X86Ops.Pmullw,
+  Paddw, Psrlw, Packuswb: four lanes by shifts and masks), tens of operations a pixel, about six
+  times the MMX; Parallel.For in bands of 16 rows adds about 5 ms of processor a frame. The zoom
+  itself (3 s from 100 to 130 %) is cheap (0.7 ms a frame).
 - **enlarge32** (ScnVm.Enlarge32.cs, 2026-10-08): the enlarging case of the zoom and pan, Oreimo
   START 77108 / Re: Rem Plus 866A8, in 10 of the 11 games (not Ero-On!, which has enlarge16), three
   builds (v2.47, v2.49, v2.50 signatures). A table of the destination columns that mix two source

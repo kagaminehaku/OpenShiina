@@ -6,11 +6,15 @@ README).
 
 ## Speed
 
-- [ ] **Measure against the original exe in heavy scenes.** So far only a title screen was
-  compared (Re:Rem Plus: about 3% of the machine for both). Take one heavy scene, for instance
-  Re:Rem Plus's prologue zoom (the original runs on Windows 10 through Locale Emulator), and
-  record the time a frame and the processor used on both, before and after the items below, to
-  know how far from the original the player still is.
+- [ ] **The pixel routines on real vector instructions.** Measured against the original
+  (engine-notes.md section 7, "Against the original in a heavy scene"): in Re:Rem Plus's held
+  kiss zoom the players use 12% of the machine, the original 1%. enlarge32 does the MMX code on
+  64-bit integers (X86Ops), about six times the MMX; the same goes for scale32, subpixel32,
+  blend32 and the others built on X86Ops. Vector128 (SSE2 / AdvSimd: 16-bit lanes, pmullw,
+  packuswb) gives the same numbers with an instruction for each step, all four channels at once.
+  Then fewer, larger bands for Parallel.For (or none below a few milliseconds of work): it adds
+  about 5 ms of processor a frame. Measure again with zoom.ps1 / cpuframe.ps1 (scratch
+  sessions/2026-10-10-measure); check every routine against its x86 code (nativetest).
 - [ ] **Flat memory: what is left** (engine-notes.md section 10, "Flat memory").
   - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run).
   - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`) builds but has not run: ScnBoot
