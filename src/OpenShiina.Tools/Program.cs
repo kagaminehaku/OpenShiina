@@ -20,6 +20,12 @@ internal static class Program
 
 public sealed class ToolsApplication : Application
 {
+    /// <summary>The tools' icon (the player's book with a quill) for their windows.</summary>
+    private static WindowIcon? Logo()
+    {
+        using var stream = typeof(ToolsApplication).Assembly.GetManifestResourceStream("OpenShiina.Tools.icon.png");
+        return stream == null ? null : new WindowIcon(stream);
+    }
 
     public override void Initialize()
     {
@@ -45,6 +51,7 @@ public sealed class ToolsApplication : Application
             var window = new Window
             {
                 Title = "OpenShiina Tools",
+                Icon = Logo(),
                 Width = 1180,
                 Height = 760,
                 MinWidth = 720,

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/wordmark-dark.svg">
+    <img src="docs/logo/wordmark-light.svg" alt="OpenShiina" width="480">
+  </picture>
+</p>
+
 # OpenShiina
 
 An unofficial, open-source player for visual novels made with the ShiinaRio (椎名里緒) engine.
@@ -175,6 +182,10 @@ is one of the strings' or names' originals.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.
 - `tools/ScnTools`: disassembler for SCN bytecode.
+- `tools/LogoGen`: draws the logo (a locked book whose keyhole is a shii nut, 椎 as in Shiina;
+  OpenShiina Tools' icon adds a quill; the wordmark's red S, i, n spell the sin in the name, in
+  Cinzel, or Playfair Display with `--font playfair`) into `docs/logo`, the players' and the
+  tools' icons and the Android icons: `dotnet run --project tools/LogoGen`.
 - `tools/GdiEllipseCheck`: compares the players' own ellipses with GDI's (run it on Windows).
 - `tools/SchemeImport`: brings the ShiinaRio schemes of GARbro's `Formats.dat` into
   `Formats.Json` (keeps ours, adds the others; see docs/engine-notes.md section 1).
@@ -191,6 +202,9 @@ is one of the strings' or names' originals.
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
 - Ellipses without Windows flatten their curves with GDI's Bézier flattener as kept in
   [WPF](https://github.com/dotnet/wpf)'s bezier.cpp (MIT, .NET Foundation).
+- The wordmark's letters are [Cinzel](https://github.com/NDISCOVER/Cinzel) (the logo's fonts,
+  Cinzel and [Playfair Display](https://github.com/clauseggers/Playfair-Display), are in
+  `tools/LogoGen/Fonts` under the SIL Open Font License 1.1).
 - The FSR 1 upscaler (EASU and RCAS) is ported from AMD's
   [FidelityFX FSR](https://github.com/GPUOpen-Effects/FidelityFX-FSR) `ffx_fsr1.h` (MIT, Advanced Micro
   Devices), the Anime4K one from [Anime4K](https://github.com/bloc97/Anime4K)'s Upscale CNN x2 (S)

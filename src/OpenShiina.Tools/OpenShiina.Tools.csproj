@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>OpenShiinaTools</AssemblyName>
     <RootNamespace>OpenShiina.Tools</RootNamespace>
-    <ApplicationIcon>..\OpenShiina.Desktop\Resources\icon.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
     <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Tools\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
@@ -25,6 +25,11 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+  </ItemGroup>
+
+  <!-- The windows' icon: the player's book with a quill (tools/LogoGen draws it) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\icon.png" LogicalName="OpenShiina.Tools.icon.png" />
   </ItemGroup>
 
   <ItemGroup>

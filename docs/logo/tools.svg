@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <path d="M56 0H200A56 56 0 0 1 256 56V200A56 56 0 0 1 200 256H56A56 56 0 0 1 0 200V56A56 56 0 0 1 56 0Z" fill="#1A0A10"/>
+  <path d="M179 44H195A5 5 0 0 1 200 49V207A5 5 0 0 1 195 212H179A5 5 0 0 1 174 207V49A5 5 0 0 1 179 44Z" fill="#F3E6C8"/>
+  <path d="M192 50V206M196 52V204" fill="none" stroke="#D6C49C" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M70 34H180A10 10 0 0 1 190 44V212A10 10 0 0 1 180 222H70A10 10 0 0 1 60 212V44A10 10 0 0 1 70 34Z" fill="#6B1024"/>
+  <path d="M70 34H72A10 10 0 0 1 82 44V212A10 10 0 0 1 72 222H70A10 10 0 0 1 60 212V44A10 10 0 0 1 70 34Z" fill="#4A0A18"/>
+  <path d="M72 34H82V222H72Z" fill="#4A0A18"/>
+  <path d="M100 50H170A6 6 0 0 1 176 56V200A6 6 0 0 1 170 206H100A6 6 0 0 1 94 200V56A6 6 0 0 1 100 50Z" fill="none" stroke="#D4A649" stroke-width="3" stroke-linecap="round"/>
+  <path d="M190 34H168L190 56Z" fill="#D4A649"/>
+  <path d="M190 222H168L190 200Z" fill="#D4A649"/>
+  <path d="M140 119H203A3 3 0 0 1 206 122V136A3 3 0 0 1 203 139H140A3 3 0 0 1 137 136V122A3 3 0 0 1 140 119Z" fill="#2A0A12"/>
+  <path d="M118 98H156A8 8 0 0 1 164 106V152A8 8 0 0 1 156 160H118A8 8 0 0 1 110 152V106A8 8 0 0 1 118 98Z" fill="#D4A649"/>
+  <path d="M120 103H154A5 5 0 0 1 159 108V150A5 5 0 0 1 154 155H120A5 5 0 0 1 115 150V108A5 5 0 0 1 120 103Z" fill="none" stroke="#A9792B" stroke-width="2" stroke-linecap="round"/>
+  <path d="M137 108.24C151.61 119.64 151.61 137.88 137 139.4C122.39 137.88 122.39 119.64 137 108.24ZM124.75 134.84Q137 150.8 149.25 134.84Z" fill="#2A0A12"/>
+  <path d="M232 20Q243.6 86.27 185.8 175.4Q191.11 80.33 232 20Z" fill="#FBF6EC"/>
+  <path d="M229.36 28.88L185.8 175.4" fill="none" stroke="#C9B49A" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M185.8 175.4L175.24 210.92" fill="none" stroke="#EDE3CF" stroke-width="5" stroke-linecap="round"/>
+  <path d="M179.55 212.2L166 242L170.93 209.64Z" fill="#2A0A12"/>
+  <path d="M171.6 231.58L166 242L167 230.22Z" fill="#C8102E"/>
+</svg>

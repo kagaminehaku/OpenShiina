@@ -12,6 +12,13 @@ namespace OpenShiina.App;
 
 public sealed class OpenShiinaApplication : Application
 {
+    /// <summary>OpenShiina's logo as a window's icon (the tools' windows use it too).</summary>
+    public static WindowIcon? Logo()
+    {
+        using var stream = typeof(OpenShiinaApplication).Assembly.GetManifestResourceStream("OpenShiina.App.icon.png");
+        return stream == null ? null : new WindowIcon(stream);
+    }
+
     public override void Initialize()
     {
         // The GPU mode (Settings): Vulkan compute, made when a game first asks for it
@@ -28,6 +35,7 @@ public sealed class OpenShiinaApplication : Application
             var window = new Window
             {
                 Title = "OpenShiina",
+                Icon = Logo(),
                 Content = view,
                 Width = 800,
                 Height = 600,
