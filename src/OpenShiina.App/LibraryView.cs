@@ -6,6 +6,7 @@
 // settings.
 
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -66,9 +67,11 @@ public sealed class LibraryView : UserControl
     }
 
     /// <summary>
-    /// The settings, saved as they change, counting from the next game started: where the games'
-    /// pictures are scaled and mixed (the CPU or the GPU through Vulkan), then the on / off
-    /// settings (PlayerSettings.Switches) in their sections; it scrolls on small screens.
+    /// The settings, saved as they change, counting from the next game started: the graphics level
+    /// (GraphicsPresets), with what it sets one by one under Advanced graphics (where the games'
+    /// pictures are scaled and mixed, the CPU or the GPU through Vulkan, the frame rate, the
+    /// scaling, FSR's sharpening), then the on / off settings (PlayerSettings.Switches) in their
+    /// sections; it scrolls on small screens.
     /// </summary>
     private static Flyout SettingsFlyout()
     {
@@ -101,9 +104,60 @@ public sealed class LibraryView : UserControl
             new() { Text = text, FontSize = 16, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
         static TextBlock Help(string text, double indent) =>
             new() { Text = text, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray, Margin = new Thickness(indent, 0, 0, 0) };
+
+        // The levels and the advanced settings they set, each showing the other's changes
+        // (showing is set while they are shown, so their handlers leave the settings be)
+        bool showing = false;
+        var levels = new Dictionary<GraphicsQuality, RadioButton>();
+        var scalings = new Dictionary<Scaling, RadioButton>();
+        var sharpness = new Slider { Minimum = 0, Maximum = 10, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(28, 0, 0, 0) };
+        var sharpnessLabel = new TextBlock { Margin = new Thickness(28, 4, 0, 0) };
+        void Show()
+        {
+            showing = true;
+            var level = GraphicsPresets.Of(settings);
+            foreach (var (quality, button) in levels)
+                button.IsChecked = quality == level;
+            levels[GraphicsQuality.Custom].IsVisible = level == GraphicsQuality.Custom;
+            foreach (var (scaling, button) in scalings)
+                button.IsChecked = settings.Scaling == scaling;
+            sharpness.Value = settings.FsrSharpness;
+            sharpness.IsEnabled = settings.Scaling == Scaling.Fsr;
+            sharpnessLabel.Text = "FSR sharpening: " + (settings.FsrSharpness == 0 ? "none" : $"{settings.FsrSharpness} of 10");
+            showing = false;
+        }
         var page = new StackPanel
         {
             Width = 340,
+            Spacing = 4,
+            Children =
+            {
+                Heading("Graphics"),
+                Help("How the game's picture is scaled to the window, from the lightest to the heaviest. FSR and Anime4K run on the GPU that draws the window (without one, as Low).", 0),
+            },
+        };
+        foreach (var (quality, label, help) in GraphicsPresets.Choices.Append((GraphicsQuality.Custom, "Custom", "Set one by one under Advanced graphics.")))
+        {
+            var choice = new RadioButton
+            {
+                Content = new StackPanel { Children = { new TextBlock { Text = label }, Help(help, 0) } },
+                GroupName = "graphics", IsEnabled = quality != GraphicsQuality.Custom,
+            };
+            AutomationProperties.SetName(choice, label);
+            choice.IsCheckedChanged += (_, _) =>
+            {
+                if (showing || choice.IsChecked != true)
+                    return;
+                GraphicsPresets.Apply(settings, quality);
+                settings.Save();
+                Show();
+            };
+            levels[quality] = choice;
+            page.Children.Add(choice);
+        }
+
+        var advanced = new StackPanel
+        {
             Spacing = 4,
             Children =
             {
@@ -129,26 +183,48 @@ public sealed class LibraryView : UserControl
                 settings.FramePacing = pacing;
                 settings.Save();
             };
-            page.Children.Add(choice);
+            advanced.Children.Add(choice);
         }
-        page.Children.Add(Heading("Scaling"));
-        page.Children.Add(Help("How the game's picture is scaled to the window.", 0));
+        advanced.Children.Add(Heading("Scaling"));
+        advanced.Children.Add(Help("How the game's picture is scaled to the window.", 0));
         foreach (var (scaling, label) in PictureScaling.Choices)
         {
             var choice = new RadioButton
             {
                 Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
-                GroupName = "scaling", IsChecked = settings.Scaling == scaling,
+                GroupName = "scaling",
             };
             choice.IsCheckedChanged += (_, _) =>
             {
-                if (choice.IsChecked != true)
+                if (showing || choice.IsChecked != true)
                     return;
                 settings.Scaling = scaling;
                 settings.Save();
+                Show();
             };
-            page.Children.Add(choice);
+            scalings[scaling] = choice;
+            advanced.Children.Add(choice);
         }
+        sharpness.ValueChanged += (_, _) =>
+        {
+            int value = (int)Math.Round(sharpness.Value);
+            if (showing || value == settings.FsrSharpness)
+                return;
+            settings.FsrSharpness = value;
+            settings.Save();
+            Show();
+        };
+        advanced.Children.Add(sharpnessLabel);
+        advanced.Children.Add(sharpness);
+        page.Children.Add(new Expander
+        {
+            Header = new TextBlock { Text = "Advanced graphics", FontSize = 16, FontWeight = FontWeight.SemiBold },
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 8, 0, 0),
+            Content = advanced,
+        });
+        Show();
+
         string? section = null;
         foreach (var item in PlayerSettings.Switches)
         {

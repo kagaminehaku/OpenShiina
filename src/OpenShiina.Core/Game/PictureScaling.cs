@@ -3,8 +3,10 @@
 // pixels would become 3 screen pixels and some 4 with nearest-neighbour (uneven text and lines),
 // and bilinear alone blurs. Sharp: the picture multiplied by a whole number with nearest-neighbour,
 // the rest of the way bilinear (on the GPU where the player can: the "sharp bilinear" shader;
-// else the whole-number copy on the CPU, Multiply, drawn with linear filtering). Placement gives
-// where the picture goes in the window, for drawing and for the pointer.
+// else the whole-number copy on the CPU, Multiply, drawn with linear filtering). FSR and Anime4K
+// are upscalers that run as shaders (the Avalonia player: GamePicture); a player without them
+// (WPF) draws them as Sharp (ForCopy). Placement gives where the picture goes in the window, for
+// drawing and for the pointer. GraphicsPresets (GraphicsQuality.cs) picks them by level.
 
 namespace OpenShiina.Game;
 
@@ -18,6 +20,10 @@ public enum Scaling
     Smooth,
     /// <summary>Nearest-neighbour to the window's size: uneven at scales that are not whole numbers.</summary>
     Nearest,
+    /// <summary>AMD FidelityFX Super Resolution 1: edge-adaptive upscaling (EASU), then sharpening (RCAS) as PlayerSettings.FsrSharpness says.</summary>
+    Fsr,
+    /// <summary>Anime4K's upscaling network (CNN x2), made for drawn art; then to the window's size.</summary>
+    Anime4K,
 }
 
 public static class PictureScaling
@@ -29,7 +35,18 @@ public static class PictureScaling
         (Scaling.WholeNumbers, "Whole numbers only: x2, x3... with black around (exact)"),
         (Scaling.Smooth, "Smooth: filtered, soft"),
         (Scaling.Nearest, "Nearest: the window's size, pixels as they fall (uneven when not a whole number)"),
+        (Scaling.Fsr, "FSR 1: AMD's upscaler, clean edges, sharpened as set below (the GPU's work)"),
+        (Scaling.Anime4K, "Anime4K: an upscaler made for drawn art (heaviest: a desktop GPU)"),
     ];
+
+    /// <summary>The choices a player that draws without shaders (WPF) offers.</summary>
+    public static IReadOnlyList<(Scaling Scaling, string Label)> CopyChoices { get; } = Choices.Where(c => !c.Scaling.NeedsShader()).ToList();
+
+    /// <summary>The upscalers that need a shader (FSR, Anime4K).</summary>
+    public static bool NeedsShader(this Scaling scaling) => scaling is Scaling.Fsr or Scaling.Anime4K;
+
+    /// <summary>The scaling a player without shaders uses for <paramref name="scaling"/>: Sharp for the upscalers.</summary>
+    public static Scaling ForCopy(Scaling scaling) => scaling.NeedsShader() ? Scaling.Sharp : scaling;
 
     /// <summary>
     /// The picture's scale and its top left corner in a view (any unit, the same for both: device

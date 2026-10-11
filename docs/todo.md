@@ -45,12 +45,12 @@ should follow what their perf.log shows.
 
 ## The picture on large screens
 
-The setting "Scaling" (sharp, whole numbers, smooth, nearest) is done (engine-notes.md section 6,
+The setting "Scaling" (sharp, whole numbers, smooth, nearest, and in the Avalonia player the
+upscalers FSR 1 and Anime4K) and the graphics levels are done (engine-notes.md section 6,
 "Scaling"). Left:
 
-- [ ] **Upscaler** on the GPU: FSR 1 (EASU + RCAS) or an anime-art upscaler (Anime4K, xBRZ);
-  heavier, an option for desktop GPUs, maybe too slow for old phones. Avalonia could run it as
-  SkSL like the sharp shader; WPF has no shader path yet (its sharp scaling is a CPU copy).
+- [ ] FSR and Anime4K on phones: how fast on an old one (the S7: Anime4K's four half-float
+  passes at the picture's size each new frame); measured on a PC only (Intel UHD, 60 fps).
 - [ ] WPF's sharp scaling on the GPU (a `ShaderEffect`, or the picture drawn through Direct3D),
   as the Avalonia player does it: now the picture multiplied by a whole number on the CPU, which
   uploads a picture up to the window's size each frame.

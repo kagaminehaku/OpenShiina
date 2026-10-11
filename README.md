@@ -74,7 +74,9 @@ Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux,
 `fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
 
 Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
-each counts from the next game started): drawing on the CPU or on the GPU (the GPU mode runs
+each counts from the next game started): the graphics level (Potato: nearest pixels; Low: sharp;
+Medium: FSR 1; High: FSR 1 sharpened; Max: Anime4K; Custom when the advanced settings match none
+of them), and under the Avalonia player's Advanced graphics drawing on the CPU or on the GPU (the GPU mode runs
 heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
 rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
 faster on its first large calls, with the same pictures; without a Vulkan driver the games run on the CPU), the frame
@@ -82,8 +84,9 @@ rate (the game's own pace, up to 60 frames a second with the window drawing only
 as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
 scripts run as often: four times as much processor on a 240 Hz one), the scaling of the
 picture to the window (sharp: whole game pixels as far as they fit and the rest smooth, so text
-and lines stay even at any size; whole numbers only, with black around; smooth; or nearest),
-pausing the game while another window is in front (on by default; off, the game does as its
+and lines stay even at any size; whole numbers only, with black around; smooth; nearest; or, in
+the Avalonia player on the GPU that draws its window, the upscalers FSR 1, with its sharpening
+from none to 10, and Anime4K, the heaviest; the WPF player draws them as sharp), pausing the game while another window is in front (on by default; off, the game does as its
 RIO.INI says: most go on, sound included), the game controller, showing the frame rate (in the title; on phones over the game), and for bug reports
 writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
 `draw-trace.log` (both logs go to the game's save folder).
@@ -129,6 +132,10 @@ players share them.
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
 - Ellipses without Windows flatten their curves with GDI's Bézier flattener as kept in
   [WPF](https://github.com/dotnet/wpf)'s bezier.cpp (MIT, .NET Foundation).
+- The FSR 1 upscaler (EASU and RCAS) is ported from AMD's
+  [FidelityFX FSR](https://github.com/GPUOpen-Effects/FidelityFX-FSR) `ffx_fsr1.h` (MIT, Advanced Micro
+  Devices), the Anime4K one from [Anime4K](https://github.com/bloc97/Anime4K)'s Upscale CNN x2 (S)
+  (MIT, bloc97).
 
 ## License
 

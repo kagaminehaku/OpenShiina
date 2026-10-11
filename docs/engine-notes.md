@@ -273,6 +273,25 @@ game's own. It is split in two projects:
   as before. The pointer follows the picture's place (`PictureScaling.Placement`, in screen
   pixels). The WPF player is per-monitor DPI aware (app.manifest, PerMonitorV2): it was system
   aware, so Windows stretched its window again on a screen with another scale.
+- **Upscalers and graphics levels** (2026-10-11; App `Upscalers.cs`, Core
+  `Game/GraphicsQuality.cs`, settings "Scaling" Fsr / Anime4K and "FsrSharpness"). Avalonia
+  only, as SkSL runtime effects on the GPU context Skia draws the window with
+  (`ISkiaSharpApiLease.GrContext`; without one, or for a picture not enlarged, they draw as
+  Sharp; the WPF player maps them to Sharp, `PictureScaling.ForCopy`). FSR 1: EASU (ffx_fsr1.h's
+  32-bit path: 12 taps, the Lanczos-like window stretched along the edge, deringed to the 4
+  nearest) to the target's device pixels, then RCAS when the sharpness is 1-10 (0.2 stops a
+  step, 10 the strongest). Anime4K v3.2 Upscale CNN x2 (S): four 3 x 3 convolution layers (CReLU,
+  RgbaF16 surfaces) at the picture's size, depth-to-space adding their detail to the picture
+  doubled, then Catmull-Rom to the window. Each pass draws into a surface kept by name (made
+  again when the size or the GPU context changes); the result is kept until the picture, the
+  size or the setting changes. A builder per shader is kept for good: an `SKRuntimeShaderBuilder`
+  owns its effect, and one left to the finalizer freed the static effect (crashes in
+  `sk_runtimeeffect_get_uniform_byte_size` after a minute); the child shaders made from GPU images
+  are disposed on the render thread after each pass. The settings show levels (Potato: nearest,
+  Low: sharp, Medium: FSR without sharpening, High: FSR sharpness 8, Max: Anime4K; Custom when
+  the advanced settings match none) and the rest under Advanced graphics. Checked on Bitch
+  Nee-chan's title (1280 x 720 to 1920 x 1017, Intel UHD): 60 fps in all three, about 75 MB
+  (FSR) and 135 MB (Anime4K) more than Sharp.
 - Both players start on a home screen of the games added (Core `Game/GameLibrary.cs`:
   library.json in the player folder with each game's folder, scheme name, .exe and when it was
   played; the .exe's icon read by `Formats/ExeIcon.cs` from its PE resources, without Windows):

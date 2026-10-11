@@ -50,7 +50,7 @@ public sealed class ScnWindow : Window
         int width = setup.Width, height = setup.Height;
         m_bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
         m_frame = new byte[width * height * 4];
-        m_scaling = setup.Settings.Scaling;
+        m_scaling = PictureScaling.ForCopy(setup.Settings.Scaling);
         m_image = new Image { Source = m_bitmap, Stretch = Stretch.Uniform };
         m_host = new Host(this, data, setup.SaveFolder);
         m_game = new GameThread(setup.CreateVm(m_host), setup, data.SchemeName);

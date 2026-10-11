@@ -43,6 +43,9 @@ public sealed class PlayerSettings
     [JsonConverter(typeof(JsonStringEnumConverter<Scaling>))]
     public Scaling Scaling { get; set; } = Scaling.Sharp;
 
+    /// <summary>FSR's sharpening (RCAS): 0 none, 1 to 10 more and more (10: AMD's strongest, 0 stops).</summary>
+    public int FsrSharpness { get; set; } = 8;
+
     /// <summary>
     /// Every game stands still while its window is behind another (ScnVm.PauseInBackground); off,
     /// as its RIO.INI says (Background=1: it goes on, sound included; eight of the eleven).

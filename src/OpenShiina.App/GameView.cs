@@ -317,6 +317,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         m_session = session;
         m_frame = new byte[session.Width * session.Height * 4];
         m_image.Scaling = session.Setup.Settings.Scaling;
+        m_image.FsrSharpness = session.Setup.Settings.FsrSharpness;
         m_image.SetFrame(m_frame, session.Width, session.Height, session.Width * 4);
         m_image.IsVisible = true;
         m_library.IsVisible = false;

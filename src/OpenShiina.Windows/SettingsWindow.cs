@@ -52,12 +52,12 @@ public sealed class SettingsWindow : Window
 
         page.Children.Add(Heading("Scaling"));
         page.Children.Add(Help("How the game's picture is scaled to the window."));
-        foreach (var (scaling, label) in PictureScaling.Choices)
+        foreach (var (scaling, label) in PictureScaling.CopyChoices)
         {
             var choice = new RadioButton
             {
                 Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
-                GroupName = "scaling", IsChecked = m_settings.Scaling == scaling, Margin = new Thickness(0, 6, 0, 0),
+                GroupName = "scaling", IsChecked = PictureScaling.ForCopy(m_settings.Scaling) == scaling, Margin = new Thickness(0, 6, 0, 0),
             };
             choice.Checked += (_, _) =>
             {

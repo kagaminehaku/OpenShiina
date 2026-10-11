@@ -2,8 +2,10 @@
 // (Core Game/PictureScaling.cs): nearest-neighbour (to the view, or at its whole scale), bicubic
 // (Catmull-Rom), or sharp: the "sharp bilinear" runtime shader (SkSL), which snaps the sampling
 // point within each game pixel so that only the screen pixels on its edge mix with the next one
-// (Skia runs it on the GPU where it draws on one, on the CPU otherwise). The picture is kept as an
-// SKImage made from each new frame, shared with the draw operations the render thread runs.
+// (Skia runs it on the GPU where it draws on one, on the CPU otherwise), or the upscalers FSR 1
+// and Anime4K (Upscalers.cs; on the GPU only: Sharp without one). The picture is kept as an
+// SKImage made from each new frame, shared with the draw operations the render thread runs; an
+// upscaled one is kept until the picture or the size changes.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -32,6 +34,9 @@ public sealed class GamePicture : Control
 
     /// <summary>How the picture is scaled to the view.</summary>
     public Scaling Scaling { get; set; } = Scaling.Sharp;
+
+    /// <summary>FSR's sharpening, 0 (none) to 10 (PlayerSettings.FsrSharpness).</summary>
+    public int FsrSharpness { get; set; } = 8;
 
     /// <summary>A new picture: BGRA pixels, rows stride bytes apart (copied).</summary>
     public unsafe void SetFrame(ReadOnlySpan<byte> pixels, int width, int height, int stride)
@@ -80,7 +85,7 @@ public sealed class GamePicture : Control
             return;
         double device = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
         var target = new Rect(left, top, m_width * scale, m_height * scale);
-        context.Custom(new DrawPicture(new Rect(Bounds.Size), target, image, Scaling, scale * device));
+        context.Custom(new DrawPicture(new Rect(Bounds.Size), target, image, Scaling, scale * device, device, FsrSharpness));
     }
 
     /// <summary>An SKImage the control and the draw operations hold; disposed when none does.</summary>
@@ -116,15 +121,39 @@ public sealed class GamePicture : Control
         private readonly Rect m_target;
         private readonly SharedImage? m_image;
         private readonly Scaling m_scaling;
-        private readonly double m_pixels;
+        private readonly double m_pixels, m_device;
+        private readonly int m_sharpness;
 
-        public DrawPicture(Rect bounds, Rect target, SharedImage image, Scaling scaling, double pixels)
+        public DrawPicture(Rect bounds, Rect target, SharedImage image, Scaling scaling, double pixels, double device, int sharpness)
         {
             Bounds = bounds;
             m_target = target;
             m_image = image.TryHold() ? image : null;
             m_scaling = scaling;
             m_pixels = pixels;
+            m_device = device;
+            m_sharpness = sharpness;
+        }
+
+        // The last upscaled picture (the render thread's): what it was made from, and how
+        [ThreadStatic]
+        private static (GRContext Gpu, SKImage Source, Scaling Scaling, int Width, int Height, int Sharpness, SKImage Result)? t_upscaled;
+
+        /// <summary>
+        /// The picture upscaled as the setting says (to the target's device pixels for FSR, twice
+        /// its size for Anime4K), made again only for a new picture or size; null without a GPU.
+        /// </summary>
+        private SKImage? Upscaled(GRContext? gpu, SKImage image)
+        {
+            if (gpu == null)
+                return null;
+            int width = (int)Math.Round(m_target.Width * m_device), height = (int)Math.Round(m_target.Height * m_device);
+            if (t_upscaled is { } last && last.Gpu == gpu && last.Source == image && last.Scaling == m_scaling && last.Width == width && last.Height == height && last.Sharpness == m_sharpness)
+                return last.Result;
+            var result = m_scaling == Scaling.Fsr ? Upscalers.Fsr(gpu, image, width, height, m_sharpness) : Upscalers.Anime4K(gpu, image);
+            t_upscaled?.Result.Dispose();
+            t_upscaled = result == null ? null : (gpu, image, m_scaling, width, height, m_sharpness, result);
+            return result;
         }
 
         public Rect Bounds { get; }
@@ -143,7 +172,15 @@ public sealed class GamePicture : Control
             var canvas = lease.SkCanvas;
             var image = m_image.Image;
             var target = new SKRect((float)m_target.Left, (float)m_target.Top, (float)m_target.Right, (float)m_target.Bottom);
-            switch (m_scaling)
+            if (m_scaling.NeedsShader() && m_pixels > 1 + 1e-6 && Upscaled(lease.GrContext, image) is { } upscaled)
+            {
+                // FSR: the target's own pixels; Anime4K: twice the picture, the rest bicubic
+                canvas.DrawImage(upscaled, target, m_scaling == Scaling.Fsr
+                    ? new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None)
+                    : new SKSamplingOptions(SKCubicResampler.CatmullRom));
+                return;
+            }
+            switch (m_scaling.NeedsShader() ? Scaling.Sharp : m_scaling)
             {
                 case Scaling.Smooth:
                     canvas.DrawImage(image, target, new SKSamplingOptions(SKCubicResampler.CatmullRom));
