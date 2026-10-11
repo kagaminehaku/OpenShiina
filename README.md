@@ -21,7 +21,7 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 | `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter and its x86 translator |
 | `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
 | `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
-| `src/OpenShiina.Tools` | OpenShiina Tools for Windows, Linux and macOS (Avalonia): browse, preview, extract and repack a game's archives; export its scenario text to translate and build the translation |
+| `src/OpenShiina.Tools` | OpenShiina Tools for Windows, Linux and macOS (Avalonia): browse, preview, extract and repack a game's archives; translate a game |
 | `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; plays on a Galaxy S7 (Exynos 8890), heavy scenes are slow on phones that old |
 | iOS | Planned, on `OpenShiina.App` |
 
@@ -114,7 +114,7 @@ players share them.
 
 ## OpenShiina Tools
 
-`OpenShiinaTools [archive]` (it was [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor),
+`OpenShiinaTools [archive or game folder]` (it was [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor),
 now on Avalonia and the player's engine, so it opens every game the player knows):
 
 - **Archives**: opens a game's `.WAR` archive (the game found by its `.exe` next to it, else by
@@ -130,39 +130,42 @@ now on Avalonia and the player's engine, so it opens every game the player knows
   other entries copied as they are. Every packed entry is read back and compared with its file
   before the archive is saved; the open archive itself cannot be written over. Pictures cannot
   be made from PNG yet (no S25 encoder).
-- **Translation**: see below.
+- **Translation**: translate a game in the tab itself, see below.
 
 ## Translations
 
-The **Translation** tab of OpenShiina Tools does the whole round trip:
+To translate a game, open the **Translation** tab of OpenShiina Tools (or run
+`OpenShiinaTools <game folder>`) and choose the game's folder:
 
-1. **Export the text** of a game's folder into a folder of tables: `text.tsv` has every message
-   line of the scenarios (id `FILE.TXT:line`, speaker, original, translation), `names.tsv` the
-   speakers' names, `strings.tsv` starts empty for the texts the scripts write themselves
-   (choices, menus). The tables are UTF-8 with tabs between the fields: a spreadsheet, a text
-   editor or a translation tool can fill the translation column. Exporting again keeps the
-   translations already in the tables (for the lines whose original did not change).
-2. **Build the translation** from the tables: the scenarios with a translated line are written,
-   the other lines as they were, into a folder `translation`, and the names and strings into
-   `translation\strings.txt`. The scenarios keep the original speakers' names (games find voices
-   and name plates by them); the player draws the translated names. The build says how many of
-   the 2,820 codes for letters the translation needs (beyond them a letter shows as `?`), and
-   which rows did not match the game's lines.
-3. Copy `translation` into the game's folder. The game's own files stay as they are.
+1. The first time, the tools read the game's scenarios and make the tables of its translation in
+   the game folder's `translation` folder: `text.tsv` (every message line: id `FILE.TXT:line`,
+   speaker, original, translation), `names.tsv` (the speakers' names) and `strings.tsv` (texts
+   the scripts write themselves, such as choices and menus, added by hand: the text exactly as the
+   game shows it and its translation).
+2. Translate in the tab: the scenarios a file at a time (or every line at once), with a search
+   and "untranslated only"; the names; the strings. Every change is saved a moment later.
+   **Check** says how far the translation is, how many of the 2,820 codes for letters it uses
+   (beyond them a letter shows as `?`) and which lines do not fit the game's (another version).
+   **▶ Play** opens the game in OpenShiina with the translation as it is.
+3. That is all: the player reads the tables as they are. To share the translation, share the
+   `translation` folder; the game's own files stay as they are.
 
-What the player reads: a scenario file (`.TXT`) saved as UTF-8 **with a byte order mark** is read
-as a translation: its message lines may use any letters, Vietnamese included, drawn half-width
-with their own widths and wrapped at the window's edge by words. Files in the game folder's
-`translation` folder are used in place of the archives' files, found by the path the game reads
-them by (`translation\p\pro01_01.txt`) or by their name alone (`translation\PRO01_01.TXT`, as the
-tools write them). A scenario edited by hand keeps its `;` comments and `$` commands, one message a
-line; a speaker's name in `【name】` may be translated where the game draws names as text, but a
-game whose name plates are pictures (Oreimo Plus) finds them by the original names.
+The tables are UTF-8 with tabs between the fields, so they can also be filled in a spreadsheet
+(Excel, LibreOffice, Google Sheets) or by a translation tool; more columns after the
+translation (notes, who translated a line) are kept. **Update from the game** reads the game
+again (after an update of it) and keeps the translations of the lines that did not change. The
+scenarios keep the original speakers' names, which games find voices and name plates by; the
+player draws the translated names. Keep the game's own symbols such as `①` (pictures the game
+draws in their place, a heart in the Bitch games).
 
-Texts the scripts draw from their own code (choices, menus, names they keep) go in
-`translation\strings.txt`, UTF-8, a line each: the original, a tab, the translation
-(`土筆	Tsukushi`; lines starting with `#` are comments). A text drawn is replaced when the whole
-of it is one of the originals.
+What the player reads, all in the game folder's `translation` folder: `text.tsv`, `names.tsv` and
+`strings.tsv`; a scenario file of its own (`.TXT`, UTF-8 **with a byte order mark**, found by the
+path the game reads it by, `translation\p\pro01_01.txt`, or by its name alone,
+`translation\PRO01_01.TXT`), which comes before `text.tsv` for that scenario; and
+`strings.txt` (a line each: the original, a tab, the translation; `#` comments). Translated
+lines may use any letters, Vietnamese included, drawn half-width with their own widths and
+wrapped at the window's edge by words. A text the scripts draw is replaced when the whole of it
+is one of the strings' or names' originals.
 
 ## Documentation
 

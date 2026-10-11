@@ -140,8 +140,9 @@ public sealed partial class ScnVm
     private Dictionary<string, (byte[] Bytes, int Address)>? m_strings;
 
     /// <summary>
-    /// The text to draw for <paramref name="text"/>: its translation in strings.txt when the
-    /// whole of it is there (one original a line: "original&lt;tab&gt;translation", UTF-8), else itself.
+    /// The text to draw for <paramref name="text"/>: its translation in strings.txt (one original
+    /// a line: "original&lt;tab&gt;translation", UTF-8) or the tables' names.tsv and strings.tsv
+    /// when the whole of it is there, else itself.
     /// </summary>
     private int Translated(int text)
     {
@@ -150,6 +151,11 @@ public sealed partial class ScnVm
             m_strings = new();
             if (m_host.ReadLooseFile(TranslationFolder + "strings.txt") is { } file)
                 ReadStrings(file);
+            if (Tables is { } tables)
+                foreach (var (original, translation) in tables.TranslatedStrings())
+                    AddString(original, translation);
+            if (m_strings.Count > 0 && m_host.Fonts is { } fonts)
+                fonts.Gaiji = m_gaiji.Texts;
         }
         if (m_strings.Count == 0 || text == 0)
             return text;
@@ -168,27 +174,30 @@ public sealed partial class ScnVm
 
     private void ReadStrings(byte[] file)
     {
-        var sjis = (Encoding)Encodings.cp932.Clone();
-        sjis.EncoderFallback = EncoderFallback.ExceptionFallback;
         string text = Encoding.UTF8.GetString(ScnGaiji.IsUtf8(file) ? file.AsSpan(3) : file);
         foreach (var raw in text.Split('\n'))
         {
             var parts = raw.TrimEnd('\r').Split('\t', 2);
-            if (parts.Length != 2 || parts[0].Length == 0 || parts[0].StartsWith('#'))
-                continue;
-            byte[] original;
-            try
-            {
-                original = sjis.GetBytes(parts[0]);
-            }
-            catch (EncoderFallbackException)
-            {
-                continue;
-            }
-            m_strings![Encoding.Latin1.GetString(original)] = (m_gaiji.Text(parts[1]), 0);
+            if (parts.Length == 2 && parts[0].Length > 0 && !parts[0].StartsWith('#'))
+                AddString(parts[0], parts[1]);
         }
-        if (m_strings!.Count > 0 && m_host.Fonts is { } fonts)
-            fonts.Gaiji = m_gaiji.Texts;
+    }
+
+    /// <summary>A text the scripts may draw and its translation (left out when Shift-JIS cannot write the original).</summary>
+    private void AddString(string original, string translation)
+    {
+        var sjis = (Encoding)Encodings.cp932.Clone();
+        sjis.EncoderFallback = EncoderFallback.ExceptionFallback;
+        byte[] bytes;
+        try
+        {
+            bytes = sjis.GetBytes(original);
+        }
+        catch (EncoderFallbackException)
+        {
+            return;
+        }
+        m_strings![Encoding.Latin1.GetString(bytes)] = (m_gaiji.Text(translation), 0);
     }
 
     /// <summary>FUN_00431730: the record's text, optionally with a new position.</summary>

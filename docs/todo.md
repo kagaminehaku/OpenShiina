@@ -91,11 +91,12 @@ Vietnamese included, words wrapped at the window's edge; files in the game folde
   the scripts build from parts (a name then a word) or draw another way.
 - [ ] Pictures with Japanese text (menus, buttons, titles): OpenShiina Tools can repack an
   archive's files but has no S25 encoder yet.
-- [ ] OpenShiina Tools' Export takes the scenarios' message lines and speakers' names; the texts
-  the scripts write themselves (choices, menus) go into strings.tsv by hand. Left: finding those
-  texts in the SCN modules (Shift-JIS strings the scripts pass to 0083 / 0084 / 00A0) to export
-  them too, and a translation run on a whole game (are 2,820 codes enough for every letter
-  pair of a full English or Vietnamese script? the build counts them).
+- [ ] OpenShiina Tools takes the scenarios' message lines and speakers' names into the tables; the
+  texts the scripts write themselves (choices, menus) go into strings.tsv by hand. Left: finding
+  those texts in the SCN modules (Shift-JIS strings the scripts pass to 0083 / 0084 / 00A0) to
+  list them too, a translation run on a whole game (are 2,820 codes enough for every letter pair
+  of a full English or Vietnamese script? Check counts them), Enter moving to the next line in
+  the editor, and a machine translation of the empty lines (the user's own key).
 
 ## Other ShiinaRio games
 

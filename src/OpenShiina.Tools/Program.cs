@@ -1,6 +1,7 @@
-// OpenShiina Tools: OpenShiinaTools [archive or .S25 file]. The archive tab browses, previews,
-// extracts and repacks a game's archives; the translation tab exports the scenario text and
-// builds a translation from it (Core Game/ScenarioText.cs).
+// OpenShiina Tools: OpenShiinaTools [archive, .S25 file or game folder]. The archive tab browses,
+// previews, extracts and repacks a game's archives; the translation tab translates a game (a
+// folder given opens there), its tables kept in the game folder's translation\ for the player to
+// read (Core Game/ScenarioText.cs).
 
 using Avalonia;
 using Avalonia.Controls;
@@ -19,6 +20,7 @@ internal static class Program
 
 public sealed class ToolsApplication : Application
 {
+
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
@@ -31,6 +33,15 @@ public sealed class ToolsApplication : Application
         {
             var archives = new ArchiveView();
             var translation = new TranslationView();
+            var tabs = new TabControl
+            {
+                Margin = new Thickness(8, 4, 8, 8),
+                ItemsSource = new[]
+                {
+                    new TabItem { Header = "Archives", Content = archives },
+                    new TabItem { Header = "Translation", Content = translation },
+                },
+            };
             var window = new Window
             {
                 Title = "OpenShiina Tools",
@@ -39,15 +50,7 @@ public sealed class ToolsApplication : Application
                 MinWidth = 720,
                 MinHeight = 480,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Content = new TabControl
-                {
-                    Margin = new Thickness(8, 4, 8, 8),
-                    ItemsSource = new[]
-                    {
-                        new TabItem { Header = "Archives", Content = archives },
-                        new TabItem { Header = "Translation", Content = translation },
-                    },
-                },
+                Content = tabs,
             };
             window.Closing += (_, e) =>
             {
@@ -57,11 +60,21 @@ public sealed class ToolsApplication : Application
                     _ = OpenShiina.App.MessageDialog.ShowAsync(window, "Please wait for the work going on to finish.", "OpenShiina Tools", 0);
                     return;
                 }
+                translation.Save();
                 archives.Close();
             };
             desktop.MainWindow = window;
             if (desktop.Args is [var path, ..] && path.Length > 0)
-                window.Opened += (_, _) => archives.Open(path);
+                window.Opened += (_, _) =>
+                {
+                    if (Directory.Exists(path))
+                    {
+                        tabs.SelectedIndex = 1;
+                        translation.Open(path);
+                    }
+                    else
+                        archives.Open(path);
+                };
         }
         base.OnFrameworkInitializationCompleted();
     }

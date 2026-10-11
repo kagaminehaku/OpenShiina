@@ -1,31 +1,196 @@
-// The text of a game's scenarios for a translation (OpenShiina Tools). Export puts every message
-// line of the scenario files (the .TXT entries of the game's archives) into a table to translate;
-// Build turns the table, translated, into the translation\ folder the players read in place of the
-// archives' files (ScnVm.Files; ScnGaiji draws what Shift-JIS lacks).
+// A translation as tables, kept in the game folder's translation\ and read by the player as they
+// are (OpenShiina Tools makes and edits them):
 //
-//   text.tsv     id, speaker, original, translation: a message line a row; the id is the file
-//                and the line ("PRO01_01.TXT:36"), the speaker the name of the line before it
+//   text.tsv     id, speaker, original, translation: a message line of the scenarios a row; the
+//                id is the scenario file and the line ("PRO01_01.TXT:36"), the speaker the name
+//                of the line before it
 //   names.tsv    original, translation: the speakers' names (inside 【】). The scenarios keep
-//                the original names (games find voices and name plates by them); the players
-//                draw the translation through strings.txt
+//                the original names (games find voices and name plates by them); the player draws
+//                the translation in their place, as a string
 //   strings.tsv  original, translation: other texts the scripts draw from their own code
-//                (choices, menus), added by hand; into strings.txt as the names
+//                (choices, menus), drawn translated when the whole text is the original
 //
-// The tables are UTF-8 with tabs between the fields, a header row first. A field that starts and
-// ends with a double quote is read as spreadsheets write one (its quotes doubled inside), so the
-// files can go through Excel or LibreOffice and back. An empty translation keeps the original.
+// The tables are UTF-8 with tabs between the fields, a header row first; more fields after
+// those are kept as they are (notes, who translated a line). A field that starts and ends with a
+// double quote is read as spreadsheets write one (its quotes doubled inside), so the files can go
+// through Excel or LibreOffice and back. An empty translation keeps the original.
+//
+// The player (ScnVm.Files) applies text.tsv as it reads a scenario: the lines whose original is
+// the game's are replaced, and the scenario goes on as a translated one (UTF-8, ScnGaiji). A
+// scenario file of its own in translation\ (UTF-8 with a byte order mark) comes first.
 
 using System.Text;
 
 namespace OpenShiina.Game;
 
-public static class ScenarioText
+/// <summary>A message line of text.tsv.</summary>
+public sealed class TextRow
+{
+    public required string File { get; init; }
+    public required int Line { get; init; }
+    public string Speaker { get; init; } = "";
+    public required string Original { get; init; }
+    public string Translation { get; set; } = "";
+    /// <summary>The fields after the translation, kept as they were.</summary>
+    public string[] Extra { get; set; } = [];
+
+    public string Id => $"{File}:{Line}";
+}
+
+/// <summary>A row of names.tsv or strings.tsv.</summary>
+public sealed class StringRow
+{
+    public required string Original { get; set; }
+    public string Translation { get; set; } = "";
+    public string[] Extra { get; set; } = [];
+}
+
+/// <summary>The three tables of a translation.</summary>
+public sealed class TranslationTables
 {
     public const string TextTable = "text.tsv", NameTable = "names.tsv", StringTable = "strings.tsv";
 
-    /// <summary>The folder Build writes, as the game folder takes it.</summary>
-    public const string TranslationFolder = "translation";
+    /// <summary>The folder of a game's translation, inside the game's folder.</summary>
+    public const string Folder = "translation";
 
+    public List<TextRow> Lines { get; } = new();
+    public List<StringRow> Names { get; } = new();
+    public List<StringRow> Strings { get; } = new();
+
+    // Headers' fields after the known ones (extra columns), kept for writing back
+    private string[] m_textExtra = [], m_nameExtra = [], m_stringExtra = [];
+
+    // Translated lines by scenario file (upper case) and line, made on first use
+    private Dictionary<string, Dictionary<int, TextRow>>? m_byFile;
+
+    /// <summary>A translation's tables exist in <paramref name="folder"/>.</summary>
+    public static bool Exist(string folder) => File.Exists(Path.Combine(folder, TextTable));
+
+    /// <summary>The tables of a folder (the missing ones empty).</summary>
+    public static TranslationTables ReadFolder(string folder) =>
+        Read(name => Path.Combine(folder, name) is var path && File.Exists(path) ? File.ReadAllBytes(path) : null);
+
+    /// <summary>The tables a reader gives by their names (null for a missing one).</summary>
+    public static TranslationTables Read(Func<string, byte[]?> file)
+    {
+        var tables = new TranslationTables();
+        if (file(TextTable) is { } text)
+        {
+            var rows = Tsv.Read(Tsv.Decode(text), 4, out tables.m_textExtra);
+            foreach (var row in rows)
+            {
+                int colon = row[0].LastIndexOf(':');
+                if (colon <= 0 || !int.TryParse(row[0][(colon + 1)..], out int line))
+                    continue;
+                tables.Lines.Add(new TextRow
+                {
+                    File = row[0][..colon], Line = line, Speaker = row[1], Original = row[2], Translation = row[3], Extra = row[4..],
+                });
+            }
+        }
+        if (file(NameTable) is { } names)
+            tables.Names.AddRange(StringRows(Tsv.Read(Tsv.Decode(names), 2, out tables.m_nameExtra)));
+        if (file(StringTable) is { } strings)
+            tables.Strings.AddRange(StringRows(Tsv.Read(Tsv.Decode(strings), 2, out tables.m_stringExtra)));
+        return tables;
+    }
+
+    private static IEnumerable<StringRow> StringRows(List<string[]> rows) =>
+        rows.Where(r => r[0].Length > 0 && !r[0].StartsWith('#')).Select(r => new StringRow { Original = r[0], Translation = r[1], Extra = r[2..] });
+
+    /// <summary>Writes the three tables into <paramref name="folder"/>.</summary>
+    public void Write(string folder)
+    {
+        Directory.CreateDirectory(folder);
+        Tsv.Write(Path.Combine(folder, TextTable), ["id", "speaker", "original", "translation", .. m_textExtra],
+            Lines.Select(l => (string[])[l.Id, l.Speaker, l.Original, l.Translation, .. l.Extra]));
+        Tsv.Write(Path.Combine(folder, NameTable), ["original", "translation", .. m_nameExtra],
+            Names.Select(n => (string[])[n.Original, n.Translation, .. n.Extra]));
+        Tsv.Write(Path.Combine(folder, StringTable), ["original", "translation", .. m_stringExtra],
+            Strings.Select(s => (string[])[s.Original, s.Translation, .. s.Extra]));
+        m_byFile = null;
+    }
+
+    /// <summary>
+    /// <paramref name="scenario"/> (the Shift-JIS file of that name) with the lines text.tsv
+    /// translates, as a translated scenario (UTF-8 with a byte order mark); null when it has
+    /// none (or none whose original is the game's line).
+    /// </summary>
+    public byte[]? Apply(string fileName, byte[] scenario) => Apply(fileName, scenario, null);
+
+    private byte[]? Apply(string fileName, byte[] scenario, List<string>? problems)
+    {
+        m_byFile ??= Lines.Where(l => l.Translation.Trim().Length > 0)
+            .GroupBy(l => l.File, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.GroupBy(l => l.Line).ToDictionary(x => x.Key, x => x.First()), StringComparer.OrdinalIgnoreCase);
+        if (!m_byFile.TryGetValue(fileName, out var rows))
+            return null;
+        var lines = ScenarioText.Lines(scenario);
+        var output = new StringBuilder("﻿");
+        int done = 0;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            string text = line.Text;
+            if (rows.TryGetValue(i + 1, out var row))
+            {
+                if (line.Kind == ScenarioText.LineKind.Message && Tsv.Clean(line.Text) == row.Original)
+                {
+                    text = Tsv.Clean(row.Translation);
+                    done++;
+                }
+                else
+                    problems?.Add($"{row.Id}: the game's line is not the table's original (another version of the game?): kept the game's");
+            }
+            output.Append(text).Append(line.Ending);
+        }
+        if (problems != null)
+            foreach (var row in rows.Values.Where(r => r.Line > lines.Count))
+                problems.Add($"{row.Id}: the scenario has no such line");
+        return done > 0 ? Encoding.UTF8.GetBytes(output.ToString()) : null;
+    }
+
+    /// <summary>The names and strings with a translation, names first.</summary>
+    public IEnumerable<(string Original, string Translation)> TranslatedStrings() =>
+        Names.Concat(Strings).Where(s => s.Original.Length > 0 && s.Translation.Trim().Length > 0)
+            .Select(s => (Tsv.Clean(s.Original), Tsv.Clean(s.Translation)));
+
+    public sealed record Summary(int Lines, int Translated, int Files, int Strings, int CodesUsed, int Missing, List<string> Problems);
+
+    /// <summary>
+    /// How far the translation is and what the player will make of it: the lines translated,
+    /// the gaiji codes the translation takes (ScnGaiji.Capacity in all), the rows that do not fit
+    /// the game's scenarios.
+    /// </summary>
+    public Summary Check(IReadOnlyList<(string Name, byte[] Data)> scenarios)
+    {
+        var problems = new List<string>();
+        var gaiji = new ScnGaiji();
+        int files = 0;
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, data) in scenarios)
+        {
+            known.Add(name);
+            if (Apply(name, data, problems) is { } translated)
+            {
+                gaiji.Scenario(translated);
+                files++;
+            }
+        }
+        foreach (var file in Lines.Select(l => l.File).Distinct(StringComparer.OrdinalIgnoreCase).Where(f => !known.Contains(f)))
+            problems.Add($"{file}: the game has no such scenario");
+        int strings = 0;
+        foreach (var (_, translation) in TranslatedStrings())
+        {
+            gaiji.Text(translation);
+            strings++;
+        }
+        return new Summary(Lines.Count, Lines.Count(l => l.Translation.Trim().Length > 0), files, strings, gaiji.Used, gaiji.Missing, problems);
+    }
+}
+
+public static class ScenarioText
+{
     /// <summary>
     /// The scenario files of the game in <paramref name="folder"/>: (entry name, Shift-JIS
     /// bytes), each name once (the first archive's, as the players find it), archives by name.
@@ -64,13 +229,13 @@ public static class ScenarioText
         return scenarios;
     }
 
-    /// <summary>A line of a scenario: its text (no line end), what it is, and the speaker's name for a message.</summary>
-    private readonly record struct Line(string Text, string Ending, LineKind Kind, string Speaker);
+    /// <summary>A line of a scenario: its text (no line end), its line end, what it is, and the speaker's name for a message.</summary>
+    internal readonly record struct Line(string Text, string Ending, LineKind Kind, string Speaker);
 
-    private enum LineKind { Other, Speaker, Message }
+    internal enum LineKind { Other, Speaker, Message }
 
     /// <summary>A scenario's lines (Shift-JIS, or UTF-8 after a byte order mark), the speaker of each message.</summary>
-    private static List<Line> Lines(byte[] data)
+    internal static List<Line> Lines(byte[] data)
     {
         string text = ScnGaiji.IsUtf8(data) ? Encoding.UTF8.GetString(data, 3, data.Length - 3) : Encodings.cp932.GetString(data);
         var lines = new List<Line>();
@@ -102,185 +267,117 @@ public static class ScenarioText
         return close > 1 ? body[1..close] : body[1..];
     }
 
-    public sealed record ExportResult(int Files, int Lines, int Names);
+    public sealed record ExportResult(int Files, int Lines, int Names, int Kept);
 
     /// <summary>
-    /// Writes text.tsv and names.tsv (and an empty strings.tsv when there is none) into
-    /// <paramref name="outputFolder"/>, keeping the translations of tables already there for
-    /// lines whose original is the same.
+    /// The game's message lines and speakers' names into the tables of <paramref name="folder"/>:
+    /// made there, or brought up to date with the game (the translations, and fields after them,
+    /// kept for lines whose original is the same; strings.tsv as it was).
     /// </summary>
-    public static ExportResult Export(IReadOnlyList<(string Name, byte[] Data)> scenarios, string outputFolder)
+    public static ExportResult Export(IReadOnlyList<(string Name, byte[] Data)> scenarios, string folder)
     {
-        Directory.CreateDirectory(outputFolder);
-        var oldText = ReadTable(Path.Combine(outputFolder, TextTable), 4).ToDictionary(r => r[0], r => (Original: r[2], Translation: r[3]));
-        var oldNames = TranslationsOf(Path.Combine(outputFolder, NameTable));
-        var text = new StringBuilder("id\tspeaker\toriginal\ttranslation\n");
-        var names = new List<string>();
+        var old = TranslationTables.ReadFolder(folder);
+        var oldLines = old.Lines.GroupBy(l => l.Id, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var oldNames = old.Names.GroupBy(n => n.Original).ToDictionary(g => g.Key, g => g.First());
+        var tables = old;
+        var lines = new List<TextRow>();
+        var names = new List<StringRow>();
         var nameSet = new HashSet<string>(StringComparer.Ordinal);
-        int files = 0, rows = 0;
+        int files = 0, kept = 0;
         foreach (var (name, data) in scenarios)
         {
             bool any = false;
-            var lines = Lines(data);
-            for (int i = 0; i < lines.Count; i++)
+            var scenario = Lines(data);
+            for (int i = 0; i < scenario.Count; i++)
             {
-                var line = lines[i];
+                var line = scenario[i];
                 if (line.Kind == LineKind.Speaker && SpeakerName(line.Text.Trim()) is { Length: > 0 } speaker && nameSet.Add(speaker))
-                    names.Add(speaker);
+                    names.Add(oldNames.GetValueOrDefault(speaker) ?? new StringRow { Original = speaker });
                 if (line.Kind != LineKind.Message)
                     continue;
-                string id = $"{name}:{i + 1}";
-                string kept = oldText.TryGetValue(id, out var old) && old.Original == Clean(line.Text) ? old.Translation : "";
-                text.Append(Field(id)).Append('\t').Append(Field(line.Speaker)).Append('\t')
-                    .Append(Field(line.Text)).Append('\t').Append(Field(kept)).Append('\n');
-                rows++;
+                string original = Tsv.Clean(line.Text);
+                var row = new TextRow { File = name, Line = i + 1, Speaker = line.Speaker, Original = original };
+                if (oldLines.TryGetValue(row.Id, out var was) && was.Original == original)
+                {
+                    row.Translation = was.Translation;
+                    row.Extra = was.Extra;
+                    if (was.Translation.Length > 0)
+                        kept++;
+                }
+                lines.Add(row);
                 any = true;
             }
             if (any)
                 files++;
         }
-        WriteUtf8(Path.Combine(outputFolder, TextTable), text.ToString());
-        var nameTable = new StringBuilder("original\ttranslation\n");
-        foreach (var name in names)
-            nameTable.Append(Field(name)).Append('\t').Append(Field(oldNames.GetValueOrDefault(name, ""))).Append('\n');
-        WriteUtf8(Path.Combine(outputFolder, NameTable), nameTable.ToString());
-        string strings = Path.Combine(outputFolder, StringTable);
-        if (!File.Exists(strings))
-            WriteUtf8(strings, "original\ttranslation\n");
-        return new ExportResult(files, rows, names.Count);
+        // Names the table had that the scenarios no longer use stay, after the others
+        names.AddRange(old.Names.Where(n => !nameSet.Contains(n.Original) && n.Translation.Length > 0));
+        tables.Lines.Clear();
+        tables.Lines.AddRange(lines);
+        tables.Names.Clear();
+        tables.Names.AddRange(names);
+        tables.Write(folder);
+        return new ExportResult(files, lines.Count, names.Count, kept);
     }
+}
 
-    public sealed record BuildResult(int Files, int Lines, int Strings, int CodesUsed, int Missing, List<string> Problems);
-
-    /// <summary>
-    /// Reads the tables of <paramref name="tableFolder"/> and writes into
-    /// <paramref name="outputFolder"/>\translation the scenarios with a translated line (UTF-8 with
-    /// a byte order mark, the other lines as they were) and strings.txt (names and strings).
-    /// </summary>
-    public static BuildResult Build(IReadOnlyList<(string Name, byte[] Data)> scenarios, string tableFolder, string outputFolder)
-    {
-        var problems = new List<string>();
-        // file -> line number -> (original, translation)
-        var byFile = new Dictionary<string, Dictionary<int, (string Original, string Translation)>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in ReadTable(Path.Combine(tableFolder, TextTable), 4))
-        {
-            if (row[3].Trim().Length == 0)
-                continue;
-            int colon = row[0].LastIndexOf(':');
-            if (colon <= 0 || !int.TryParse(row[0][(colon + 1)..], out int number))
-            {
-                problems.Add($"{row[0]}: not an id of text.tsv (FILE.TXT:line)");
-                continue;
-            }
-            string file = row[0][..colon];
-            if (!byFile.TryGetValue(file, out var lines))
-                byFile[file] = lines = new();
-            lines[number] = (row[2], row[3]);
-        }
-
-        string target = Path.Combine(outputFolder, TranslationFolder);
-        Directory.CreateDirectory(target);
-        var gaiji = new ScnGaiji();
-        int files = 0, translated = 0;
-        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, data) in scenarios)
-        {
-            known.Add(name);
-            if (!byFile.TryGetValue(name, out var rows))
-                continue;
-            var lines = Lines(data);
-            var output = new StringBuilder("﻿");
-            int done = 0;
-            for (int i = 0; i < lines.Count; i++)
-            {
-                var line = lines[i];
-                string text = line.Text;
-                if (rows.Remove(i + 1, out var row))
-                {
-                    if (line.Kind != LineKind.Message || Clean(line.Text) != row.Original)
-                        problems.Add($"{name}:{i + 1}: the game's line is not the table's original (another version of the game?); kept the game's");
-                    else
-                    {
-                        text = Clean(row.Translation);
-                        done++;
-                    }
-                }
-                output.Append(text).Append(line.Ending);
-            }
-            foreach (int number in rows.Keys)
-                problems.Add($"{name}:{number}: no such line");
-            if (done == 0)
-                continue;
-            byte[] bytes = Encoding.UTF8.GetBytes(output.ToString());
-            File.WriteAllBytes(MediaConverter.SafeOutputPath(target, name), bytes);
-            gaiji.Scenario(bytes);
-            files++;
-            translated += done;
-        }
-        foreach (var file in byFile.Keys.Where(f => !known.Contains(f)))
-            problems.Add($"{file}: the game has no such scenario");
-
-        // strings.txt: the names, then the strings written by hand
-        var strings = new StringBuilder();
-        int count = 0;
-        foreach (var table in new[] { NameTable, StringTable })
-            foreach (var (original, translation) in TranslationsOf(Path.Combine(tableFolder, table)))
-            {
-                if (translation.Trim().Length == 0 || original.Length == 0)
-                    continue;
-                strings.Append(Clean(original)).Append('\t').Append(Clean(translation)).Append('\n');
-                gaiji.Text(Clean(translation));
-                count++;
-            }
-        if (count > 0)
-            WriteUtf8(Path.Combine(target, "strings.txt"), strings.ToString());
-        return new BuildResult(files, translated, count, gaiji.Used, gaiji.Missing, problems);
-    }
-
+/// <summary>Tab-separated tables as OpenShiina writes them and spreadsheets save them.</summary>
+public static class Tsv
+{
     /// <summary>A field's text on one line: tabs and line ends as spaces.</summary>
-    private static string Clean(string text) => text.Replace("\r\n", " ").Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
+    public static string Clean(string text) => text.Replace("\r\n", " ").Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
 
     /// <summary>A field as written: on one line, quoted when it has a double quote.</summary>
-    private static string Field(string text)
+    public static string Field(string text)
     {
         text = Clean(text);
         return text.Contains('"') ? "\"" + text.Replace("\"", "\"\"") + "\"" : text;
     }
 
-    private static void WriteUtf8(string path, string text) => File.WriteAllText(path, text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
-
-    /// <summary>The (original, translation) rows of a two-field table, empty when there is no file.</summary>
-    private static Dictionary<string, string> TranslationsOf(string path)
+    /// <summary>A table file's text: UTF-8, or what its byte order mark says (Excel saves UTF-16).</summary>
+    public static string Decode(byte[] file)
     {
-        var rows = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var row in ReadTable(path, 2))
-            rows.TryAdd(row[0], row[1]);
-        return rows;
+        using var reader = new StreamReader(new MemoryStream(file), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
+    }
+
+    public static void Write(string path, string[] header, IEnumerable<string[]> rows)
+    {
+        var text = new StringBuilder();
+        text.AppendJoin('\t', header.Select(Field)).Append('\n');
+        foreach (var row in rows)
+            text.AppendJoin('\t', row.Select(Field)).Append('\n');
+        // Written whole then moved in place, so a table is never left half written
+        string temporary = path + ".tmp";
+        File.WriteAllText(temporary, text.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        File.Move(temporary, path, overwrite: true);
     }
 
     /// <summary>
-    /// The rows of a table after its header, each with <paramref name="fields"/> fields (missing
-    /// ones empty); none when there is no file.
+    /// The rows of a table after its header, each with at least <paramref name="fields"/> fields
+    /// (missing ones empty); <paramref name="extraHeader"/>: the header's fields after those.
     /// </summary>
-    private static List<string[]> ReadTable(string path, int fields)
+    public static List<string[]> Read(string text, int fields, out string[] extraHeader)
     {
         var rows = new List<string[]>();
-        if (!File.Exists(path))
-            return rows;
-        string text = File.ReadAllText(path, Encoding.UTF8);
+        extraHeader = [];
         var row = new List<string>();
         var field = new StringBuilder();
         bool header = true;
+        string[] headerFields = [];
         int i = 0;
         void EndRow()
         {
             if (header)
+            {
                 header = false;
+                headerFields = row.ToArray();
+            }
             else if (row.Count > 1 || row[0].Length > 0)
             {
                 while (row.Count < fields)
                     row.Add("");
-                rows.Add(row.Take(fields).ToArray());
+                rows.Add(row.ToArray());
             }
             row = new List<string>();
         }
@@ -336,6 +433,8 @@ public static class ScenarioText
             if (i == text.Length)
                 break;
         }
+        if (headerFields.Length > fields)
+            extraHeader = headerFields[fields..];
         return rows;
     }
 }

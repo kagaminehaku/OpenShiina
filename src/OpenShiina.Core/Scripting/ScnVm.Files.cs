@@ -114,9 +114,34 @@ public sealed partial class ScnVm
     private long? TranslationFileSize(string name) =>
         m_host.LooseFileSize(TranslationFolder + name) ?? (TranslationByFileName(name) is { } plain ? m_host.LooseFileSize(plain) : null);
 
-    /// <summary>A file of the archives read: a translated scenario turned, then kept (the interpreter's thread).</summary>
+    // The translation folder's tables (text.tsv, names.tsv, strings.tsv: OpenShiina Tools), read
+    // on the first scenario or string that may need them; null when there are none
+    private TranslationTables? m_translationTables;
+    private bool m_translationTablesRead;
+
+    private TranslationTables? Tables
+    {
+        get
+        {
+            if (!m_translationTablesRead)
+            {
+                m_translationTablesRead = true;
+                var tables = TranslationTables.Read(name => m_host.ReadLooseFile(TranslationFolder + name));
+                m_translationTables = tables.Lines.Count + tables.Names.Count + tables.Strings.Count > 0 ? tables : null;
+            }
+            return m_translationTables;
+        }
+    }
+
+    /// <summary>
+    /// A file of the archives read: a scenario translated by text.tsv, a translated scenario
+    /// turned into Shift-JIS and gaiji, then kept (the interpreter's thread).
+    /// </summary>
     private byte[] Kept(string name, byte[] data)
     {
+        if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && !ScnGaiji.IsUtf8(data)
+            && Tables?.Apply(name[(name.LastIndexOfAny(['\\', '/']) + 1)..], data) is { } translated)
+            data = translated;
         if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && ScnGaiji.IsUtf8(data))
         {
             data = m_gaiji.Scenario(data);

@@ -1276,13 +1276,18 @@ the functions they call from the decompile. First findings:
   Avalonia and Core): browse, preview, extract (S25 / MI4 -> PNG, layers composed as the scripts
   show them: Core `Formats/S25Composer.cs`, `S25ScriptIndex.cs`, `MontageTable.cs`,
   `MediaConverter.cs`) and repack (Core `Archives/WarcPacker.cs`, WARC 1.7 only: older versions
-  range-code their index) a game's archives; the Translation tab exports the scenarios' message
-  lines and speakers' names into tables and builds the translation from them (Core
-  `Game/ScenarioText.cs`): the scenarios keep the original speakers' names, the translated names
-  go into strings.txt, and the build counts the gaiji codes the translation takes
-  (`ScnGaiji.Used`, `Missing`). Bitch Nee-chan: 23,450 message lines of 106 files and 73 names
-  exported in 0.1 s; a few lines and two names translated, built and played in ScnBoot as the
-  hand-made translation did.
+  range-code their index) a game's archives; the Translation tab translates a game (Core
+  `Game/ScenarioText.cs`): the scenarios' message lines and speakers' names into tables in the
+  game folder's translation\ (text.tsv, names.tsv, strings.tsv), edited in the tab and saved as
+  they change, Check counting the gaiji codes the translation takes (`ScnGaiji.Used`,
+  `Missing`), Play starting the player. **The player reads the tables as they are**
+  (`ScnVm.Kept`: a scenario read from the archives gets the lines whose original is the game's,
+  as a translated scenario; names and strings join strings.txt's in `ScnVm.Translated`): read
+  once, on the first scenario (Bitch Nee-chan's 23,450 rows: 30-55 ms; applied to its 107
+  scenarios: under 6 ms). The scenarios keep the original speakers' names (voices and name plates
+  are found by them). Bitch Nee-chan: 23,450 message lines of 106 files and 73 names made into
+  tables in 0.1 s; a few lines and two names translated in the tables and played in ScnBoot as
+  the hand-made translation did.
 - A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
   by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
   to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest
