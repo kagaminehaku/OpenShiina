@@ -663,6 +663,7 @@ public sealed partial class ScnVm : IDisposable
         m_frameNumber++;
         MakePages();
         PumpGraphMovies();
+        StepMusicFades();
         // The window is shown at start: all of it waits for its first WM_PAINT
         if (m_window == null)
             InvalidateWindow();
@@ -827,6 +828,20 @@ public sealed partial class ScnVm : IDisposable
                     if (alpha)
                         args.Add(ReadOperand(ref p));
                     if (tint)
+                        for (int k = 0; k < 3; k++)
+                            args.Add(ReadOperand(ref p));
+                    break;
+                }
+                case "GLYPH250":
+                {
+                    // index, text, then w, h, pixels only for a text: a constant decides once, a
+                    // variable as it is now (decoded again next time)
+                    args.Add(ReadOperand(ref p));
+                    args.Add(ReadOperand(ref p));
+                    var t = args[1];
+                    bool constant = t.Kind == 4 && !t.Relative && !t.AddressOf;
+                    cache = constant;
+                    if ((constant ? t.Value : Value(c, t)) != 0)
                         for (int k = 0; k < 3; k++)
                             args.Add(ReadOperand(ref p));
                     break;

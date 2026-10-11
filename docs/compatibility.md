@@ -148,7 +148,7 @@ those GameMap names for the game (how the players tell it).
 | Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | v2.49 | — | ⚪ Not tried |
 | Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | v2.49 | `TORIGIRI.exe` | ⚪ Not tried |
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | v2.49 | `ZZS.exe` | ⚪ Not tried |
-| Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | v2.50 | `BITCHES3.exe` | ⚪ Not tried |
+| Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | v2.50 | `BITCHES3.exe` | 🟡 Starts (ver 1.00; ScnBoot: title, the story to frame 30,000; not tried in the players yet) |
 | Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | v2.50 | `BITCHES.EXE` | 🟡 Starts (ver 1.02; ScnBoot: title, the story to frame 30,000; to test more in the players) |
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | v2.50 | `BITCHES2.exe` | ⚪ Not tried |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | v2.50 | `CHIPPANA.exe` | ⚪ Not tried |

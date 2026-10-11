@@ -81,8 +81,21 @@ public sealed partial class X86Cpu
         }
         var a = GetX(ins, 0);
         var b = ins.OpCount > 1 ? GetX(ins, 1) : default;
-        (ulong Lo, ulong Hi) r;
-        switch (ins.Mnemonic)
+        int imm = ins.OpCount > 2 ? (int)ins.GetImmediate(2) : 0;
+        if (!SseCompute(ins.Mnemonic, a, b, imm, out var r))
+            return false;
+        SetX(ins, 0, r);
+        return true;
+    }
+
+    /// <summary>
+    /// The result of an SSE instruction other than a move from its operands (<paramref name="imm"/>
+    /// the third, for pshufd / shufps); false for one not written here. The interpreter and
+    /// X86Jit both use it, so a translated routine writes the interpreter's bytes.
+    /// </summary>
+    public static bool SseCompute(Mnemonic mnemonic, (ulong Lo, ulong Hi) a, (ulong Lo, ulong Hi) b, int imm, out (ulong Lo, ulong Hi) r)
+    {
+        switch (mnemonic)
         {
             // Bits and integer lanes: the MMX ones on each half
             case Mnemonic.Pxor or Mnemonic.Xorps or Mnemonic.Xorpd: r = (a.Lo ^ b.Lo, a.Hi ^ b.Hi); break;
@@ -131,7 +144,7 @@ public sealed partial class X86Cpu
             case Mnemonic.Packssdw: r = (Pack(a.Lo, a.Hi, 32, -32768, 32767), Pack(b.Lo, b.Hi, 32, -32768, 32767)); break;
             case Mnemonic.Pshufd:
             {
-                int order = (int)ins.GetImmediate(2);
+                int order = imm;
                 r = Dwords(k => Dword(b, (order >> (2 * k)) & 3));
                 break;
             }
@@ -150,16 +163,19 @@ public sealed partial class X86Cpu
             case Mnemonic.Rsqrtps: r = Dwords(k => Bits(1 / MathF.Sqrt(Float(b, k)))); break;
             case Mnemonic.Shufps:
             {
-                int order = (int)ins.GetImmediate(2);
+                int order = imm;
                 r = Dwords(k => Dword(k < 2 ? a : b, (order >> (2 * k)) & 3));
                 break;
             }
             default:
+                r = default;
                 return false;
         }
-        SetX(ins, 0, r);
         return true;
     }
+
+    /// <summary>The instructions <see cref="SseCompute"/> takes.</summary>
+    public static bool SseComputes(Mnemonic mnemonic) => SseCompute(mnemonic, default, (1, 0), 0, out _);
 
     private static (ulong, ulong) Halves((ulong Lo, ulong Hi) a, (ulong Lo, ulong Hi) b, int bits, Func<long, long, long> f, bool signed) =>
         (Lanes(a.Lo, b.Lo, bits, f, signed), Lanes(a.Hi, b.Hi, bits, f, signed));

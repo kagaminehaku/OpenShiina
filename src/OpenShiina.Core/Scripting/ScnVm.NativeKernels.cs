@@ -124,11 +124,12 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
-        // Maki Fes! START 850F8, Re: Rem Plus 85C68: v2.50's build of the same copy - its loop over
+        // Maki Fes! START 850F8, Re: Rem Plus 85C68 (Bitch Nee-chan C17B8, other bytes, 1,330 calls
+        // the same as its x86 code): v2.50's build of the same copy - its loop over
         // the rows from two source rows draws one row fewer and the partly covered bottom row is
         // not drawn (ScnVm.Subpixel32, v250; 387 random cases the same as the x86 code; translated it
         // took 93 ms a call on a Galaxy S7). Arguments as above
-        RegisterNative("A7DB830A1F217956E69E27B70C2AA00DC6544167", "subpixel32 v2.50", (vm, c, a) =>
+        RegisterNative(["A7DB830A1F217956E69E27B70C2AA00DC6544167", "47305BC5708566203ED531C87A4B0B177FA9EC3D"], "subpixel32 v2.50", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
@@ -170,17 +171,6 @@ public sealed partial class ScnVm
             if (!vm.Scale32(dst, pitch, vm.NativeArg(a, 2), vm.NativeArg(a, 3), right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7),
                             vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11)))
                 throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
-        });
-
-        // Bitch Nee-chan START C7C70: the SSE2 build of the same scaling copy (Re: Rem Plus's
-        // 8BDE0, which its START takes in place of 87920 when b[77] says SSE2; this START cannot
-        // do without SSE2). Its arithmetic is in floats, so a pixel may come out a step off the MMX
-        // build's that ScnVm.Scale32 gives; the interpreter has no SSE, so nothing to verify with
-        RegisterNative("A3DCAB9DFB6CC480BF9F3995AEC7212737E5EB95", "scale32 (SSE2 build)", (vm, c, a) =>
-        {
-            if (!vm.Scale32(vm.NativeArg(a, 0), vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 3), vm.NativeArg(a, 4), vm.NativeArg(a, 5),
-                            vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11)))
-                throw vm.Error(c, "Embedded x86 routine (scale32, SSE2 build): rectangles it cannot scale (the x86 code would not end)");
         });
 
         // Bitch Nee-chan START 9F5E6 (SSE2): the blur of ScnVm.Blur32.cs (15 s a call on the

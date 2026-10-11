@@ -402,8 +402,41 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], n == 0 ? 0 : (int)((uint)vm.Rand() % (uint)n));
             return 0;
         });
-        // 03AE seed: srand
-        Register(0x03AE, (vm, c, i) => { vm.SeedRand(vm.Value(c, i.Args[0])); return 0; });
+        // 03AE seed: srand (the seed kept at 0x7238C8 for 03AD); 03AD v: v = that seed
+        Register(0x03AE, (vm, c, i) =>
+        {
+            vm.m_seedGiven = vm.Value(c, i.Args[0]);
+            vm.SeedRand(vm.m_seedGiven);
+            return 0;
+        });
+        Register(0x03AD, (vm, c, i) => { vm.Store(c, i.Args[0], vm.m_seedGiven); return 0; });
+        // 03A2 v: v = |v| (aoj.EXE 0x417290)
+        Register(0x03A2, (vm, c, i) => { vm.Store(c, i.Args[0], Math.Abs(vm.Value(c, i.Args[0]))); return 0; });
+        // 03A3 s, v: v = atoi(s) (0x4172E0 -> FUN_00427310: white space, a sign, the digits)
+        Register(0x03A3, (vm, c, i) =>
+        {
+            string s = vm.ReadString(vm.Value(c, i.Args[0])).TrimStart(' ', '\t', '\n', '\r', '\v', '\f');
+            int sign = 1, k = 0;
+            if (s.Length > 0 && s[0] is '-' or '+')
+            {
+                sign = s[0] == '-' ? -1 : 1;
+                k = 1;
+            }
+            int value = 0;
+            for (; k < s.Length && s[k] is >= '0' and <= '9'; k++)
+                value = unchecked(value * 10 + (s[k] - '0'));
+            vm.Store(c, i.Args[1], unchecked(value * sign));
+            return 0;
+        });
+        // 03A4 n, s: wsprintf(s, "%d", n) (0x417330)
+        Register(0x03A4, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]);
+            vm.WriteString(vm.Value(c, i.Args[1]), n.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return 0;
+        });
+        // 03A5 v: v = v - the task's module base (an address as an offset, 0x417380)
+        Register(0x03A5, (vm, c, i) => { vm.Store(c, i.Args[0], vm.Value(c, i.Args[0]) - c.Base); return 0; });
         // 03BD v: the time in ms
         Register(0x03BD, (vm, c, i) => { vm.Store(c, i.Args[0], (int)vm.Clock); return 0; });
         // 03B7 year, month, day, day of week / 03B8 hour, minute, second, ms (local time)

@@ -112,6 +112,10 @@ public sealed partial class ScnVm
                 Write64(p + 56, 0);
                 return 1;
             }
+            case ("user32", "SetMenuItemInfoW"):
+                // The window has no menu of the system's here (Bitch Gakuen's START renames
+                // the items of its window menu): done
+                return 1;
             case ("user32", "GetMessageExtraInfo"):
                 // The message came from a mouse, not from a pen or a finger (Windows marks those
                 // 0xFF5157xx; Bitch Nee-chan's hook reads it for RIO.INI's TabletShortcut)

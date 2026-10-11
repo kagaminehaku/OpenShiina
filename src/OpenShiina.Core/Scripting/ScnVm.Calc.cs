@@ -19,6 +19,8 @@ public sealed partial class ScnVm
 
     // Microsoft C runtime rand(), as the engine uses it (op_03AC, op_03AE, rnd, rand)
     private uint m_randSeed = 1;
+    // The seed 03AE was given last (03AD)
+    private int m_seedGiven;
 
     public int Rand()
     {

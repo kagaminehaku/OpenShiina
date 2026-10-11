@@ -93,19 +93,31 @@ spaced as full-width.
 
 - [ ] Run one of each era with ScnBoot (a 2.49 / 2.50 game first: they are closest to ours) and
   write down what it stops on.
+- [ ] Bitch Gakuen ga Seijun na Hazu ga Nai!!? (v2.50, ver 1.00, next to Bitch Nee-chan here).
+  2026-10-11 in ScnBoot (the movie skipped at frame 6100, START at (160, 690) at frame 8100,
+  then (640, 300) every 40 frames): the movie, the title and the story to frame 30,000 with
+  text. Its executable has the same interpreter and opcode table as REMPLUS.EXE (opscan with
+  REMPLUS's addresses gives ops_v250.tsv again). It needed: user32 SetMenuItemInfoW, and 009C
+  read as the engine reads it (layout GLYPH250: w, h, pixels only after a text other than 0;
+  its START removes a glyph with text 0, and the fixed five operands decoded the next
+  instruction from the middle). Next: play it on in the players.
 - [ ] Bitch Nee-chan ga Seijun na Hazu ga Nai! (v2.50, ver 1.02, D:\SusGame\ｏｎｏｍａｔｏｐｅ＊\ here).
   2026-10-11 in ScnBoot (START at (130, 680) at frame 5000, then (640, 300) every 40 frames): the
   caution, the opening movie, the title and the story to frame 30,000 with text and music. It
   needed: BITCHES.EXE in GameMap (GARbro's has only BITCHES2/3); a DecodeBin for its scheme
   (GARbro-Mod's has none, so Decrypt2 was skipped: start.scn came out with garbage at 0x200); its
-  date at 0x1020 is guessed (0x20150818, the exe's build date) - every one of its 1,029 S25
-  pictures decodes either way, so check a file that uses that slot if one comes out wrong; 0410
+  date at 0x1020 is 0x20160409, worked out from the 16 pictures whose bytes use that slot (none of
+  its 11,406 Ogg files does: their headers are alike): with it each one's row table runs on
+  evenly (0x20150818, the exe's build date, broke them; the pictures decode either way, so a
+  look at the bytes was needed). Bitch Gakuen's GARbro date (0x20170901) passes the same check; 0410
   (GetKeyboardState mode: 0); kernel32 GetVersionExA, LoadLibraryA and HID_ONAHOLE.dll (its USB
   device, as it is without one), user32 GetMessageExtraInfo; 06D6 of a music file copied into a
   buffer (the length from its header); SSE2: its START will not run without it, so cpuid says
-  SSE2 for a START with that refusal, the interpreter runs SSE / SSE2 (X86Cpu.Sse.cs), its SSE2
-  scale32 runs as the MMX build's C# version and its blur as C# (ScnVm.Blur32.cs, the same bytes
-  as its x86 code in both calls checked); glyphs drawn into a layer are clipped to the frame
+  SSE2 for a START with that refusal, the interpreter runs SSE / SSE2 (X86Cpu.Sse.cs) and X86Jit
+  translates it (the same X86Cpu.SseCompute); its SSE2 scale32 (only the save thumbnail) runs
+  translated - the MMX build's C# version gave other bytes, the translation the interpreter's -
+  its blur as C# (ScnVm.Blur32.cs, the same bytes as its x86 code in both calls checked), its
+  C17B8 as subpixel32 v2.50 (1,330 calls the same); glyphs drawn into a layer are clipped to the frame
   (each character goes into a 28 x 29 frame; the overflow broke the next row's header). Next:
   play it on in the players.
 - [x] Aneiro (v2.49, D:\SusGame\ALcot Honey Comb\アネイロ here, updated to 1.03a). 2026-10-10 in
@@ -144,7 +156,14 @@ spaced as full-width.
     (RunFrame): its text loop draws the CLICK mark every round, and a frame ended there
     never reached the mouse. The time (03BD, 03BC) read again in a frame waits as the mouse
     does (a transition polls the clock in a loop).
-  - 06E3 s, v (Music.cs): the stream's volume, -1 without one.
+  - 06E3 s, v (Music.cs): the stream's volume, -1 without one; 06EC s, ms, delta, target: a
+    fade (a step every ms, the stream stopped at the end of a fade down to a target without
+    bit 31), run before each frame.
+  - 2026-10-11: 03A2 (abs), 03A3 (atoi), 03A4 (wsprintf "%d"), 03A5 (an address as an
+    offset), 03AD (03AE's seed) - the user's play stopped on 03A2; 0A28's old behaviour had
+    also made START's file name buffer grow over its code. All six SCN files read with
+    ops_v234 use no other opcode without a handler; ScnBoot ran on to frame 65,000 (20
+    music tracks, choices) without a stop.
   - A named operand in 2.34 is read up to its 0 and named up to the first '}' (the local
     "{ret_flag}" is "{ret_flag"; ReadOperand in ScnVm.cs).
   - aoj.EXE: dispatcher 0x41E5C0, GetVar 0x40D700, SetVar 0x40D000, GetVarAdr 0x40D520 (they

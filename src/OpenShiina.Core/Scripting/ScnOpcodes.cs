@@ -34,10 +34,12 @@ public sealed class ScnOpcodes
 
     // Layouts of one engine version only. SPRITE234 = 04BD of v2.34: seven operands, then one more
     // (an alpha ORed into the flags) when the third has bits 0x60000000, three more (the tint's
-    // red, green, blue) when it has 0x20000000
+    // red, green, blue) when it has 0x20000000. GLYPH250 = 009C of v2.50: two operands, then
+    // three more unless the second is 0 (FUN_00416E90 stops reading there)
     private static readonly Dictionary<string, Dictionary<int, string[]>> s_versionOverrides = new()
     {
         ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v250"] = new() { [0x009C] = ["GLYPH250"] },
     };
 
     private ScnOpcodes(string table, string name)

@@ -3,8 +3,9 @@
 // branches as gotos and every operation done by X86Ops, so it writes the bytes the interpreter
 // (X86Cpu) and the game's own code write - tens of times faster than interpreting it. It is the
 // same translation tools/X86Gen makes into C# source, done for any routine of any game when it
-// is first called. Routines with instructions it does not translate (calls, cpuid, SSE, parity
-// flags, division and multiplication of bytes and words, ...) stay on the interpreter.
+// is first called. Routines with instructions it does not translate (calls, cpuid, parity
+// flags, division and multiplication of bytes and words, ...) stay on the interpreter. SSE / SSE2
+// (the routines of a START that needs it) is computed by X86Cpu.SseCompute, as the interpreter does.
 //
 // Differences with the interpreter that no routine can see: the parity and adjust flags are not
 // kept (pushfd stores them as 0; no translated routine tests them), and the registers start at 0
@@ -105,6 +106,19 @@ public static class X86Jit
 
     public static Exception Endless(uint entry) => new InvalidOperationException($"x86 routine at {entry:X8} did not return");
 
+    /// <summary>16 bytes at <paramref name="a"/> as an xmm value (low half first).</summary>
+    public static (ulong, ulong) R128(ScnVm vm, uint a) => (X86Ops.R64(vm, a), X86Ops.R64(vm, a + 8));
+
+    public static void W128(ScnVm vm, uint a, (ulong Lo, ulong Hi) v)
+    {
+        X86Ops.W64(vm, a, v.Lo);
+        X86Ops.W64(vm, a + 8, v.Hi);
+    }
+
+    /// <summary>An SSE instruction's result, as the interpreter computes it.</summary>
+    public static (ulong, ulong) Sse(int mnemonic, (ulong, ulong) a, (ulong, ulong) b, int imm) =>
+        X86Cpu.SseCompute((Mnemonic)mnemonic, a, b, imm, out var r) ? r : throw new InvalidOperationException($"SSE {(Mnemonic)mnemonic}");
+
     #endregion
 
     private sealed class Builder
@@ -114,6 +128,7 @@ public static class X86Jit
         private readonly ParameterExpression m_argument = Parameter(typeof(uint), "argument");
         private readonly ParameterExpression[] m_r = new ParameterExpression[8];
         private readonly ParameterExpression[] m_mm = new ParameterExpression[8];
+        private readonly ParameterExpression[] m_xmm = new ParameterExpression[8];
         private readonly ParameterExpression m_cf = Variable(typeof(bool), "cf"), m_zf = Variable(typeof(bool), "zf");
         private readonly ParameterExpression m_sf = Variable(typeof(bool), "sf"), m_of = Variable(typeof(bool), "of");
         private readonly ParameterExpression m_df = Variable(typeof(bool), "df"), m_keep = Variable(typeof(bool), "keep");
@@ -133,6 +148,7 @@ public static class X86Jit
             {
                 m_r[i] = i == 4 ? Parameter(typeof(uint), "esp") : Variable(typeof(uint), s_names[i]);
                 m_mm[i] = Variable(typeof(ulong), $"mm{i}");
+                m_xmm[i] = Variable(typeof((ulong, ulong)), $"xmm{i}");
             }
         }
 
@@ -164,7 +180,7 @@ public static class X86Jit
                 Translate(ins);
             }
             Emit(Label(m_return));
-            var variables = m_r.Where((_, i) => i != 4).Concat(m_mm)
+            var variables = m_r.Where((_, i) => i != 4).Concat(m_mm).Concat(m_xmm)
                 .Concat(new[] { m_cf, m_zf, m_sf, m_of, m_df, m_keep, m_addr, m_t1, m_t2, m_loops });
             return Lambda<Routine>(Block(variables, m_body), $"x86_{m_routine.Entry:X}", new[] { m_vm, m_argument, m_r[4] });
         }
@@ -357,14 +373,17 @@ public static class X86Jit
 
         private void Translate(in Instruction ins)
         {
-            for (int i = 0; i < ins.OpCount; i++)
-                if (ins.GetOpKind(i) == OpKind.Register && ins.GetOpRegister(i).IsXMM())
-                    throw new NotSupportedException($"SSE ({ins.Mnemonic} at {ins.IP32:X8})");
             if (ins.HasLockPrefix)
                 throw new NotSupportedException($"lock prefix at {ins.IP32:X8}");
             bool memory = HasMemory(ins) && ins.Mnemonic is not (Mnemonic.Lea or Mnemonic.Pop);
             if (memory)
                 Emit(Assign(m_addr, Address(ins)));
+            for (int i = 0; i < ins.OpCount; i++)
+                if (ins.GetOpKind(i) == OpKind.Register && ins.GetOpRegister(i).IsXMM())
+                {
+                    TranslateSse(ins);
+                    return;
+                }
             int size0 = ins.OpCount > 0 ? Size(ins, 0) : 4;
             var esp = m_r[4];
             switch (ins.Mnemonic)
@@ -586,6 +605,70 @@ public static class X86Jit
                     }
                     throw new NotSupportedException($"{ins.Mnemonic} at {ins.IP32:X8}");
             }
+        }
+
+        private static readonly System.Reflection.ConstructorInfo s_xmmPair = typeof((ulong, ulong)).GetConstructor([typeof(ulong), typeof(ulong)])!;
+
+        private static Expression Pair(Expression lo, Expression hi) => New(s_xmmPair, lo, hi);
+
+        private static Expression Low(Expression x) => Field(x, "Item1");
+
+        /// <summary>An operand as an xmm value: a register, 4, 8 or 16 bytes of memory, a general register or an immediate (in the low half).</summary>
+        private Expression GetX(in Instruction ins, int i)
+        {
+            switch (ins.GetOpKind(i))
+            {
+                case OpKind.Register when ins.GetOpRegister(i).IsXMM():
+                    return m_xmm[ins.GetOpRegister(i) - Register.XMM0];
+                case OpKind.Register:
+                    return Pair(Convert(Reg(ins.GetOpRegister(i)), typeof(ulong)), Constant(0UL));
+                case OpKind.Memory:
+                    return ins.MemorySize.GetSize() switch
+                    {
+                        4 => Pair(Convert(Load(4, m_addr), typeof(ulong)), Constant(0UL)),
+                        8 => Pair(Call(Op("R64"), m_vm, m_addr), Constant(0UL)),
+                        _ => Call(Helper("R128"), m_vm, m_addr),
+                    };
+                default:
+                    return Pair(Constant(ins.GetImmediate(i)), Constant(0UL));
+            }
+        }
+
+        private Expression SetX(in Instruction ins, int i, Expression v)
+        {
+            if (ins.GetOpKind(i) == OpKind.Register)
+                return Assign(m_xmm[ins.GetOpRegister(i) - Register.XMM0], v);
+            return ins.MemorySize.GetSize() switch
+            {
+                4 => StoreMem(4, m_addr, Convert(Low(v), typeof(uint))),
+                8 => Call(Op("W64"), m_vm, m_addr, Low(v)),
+                _ => Call(Helper("W128"), m_vm, m_addr, v),
+            };
+        }
+
+        /// <summary>An instruction with an xmm operand, as X86Cpu.Sse runs it.</summary>
+        private void TranslateSse(in Instruction ins)
+        {
+            bool toXmm = ins.GetOpKind(0) == OpKind.Register && ins.GetOpRegister(0).IsXMM();
+            switch (ins.Mnemonic)
+            {
+                case Mnemonic.Movd:
+                    Emit(toXmm
+                        ? SetX(ins, 0, Pair(Convert(Convert(Low(GetX(ins, 1)), typeof(uint)), typeof(ulong)), Constant(0UL)))
+                        : Set(ins, 0, Convert(Low(GetX(ins, 1)), typeof(uint))));
+                    return;
+                case Mnemonic.Movq:
+                    Emit(toXmm ? SetX(ins, 0, Pair(Low(GetX(ins, 1)), Constant(0UL))) : Call(Op("W64"), m_vm, m_addr, Low(GetX(ins, 1))));
+                    return;
+                case Mnemonic.Movaps or Mnemonic.Movups or Mnemonic.Movdqa or Mnemonic.Movdqu or Mnemonic.Movapd or Mnemonic.Movupd:
+                    Emit(SetX(ins, 0, GetX(ins, 1)));
+                    return;
+            }
+            if (!toXmm || !X86Cpu.SseComputes(ins.Mnemonic))
+                throw new NotSupportedException($"SSE ({ins.Mnemonic} at {ins.IP32:X8})");
+            var b = ins.OpCount > 1 ? GetX(ins, 1) : Pair(Constant(0UL), Constant(0UL));
+            int imm = ins.OpCount > 2 ? (int)ins.GetImmediate(2) : 0;
+            Emit(SetX(ins, 0, Call(Helper("Sse"), Constant((int)ins.Mnemonic), GetX(ins, 0), b, Constant(imm))));
         }
 
         private static Expression FlagBit(ParameterExpression flag, uint bit) => Expression.Condition(flag, U(bit), U(0));

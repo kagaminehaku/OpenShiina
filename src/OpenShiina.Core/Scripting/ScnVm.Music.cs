@@ -43,6 +43,11 @@ public sealed partial class ScnVm
         public bool Compressed;
         public int StartMs, LoopMs = -1;
         public int SampleRate;
+        // 06EC's fade: a step of Delta every StepMs up to Target (the stream stops there when
+        // StopAtEnd and it went down), the time the last step was due; StepMs 0: none
+        public int FadeStepMs, FadeDelta, FadeTarget;
+        public bool FadeStopAtEnd;
+        public uint FadeDue;
     }
 
     // 0x4A15E0: volume 0-100 -> DirectSound volume
@@ -180,6 +185,23 @@ public sealed partial class ScnVm
             }
             return 0;
         });
+        // 06EC s, ms, delta, target (aoj.EXE 0x41D2A0 -> FUN_0043f950, its thread 0x43FAE0): the
+        // volume goes by delta (0: -1) every ms (counted in 5 ms ticks) until it reaches target
+        // (0-100); going down to a target without bit 31 the stream stops there. Nothing for a
+        // stream not playing or already at the target
+        Register(0x06EC, (vm, c, i) =>
+        {
+            var s = vm.Stream(vm.Value(c, i.Args[0]));
+            int ms = vm.Value(c, i.Args[1]), delta = vm.Value(c, i.Args[2]), target = vm.Value(c, i.Args[3]);
+            if (s == null || (s.Status & 1) == 0 || s.Volume == (target & 0x7FFFFFFF))
+                return 0;
+            s.FadeStepMs = Math.Max((int)((uint)ms / 5), 1) * 5;
+            s.FadeDelta = delta == 0 ? -1 : delta;
+            s.FadeTarget = target & 0x7FFFFFFF;
+            s.FadeStopAtEnd = target >= 0;
+            s.FadeDue = vm.Clock + (uint)s.FadeStepMs;
+            return 0;
+        });
         // 06E3 s, v (aoj.EXE 0x41D460 -> FUN_0043f860): v = the volume (0-100; -1 without a stream)
         Register(0x06E3, (vm, c, i) =>
         {
@@ -219,6 +241,33 @@ public sealed partial class ScnVm
                 s.LoopCount = count;
             return 0;
         });
+    }
+
+    /// <summary>The steps of 06EC's fades due by now (before each frame).</summary>
+    private void StepMusicFades()
+    {
+        foreach (var s in m_music.Values)
+        {
+            for (int steps = 0; s.FadeStepMs > 0 && Clock - s.FadeDue < 0x80000000u && steps < 1000; steps++)
+            {
+                s.FadeDue += (uint)s.FadeStepMs;
+                s.Volume += s.FadeDelta;
+                bool reached = s.FadeDelta > 0 ? s.Volume >= s.FadeTarget : s.Volume <= s.FadeTarget;
+                if (reached)
+                {
+                    s.Volume = s.FadeTarget;
+                    s.FadeStepMs = 0;
+                    if (s.FadeDelta < 0 && s.FadeStopAtEnd)
+                    {
+                        if (s.Handle != 0)
+                            Music?.Stop(s.Handle);
+                        s.Status = 0;
+                    }
+                }
+                if (s.Handle != 0)
+                    Music?.SetVolume(s.Handle, s_musicVolumes[Math.Clamp(s.Volume, 0, 100)]);
+            }
+        }
     }
 
     /// <summary>
