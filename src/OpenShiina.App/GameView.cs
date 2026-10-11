@@ -246,7 +246,10 @@ public sealed partial class GameView : UserControl, IGameWindow
         return null;
     }
 
-    /// <summary>"Add a game…": a folder into the library, when the game in it is recognised.</summary>
+    /// <summary>
+    /// "Add a game…": a folder into the library, when the game in it is recognised: by its .exe,
+    /// else by the keys that open its archives (SchemeDetector; the user picks when several fit).
+    /// </summary>
     private async Task AddGameAsync()
     {
         if (!await FileAccessAsync())
@@ -254,8 +257,28 @@ public sealed partial class GameView : UserControl, IGameWindow
         if (await ChooseFolderAsync() is not { } folder)
             return;
         var game = await Task.Run(() => GameLibrary.Add(folder));
+        if (game == null && GameData.FindArchive(folder) != null)
+        {
+            m_library.Message = "The game's .exe is not one the player knows: looking for the keys that open its archives…";
+            var found = await Task.Run(() => SchemeDetector.Detect(folder));
+            string? chosen = found.Count switch
+            {
+                0 => null,
+                1 => found[0].Name,
+                _ => await m_library.ChooseAsync(
+                    $"These {found.Count} games' keys all open the archives in {folder}. Which game is it?",
+                    found.Select(c => c.Name).ToList()),
+            };
+            if (chosen != null)
+                game = await Task.Run(() => GameLibrary.Add(folder, chosen));
+            else if (found.Count > 0)
+            {
+                m_library.Message = "";
+                return;
+            }
+        }
         m_library.Message = game == null
-            ? $"No game was recognised in {folder}: choose the folder with the game's own .exe and .WAR files."
+            ? $"No game was recognised in {folder}: choose the folder with the game's .WAR files (no keys the player knows open them)."
             : "";
         m_library.Refresh();
     }
@@ -286,10 +309,9 @@ public sealed partial class GameView : UserControl, IGameWindow
         {
             var data = await Task.Run(() =>
             {
-                string archive = GameData.FindArchive(folder) ?? throw new InvalidDataException("The folder has no .WAR archives.");
-                var scheme = FormatManager.Instance.SchemeForArchive(archive);
-                if (scheme == null)
-                    throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder.");
+                _ = GameData.FindArchive(folder) ?? throw new InvalidDataException("The folder has no .WAR archives.");
+                var scheme = GameLibrary.SchemeFor(folder)
+                    ?? throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder, or add it again.");
                 return GameData.Open(folder, scheme);
             });
             GameSession session;
@@ -472,6 +494,8 @@ public sealed partial class GameView : UserControl, IGameWindow
         FullScreenChanged?.Invoke(false);
         TitleChanged?.Invoke("OpenShiina");
         GameEnded?.Invoke();
+        // What the game left, once the calls it posted to this thread have run
+        Dispatcher.UIThread.Post(GameMemory.CollectAfterGame, DispatcherPriority.Background);
     }
 
     /// <summary>Stops the game (the window closes).</summary>

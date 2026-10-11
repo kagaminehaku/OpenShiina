@@ -73,7 +73,9 @@ public sealed partial class ScnVm
 
     /// <summary>
     /// A file the scripts open for reading: a save file, a file of the archives (kept decoded,
-    /// see <see cref="FileCacheBytes"/>), or a loose file. The arrays are only read.
+    /// see <see cref="FileCacheBytes"/>) or of the game folder's translation\ (which comes first),
+    /// or a loose file. A .TXT that starts with a UTF-8 byte order mark is a translated scenario,
+    /// read as Shift-JIS and gaiji (ScnGaiji). The arrays are only read.
     /// </summary>
     public byte[]? ReadScriptFile(string path)
     {
@@ -87,11 +89,29 @@ public sealed partial class ScnVm
             m_fileCacheOrder.AddFirst(kept);
             return kept.Value.Data;
         }
-        if (m_host.ReadFile(p.Name) is not { } data)
+        if (ReadArchiveFile(p.Name) is not { } data)
             return m_host.ReadLooseFile(p.Name);
-        if (data.Length <= FileCacheBytes / 4)
+        return Kept(p.Name, data);
+    }
+
+    /// <summary>
+    /// A file of the game folder's translation\ or of the archives as it is (any thread may read
+    /// one: the archives read under a lock), or null.
+    /// </summary>
+    private byte[]? ReadArchiveFile(string name) => m_host.ReadLooseFile(TranslationFolder + name) ?? m_host.ReadFile(name);
+
+    /// <summary>A file of the archives read: a translated scenario turned, then kept (the interpreter's thread).</summary>
+    private byte[] Kept(string name, byte[] data)
+    {
+        if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && ScnGaiji.IsUtf8(data))
         {
-            m_fileCache[p.Name] = m_fileCacheOrder.AddFirst((p.Name, data));
+            data = m_gaiji.Scenario(data);
+            if (m_host.Fonts is { } fonts)
+                fonts.Gaiji = m_gaiji.Texts;
+        }
+        if (data.Length <= FileCacheBytes / 4 && !m_fileCache.ContainsKey(name))
+        {
+            m_fileCache[name] = m_fileCacheOrder.AddFirst((name, data));
             m_fileCacheSize += data.Length;
             while (m_fileCacheSize > FileCacheBytes && m_fileCacheOrder.Last is { } oldest)
             {
@@ -108,17 +128,26 @@ public sealed partial class ScnVm
     // times in a scene, 10-40 ms each to decrypt and unpack). FileCacheBytes in all, files of up
     // to a quarter of it.
     private const long FileCacheBytes = 64L << 20;
+
+    // Files of a translation, in place of the archives' files of the same names
+    private const string TranslationFolder = "translation\\";
+    private readonly ScnGaiji m_gaiji = new();
     private readonly Dictionary<string, LinkedListNode<(string Name, byte[] Data)>> m_fileCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly LinkedList<(string Name, byte[] Data)> m_fileCacheOrder = new();
     private long m_fileCacheSize;
 
-    /// <summary>The length ReadScriptFile gives, from the archive's index for a file of the archives.</summary>
+    /// <summary>
+    /// The length ReadScriptFile gives: from the archive's index for a file of the archives, but
+    /// for a .TXT (a translated one's length is its Shift-JIS one) or a file of translation\.
+    /// </summary>
     public long? ScriptFileSize(string path)
     {
         if (ResolvePath(path) is not { } p)
             return null;
         if (p.Save)
             return m_host.ReadSaveFile(p.Name)?.Length;
+        if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || m_host.LooseFileSize(TranslationFolder + p.Name) != null)
+            return ReadScriptFile(path)?.Length;
         return m_host.ArchiveFileSize(p.Name) ?? m_host.LooseFileSize(p.Name);
     }
 

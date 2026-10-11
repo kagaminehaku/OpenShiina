@@ -14,10 +14,10 @@ should follow what their perf.log shows.
   section 7, "Vectors, fewer pieces, the changed part": WPF 2.2-2.4% of the machine, Avalonia
   3.1-3.3%, the original 1.0%); about half is the frame (2.4 ms), half showing it. Measure
   with zoom.ps1 / cpuframe.ps1 (scratch sessions/2026-10-10-measure).
-- [ ] **The Avalonia player's picture**: each new frame is copied whole into a new SKImage (the
-  render thread draws the one it holds while the next is made). Keep two or three pixel buffers
-  and wrap them (SKImage.FromPixels with a release), or keep a texture and update only the
-  changed part (GameSession.TakeFrame gives it).
+- [ ] **The Avalonia player's picture**: each new frame is copied into one of up to four pinned
+  buffers that SKImages wrap without a copy (2026-10-11: no 3.7 MB array a frame to collect);
+  left: a GPU texture that takes only the changed part (GameSession.TakeFrame gives it), which
+  would save the upload of the whole picture.
 - [ ] **Flat memory: what is left** (engine-notes.md section 10, "Flat memory").
   - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run).
   - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`): ScnBoot as a 32-bit process
@@ -32,13 +32,14 @@ should follow what their perf.log shows.
   opcode in C# and works its operands out (variables, named ones by name) every time it runs
   (the instructions themselves are decoded once). Script logic is rarely where the
   time goes, but profile the dispatch (SCNBOOT_PROFILE) on a busy scene and trim what shows up.
-- [ ] **Load files in the background.** Pictures and sounds are read and decoded on the
-  interpreter's thread, so a scene change waits for them. `ArcView` is not thread-safe: a
-  loader thread needs its own view of the archives.
+- [ ] **Load files in the background.** The engine's own background loader (`00CE`) reads on
+  another thread in the players now (2026-10-11), and files read again come from the cache; the
+  pictures and sounds the scripts load with `00C9`, `04B0`, `06A6` are still read on the
+  interpreter's thread the first time (a scene change waits for them).
 - [ ] **`00A1`** (the incremental redraw of the message text, a character at a time as it
-  fades in): its glyphs are kept now (2026-10-11: 848 -> 307 ms over 282 calls in Bitch
-  Nee-chan); what is left is the font made and deleted every call and every shown character
-  drawn again. A font kept per request in the font engines would take most of the rest.
+  fades in): its glyphs and the fonts' ascents are kept now (2026-10-11: 848 -> 298 ms over
+  282 calls in Bitch Nee-chan, about 1 ms a call); what is left is every shown character drawn
+  again at each call (the font made again costs little: keeping its ascent saved 3%).
 - [ ] **Older phones, first.** Zooms and transitions dropped frames on a Galaxy S7 (Vulkan 1.0)
   before the vector routines and ParallelRows (2026-10-10, not built for Android yet). Build the
   APK, play Re:Rem Plus's prologue zoom, a scene change and a movie with perf.log on, and work
@@ -56,8 +57,6 @@ upscalers FSR 1 and Anime4K) and the graphics levels are done (engine-notes.md s
 - [ ] WPF's sharp scaling on the GPU (a `ShaderEffect`, or the picture drawn through Direct3D),
   as the Avalonia player does it: now the picture multiplied by a whole number on the CPU, which
   uploads a picture up to the window's size each frame.
-- [ ] Check on an unlocked screen that the WPF player's picture fills the window after a resize
-  (captured while the PC was locked, the bottom 52 pixels stayed black in the stretched modes).
 
 Text cannot be drawn at the screen's resolution: the engine draws it into the game's surfaces,
 which the scripts then copy and blend.
@@ -75,17 +74,24 @@ which the scripts then copy and blend.
 
 ## Translations
 
-The scenario files are Shift-JIS and the engine makes half-width characters full-width, so a
-translated script can only use what Shift-JIS has: no Vietnamese letters, and English comes out
-spaced as full-width.
+A scenario `.TXT` that starts with a UTF-8 byte order mark is read as a translation (2026-10-11,
+engine-notes.md section 6, "Translations"): Latin letters half-width with their own advances,
+Vietnamese included, words wrapped at the window's edge; files in the game folder's
+`translation\` come before the archives'. Left:
 
-- [ ] Read a scenario `.TXT` as UTF-8 when it starts with a byte order mark.
-- [ ] Keep Latin letters half-width in such files, and draw them with a font that has them
-  (Vietnamese included) and the game's measures.
-- [ ] Speaker names: `【name】` is looked up in `NWINTBL.BIN` for the name plate; translated
-  names need the table translated too, or a map from the new names to the old.
-- [ ] Choices written in the SCN code (Oreimo Plus's menus pass them from the scripts): a way
-  to replace those strings without moving the code.
+- [ ] A translated scene on a phone. In the Avalonia player on Windows (Skia fonts) Bitch
+  Nee-chan's translated first scene draws right (2026-10-11: Vietnamese and English lines, the
+  name from `strings.txt`, words wrapped within the edge); Skia's widths are GDI's within 2%
+  (scratch fonttest), so a line may break a word apart from GDI's.
+- [ ] Speaker names where the game looks them up: a translated `【name】` is drawn as the
+  translation's letters (Bitch Nee-chan draws names as text), but Oreimo Plus's name plates are
+  pictures found by name in `NWINTBL.BIN` (and voices may be set by name): those need the
+  original names (kept in the scenario, drawn translated through `strings.txt` where the game
+  draws them as text); the plates themselves are pictures (below).
+- [ ] Choices written in the SCN code: `translation\strings.txt` (original, tab, translation)
+  replaces a text the scripts pass to 0083 / 0084 / 00A0 when it is the whole of one original
+  (2026-10-11; checked on Bitch Nee-chan's speaker names). Left: Oreimo Plus's menus, and texts
+  the scripts build from parts (a name then a word) or draw another way.
 - [ ] Pictures with Japanese text (menus, buttons, titles): GrandCrossExtractor can repack an
   archive's files but has no S25 encoder yet.
 
@@ -174,16 +180,13 @@ spaced as full-width.
     0x4207B0, message pump 0x40B9E0 (only while 0x468DF8, 0033's flag, is set).
   - The first music file (19,842,092 bytes) is a RIFF WAVE (the players read it; ScnBoot's
     TestMusic now does too).
-  Still to do: the 11
-  opcodes that take other operands than v2.47's (music with one stream: 0686-068B; 055A, 055B,
-  04EC, 0B7D) and the 9 new ones (007D-0080, 060E-0610, 0614, 077B) as the game reaches them;
-  03BF.
+  Left for other 2.34 games: the 11 opcodes that take other operands than v2.47's (music with
+  one stream: 0686-068B; 055A, 055B, 04EC, 0B7D) and the 9 new ones (007D-0080, 060E-0610,
+  0614, 077B), 03BF: none of Ao no Juuai's eight SCN files uses any of them (2026-10-11).
 - [ ] Opcode tables for the other engine versions (2.35-2.46, 2.48; opscan on the game's
   executable, the aoj preset as an example of an old build).
 - [ ] The ExtraCrypts ported for those games (PostAdler, PreAdler, Binbo, Count, AltCount,
   Ushimitsu, Nukitashi2, Saimin) against their archives.
-- [ ] A scheme chooser in the players for a game whose .exe is not in GameMap (renamed, or a
-  version GARbro does not list).
 
 ## Platforms
 

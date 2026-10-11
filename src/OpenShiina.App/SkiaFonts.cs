@@ -11,6 +11,10 @@
 // glyph is its black box (the smallest rectangle around its ink) in 65 levels of coverage (0-64),
 // rows padded to 4 bytes, placed by its origin (left of the box from the pen, top of the box above
 // the baseline) and followed by its advance.
+//
+// The gaiji of translated scenarios (ScnGaiji) are measured and drawn with a Latin face that has
+// every Vietnamese letter (Segoe UI, Arial, ... or one the system matches), its cell the font's;
+// text without them is as before.
 
 using System.Text;
 using OpenShiina.IO;
@@ -50,6 +54,32 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
         public readonly SKFont Skia = skia;
         public readonly int Ascent = ascent, Descent = descent;
         public readonly Dictionary<int, ScnGlyph> Glyphs = new();
+        // for gaiji, made when first needed
+        public SKFont? Latin;
+    }
+
+    // Latin faces for the gaiji of translations, in order
+    private static readonly string[] s_latinFaces =
+        ["Segoe UI", "Arial", "Helvetica Neue", "Helvetica", "Roboto", "Noto Sans", "DejaVu Sans", "Liberation Sans"];
+    private SKTypeface? m_latinFace;
+
+    /// <inheritdoc/>
+    public IReadOnlyDictionary<int, string>? Gaiji { get; set; }
+
+    /// <summary>The Latin font for gaiji drawn with <paramref name="f"/>: its cell height the font's.</summary>
+    private SKFont Latin(Font f)
+    {
+        if (f.Latin != null)
+            return f.Latin;
+        var style = f.Skia.Typeface.FontStyle;
+        m_latinFace ??= s_latinFaces.Select(n => Matching(SKFontManager.Default, n, style)).FirstOrDefault(t => t != null)
+            ?? SKFontManager.Default.MatchCharacter(null, style, ["vi"], 'ữ')
+            ?? SKTypeface.Default;
+        var font = new SKFont(m_latinFace, 1) { Edging = f.Skia.Edging, Subpixel = false, Hinting = f.Skia.Hinting };
+        var unit = font.Metrics;
+        float cell = Math.Max(0.01f, unit.Descent - unit.Ascent);
+        font.Size = Math.Max(1, f.Ascent + f.Descent) / cell;
+        return f.Latin = font;
     }
 
     public SkiaFonts()
@@ -68,7 +98,10 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
     public void DeleteFont(int font)
     {
         if (m_fonts.Remove(font, out var f))
+        {
             f.Skia.Dispose();
+            f.Latin?.Dispose();
+        }
     }
 
     private Font Get(int font) => font != 0 && m_fonts.TryGetValue(font, out var f) ? f : m_system;
@@ -163,10 +196,16 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
     public (int Width, int Height) TextExtent(int font, ReadOnlySpan<byte> text)
     {
         var f = Get(font);
-        string s = m_sjis.GetString(text);
+        string s = ScnGaiji.Decode(m_sjis, text, Gaiji, out var gaiji);
         int width = 0;
         for (int i = 0; i < s.Length; i += char.IsSurrogatePair(s, i) ? 2 : 1)
         {
+            if (gaiji != null && gaiji[i])
+            {
+                var latin = Latin(f);
+                width += Advance(latin, latin.GetGlyph(char.ConvertToUtf32(s, i)));
+                continue;
+            }
             var (skia, glyph, owned) = GlyphFor(f, s.Substring(i, char.IsSurrogatePair(s, i) ? 2 : 1));
             width += Advance(skia, glyph);
             if (owned)
@@ -185,6 +224,13 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
         var f = Get(font);
         if (f.Glyphs.TryGetValue(code, out var cached))
             return cached;
+        if (Gaiji != null && Gaiji.TryGetValue(code, out var text))
+        {
+            // a translation's letters (none, one or two) with the Latin font
+            var latin = Latin(f);
+            var letters = text.EnumerateRunes().Select(r => Render(latin, latin.GetGlyph(r.Value))).ToList();
+            return f.Glyphs[code] = letters.Count == 1 ? letters[0] : ScnGlyph.Compose(letters);
+        }
         var (skia, glyph, owned) = GlyphFor(f, Decode(code));
         try
         {
@@ -254,9 +300,11 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
 
     public void Dispose()
     {
-        foreach (var f in m_fonts.Values)
+        foreach (var f in m_fonts.Values.Append(m_system))
+        {
             f.Skia.Dispose();
+            f.Latin?.Dispose();
+        }
         m_fonts.Clear();
-        m_system.Skia.Dispose();
     }
 }

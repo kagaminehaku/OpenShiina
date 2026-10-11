@@ -69,6 +69,7 @@ public sealed class GameSetup
             Joypad = Joypad,
             Accelerator = Settings.AcceleratorForGame(),
             PauseInBackground = Settings.PauseInBackground,
+            LoadInBackground = true,
         };
         if (!Settings.X86JitForGame())
             vm.JitX86 = false;

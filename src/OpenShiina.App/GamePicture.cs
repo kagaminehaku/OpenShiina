@@ -5,7 +5,9 @@
 // (Skia runs it on the GPU where it draws on one, on the CPU otherwise), or the upscalers FSR 1
 // and Anime4K (Upscalers.cs; on the GPU only: Sharp without one). The picture is kept as an
 // SKImage made from each new frame, shared with the draw operations the render thread runs; an
-// upscaled one is kept until the picture or the size changes.
+// upscaled one is kept until the picture or the size changes. Each frame is copied into one of a
+// few pinned buffers that SKImages wrap without a copy (a buffer is free again when Skia lets go
+// of its image): a new 3.7 MB array a frame was 220 MB a second of large objects to collect.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -22,6 +24,15 @@ public sealed class GamePicture : Control
 {
     private SharedImage? m_image;
     private int m_width, m_height;
+
+    // The frames' buffers: pinned, each free when no image of it is left (Busy 0)
+    private sealed class FrameBuffer(int length)
+    {
+        public readonly byte[] Pixels = GC.AllocateArray<byte>(length, pinned: true);
+        public int Busy;
+    }
+    private readonly List<FrameBuffer> m_buffers = new();
+    private const int MaxBuffers = 4;
 
     public GamePicture()
     {
@@ -42,9 +53,21 @@ public sealed class GamePicture : Control
     public unsafe void SetFrame(ReadOnlySpan<byte> pixels, int width, int height, int stride)
     {
         var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-        SKImage? image;
-        fixed (byte* p = pixels)
-            image = SKImage.FromPixelCopy(info, (nint)p, stride);
+        int length = stride * height;
+        SKImage? image = null;
+        if (Free(length) is { } buffer)
+        {
+            pixels[..length].CopyTo(buffer.Pixels);
+            fixed (byte* p = buffer.Pixels)
+                image = SKImage.FromPixels(new SKPixmap(info, (nint)p, stride), (_, _) => Volatile.Write(ref buffer.Busy, 0), null);
+            if (image == null)
+                Volatile.Write(ref buffer.Busy, 0);
+        }
+        if (image == null)
+        {
+            fixed (byte* p = pixels)
+                image = SKImage.FromPixelCopy(info, (nint)p, stride);
+        }
         if (image == null)
             return;
         var old = m_image;
@@ -53,6 +76,20 @@ public sealed class GamePicture : Control
         m_width = width;
         m_height = height;
         InvalidateVisual();
+    }
+
+    /// <summary>A free buffer of that length, taken (Busy 1); a new one while there are fewer than MaxBuffers; else null.</summary>
+    private FrameBuffer? Free(int length)
+    {
+        m_buffers.RemoveAll(b => b.Pixels.Length != length && Volatile.Read(ref b.Busy) == 0);
+        foreach (var buffer in m_buffers)
+            if (buffer.Pixels.Length == length && Interlocked.CompareExchange(ref buffer.Busy, 1, 0) == 0)
+                return buffer;
+        if (m_buffers.Count >= MaxBuffers)
+            return null;
+        var made = new FrameBuffer(length) { Busy = 1 };
+        m_buffers.Add(made);
+        return made;
     }
 
     /// <summary>No picture (the game ended).</summary>

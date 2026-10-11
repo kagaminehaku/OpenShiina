@@ -150,7 +150,7 @@ those GameMap names for the game (how the players tell it).
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | v2.49 | `ZZS.exe` | ⚪ Not tried |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | v2.50 | `BITCHES3.exe` | 🟡 Starts (ver 1.00; ScnBoot: title, the story to frame 30,000; tried in the players: its 1 fps menus fixed 2026-10-11, to test more) |
 | Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | v2.50 | `BITCHES.EXE` | 🟡 Starts (ver 1.02; ScnBoot: title, the story to frame 30,000; tried in the players: its 1 fps menus fixed 2026-10-11, to test more) |
-| Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | v2.50 | `BITCHES2.exe` | ⚪ Not tried |
+| Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | v2.50 | `BITCHES2.exe` | 🟡 Starts (ver 1.01; ScnBoot: the opening movie, the title, the story to frame 16,000 with nothing missing; not tried in the players yet) |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | v2.50 | `CHIPPANA.exe` | ⚪ Not tried |
 | Chuuni Hime no Teikoku | 厨二姫の帝国 | v2.50 | `CHU2HIME.exe` | ⚪ Not tried |
 | Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | v2.50 | `GHNURSE.exe` | ⚪ Not tried |

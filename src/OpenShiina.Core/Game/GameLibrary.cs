@@ -1,8 +1,9 @@
 // The games the players have opened, for their home screen: library.json in the player folder
 // (PlayerFolders.Root), shared by both players. A game is its folder, recognised by its .exe as
 // when it is opened (FormatManager's GameMap), with the name of its scheme and when it was
-// played last. The folder played last before the library existed (last-game.txt) is taken in
-// the first time the library is read.
+// played last. A game whose .exe is not in GameMap keeps the scheme found for it
+// (SchemeDetector, or the user's choice among those that fit). The folder played last before
+// the library existed (last-game.txt) is taken in the first time the library is read.
 
 using System.IO;
 using System.Text.Json;
@@ -11,8 +12,11 @@ using OpenShiina.Archives;
 
 namespace OpenShiina.Game;
 
-/// <summary>A game of the library: its folder, its name, its .exe (for the icon) and when it was added and played last.</summary>
-public sealed record LibraryGame(string Folder, string Name, string? Exe, DateTime Added, DateTime? LastPlayed)
+/// <summary>
+/// A game of the library: its folder, its name, its .exe (for the icon), when it was added and
+/// played last, and the scheme chosen for it when its .exe does not tell (else null).
+/// </summary>
+public sealed record LibraryGame(string Folder, string Name, string? Exe, DateTime Added, DateTime? LastPlayed, string? Scheme = null)
 {
     /// <summary>The folder is still there (a drive may be gone, a folder renamed).</summary>
     [JsonIgnore]
@@ -58,28 +62,66 @@ public static class GameLibrary
     /// <summary>
     /// The game in <paramref name="folder"/>: the name of its scheme and its .exe, or null when it
     /// is not one the players know (no .WAR archives, or no .exe they recognise for archives with
-    /// keys; WARC 1.0 / 1.1 games are named after their folder).
+    /// keys and no scheme chosen for it; WARC 1.0 / 1.1 games are named after their folder).
+    /// <paramref name="chosen"/>: a scheme for a game its .exe does not tell (else the one the
+    /// library keeps for the folder).
     /// </summary>
-    public static (string Name, string? Exe)? Identify(string folder)
+    public static (string Name, string? Exe, bool Chosen)? Identify(string folder, string? chosen = null)
     {
         if (GameData.FindArchive(folder) is not { } archive)
             return null;
         var formats = FormatManager.Instance;
-        if (formats.SchemeForArchive(archive) is not { } found)
+        if (formats.SchemeForArchive(archive) is { } found)
+        {
+            string name = found.Name;
+            foreach (var (file, scheme) in formats.GameMap)
+                if (scheme == name && GameData.ResolvePath(folder, file) is { } path)
+                    return (name, path, false);
+            return (name, null, false);
+        }
+        chosen ??= Read()?.FirstOrDefault(g => SameFolder(g.Folder, folder))?.Scheme;
+        if (chosen == null || formats.GetScheme(chosen) is not { } scheme2)
             return null;
-        string name = found.Name;
-        string? exe = null;
-        foreach (var (file, scheme) in formats.GameMap)
-            if (scheme == name && GameData.ResolvePath(folder, file) is { } path)
-            {
-                exe = path;
-                break;
-            }
-        return (name, exe);
+        return (scheme2.Name, MainExe(folder), true);
     }
 
-    /// <summary>Adds the game in <paramref name="folder"/> (or finds it again); null when it is not recognised.</summary>
-    public static LibraryGame? Add(string folder) => Update(folder, played: false);
+    /// <summary>
+    /// The scheme to open the game in <paramref name="folder"/> with: the one its .exe tells, else
+    /// the one chosen for it; null when neither.
+    /// </summary>
+    public static EncryptionScheme? SchemeFor(string folder)
+    {
+        if (GameData.FindArchive(folder) is not { } archive)
+            return null;
+        if (FormatManager.Instance.SchemeForArchive(archive) is { } scheme)
+            return scheme;
+        return Read()?.FirstOrDefault(g => SameFolder(g.Folder, folder))?.Scheme is { } chosen
+            ? FormatManager.Instance.GetScheme(chosen)
+            : null;
+    }
+
+    /// <summary>The game's own .exe for the icon, when the folder has one (the largest, installers apart).</summary>
+    private static string? MainExe(string folder)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(folder, "*.exe", new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive })
+                .Where(f => !Path.GetFileNameWithoutExtension(f).StartsWith("unins", StringComparison.OrdinalIgnoreCase)
+                            && !Path.GetFileNameWithoutExtension(f).StartsWith("setup", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(f => new FileInfo(f).Length)
+                .FirstOrDefault();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Adds the game in <paramref name="folder"/> (or finds it again); null when it is not
+    /// recognised. <paramref name="scheme"/>: the scheme chosen for a game its .exe does not tell.
+    /// </summary>
+    public static LibraryGame? Add(string folder, string? scheme = null) => Update(folder, played: false, scheme);
 
     /// <summary>The game in <paramref name="folder"/> was played now: it is added if it was not there.</summary>
     public static LibraryGame? Played(string folder) => Update(folder, played: true);
@@ -92,16 +134,17 @@ public static class GameLibrary
             Write(games);
     }
 
-    private static LibraryGame? Update(string folder, bool played)
+    private static LibraryGame? Update(string folder, bool played, string? scheme = null)
     {
         folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
-        if (Identify(folder) is not { } found)
+        if (Identify(folder, scheme) is not { } found)
             return null;
         var games = Read() ?? [];
         int at = games.FindIndex(g => SameFolder(g.Folder, folder));
+        string? chosen = found.Chosen ? found.Name : null;
         var game = at >= 0
-            ? games[at] with { Name = found.Name, Exe = found.Exe }
-            : new LibraryGame(folder, found.Name, found.Exe, DateTime.Now, null);
+            ? games[at] with { Name = found.Name, Exe = found.Exe, Scheme = chosen }
+            : new LibraryGame(folder, found.Name, found.Exe, DateTime.Now, null, chosen);
         if (played)
             game = game with { LastPlayed = DateTime.Now };
         if (at >= 0)

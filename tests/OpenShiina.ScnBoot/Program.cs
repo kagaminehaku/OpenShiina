@@ -73,6 +73,9 @@ foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm
     if (System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m)
         set(int.Parse(m.Groups[1].Value));
 vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
+// SCNBOOT_BGLOAD=1: the background loader (00CE) reads on another thread, as in the players
+// (the frames then depend on the machine's timing: off by default)
+vm.LoadInBackground = Environment.GetEnvironmentVariable("SCNBOOT_BGLOAD") == "1";
 // SCNBOOT_GPU=1: the GPU mode (Vulkan)
 if (Environment.GetEnvironmentVariable("SCNBOOT_GPU") == "1")
 {

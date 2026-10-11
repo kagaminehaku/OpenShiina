@@ -64,7 +64,12 @@ public partial class App : Application
                 data.Dispose();
                 throw;
             }
-            window.Closed += (_, _) => ShowLibrary();
+            window.Closed += (_, _) =>
+            {
+                ShowLibrary();
+                // What the game left, once its window has let go of it
+                Dispatcher.BeginInvoke(GameMemory.CollectAfterGame, System.Windows.Threading.DispatcherPriority.Background);
+            };
             MainWindow = window;
             window.Show();
             GameLibrary.Played(folder);
@@ -84,11 +89,11 @@ public partial class App : Application
     /// <summary>Recognises the game in <paramref name="folder"/> and opens its archives.</summary>
     private static GameData OpenGame(string folder)
     {
-        string archive = GameData.FindArchive(folder)
+        _ = GameData.FindArchive(folder)
             ?? throw new InvalidDataException("The folder has no .WAR archives.");
-        var scheme = FormatManager.Instance.SchemeForArchive(archive);
-        if (scheme == null)
-            throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder.");
+        // the scheme its .exe tells, or the one chosen for it in the library (the Avalonia player's)
+        var scheme = GameLibrary.SchemeFor(folder)
+            ?? throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder.");
         return GameData.Open(folder, scheme);
     }
 }

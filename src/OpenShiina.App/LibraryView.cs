@@ -59,7 +59,7 @@ public sealed class LibraryView : UserControl
         };
         Grid.SetColumn(settings, 1);
         Grid.SetColumn(add, 2);
-        var body = new StackPanel { Spacing = 8, Margin = new Thickness(16, 0, 16, 16), Children = { m_cards, m_empty, m_message } };
+        var body = new StackPanel { Spacing = 8, Margin = new Thickness(16, 0, 16, 16), Children = { m_cards, m_empty, m_message, m_choice } };
         var page = new DockPanel { Children = { header, new ScrollViewer { Content = body } } };
         DockPanel.SetDock(header, Dock.Top);
         Content = page;
@@ -248,6 +248,38 @@ public sealed class LibraryView : UserControl
             Placement = PlacementMode.BottomEdgeAlignedRight,
             Content = new ScrollViewer { MaxHeight = 560, Content = page },
         };
+    }
+
+    // A question under the cards (ChooseAsync): its text and a button an answer, then Cancel
+    private readonly StackPanel m_choice = new() { Spacing = 6, IsVisible = false, MaxWidth = 640, HorizontalAlignment = HorizontalAlignment.Left };
+
+    /// <summary>
+    /// Asks the user to pick one of <paramref name="answers"/> under the cards; the answer, or
+    /// null for Cancel (or when another question replaces this one).
+    /// </summary>
+    public Task<string?> ChooseAsync(string question, IReadOnlyList<string> answers)
+    {
+        var done = new TaskCompletionSource<string?>();
+        void Answer(string? answer)
+        {
+            m_choice.IsVisible = false;
+            m_choice.Children.Clear();
+            done.TrySetResult(answer);
+        }
+        m_choice.Children.Clear();
+        m_choice.Children.Add(new TextBlock { Text = question, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White });
+        foreach (var answer in answers)
+        {
+            var button = new Button { Content = answer, HorizontalAlignment = HorizontalAlignment.Stretch };
+            button.Click += (_, _) => Answer(answer);
+            m_choice.Children.Add(button);
+        }
+        var cancel = new Button { Content = "Cancel", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
+        cancel.Click += (_, _) => Answer(null);
+        m_choice.Children.Add(cancel);
+        m_choice.IsVisible = true;
+        Message = "";
+        return done.Task;
     }
 
     /// <summary>A line under the cards (opening, an error); empty to clear it.</summary>

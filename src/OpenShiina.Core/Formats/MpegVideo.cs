@@ -9,19 +9,32 @@ using System.Runtime.Intrinsics;
 
 namespace OpenShiina.Formats;
 
-/// <summary>The elementary streams of an MPEG-1 (or MPEG-2 program) system stream.</summary>
+/// <summary>
+/// The elementary streams of an MPEG-1 (or MPEG-2 program) system stream. The video stream is
+/// copied once, into an array with <see cref="Mpeg1Video.Padding"/> bytes after it that
+/// Mpeg1Video takes as it is (a 1280 x 720 opening movie: 152 MB; it was copied three times).
+/// </summary>
 public sealed class MpegSystemStream
 {
-    /// <summary>The first video stream (0xE0-0xEF), or empty.</summary>
-    public byte[] Video { get; }
+    private readonly byte[] m_video;
+
+    /// <summary>The first video stream (0xE0-0xEF), or empty (a copy).</summary>
+    public byte[] Video => m_video.AsSpan(0, VideoLength).ToArray();
+
+    /// <summary>The length of the video stream in <see cref="VideoPadded"/>.</summary>
+    public int VideoLength { get; }
+
+    /// <summary>The video stream followed by <see cref="Mpeg1Video.Padding"/> zeros.</summary>
+    public byte[] VideoPadded => m_video;
 
     /// <summary>The first audio stream (0xC0-0xDF), or empty.</summary>
     public byte[] Audio { get; }
 
     public MpegSystemStream(byte[] file)
     {
-        var video = new MemoryStream();
-        var audio = new MemoryStream();
+        // The payloads first, then each stream copied into an array of its size
+        var parts = new List<(int Start, int Length, bool Video)>();
+        long videoLength = 0, audioLength = 0;
         int videoId = -1, audioId = -1;
         int pos = 0, n = file.Length;
         while (pos + 4 <= n)
@@ -81,10 +94,33 @@ public sealed class MpegSystemStream
                 }
             }
             if (p < end)
-                (isVideo ? video : audio).Write(file, p, end - p);
+            {
+                parts.Add((p, end - p, isVideo));
+                if (isVideo)
+                    videoLength += end - p;
+                else
+                    audioLength += end - p;
+            }
         }
-        Video = video.ToArray();
-        Audio = audio.ToArray();
+        if (videoLength + Mpeg1Video.Padding > Array.MaxLength)
+            throw new InvalidDataException("Video stream too large");
+        m_video = new byte[videoLength + Mpeg1Video.Padding];
+        VideoLength = (int)videoLength;
+        Audio = new byte[audioLength];
+        int v = 0, a = 0;
+        foreach (var (start, length, isVideo) in parts)
+        {
+            if (isVideo)
+            {
+                Buffer.BlockCopy(file, start, m_video, v, length);
+                v += length;
+            }
+            else
+            {
+                Buffer.BlockCopy(file, start, Audio, a, length);
+                a += length;
+            }
+        }
     }
 }
 
@@ -219,12 +255,30 @@ public sealed class Mpeg1Video
 
     private static readonly double[] s_frameRates = [0, 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60000.0 / 1001, 60, 0, 0, 0, 0, 0, 0, 0];
 
-    public Mpeg1Video(byte[] stream)
+    /// <summary>Bytes of zeros after the stream, so that peeking past its end reads zeros.</summary>
+    public const int Padding = 8;
+
+    public Mpeg1Video(byte[] stream) : this(Padded(stream), stream.Length)
     {
-        // Padding so that peeking past the end reads zeros
-        m_data = new byte[stream.Length + 8];
-        stream.CopyTo(m_data, 0);
-        m_end = stream.Length * 8;
+    }
+
+    /// <summary>The video stream of a system stream, taken as it is (no copy).</summary>
+    public Mpeg1Video(MpegSystemStream system) : this(system.VideoPadded, system.VideoLength)
+    {
+    }
+
+    private static byte[] Padded(byte[] stream)
+    {
+        var data = new byte[stream.Length + Padding];
+        stream.CopyTo(data, 0);
+        return data;
+    }
+
+    /// <summary><paramref name="length"/> bytes of <paramref name="data"/>, which has <see cref="Padding"/> zeros after them.</summary>
+    private Mpeg1Video(byte[] data, int length)
+    {
+        m_data = data;
+        m_end = length * 8;
         if (!NextStartCode(0xB3))
             throw new InvalidDataException("No MPEG-1 sequence header");
         ReadSequenceHeader();

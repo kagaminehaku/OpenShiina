@@ -33,8 +33,48 @@ public sealed partial class ScnVm
         return t;
     }
 
-    // op_00CE: the background loader (0x7DCD48: busy, data)
+    // op_00CE: the background loader (0x7DCD48: busy, data). With LoadInBackground a file not
+    // kept yet is read on another thread while the scripts go on (START polls 00CF and draws its
+    // frames meanwhile), and taken into script memory when 00D0 / 00D1 / the next 00CE asks
     private int m_loaded;
+    private (string Name, Task<byte[]?> Read)? m_loading;
+
+    /// <summary>
+    /// The background loader (00CE) reads on another thread, as the engine's does: a scene
+    /// change goes on drawing while a large picture loads. The players set it; tests keep the
+    /// frames the same from run to run without it.
+    /// </summary>
+    public bool LoadInBackground { get; set; }
+
+    /// <summary>The loading file, waited for and taken into script memory (0 when it could not be read).</summary>
+    private void FinishLoading()
+    {
+        if (m_loading is not { } loading)
+            return;
+        m_loading = null;
+        byte[]? data;
+        try
+        {
+            data = loading.Read.Result;
+        }
+        catch (AggregateException)
+        {
+            data = null;
+        }
+        if (data == null)
+        {
+            m_loaded = 0;
+            return;
+        }
+        Loaded(Kept(loading.Name, data));
+    }
+
+    private void Loaded(byte[] data)
+    {
+        m_loaded = AllocateCopy(data);
+        m_fileSizes[m_loaded] = data.Length;
+        EngineGlobals[0x4C4514] = data.Length;
+    }
 
     private void RegisterMisc()
     {
@@ -60,21 +100,37 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], vm.RepeatButtons(key, held));
             return 0;
         });
-        // 00CE file: load a file in the background (here: at once); 00CF v: still loading (0);
-        // 00D0 v: the data; 00D1: wait for the loader
+        // 00CE file: load a file in the background (at once without LoadInBackground, or when it
+        // is kept already); 00CF v: still loading (0 when done); 00D0 v: the data; 00D1: wait for
+        // the loader
         Register(0x00CE, (vm, c, i) =>
         {
             string file = vm.ReadString(vm.Value(c, i.Args[0]));
+            vm.FinishLoading();
+            if (vm.LoadInBackground && vm.ResolvePath(file) is { Save: false } p && !vm.m_fileCache.ContainsKey(p.Name)
+                && vm.m_host.ArchiveFileSize(p.Name) != null)
+            {
+                vm.m_loaded = 0;
+                vm.m_loading = (p.Name, Task.Run(() => vm.ReadArchiveFile(p.Name)));
+                return 0;
+            }
             if (vm.ReadScriptFile(file) is not { } data)
                 return 2;
-            vm.m_loaded = vm.AllocateCopy(data);
-            vm.m_fileSizes[vm.m_loaded] = data.Length;
-            vm.EngineGlobals[0x4C4514] = data.Length;
+            vm.Loaded(data);
             return 0;
         });
-        Register(0x00CF, (vm, c, i) => { vm.Store(c, i.Args[0], 0); return 0; });
-        Register(0x00D0, (vm, c, i) => { vm.Store(c, i.Args[0], vm.m_loaded); return 0; });
-        Register(0x00D1, (vm, c, i) => 0);
+        Register(0x00CF, (vm, c, i) => { vm.Store(c, i.Args[0], vm.m_loading is { Read.IsCompleted: false } ? 1 : 0); return 0; });
+        Register(0x00D0, (vm, c, i) =>
+        {
+            vm.FinishLoading();
+            vm.Store(c, i.Args[0], vm.m_loaded);
+            return 0;
+        });
+        Register(0x00D1, (vm, c, i) =>
+        {
+            vm.FinishLoading();
+            return 0;
+        });
         // 06C3: release the movie player's DirectShow objects
         Register(0x06C3, (vm, c, i) => 0);
         // 0A30 file, dest: "X:\" of the CD-ROM drive holding the file, or "" (no disc here)

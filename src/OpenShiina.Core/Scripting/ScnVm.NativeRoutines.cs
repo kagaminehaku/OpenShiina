@@ -60,6 +60,30 @@ public sealed partial class ScnVm
         RegisterNative(["DCEE38C4FB3BC259CFB217ABD2D2F712B23BB57A", "1444F8C617F489497F12A55553446AC99F217C14"], "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75));
         RegisterNative("1174F52A9A080EAEF9B086E491846FF3D5B35EB8", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 50, 16, 12));
+        // Ao no Juuai 188BE (START2 18950; v2.34): the same 100 x 75 thumbnail, f[0] src, f[1] dst
+        RegisterNative("FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "thumbnail",
+                       (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F)));
+
+        // Ao no Juuai 7F562 (START2 7F7B2; v2.34): l[0] = the index of the first word l[1] in the
+        // string of words at l[0] (before its 0), else -1
+        RegisterNative("974E8152ACDBC5F4413632178D75F40431C4A296", "wcsindex", (vm, c, a) =>
+        {
+            int start = vm.NativeArg(a, 0), result = -1;
+            ushort ch = (ushort)vm.NativeArg(a, 1);
+            using var verify = vm.VerifyRegion(c, a, a.Stack, 4);
+            for (int p = start; ; p += 2)
+            {
+                ushort w = vm.Read16(p);
+                if (w == 0)
+                    break;
+                if (w == ch)
+                {
+                    result = (int)((uint)(p - start) >> 1);
+                    break;
+                }
+            }
+            vm.SetL(a, 0, result);
+        });
 
         // START 75E25 / 76273 (Ero-On! 5DA73): 600 rows of 2400 bytes from l[1] (one after the
         // other) to l[0], rows 2404 bytes apart
@@ -87,6 +111,43 @@ public sealed partial class ScnVm
         RegisterNative("9721452713208958DEE71DA51F85540180359028", "block", (vm, c, a) => vm.BlockCopy(c, a, 12, 48, 2400));
         RegisterNative("C4839FCEF4CF13538D043A595B66E1D7B9B04E21", "block", (vm, c, a) => vm.BlockCopy(c, a, 90, 480, 3840));
         RegisterNative("0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
+        // Bitch Nee-chan C11C4: 128 rows of 684 bytes (0xAB dwords), 3840 apart; Bitch Gakuen
+        // C3724: 128 rows of 681 bytes (0xAA dwords and a byte), 3840 apart (every frame of text)
+        RegisterNative("796FFAA089B4BBA15CDDB190D35F8529B95949A7", "block", (vm, c, a) => vm.BlockCopy(c, a, 128, 684, 3840));
+        RegisterNative("EC35C823FB602E8AA31C44D28AE1C1FD15808C7B", "block", (vm, c, a) => vm.BlockCopy(c, a, 128, 681, 3840));
+
+        // Bitch Nee-chan C7C2C (Bitch Gakuen CA19C, Bitch Shimai C9D6C; once at the start): 25 x 25
+        // samples of the first byte of 24-bit pixels from l[0] (rows 3840 bytes apart) to l[1],
+        // each b * 64 / 255; read and written in the x86 code's order
+        RegisterNative("36FEBAB2B4673E7C14FF5B69625F879475C6F6AE", "samples25", (vm, c, a) =>
+        {
+            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1);
+            using var verify = vm.VerifyRegion(c, a, dst, 25 * 25);
+            for (int y = 0; y < 25; y++)
+                for (int x = 0; x < 25; x++)
+                    vm.WriteByte(dst++, (byte)((vm.ReadByte(src + y * 3840 + x * 3) << 6) / 255));
+        });
+
+        // Bitch Gakuen 2B8BC (Bitch Shimai 2B70C): strrchr for Shift-JIS text: l[0] = the
+        // address of the last byte l[2] in the string at l[1], lead bytes 81-9F and E0-FC
+        // taking their next byte with them (a 0 after a lead byte ends the string), else 0
+        RegisterNative("B15B347864344219C0D7C41EFA26FB360D393ED8", "strrchr", (vm, c, a) =>
+        {
+            using var verify = vm.VerifyRegion(c, a, a.Stack, 4);
+            int s = vm.NativeArg(a, 1), found = 0;
+            byte ch = (byte)vm.NativeArg(a, 2);
+            for (int b; s != 0 && (b = vm.ReadByte(s)) != 0; s++)
+            {
+                if (b is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
+                {
+                    if (vm.ReadByte(++s) == 0)
+                        break;
+                }
+                else if (b == ch)
+                    found = s;
+            }
+            vm.SetL(a, 0, found);
+        });
 
         // START 75F62 / 763AC / 85844: f[2] = the index of the first word f[0] in the string of
         // words at f[1] (before its 0), else -1
@@ -130,10 +191,11 @@ public sealed partial class ScnVm
             vm.Write32(a.F + 8, result);
         });
 
-        // START 75FEE / 76434 / 858D0 (Ero-On! 5DC31): l[0] = NOT l[1], l[2] bytes, by 8 bytes
+        // START 75FEE / 76434 / 858D0 (Ero-On! 5DC31, Aneiro 889E6): l[0] = NOT l[1], l[2] bytes, by 8 bytes
         // (l[3] = 0: the count rounded down to 8) or by 4
         RegisterNative(["8EE6D4D8C30D61F6379F0F7FA42BAB648AE0483E", "0CF868D5FF21E737808C7235BF0D164BFDE48B4F",
-                        "516F6F4090493362A1590006FF9F3031DFFC9346", "039192F71200D43AF29A5F5AE0682CCAC4317F2C"], "not", (vm, c, a) =>
+                        "516F6F4090493362A1590006FF9F3031DFFC9346", "039192F71200D43AF29A5F5AE0682CCAC4317F2C",
+                        "7B2B7B77BACDED981FFB2FEBE08F68CBFB09DB09"], "not", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
             uint count = (uint)vm.NativeArg(a, 2);
@@ -226,10 +288,12 @@ public sealed partial class ScnVm
                 vm.MoveMemory(dst + y * sd, src + y * ss, (int)rowBytes);
         });
 
-        // EFCLIB 1E9E (Re: Rem Plus 2792): the negative and other fills: l[3] dwords from l[4] to
-        // l[0], each XORed with l[5]'s byte in every byte
+        // EFCLIB 1E9E (Re: Rem Plus 2792; Bitch Gakuen and Shimai 285A, Ao no Juuai 1978: other padding): the
+        // negative and other fills: l[3] dwords from l[4] to l[0], each XORed with l[5]'s byte in
+        // every byte
         RegisterNative(["EB59CB1AF7084D666150A58C5866638D49AAC562", "BD87E97A68BDF28ECD10B4E3EBDBD6799D5A0F1D",
-                        "997E3DD49B9B61739720F69D2E180ADAC4C9D884"], "xor32", (vm, c, a) =>
+                        "997E3DD49B9B61739720F69D2E180ADAC4C9D884", "D299BA54CDEF926F62CDC0733BC018D56CDA54D5",
+                        "683B763EC4CA9666F13D288DF45400CB2F498B4E"], "xor32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
             uint count = (uint)vm.NativeArg(a, 3), v = (uint)vm.NativeArg(a, 5);
@@ -518,10 +582,12 @@ public sealed partial class ScnVm
         ArrayPool<byte>.Shared.Return(buffer);
     }
 
-    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows)
+    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows) =>
+        Thumbnail(c, a, block, columns, rows, NativeArg(a, 0), NativeArg(a, 4));
+
+    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int dst, int src)
     {
         const int Stride = 2400;
-        int dst = NativeArg(a, 0), src = NativeArg(a, 4);
         int outBytes = columns * rows * 3, inRows = rows * block;
         if (!Apart(dst, outBytes, src, (long)Stride * inRows))
         {

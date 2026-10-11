@@ -1,6 +1,8 @@
 // IScnFonts with Windows GDI, the font engine the game itself uses, so text comes out with the
 // same glyphs. One memory device context does all the work; the game's "A" calls are made with
 // the matching "W" calls after decoding the Shift-JIS text, as GDI does for a SHIFTJIS_CHARSET font.
+// The gaiji of translated scenarios (ScnGaiji) are measured and drawn with a Latin face of the
+// font's height (Segoe UI), which has every Vietnamese letter; text without them is as before.
 
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -15,7 +17,13 @@ public sealed class GdiFonts : IScnFonts, IDisposable
     private readonly IntPtr m_dc;
     private readonly IntPtr m_systemFont;
     private readonly Dictionary<int, IntPtr> m_fonts = new();
+    private readonly Dictionary<int, ScnFontRequest> m_requests = new();
+    // The Latin font of each font, for gaiji (made when first needed)
+    private readonly Dictionary<int, IntPtr> m_latin = new();
     private int m_next = 1;
+
+    /// <inheritdoc/>
+    public IReadOnlyDictionary<int, string>? Gaiji { get; set; }
 
     static GdiFonts()
     {
@@ -38,6 +46,7 @@ public sealed class GdiFonts : IScnFonts, IDisposable
             return 0;
         int id = m_next++;
         m_fonts[id] = font;
+        m_requests[id] = r;
         return id;
     }
 
@@ -45,6 +54,21 @@ public sealed class GdiFonts : IScnFonts, IDisposable
     {
         if (m_fonts.Remove(font, out var handle))
             DeleteObject(handle);
+        m_requests.Remove(font);
+        if (m_latin.Remove(font, out var latin))
+            DeleteObject(latin);
+    }
+
+    /// <summary>The Latin font for the gaiji drawn with <paramref name="font"/>: Segoe UI of its height and weight.</summary>
+    private IntPtr Latin(int font)
+    {
+        if (m_latin.TryGetValue(font, out var handle))
+            return handle;
+        var r = font != 0 && m_requests.TryGetValue(font, out var made) ? made : new ScnFontRequest(16, 0, 0, 0, 700, 0, 0, 0, 0x80, 0, 0, "System");
+        handle = CreateFontW(r.Height, 0, r.Escapement, r.Orientation, r.Weight, (uint)r.Italic, (uint)r.Underline,
+            (uint)r.StrikeOut, DefaultCharSet, 0, 0, (uint)r.Quality, 0, "Segoe UI");
+        m_latin[font] = handle;
+        return handle;
     }
 
     private void Select(int font) =>
@@ -53,8 +77,25 @@ public sealed class GdiFonts : IScnFonts, IDisposable
     public (int Width, int Height) TextExtent(int font, ReadOnlySpan<byte> text)
     {
         Select(font);
-        string s = s_sjis.GetString(text);
-        return GetTextExtentPoint32W(m_dc, s, s.Length, out var size) ? (size.Cx, size.Cy) : (0, 0);
+        string s = ScnGaiji.Decode(s_sjis, text, Gaiji, out var gaiji);
+        if (gaiji == null)
+            return GetTextExtentPoint32W(m_dc, s, s.Length, out var size) ? (size.Cx, size.Cy) : (0, 0);
+        // Runs of the font's characters and of gaiji, the height the font's
+        int width = 0, height = GetTextMetricsW(m_dc, out var tm) ? tm.Height : 0;
+        for (int i = 0; i < s.Length; )
+        {
+            int end = i + 1;
+            while (end < s.Length && gaiji[end] == gaiji[i])
+                end++;
+            if (gaiji[i])
+                SelectObject(m_dc, Latin(font));
+            else
+                Select(font);
+            if (GetTextExtentPoint32W(m_dc, s[i..end], end - i, out var run))
+                width += run.Cx;
+            i = end;
+        }
+        return (width, height);
     }
 
     public int Ascent(int font)
@@ -65,10 +106,21 @@ public sealed class GdiFonts : IScnFonts, IDisposable
 
     public ScnGlyph Glyph(int font, int code)
     {
+        if (Gaiji != null && Gaiji.TryGetValue(code, out var text))
+        {
+            // a translation's letters (none, one or two) with the Latin font
+            SelectObject(m_dc, Latin(font));
+            return text.Length == 1 ? GlyphOf(text[0]) : ScnGlyph.Compose(text.Select(GlyphOf).ToList());
+        }
         Select(font);
         byte[] bytes = code > 0xFF ? [(byte)(code >> 8), (byte)code] : [(byte)code];
         string s = s_sjis.GetString(bytes);
-        uint ch = s.Length > 0 ? s[0] : '?';
+        return GlyphOf(s.Length > 0 ? s[0] : '?');
+    }
+
+    /// <summary>GetGlyphOutlineW of a character in the selected font.</summary>
+    private ScnGlyph GlyphOf(char ch)
+    {
         var matrix = new Mat2 { M11 = 1 << 16, M22 = 1 << 16 };
         uint size = GetGlyphOutlineW(m_dc, ch, GgoGray8Bitmap, out var gm, 0, null, ref matrix);
         int pitch = (int)(gm.BlackBoxX + 3 & ~3u);
@@ -106,14 +158,16 @@ public sealed class GdiFonts : IScnFonts, IDisposable
 
     public void Dispose()
     {
-        foreach (var handle in m_fonts.Values)
+        foreach (var handle in m_fonts.Values.Concat(m_latin.Values))
             DeleteObject(handle);
         m_fonts.Clear();
+        m_latin.Clear();
         DeleteDC(m_dc);
     }
 
     private const int SystemFont = 13;
     private const byte ShiftJisCharSet = 0x80;
+    private const uint DefaultCharSet = 1;
 
     private delegate int EnumFontProc(IntPtr logFont, IntPtr textMetric, uint fontType, IntPtr parameter);
 

@@ -40,6 +40,8 @@ public sealed partial class ScnVm
         public byte[]? LastRows;
         /// <summary>The movie's sound as a WAVE (null when it has none) and its music stream while it plays.</summary>
         public byte[]? Wave;
+        /// <summary>The decoding of the rest of the sound (MpegAudio.StartWave).</summary>
+        public Task WaveRest = Task.CompletedTask;
         public int Sound;
     }
 
@@ -70,9 +72,15 @@ public sealed partial class ScnVm
         try
         {
             var stream = new MpegSystemStream(data);
-            movie.Video = new Mpeg1Video(stream.Video);
+            movie.Video = new Mpeg1Video(stream);
             if (!m_movieWaves.TryGetValue(name, out movie.Wave))
-                m_movieWaves[name] = movie.Wave = Music != null ? MpegAudio.ToWave(stream.Audio) : null;
+            {
+                // the first seconds now, the rest while it plays (the whole sound took 0.6 s)
+                var rest = Task.CompletedTask;
+                m_movieWaves[name] = movie.Wave = Music != null ? MpegAudio.StartWave(stream.Audio, 3, out rest) : null;
+                m_movieWaveRest[name] = rest;
+            }
+            movie.WaveRest = m_movieWaveRest.GetValueOrDefault(name) ?? Task.CompletedTask;
         }
         catch (InvalidDataException)
         {
@@ -108,8 +116,9 @@ public sealed partial class ScnVm
         return true;
     }
 
-    // Movie sounds decoded so far, by file
+    // Movie sounds decoded so far, by file, and the decoding of their rest
     private readonly Dictionary<string, byte[]?> m_movieWaves = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Task> m_movieWaveRest = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The movie's sound from the start (or <paramref name="milliseconds"/> into it).</summary>
     private void MovieSoundStart(Movie movie, long milliseconds = 0)
@@ -117,6 +126,9 @@ public sealed partial class ScnVm
         MovieSoundStop(movie);
         if (movie.Wave is not { } wave || Music is not { } music)
             return;
+        // a part from the middle is a copy: the whole sound first
+        if (milliseconds > 0)
+            movie.WaveRest.Wait();
         movie.Sound = music.Open(milliseconds > 0 ? MpegAudio.From(wave, milliseconds) : wave);
         if (movie.Sound == 0)
             return;

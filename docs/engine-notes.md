@@ -937,7 +937,7 @@ the functions they call from the decompile. First findings:
   slot, frame, x, y, w, h, colour` fills a rectangle (4 bytes a pixel: the dword; 3 bytes: its
   bytes 2, 3, 1); `055C slot, surface` copies a surface into a new picture; `0560` / `0561` set /
   get a frame's offset; `0FD4` row bytes; `0BCF` strncmp, `0BD4` strstr; `02C1` GlobalMemoryStatus;
-  `03EC` DirectInput key with repeat; `00CE`-`00D1` background file loader (done at once here);
+  `03EC` DirectInput key with repeat; `00CE`-`00D1` background file loader (see "0158" below);
   `0A30` / `0A31` disc check / extra folder.
 - **32-bit pictures** (text and button layers): `0562 picture, frame, x, y, slot, frame` draws a
   frame over one (FUN_004436F0 / 004437C0, one entry): source alpha 0 skips, 255 or a transparent
@@ -1222,13 +1222,72 @@ the functions they call from the decompile. First findings:
   ScnBoot `SCNBOOT_FILES=1` lists every file read with its size and time.
 - Aneiro's only embedded routine that ran translated, START 88717, is a lone `ret` (the next
   routine starts at 88718), called after each file its scripts load themselves (0154 / 0156): a
-  C# no-op now. With it no embedded routine of the 4 games beyond the 11 runs translated in
-  the parts played, but for a few small ones of the Bitch games (Nee-chan C11C4 / Gakuen C3724,
-  about 0.02 ms a call; Gakuen 2B8BC, under 0.01 ms; C7C2C, CA19C, C3D28 once).
+  C# no-op now. The Bitch games' small ones are C# too: their 24-bit block copies (Nee-chan
+  C11C4: 128 rows of 684 bytes; Gakuen C3724: 681; 3840 apart, every frame of text), a Shift-JIS
+  strrchr (Gakuen 2B8BC, Shimai 2B70C) and 25 x 25 samples of a picture, b * 64 / 255 (Nee-chan
+  C7C2C, Gakuen CA19C, Shimai C9D6C); Gakuen's C3D28 is subpixel32 v2.50. All the same as their
+  x86 code on random cases (scratch nativetest, filter Bitch). Every 0276 target of every SCN
+  file of the 5 games beyond the 11 has a C# version now (scratch jitinvtool over their
+  disassembly, 2026-10-11: Bitch Nee-chan, Gakuen and Shimai 29 each, Aneiro 18, Ao no Juuai 5):
+  besides the above, Shimai's blur (the same code as Nee-chan's, its work buffers 4 bytes on; it
+  calls to find itself, so it ran on the interpreter: 15 s a call), xor32 / not builds that
+  differ in padding only (Gakuen and Shimai EFCLIB 285A, Ao no Juuai EFCLIB 1978, Aneiro 889E6),
+  Ao no Juuai's thumbnail (188BE: f[0] src, f[1] dst) and wcsindex on l (7F562).
+- Movies open faster and lighter (2026-10-11): the system stream's video is copied once, into
+  an array with Mpeg1Video's padding that the decoder takes as it is (it was a MemoryStream,
+  its ToArray, then the decoder's own copy: over 450 MB for Bitch Shimai's 159 MB opening
+  movie), and the sound's first 3 s are decoded at once, the rest into the same WAVE on another
+  thread (MpegAudio.StartWave; NLayer gives the sample count from the frame headers; the same
+  bytes as before). Opening that movie: about 1,100 -> 210 ms; its frames are the same (400
+  compared, scratch movietime). A sound started from the middle waits for the decoding.
+- **Translations** (2026-10-11; Core `Scripting/ScnGaiji.cs`). A scenario `.TXT` that starts
+  with a UTF-8 byte order mark is turned into Shift-JIS when the scripts read it
+  (`ScnVm.ReadScriptFile`): what Shift-JIS has stays (but ASCII in message lines); Latin text
+  and what Shift-JIS lacks (Vietnamese letters) get codes Shift-JIS leaves free (gaiji:
+  F040-F9FC and the unused lead bytes 85, 86, EB, EC, EF, 2,820 codes): two-byte characters to
+  START, so its half-width to full-width step leaves them alone. A code stands for two letters of
+  a word, a letter, or a space; a message line ends with a code of nothing (End). Comment (`;`),
+  command (`$`) lines keep their ASCII; a speaker's line (`【`) is turned as a message's, without
+  End. The font engines (`IScnFonts.Gaiji`)
+  draw a code as its text with a Latin face of the font's cell height (GDI: Segoe UI; Skia: Segoe
+  UI, Arial, ... or a matched face), a pair as one composed glyph (`ScnGlyph.Compose`), and
+  measure it by its own advances; the text system gives it that advance in place of the fixed
+  width or pitch (`_p`) of the window. START breaks a message after 33 characters (`_r` it puts
+  in; Bitch Nee-chan), not by width: a `_r` after a translation's letter or space (not after End,
+  so a backlog's line breaks stay) is left out, START's count of characters a line is learned from
+  the first one (the right edge: the left edge plus that many full-width cells), and a word that
+  would cross that edge starts the next line. Files in the game folder's `translation\` come
+  before the archives' of the same path (`translation\p\pro01_01.txt`). Checked in ScnBoot
+  (GDI) on Bitch Nee-chan's first scene with English and Vietnamese lines (scratch tltest,
+  `SCNBOOT_FILE`); text without gaiji takes the same paths as before.
+  Texts in the scripts' own code: `translation\strings.txt` (UTF-8, `original<tab>translation`
+  a line, `#` comments) is read on the first text drawn; a text passed to 0083, 0084 or 00A0
+  whose bytes are those of an original (its Shift-JIS) is replaced by the translation turned
+  like a message line (gaiji, End after it), copied into script memory once
+  (`ScnVm.Translated`). A speaker line kept as the original (`【土筆】`) is drawn as its
+  translation there (Bitch Nee-chan with `土筆	Tsukushi`: checked in ScnBoot against a run
+  without the file), so a translation may keep the original names where voices or name plates
+  are found by them.
+- A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
+  by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
+  to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest
+  archives first (their indexes decode quickest), and stops at the first file that comes out
+  wrong. An archive opening proves little (its index does not use the ShiinaImage). On the 16
+  games here (GameMap left out) every keyed one gave its own scheme alone, in 0.2-0.4 s; Ao no
+  Juuai (WARC 1.5, files without the per-game key) gave 24 that all decode it. The Avalonia
+  player's "Add a game…" adds a game its .exe does not tell this way (one scheme: at once;
+  several: the user picks under the cards); library.json keeps it (LibraryGame.Scheme) and
+  both players open the game with it (GameLibrary.SchemeFor). Checked on hard links of Bitch
+  Shimai's archives renamed ZZ_*.WAR with no .exe (scratch detecttest --library).
 - `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's
   index instead of decoding the file (checked: the index's unpacked size is the decoded length
   for every entry of the 11 games). `00CE` itself is the engine's background loader (START
-  polls `00CF` every 5 ms and goes on drawing), done at once here.
+  polls `00CF` every 5 ms and goes on drawing): in the players (ScnVm.LoadInBackground,
+  2026-10-11) a file not kept yet is read on another thread (the archives read under their lock;
+  the extra crypts after it keep no state), `00CF` says 1 until it is read, and `00D0` / `00D1` /
+  the next `00CE` take it into script memory; ScnBoot loads at once (its frames the same from
+  run to run) unless SCNBOOT_BGLOAD=1, with which the verify runs end as before, a few lines
+  apart in time.
 - YH1 (Huffman) entries, some of the music, are decoded with a 12-bit look-up table instead of
   a bit at a time: Sena's BGM25 (4.3 MB) 80 ms -> about 15 ms; the same bytes as before for the
   50 YH1 entries of the 11 games.
@@ -1237,6 +1296,13 @@ the functions they call from the decompile. First findings:
 - The compositor (04C4) gathers the shown entries once and sorts them by (priority, index), and
   draws rows straight into script memory; it costs about 1-2 ns a pixel, under 1 ms a frame in
   the opening.
+- A game closed leaves its managed part (the file cache, pictures and sounds read, a movie's
+  streams: large objects) to a collection the home screen, allocating next to nothing, never
+  brings on: Ao no Juuai played again and again in the Avalonia player grew by about 85 MB a
+  time (nothing held it: a test that ran the dispatcher's jobs and collected found 3 MB left).
+  Both players now collect everything, the large objects compacted, once a game has closed
+  (2026-10-11, Core `Game/GameMemory.cs`): six plays of Ao no Juuai, the home screen 149-168 MB
+  after each (it was 239, 392, 286, ...).
 - **Flat memory** (2026-10-09, branch flat-memory; Scripting/ScnAddressSpace.cs). The scripts'
   memory was 64 KB pages made on first use, every read and write looking its page up and the C#
   routines copying row by row across pages. It is now the whole 32-bit address space as one block

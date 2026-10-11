@@ -73,6 +73,10 @@ does. The Avalonia player draws text with the system's fonts, with MS Gothic's m
 Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux, for instance,
 `fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
 
+A game whose .exe the player does not know (renamed, or a version it does not list) is found by
+the keys that open its archives when it is added; when several games' keys fit, the player asks
+which game it is.
+
 Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
 each counts from the next game started): the graphics level (Potato: nearest pixels; Low: sharp;
 Medium: FSR 1; High: FSR 1 sharpened; Max: Anime4K; Custom when the advanced settings match none
@@ -107,6 +111,22 @@ RIO.INI (Joypad=0) but the players read it anyway; the setting "Game controller"
 
 Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`); both
 players share them.
+
+## Translations
+
+A scenario file (`.TXT`) saved as UTF-8 **with a byte order mark** is read as a translation: its
+message lines may use any letters, Vietnamese included, drawn half-width with their own widths and
+wrapped at the window's edge by words. Put translated files in a `translation` folder inside the
+game's folder, at the path the game reads them by (for example `translation\p\pro01_01.txt`): they
+are used in place of the archives' files of the same path, and the game's files stay as they are.
+Keep the file's lines as they are: `;` comments and `$` commands; translate the other lines, one
+message a line. A speaker's name in `【name】` may be translated where the game draws names as
+text; a game whose name plates are pictures (Oreimo Plus) finds them by the original names.
+
+Texts the scripts draw from their own code (choices, menus, names they keep) go in
+`translation\strings.txt`, UTF-8, a line each: the original, a tab, the translation
+(`土筆	Tsukushi`; lines starting with `#` are comments). A text drawn is replaced when the whole
+of it is one of the originals.
 
 ## Documentation
 
