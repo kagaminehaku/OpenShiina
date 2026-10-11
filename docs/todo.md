@@ -20,10 +20,10 @@ should follow what their perf.log shows.
   changed part (GameSession.TakeFrame gives it).
 - [ ] **Flat memory: what is left** (engine-notes.md section 10, "Flat memory").
   - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run).
-  - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`) builds but has not run: ScnBoot
-    as a 32-bit program (`dotnet publish tests/OpenShiina.ScnBoot -c Release -r win-x86
-    --self-contained`) against the 64-bit one's pictures (Re: Rem Plus's zoom, Oreimo's park
-    route), then an `android-arm` APK on a 32-bit phone or TV box.
+  - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`): ScnBoot as a 32-bit process
+    (scnboot.dll on the x86 .NET runtime, scratch scnboot32.sh / verify32.sh) gives the 64-bit
+    one's pictures, 287 of 287 (Re: Rem Plus's zoom and first route, Oreimo's park route;
+    2026-10-11). Left: an `android-arm` APK on a 32-bit phone or TV box.
 - [ ] **The x86 translation, for games beyond the eleven.** No routine of the eleven games runs
   translated any more (each has a C# version); X86Jit and the interpreter stay for builds no
   signature matches. Only worth it if other ShiinaRio games come: flags computed only where a
