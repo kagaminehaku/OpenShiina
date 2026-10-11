@@ -1,6 +1,8 @@
 # Builds the players and, for a tag v*, publishes them as a GitHub release:
 #   OpenShiina-<version>-windows-x64.zip       the Avalonia player for Windows
 #   OpenShiina-<version>-linux-x64.tar.gz      the Avalonia player for Linux
+#   OpenShiinaTools-<version>-windows-x64.zip  OpenShiina Tools (archives, translations) for Windows
+#   OpenShiinaTools-<version>-linux-x64.tar.gz OpenShiina Tools for Linux
 #   OpenShiina-<version>-android.apk           the Android player (arm64, arm, x64)
 # The version is the tag's (v0.2.0 -> 0.2.0). Run by hand (Actions > Release > Run workflow),
 # it only builds, and the files are kept as the run's artifacts.
@@ -54,8 +56,10 @@ jobs:
         shell: pwsh
         run: |
           dotnet publish src/OpenShiina.Desktop -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/desktop
+          dotnet publish src/OpenShiina.Tools -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/tools
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path out/desktop/* -DestinationPath "dist/OpenShiina-$env:VERSION-windows-x64.zip"
+          Compress-Archive -Path out/tools/* -DestinationPath "dist/OpenShiinaTools-$env:VERSION-windows-x64.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -74,9 +78,11 @@ jobs:
       - name: Publish
         run: |
           dotnet publish src/OpenShiina.Desktop -c Release -r linux-x64 --self-contained -p:Version=$VERSION -o out/OpenShiina
-          chmod +x out/OpenShiina/OpenShiina
+          dotnet publish src/OpenShiina.Tools -c Release -r linux-x64 --self-contained -p:Version=$VERSION -o out/OpenShiinaTools
+          chmod +x out/OpenShiina/OpenShiina out/OpenShiinaTools/OpenShiinaTools
           mkdir -p dist
           tar -czf "dist/OpenShiina-$VERSION-linux-x64.tar.gz" -C out OpenShiina
+          tar -czf "dist/OpenShiinaTools-$VERSION-linux-x64.tar.gz" -C out OpenShiinaTools
       - uses: actions/upload-artifact@v4
         with:
           name: linux

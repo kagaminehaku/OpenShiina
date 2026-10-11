@@ -39,6 +39,15 @@ public sealed class ScnGaiji
     /// <summary>The text each code given out stands for (the font engines read it).</summary>
     public IReadOnlyDictionary<int, string> Texts => m_texts;
 
+    /// <summary>How many codes there are in all.</summary>
+    public const int Capacity = Codes;
+
+    /// <summary>How many codes have been given out.</summary>
+    public int Used => m_codes.Count;
+
+    /// <summary>Letters or spaces that found no code left (drawn as a full-width "?").</summary>
+    public int Missing { get; private set; }
+
     /// <summary>The code that ends a translated message line (it stands for nothing).</summary>
     public int End { get; }
 
@@ -186,6 +195,7 @@ public sealed class ScnGaiji
         int code = CodeFor(text);
         if (code < 0)
         {
+            Missing++;
             output.AddRange([0x81, 0x48]);    // no code left: a full-width "?"
             return;
         }

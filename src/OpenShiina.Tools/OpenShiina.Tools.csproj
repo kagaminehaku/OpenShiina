@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- OpenShiina Tools (Avalonia; Windows, Linux, macOS): a game's archives browsed, previewed,
+       extracted and packed again, and its scenario text exported to translate and built back
+       into a translation the player reads. From GrandCrossExtractor. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>OpenShiinaTools</AssemblyName>
+    <RootNamespace>OpenShiina.Tools</RootNamespace>
+    <ApplicationIcon>..\OpenShiina.Desktop\Resources\icon.ico</ApplicationIcon>
+    <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Tools\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>OpenShiina Tools</Product>
+    <AssemblyTitle>OpenShiina Tools</AssemblyTitle>
+    <Version>0.1.0</Version>
+    <Authors>kagaminehaku</Authors>
+    <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The player's library: its message box and sound output, Avalonia's theme -->
+    <ProjectReference Include="..\OpenShiina.App\OpenShiina.App.csproj" />
+  </ItemGroup>
+
+</Project>

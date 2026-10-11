@@ -98,7 +98,21 @@ public sealed partial class ScnVm
     /// A file of the game folder's translation\ or of the archives as it is (any thread may read
     /// one: the archives read under a lock), or null.
     /// </summary>
-    private byte[]? ReadArchiveFile(string name) => m_host.ReadLooseFile(TranslationFolder + name) ?? m_host.ReadFile(name);
+    private byte[]? ReadArchiveFile(string name) =>
+        m_host.ReadLooseFile(TranslationFolder + name) ?? (TranslationByFileName(name) is { } plain ? m_host.ReadLooseFile(plain) : null)
+        ?? m_host.ReadFile(name);
+
+    /// <summary>
+    /// A translation's file may also be named as its entry alone (translation\PRO01_01.TXT for
+    /// "p\pro01_01.txt"), as the archives find it and OpenShiina Tools writes it; null for a name
+    /// without a folder.
+    /// </summary>
+    private static string? TranslationByFileName(string name) =>
+        name.LastIndexOfAny(['\\', '/']) is >= 0 and int at ? TranslationFolder + name[(at + 1)..] : null;
+
+    /// <summary>The size of a translation's file for the name, or null when there is none.</summary>
+    private long? TranslationFileSize(string name) =>
+        m_host.LooseFileSize(TranslationFolder + name) ?? (TranslationByFileName(name) is { } plain ? m_host.LooseFileSize(plain) : null);
 
     /// <summary>A file of the archives read: a translated scenario turned, then kept (the interpreter's thread).</summary>
     private byte[] Kept(string name, byte[] data)
@@ -146,7 +160,7 @@ public sealed partial class ScnVm
             return null;
         if (p.Save)
             return m_host.ReadSaveFile(p.Name)?.Length;
-        if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || m_host.LooseFileSize(TranslationFolder + p.Name) != null)
+        if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || TranslationFileSize(p.Name) != null)
             return ReadScriptFile(path)?.Length;
         return m_host.ArchiveFileSize(p.Name) ?? m_host.LooseFileSize(p.Name);
     }

@@ -1269,6 +1269,20 @@ the functions they call from the decompile. First findings:
   translation there (Bitch Nee-chan with `土筆	Tsukushi`: checked in ScnBoot against a run
   without the file), so a translation may keep the original names where voices or name plates
   are found by them.
+  A translation's file may also be named as its entry alone (`translation\PRO01_01.TXT` for the
+  scripts' `p\pro01_01.txt`), as the archives find entries by their name: the archives keep no
+  folders, so a tool cannot know the path the scripts use.
+- **OpenShiina Tools** (2026-10-11, `src/OpenShiina.Tools`; GrandCrossExtractor carried on, on
+  Avalonia and Core): browse, preview, extract (S25 / MI4 -> PNG, layers composed as the scripts
+  show them: Core `Formats/S25Composer.cs`, `S25ScriptIndex.cs`, `MontageTable.cs`,
+  `MediaConverter.cs`) and repack (Core `Archives/WarcPacker.cs`, WARC 1.7 only: older versions
+  range-code their index) a game's archives; the Translation tab exports the scenarios' message
+  lines and speakers' names into tables and builds the translation from them (Core
+  `Game/ScenarioText.cs`): the scenarios keep the original speakers' names, the translated names
+  go into strings.txt, and the build counts the gaiji codes the translation takes
+  (`ScnGaiji.Used`, `Missing`). Bitch Nee-chan: 23,450 message lines of 106 files and 73 names
+  exported in 0.1 s; a few lines and two names translated, built and played in ScnBoot as the
+  hand-made translation did.
 - A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
   by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
   to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest

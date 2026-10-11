@@ -89,8 +89,13 @@ Vietnamese included, words wrapped at the window's edge; files in the game folde
   replaces a text the scripts pass to 0083 / 0084 / 00A0 when it is the whole of one original
   (2026-10-11; checked on Bitch Nee-chan's speaker names). Left: Oreimo Plus's menus, and texts
   the scripts build from parts (a name then a word) or draw another way.
-- [ ] Pictures with Japanese text (menus, buttons, titles): GrandCrossExtractor can repack an
+- [ ] Pictures with Japanese text (menus, buttons, titles): OpenShiina Tools can repack an
   archive's files but has no S25 encoder yet.
+- [ ] OpenShiina Tools' Export takes the scenarios' message lines and speakers' names; the texts
+  the scripts write themselves (choices, menus) go into strings.tsv by hand. Left: finding those
+  texts in the SCN modules (Shift-JIS strings the scripts pass to 0083 / 0084 / 00A0) to export
+  them too, and a translation run on a whole game (are 2,820 codes enough for every letter
+  pair of a full English or Vietnamese script? the build counts them).
 
 ## Other ShiinaRio games
 

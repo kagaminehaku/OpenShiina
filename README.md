@@ -21,6 +21,7 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 | `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter and its x86 translator |
 | `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
 | `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
+| `src/OpenShiina.Tools` | OpenShiina Tools for Windows, Linux and macOS (Avalonia): browse, preview, extract and repack a game's archives; export its scenario text to translate and build the translation |
 | `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; plays on a Galaxy S7 (Exynos 8890), heavy scenes are slow on phones that old |
 | iOS | Planned, on `OpenShiina.App` |
 
@@ -33,7 +34,8 @@ dotnet build -c Release
 ```
 
 The player is written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
-`dotnet OpenShiina.dll`), with the scheme data (`Formats.Json`) next to it. The Windows player
+`dotnet OpenShiina.dll`), OpenShiina Tools to `bin/Release/OpenShiina.Tools/` (`OpenShiinaTools`),
+each with the scheme data (`Formats.Json`) next to it. The Windows player
 on WPF (text drawn by Windows GDI) was retired after 0.2.0; its code is kept on the branch
 `legacy-wpf`.
 
@@ -110,16 +112,52 @@ RIO.INI (Joypad=0) but the players read it anyway; the setting "Game controller"
 Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`); both
 players share them.
 
+## OpenShiina Tools
+
+`OpenShiinaTools [archive]` (it was [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor),
+now on Avalonia and the player's engine, so it opens every game the player knows):
+
+- **Archives**: opens a game's `.WAR` archive (the game found by its `.exe` next to it, else by
+  its keys, or chosen under Scheme) or a standalone `.S25` picture; lists, filters and searches
+  its files; previews pictures (S25 frames, MI4, PNG, JPEG, BMP), plays sounds (OGV, OGG, PAD,
+  WAV) and shows scripts as text, anything else as bytes.
+- **Extract** a file, the selection or everything, as stored or converted (on by default):
+  S25 / MI4 to PNG (an S25 a file per frame), OGV to OGG, PAD to WAV. **Compose layers** saves
+  each layered S25 (event CGs and sprites: a base and eyes, mouth, effect layers) as the whole
+  pictures the scenario scripts show, read from the archives next to it.
+- **Repack** (WARC 1.7 archives): the files of a folder named as entries of the open archive
+  (extracted without converting, then edited) are packed and encrypted into a new archive, the
+  other entries copied as they are. Every packed entry is read back and compared with its file
+  before the archive is saved; the open archive itself cannot be written over. Pictures cannot
+  be made from PNG yet (no S25 encoder).
+- **Translation**: see below.
+
 ## Translations
 
-A scenario file (`.TXT`) saved as UTF-8 **with a byte order mark** is read as a translation: its
-message lines may use any letters, Vietnamese included, drawn half-width with their own widths and
-wrapped at the window's edge by words. Put translated files in a `translation` folder inside the
-game's folder, at the path the game reads them by (for example `translation\p\pro01_01.txt`): they
-are used in place of the archives' files of the same path, and the game's files stay as they are.
-Keep the file's lines as they are: `;` comments and `$` commands; translate the other lines, one
-message a line. A speaker's name in `【name】` may be translated where the game draws names as
-text; a game whose name plates are pictures (Oreimo Plus) finds them by the original names.
+The **Translation** tab of OpenShiina Tools does the whole round trip:
+
+1. **Export the text** of a game's folder into a folder of tables: `text.tsv` has every message
+   line of the scenarios (id `FILE.TXT:line`, speaker, original, translation), `names.tsv` the
+   speakers' names, `strings.tsv` starts empty for the texts the scripts write themselves
+   (choices, menus). The tables are UTF-8 with tabs between the fields: a spreadsheet, a text
+   editor or a translation tool can fill the translation column. Exporting again keeps the
+   translations already in the tables (for the lines whose original did not change).
+2. **Build the translation** from the tables: the scenarios with a translated line are written,
+   the other lines as they were, into a folder `translation`, and the names and strings into
+   `translation\strings.txt`. The scenarios keep the original speakers' names (games find voices
+   and name plates by them); the player draws the translated names. The build says how many of
+   the 2,820 codes for letters the translation needs (beyond them a letter shows as `?`), and
+   which rows did not match the game's lines.
+3. Copy `translation` into the game's folder. The game's own files stay as they are.
+
+What the player reads: a scenario file (`.TXT`) saved as UTF-8 **with a byte order mark** is read
+as a translation: its message lines may use any letters, Vietnamese included, drawn half-width
+with their own widths and wrapped at the window's edge by words. Files in the game folder's
+`translation` folder are used in place of the archives' files, found by the path the game reads
+them by (`translation\p\pro01_01.txt`) or by their name alone (`translation\PRO01_01.TXT`, as the
+tools write them). A scenario edited by hand keeps its `;` comments and `$` commands, one message a
+line; a speaker's name in `【name】` may be translated where the game draws names as text, but a
+game whose name plates are pictures (Oreimo Plus) finds them by the original names.
 
 Texts the scripts draw from their own code (choices, menus, names they keep) go in
 `translation\strings.txt`, UTF-8, a line each: the original, a tab, the translation
@@ -144,7 +182,7 @@ of it is one of the originals.
 
 - Archive formats and encryption schemes are based on [GARbro](https://github.com/morkt/GARbro) by morkt;
   the schemes of the other ShiinaRio games come from GARbro-Mod's scheme database.
-- Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor).
+- Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor), which OpenShiina Tools carries on.
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
 - The player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
