@@ -177,7 +177,7 @@ those GameMap names for the game (how the players tell it).
 
 | Platform | Player | Status | Checked |
 |---|---|---|---|
-| Windows 10 / 11 | WPF (`OpenShiina.Windows`) and Avalonia (`OpenShiina.Desktop`) | ✅ The games above | 2026-10-08 |
+| Windows 10 / 11 | Avalonia (`OpenShiina.Desktop`; the WPF player of 0.2.0 and before is on the branch `legacy-wpf`) | ✅ The games above | 2026-10-08 |
 | Android | Avalonia (`OpenShiina.Android`), Release built with LLVM | 🟢 Plays | 2026-10-08 |
 | Linux, macOS | Avalonia (`OpenShiina.Desktop`) | ⚪ Builds; no game run recorded here | |
 | iOS | not written yet | ⚪ Planned | |

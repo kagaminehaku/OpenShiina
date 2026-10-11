@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>OpenShiina</AssemblyName>
     <RootNamespace>OpenShiina.Desktop</RootNamespace>
-    <ApplicationIcon>..\OpenShiina.Windows\Resources\icon.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
     <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Desktop\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>

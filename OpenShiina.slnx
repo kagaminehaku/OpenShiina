@@ -7,7 +7,6 @@
     <Project Path="src/OpenShiina.Core/OpenShiina.Core.csproj" />
     <Project Path="src/OpenShiina.Desktop/OpenShiina.Desktop.csproj" />
     <Project Path="src/OpenShiina.Gpu/OpenShiina.Gpu.csproj" />
-    <Project Path="src/OpenShiina.Windows/OpenShiina.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/OpenShiina.ScnBoot/OpenShiina.ScnBoot.csproj" />

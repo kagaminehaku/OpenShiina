@@ -250,7 +250,8 @@ game's own. It is split in two projects:
   (`SdlAudioOutput`); text is `SkiaFonts`: GDI's font calls on SkiaSharp, with a Japanese
   stand-in for a missing face, measured as MS Gothic (cell = em, ascent 0.859 em, average width
   half an em); shapes are Core's `Platform/DibShapes.cs` (GDI's Ellipse, worked out from Windows' pixels).
-- `OpenShiina.Windows` (WPF): `Scn/ScnWindow.cs` lets the GameThread run a frame on each frame
+- `OpenShiina.Windows` (WPF; retired after 0.2.0, on the branch `legacy-wpf`: what this file
+  says of the WPF player is how it was): `Scn/ScnWindow.cs` lets the GameThread run a frame on each frame
   WPF renders (Rendering raised twice for one RenderingTime counts once); sound through the same
   mixer on NAudio's wave output; text and shapes with GDI (Core `Platform/GdiFonts.cs`,
   `GdiShapes.cs`, Windows only), pixel for pixel as the games. Keys, mouse buttons and the

@@ -21,7 +21,6 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 | `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter and its x86 translator |
 | `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
 | `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
-| `src/OpenShiina.Windows` | The Windows player on WPF, whose text is drawn by Windows GDI as the games draw it |
 | `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; plays on a Galaxy S7 (Exynos 8890), heavy scenes are slow on phones that old |
 | iOS | Planned, on `OpenShiina.App` |
 
@@ -33,9 +32,10 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 dotnet build -c Release
 ```
 
-The players are written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
-`dotnet OpenShiina.dll`) and `bin/Release/OpenShiina.Windows/`, with the scheme data
-(`Formats.Json`) next to them. The WPF player builds on Windows only.
+The player is written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
+`dotnet OpenShiina.dll`), with the scheme data (`Formats.Json`) next to it. The Windows player
+on WPF (text drawn by Windows GDI) was retired after 0.2.0; its code is kept on the branch
+`legacy-wpf`.
 
 The Android player is not in the solution (it needs the .NET Android workload and the Android
 SDK); build it on its own:
@@ -53,8 +53,7 @@ the wheel (down opens the backlog); the bar on the right has Menu (a right click
 Auto, Skip, Log and Exit.
 
 Releases: pushing a tag `v*` (for instance `v0.2.0`) has GitHub Actions
-(`.github/workflows/release.yml`) build the WPF and Avalonia players for Windows, the Avalonia
-player for Linux and the APK, with the tag's version, and publish them as a release. The APK is
+(`.github/workflows/release.yml`) build the player for Windows and Linux and the APK, with the tag's version, and publish them as a release. The APK is
 signed with the keystore in the repository's secrets (`ANDROID_KEYSTORE_BASE64`,
 `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), or with a debug key when there is none.
 
@@ -65,11 +64,10 @@ game…** takes the game's folder (the one with its `.exe` and `.WAR` files); th
 and its menu (right click) opens its save folder or takes it off the list. Passing a folder on the
 command line plays that game at once and adds it to the list. Quitting a game brings the list back;
 closing the list ends the player. The game is recognised by its
-`.exe`. Both players share the list (`library.json` next to the saves). The player runs the
+`.exe`. The list is kept in `library.json` next to the saves. The player runs the
 game's own SCN scripts, so the game looks and behaves as it does in its own engine.
 
-Text: the games ask for MS Gothic. The WPF player draws it with Windows GDI, exactly as the game
-does. The Avalonia player draws text with the system's fonts, with MS Gothic's measures: on
+Text: the games ask for MS Gothic. The player draws text with the system's fonts, with MS Gothic's measures: on
 Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux, for instance,
 `fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
 
@@ -80,7 +78,7 @@ which game it is.
 Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
 each counts from the next game started): the graphics level (Potato: nearest pixels; Low: sharp;
 Medium: FSR 1; High: FSR 1 sharpened; Max: Anime4K; Custom when the advanced settings match none
-of them), and under the Avalonia player's Advanced graphics drawing on the CPU or on the GPU (the GPU mode runs
+of them), and under Advanced graphics drawing on the CPU or on the GPU (the GPU mode runs
 heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
 rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
 faster on its first large calls, with the same pictures; without a Vulkan driver the games run on the CPU), the frame
@@ -88,9 +86,9 @@ rate (the game's own pace, up to 60 frames a second with the window drawing only
 as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
 scripts run as often: four times as much processor on a 240 Hz one), the scaling of the
 picture to the window (sharp: whole game pixels as far as they fit and the rest smooth, so text
-and lines stay even at any size; whole numbers only, with black around; smooth; nearest; or, in
-the Avalonia player on the GPU that draws its window, the upscalers FSR 1, with its sharpening
-from none to 10, and Anime4K, the heaviest; the WPF player draws them as sharp), pausing the game while another window is in front (on by default; off, the game does as its
+and lines stay even at any size; whole numbers only, with black around; smooth; nearest; or, on
+the GPU that draws the window, the upscalers FSR 1, with its sharpening from none to 10, and
+Anime4K, the heaviest), pausing the game while another window is in front (on by default; off, the game does as its
 RIO.INI says: most go on, sound included), the game controller, showing the frame rate (in the title; on phones over the game), and for bug reports
 writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
 `draw-trace.log` (both logs go to the game's save folder).
@@ -148,7 +146,7 @@ of it is one of the originals.
   the schemes of the other ShiinaRio games come from GARbro-Mod's scheme database.
 - Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor).
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
-- The Avalonia player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
+- The player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
 - Ellipses without Windows flatten their curves with GDI's Bézier flattener as kept in
   [WPF](https://github.com/dotnet/wpf)'s bezier.cpp (MIT, .NET Foundation).

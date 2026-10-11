@@ -1,5 +1,4 @@
 # Builds the players and, for a tag v*, publishes them as a GitHub release:
-#   OpenShiina-<version>-windows-x64-wpf.zip   the WPF player (text drawn by Windows GDI)
 #   OpenShiina-<version>-windows-x64.zip       the Avalonia player for Windows
 #   OpenShiina-<version>-linux-x64.tar.gz      the Avalonia player for Linux
 #   OpenShiina-<version>-android.apk           the Android player (arm64, arm, x64)
@@ -54,10 +53,8 @@ jobs:
       - name: Publish
         shell: pwsh
         run: |
-          dotnet publish src/OpenShiina.Windows -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/wpf
           dotnet publish src/OpenShiina.Desktop -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/desktop
           New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path out/wpf/* -DestinationPath "dist/OpenShiina-$env:VERSION-windows-x64-wpf.zip"
           Compress-Archive -Path out/desktop/* -DestinationPath "dist/OpenShiina-$env:VERSION-windows-x64.zip"
       - uses: actions/upload-artifact@v4
         with:

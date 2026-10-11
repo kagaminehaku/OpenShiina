@@ -11,8 +11,8 @@ frames a second: more work there is not worth it for now. What is left is for sl
 should follow what their perf.log shows.
 
 - [ ] **Still two to three times the original** in Re:Rem Plus's held kiss zoom (engine-notes.md
-  section 7, "Vectors, fewer pieces, the changed part": WPF 2.2-2.4% of the machine, Avalonia
-  3.1-3.3%, the original 1.0%); about half is the frame (2.4 ms), half showing it. Measure
+  section 7, "Vectors, fewer pieces, the changed part": the player 3.1-3.3% of the machine,
+  the original 1.0%); about half is the frame (2.4 ms), half showing it. Measure
   with zoom.ps1 / cpuframe.ps1 (scratch sessions/2026-10-10-measure).
 - [ ] **The Avalonia player's picture**: each new frame is copied into one of up to four pinned
   buffers that SKImages wrap without a copy (2026-10-11: no 3.7 MB array a frame to collect);
@@ -54,9 +54,6 @@ upscalers FSR 1 and Anime4K) and the graphics levels are done (engine-notes.md s
 
 - [ ] FSR and Anime4K on phones: how fast on an old one (the S7: Anime4K's four half-float
   passes at the picture's size each new frame); measured on a PC only (Intel UHD, 60 fps).
-- [ ] WPF's sharp scaling on the GPU (a `ShaderEffect`, or the picture drawn through Direct3D),
-  as the Avalonia player does it: now the picture multiplied by a whole number on the CPU, which
-  uploads a picture up to the window's size each frame.
 
 Text cannot be drawn at the screen's resolution: the engine draws it into the game's surfaces,
 which the scripts then copy and blend.
