@@ -1,8 +1,15 @@
-# ShiinaRio engine notes (GRAND†CROSS "Plus" games)
+# ShiinaRio engine notes
 
-Research notes for OpenShiina (the player), the SCN tools (`tools/ScnTools`) and the
-GrandCrossExtractor archive tool they started in. Facts marked *(verified)* were checked
-against all 11 games' data or the engine code; everything else is an inference and says so.
+Research notes on the ShiinaRio (椎名里緒) engine as its games use it, for OpenShiina (the player
+and OpenShiina Tools) and the SCN tools (`tools/ScnTools`): archives and their keys, pictures,
+scenarios, the SCN bytecode and the x86 code embedded in it, and how the player runs them.
+
+Most of it was first worked out on the eleven GRAND†CROSS "Plus" games OpenShiina started with
+(engine v2.47, v2.49 and v2.50; "the eleven games" below), and has held for the games tried since
+(Aneiro, the three Bitch games, Ao no Juuai on v2.34: see compatibility.md). A game's name in a
+note says where something was found, not that it holds for that game alone; what differs between
+engine versions or builds says so. Facts marked *(verified)* were checked against the eleven
+games' data or the engine code; everything else is an inference and says so.
 
 ## 1. Archives
 
@@ -65,7 +72,7 @@ boundary (99 and 100 both used).
 
 Which combinations are shown is written in the scenario: `$L_MONT,<plane>,<file>,x,y,?,m,<base>,<l1>,<l2>,...`
 (also `$L_CHR ...,m,...` for sprites). Value v at position k = slot k*100+v; -1 or a missing value
-switches the layer off. All ~4000 such commands in the 11 games point at existing slots. Zoomed CGs
+switches the layer off. All ~4000 such commands in the eleven games point at existing slots. Zoomed CGs
 (`EV02_02L`, `..M`) are never named in the script; the engine swaps them in, and they share the
 slot table of the unzoomed file, so they use its combinations. Oreimo's sprite `KIR.S25` is
 changed with `$L_MONT,1,,0,0,0,M,101` (upper-case M, no file): these are expression codes,
@@ -124,7 +131,7 @@ with the text drawn on it.
 
 Every resource Oreimo Plus references exists (1,515 files).
 
-## 4. SCN bytecode *(verified on all 11 SRC_MAIN.SCN, 0 decode errors)*
+## 4. SCN bytecode *(verified on the eleven games' SRC_MAIN.SCN, 0 decode errors)*
 
 The engine interprets **TXT at run time**; the SCN files are the engine's own script code:
 
@@ -207,7 +214,7 @@ SRC_MAIN identically; use the game's own table when one exists.
 Decoding coverage of Oreimo's SCN: LAUNCH 100 %, PLAUNCH 97 %, EFCLIB 95 %, SRC_MAIN 83 % (rest is
 data), START 54 %, TOPMENU 56 % - START and TOPMENU still have unhandled special instructions.
 
-## 5. Oreimo Plus game flow (SRC_MAIN.SCN)
+## 5. A game's flow: SRC_MAIN.SCN (Oreimo Plus as the example)
 
 1. Start: `b[250]` (scenario number) indexes a 40-entry address table - resumes a saved game.
 2. Run a TXT: set `filename = "p\oreXX.txt"`, `msg_no`, `msg_gno`, `save_no`, then `gosub 240`.
@@ -474,7 +481,7 @@ Finding problems:
     park route (61) the same as before, and of all eleven games from their title for 6,000
     frames (61 each, built from the commit before; scratch allgames.sh) the same.
 - **enlarge32** (ScnVm.Enlarge32.cs, 2026-10-08): the enlarging case of the zoom and pan, Oreimo
-  START 77108 / Re: Rem Plus 866A8, in 10 of the 11 games (not Ero-On!, which has enlarge16), three
+  START 77108 / Re: Rem Plus 866A8, in 10 of the eleven games (not Ero-On!, which has enlarge16), three
   builds (v2.47, v2.49, v2.50 signatures). A table of the destination columns that mix two source
   columns (an accumulator that loses sW a pixel, weights acc * 257 / sW by scale32's reciprocal
   division; the partly covered first and last columns their own, alpha lane scaled by the part),
@@ -487,7 +494,7 @@ Finding problems:
 - `tools/X86Gen` (an embedded routine to C# ahead of time; X86Jit now does it at run time) and
   `tools/GdiEllipseCheck` (DibShapes against GDI, and `dump` of what GDI draws).
 
-## 8. START.SCN / EFCLIB.SCN findings (Oreimo build, used by the player)
+## 8. START.SCN / EFCLIB.SCN findings (v2.47's START, read from Oreimo Plus)
 
 Read from START.SCN with ScnTools after fixing 0x280 (`N2V`), 0x281 (`V V N2V`, local call) and
 following `op_000C id, label` (function registration) as code. Command table at 0x3B020
@@ -533,7 +540,7 @@ DRAW_EX 423F5, EFECT 42EC3, SE 454A6, EX 46E58, A_CHR 4766C, WAITA 41B0B, L_MONT
   wait, 3 load only), channel` (slot = channel + 11). **MUSIC** `file, loop, fade-in ms`.
   **VOICE** `file, loop, slot, wait`. **SE_FADE** `ms, channel`.
 
-## 9. The other games (survey of all 11, 2026-10-03)
+## 9. Games of one engine version alike (survey of the eleven games, 2026-10-03)
 
 | Engine (START.SCN) | Games | TXT command table vs Oreimo |
 |---|---|---|
@@ -551,7 +558,7 @@ player handles, the scripts use:
 - v2.50 only: `L_DELAY` (Maki Fes 133 uses), `DELAYRESET`, `MOVIE`; Re: Rem also `FACE`, `EMOTION`.
 
 SRC_MAIN.SCN of every game follows the Oreimo pattern (opening, route menu that hides played
-routes, ejaculation choices, ending). Across all 11 they use few instructions: mov / local / if /
+routes, ejaculation choices, ending). Across the eleven games they use few instructions: mov / local / if /
 goto / gosub / lea / switch / case / eval and arithmetic; TXT files run through `gosub 240`
 (357 calls), menus through `callmod 0,203` or `callmod 0,270`; the rest is the staff roll's
 drawing. The old story player (section 6) ran this subset with its `ScnMachine`:
@@ -622,14 +629,14 @@ drawing. The old story player (section 6) ran this subset with its `ScnMachine`:
 
 Goal: run START.SCN, TOPMENU.SCN and EFCLIB.SCN of each game in the interpreter, as the
 engine does, instead of reimplementing their behaviour by hand (sections 6 and 8). All 66 SCN
-files of the 11 games were disassembled with ScnTools (Oreimo / Azu with the Oreimo table,
+files of the eleven games were disassembled with ScnTools (Oreimo / Azu with the Oreimo table,
 the others with the Sena table):
 
 - **Opcode numbers are shared by v2.47 and v2.49** (not v2.50: see "Engine v2.50" below): the Oreimo table (v2.47, 704
   opcodes) is a subset of the Sena table (1,658); only 5 opcodes (02DB, 04E7, 05D5, 05D6,
   0C30) have different operands.
 - **Oreimo's six files use 247 distinct opcodes** (START 237, TOPMENU 60, EFCLIB 50, SRC_MAIN
-  51, PLAUNCH 27, LAUNCH 17). All 11 games together use 273; 234 are used by every game.
+  51, PLAUNCH 27, LAUNCH 17). The eleven games together use 273; 234 are used by every game.
 - Beyond Oreimo's set: Homu, Yuru, Nyaru, Sena, Kuroneko 1 opcode each; Rikka 2; ERO-ON and Azu
   3; Maki Fes! 22 and Re: Rem Plus 21 (engine v2.50). Running Oreimo's files covers almost all
   of the other games.
@@ -708,8 +715,8 @@ the functions they call from the decompile. First findings:
   resource), and START 0x002F0 stops with "Program Revision Error" unless v ^ 306723180 is
   1804523910 (or when bit 0 of 0x487F24 from `03C0` is set). OpenShiina gives the value of an
   unchanged AZUPLUS.EXE (0x79C6E0EA). No other game reads it.
-- Registry (`00FA` key, `00FF` exists, `00FE` string, `00FD` number): HKCU\software\GrandCross\
-  <title>, DataPath (the save folder; START appends `oreimoplus_save.bin`) and InstMode (0 - one
+- Registry (`00FA` key, `00FF` exists, `00FE` string, `00FD` number): HKCU\software\<brand>\
+  <title> (GrandCross for the eleven games), DataPath (the save folder; START appends `oreimoplus_save.bin`) and InstMode (0 - one
   install choice in SETUP.INI). OpenShiina emulates it: DataPath is the host's save folder.
 - Settings: `0104 "RIO.INI"` then `0107 section, key, v` = GetPrivateProfileInt (default = v).
   Keys read: FullScreen, WideMode, SSE2, MovieMode, KeyRepeatDelay / Speed, CacheSize(NA)...
@@ -929,7 +936,7 @@ the functions they call from the decompile. First findings:
 - **Embedded x86** now runs on an interpreter (Scripting/X86Cpu, Iced for decoding) over the VM's
   flat memory: integer, string and MMX instructions; `cpuid` reports "GenuineIntel" family 6 with
   FPU, CMOV and MMX only, so Oreimo's CPUID routine gives 0x11 and every script takes its MMX
-  paths (the SSE paths in all 11 games are never run). A survey of the 230 routines of the 11
+  paths (the SSE paths in the eleven games are never run). A survey of the 230 routines of the eleven
   games (57,393 instructions) found about 100 mnemonics; xmm ones only on SSE2 paths.
 - Title menu: the menu engine (START 230, "menu5.asm") selects with the mouse (`04C7` hit test)
   or the keyboard cursor; decide (0x20) acts only on the item under the cursor. Moving with the
@@ -1020,7 +1027,7 @@ the functions they call from the decompile. First findings:
 
 ### Movies (ScnVm, 2026-10-06)
 
-- Every movie of the 11 games is an MPEG-1 system stream (`mv\*.mpg` or `a\*.mpg` in the game
+- Every movie of the eleven games is an MPEG-1 system stream (`mv\*.mpg` or `a\*.mpg` in the game
   folder, 800 x 600 or 1280 x 720 at 30 frames a second; only a few carry MPEG-1 Layer II sound:
   Oreimo's sepa.mpg, the ending movies ed.mpg of Maki Fes! and Re: Rem Plus). OpenShiina decodes
   them itself (Formats/MpegVideo.cs: system stream, MPEG-1 video with the tables of ISO/IEC
@@ -1228,7 +1235,7 @@ the functions they call from the decompile. First findings:
   strrchr (Gakuen 2B8BC, Shimai 2B70C) and 25 x 25 samples of a picture, b * 64 / 255 (Nee-chan
   C7C2C, Gakuen CA19C, Shimai C9D6C); Gakuen's C3D28 is subpixel32 v2.50. All the same as their
   x86 code on random cases (scratch nativetest, filter Bitch). Every 0276 target of every SCN
-  file of the 5 games beyond the 11 has a C# version now (scratch jitinvtool over their
+  file of the five other games tried has a C# version now (scratch jitinvtool over their
   disassembly, 2026-10-11: Bitch Nee-chan, Gakuen and Shimai 29 each, Aneiro 18, Ao no Juuai 5):
   besides the above, Shimai's blur (the same code as Nee-chan's, its work buffers 4 bytes on; it
   calls to find itself, so it ran on the interpreter: 15 s a call), xor32 / not builds that
@@ -1301,7 +1308,7 @@ the functions they call from the decompile. First findings:
   Shimai's archives renamed ZZ_*.WAR with no .exe (scratch detecttest --library).
 - `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's
   index instead of decoding the file (checked: the index's unpacked size is the decoded length
-  for every entry of the 11 games). `00CE` itself is the engine's background loader (START
+  for every entry of the eleven games). `00CE` itself is the engine's background loader (START
   polls `00CF` every 5 ms and goes on drawing): in the players (ScnVm.LoadInBackground,
   2026-10-11) a file not kept yet is read on another thread (the archives read under their lock;
   the extra crypts after it keep no state), `00CF` says 1 until it is read, and `00D0` / `00D1` /
@@ -1310,7 +1317,7 @@ the functions they call from the decompile. First findings:
   apart in time.
 - YH1 (Huffman) entries, some of the music, are decoded with a 12-bit look-up table instead of
   a bit at a time: Sena's BGM25 (4.3 MB) 80 ms -> about 15 ms; the same bytes as before for the
-  50 YH1 entries of the 11 games.
+  50 YH1 entries of the eleven games.
 - `0562` draws whole rows of 1684 x 1261 pictures in Sena (zoomed characters); its runs are
   read and written once a run and blended a pixel (dword) at a time: 40 ms -> 17 ms.
 - The compositor (04C4) gathers the shown entries once and sorts them by (priority, index), and

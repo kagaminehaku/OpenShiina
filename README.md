@@ -12,11 +12,12 @@ It reads the game's own files and runs the game's own scripts (the engine's SCN 
 x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
 game's own.
 
-**Status:** early. The first target is the eleven GRAND†CROSS "Plus" games; all eleven play
-through: the nine on engine v2.47 and v2.49 (Ero-On!, Azu Plus, Oreimo Plus, Homu☆Plus, Yuru Plus,
-Sena Plus, Kuroneko Plus, Nyaru Plus, Rikka Plus) and the two on v2.50 (Maki Fes!, Re:Rem Plus).
-The Android player runs them on phones too (checked on a Galaxy S7). Every game's and platform's
-state is in [docs/compatibility.md](docs/compatibility.md); what is planned next is in
+**Status:** early. The interpreter runs ShiinaRio engine versions 2.47, 2.49 and 2.50, and 2.34
+in part. OpenShiina has the keys of 136 ShiinaRio games; 16 were tried and 12 play through (the
+eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start and play
+their stories. The Android player runs them on phones too (checked on a Galaxy S7). Every game,
+with its engine version and VNDB page, and every platform's state is in
+[docs/compatibility.md](docs/compatibility.md); what is planned next is in
 [docs/todo.md](docs/todo.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
