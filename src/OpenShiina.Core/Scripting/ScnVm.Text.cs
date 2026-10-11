@@ -52,6 +52,12 @@ public sealed partial class ScnVm
     private readonly Dictionary<int, ScnGlyph>?[] m_glyphs = new Dictionary<int, ScnGlyph>?[TextRecords];
     // Fonts that exist: a deleted handle stays in records and fails as GDI's would
     private readonly HashSet<int> m_liveFonts = new();
+    // What each live font was made from, and the glyphs made with such fonts: kept when a
+    // record's font goes (00A1 deletes and makes it again every frame while text fades in, and
+    // every shown character was drawn again by the font engine: 3 ms a frame in Bitch Nee-chan)
+    private readonly Dictionary<int, ScnFontRequest> m_fontRequests = new();
+    private readonly Dictionary<(ScnFontRequest Font, int Code), ScnGlyph> m_madeGlyphs = new();
+    private const int MadeGlyphsMax = 16384;
     // "_(" / "_)" saved positions (0x5E3A68 / 0x5E3AB4)
     private readonly int[] m_savedX = new int[19], m_savedY = new int[19];
     // The record "{" ruby text is laid out with (0x485500, "_u")
@@ -137,6 +143,7 @@ public sealed partial class ScnVm
     {
         if (!m_liveFonts.Remove(font))
             return false;
+        m_fontRequests.Remove(font);
         m_host.Fonts?.DeleteFont(font);
         return true;
     }
@@ -169,6 +176,7 @@ public sealed partial class ScnVm
         if (font == 0)
             font = 0x7F000000 + m_liveFonts.Count;   // no font engine: a stand-in handle
         m_liveFonts.Add(font);
+        m_fontRequests[font] = request;
         S(rec, RFont, font);
         S(rec, RFontDirty, 0);
         S(rec, RFontMade, 1);
@@ -1295,7 +1303,17 @@ public sealed partial class ScnVm
         {
             var cache = m_glyphs[G(rec, RIndex) % TextRecords] ??= new Dictionary<int, ScnGlyph>();
             if (!cache.TryGetValue(code, out glyph))
-                cache[code] = glyph = fonts.Glyph(font, code);
+            {
+                if (!m_fontRequests.TryGetValue(font, out var request))
+                    glyph = fonts.Glyph(font, code);
+                else if (!m_madeGlyphs.TryGetValue((request, code), out glyph))
+                {
+                    if (m_madeGlyphs.Count >= MadeGlyphsMax)
+                        m_madeGlyphs.Clear();
+                    m_madeGlyphs[(request, code)] = glyph = fonts.Glyph(font, code);
+                }
+                cache[code] = glyph;
+            }
         }
 
         int ascent = fonts.Ascent(font);

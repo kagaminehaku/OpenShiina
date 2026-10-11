@@ -1200,6 +1200,31 @@ the functions they call from the decompile. First findings:
   (which now checks every place a routine writes). Left to the x86 code: the SSE2 build of the
   zoom (Oreimo 79A20, Sena 79E70, Re: Rem Plus 8BDE0), which START takes only when the CPU
   check gives SSE2 (b[77]); the interpreter's CPU has none, so it never runs.
+- The SSE2 games (2026-10-11; Bitch Nee-chan and Bitch Gakuen: their START will not run
+  without SSE2, so their zoom and blur run their SSE2 builds). Their scale32 (START C7C70 /
+  CA1E0, one signature) took 700 ms a call translated, and the scripts call it every frame for
+  the picture behind the menus (1 fps): it is C# now, `ScnVm.Scale32Sse.cs`, 2-5 ms for a
+  1280 x 720 screen. The same plan as the MMX build but in single floats, so the order of the
+  sums is kept (rows in order, columns in order; the two- and three-row loops go across the rows
+  column by column), with the x86 code's slips kept: the three-row loop's partial last column
+  swaps the first two rows' weights, and a first column that starts and ends in one source pixel
+  sets 0x20 in the column table's loop counter (32 more entries; the trailing partial entry is
+  not the one used). rcpps is the interpreter's (exact): a real CPU's 12-bit estimate can put a
+  channel a step off. Their blur (`ScnVm.Blur32.cs`, 290 -> 6 ms): the rows on several cores, a
+  pixel a vector; the columns all at once, a picture row a step, in bands of columns on several
+  cores. Both the same bytes as the interpreter on random cases (scratch sse32test: 980 cases,
+  the quirk among them; blurtest: 660, in place among them).
+- Files of the archives are kept decoded (`ScnVm.ReadScriptFile`, 64 MB, the last read first):
+  scripts read a character's picture sheet again at every change of expression (Bitch
+  Nee-chan's 2.6 MB `st\hm10_m.s25` 28 times in a scene, 10-40 ms each to decrypt and unpack;
+  164 -> 84 reads, 911 -> 289 ms in its first scene). The glyphs a font request made are kept
+  across fonts (`00A1` deletes the record's font and makes it again every call).
+  ScnBoot `SCNBOOT_FILES=1` lists every file read with its size and time.
+- Aneiro's only embedded routine that ran translated, START 88717, is a lone `ret` (the next
+  routine starts at 88718), called after each file its scripts load themselves (0154 / 0156): a
+  C# no-op now. With it no embedded routine of the 4 games beyond the 11 runs translated in
+  the parts played, but for a few small ones of the Bitch games (Nee-chan C11C4 / Gakuen C3724,
+  about 0.02 ms a call; Gakuen 2B8BC, under 0.01 ms; C7C2C, CA19C, C3D28 once).
 - `0158` (a file's size; START asks it before every `00CE`) reads the size from the archive's
   index instead of decoding the file (checked: the index's unpacked size is the decoded length
   for every entry of the 11 games). `00CE` itself is the engine's background loader (START

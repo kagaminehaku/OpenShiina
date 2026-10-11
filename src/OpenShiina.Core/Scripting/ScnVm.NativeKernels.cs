@@ -173,6 +173,20 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
         });
 
+        // Bitch Nee-chan START C7C70 (Bitch Gakuen CA1E0): scale32's SSE2 build, written out in
+        // ScnVm.Scale32Sse.cs (700 ms a call translated, every frame behind the menus).
+        // Arguments as scale32's; cases the C# version does not take run as x86 code
+        RegisterNative("A3DCAB9DFB6CC480BF9F3995AEC7212737E5EB95", "scale32 (SSE2 build)", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
+            int length = right < 0 || bottom < 0 ? 0 : pitch * ((bottom >> 4) + 1) + ((right >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Scale32Sse(dst, pitch, vm.NativeArg(a, 2), vm.NativeArg(a, 3), right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7),
+                               vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11)))
+                vm.RunX86(c, a);
+        });
+
         // Bitch Nee-chan START 9F5E6 (SSE2): the blur of ScnVm.Blur32.cs (15 s a call on the
         // interpreter). l[0] dst, l[1] its stride, l[2] width, l[3] height, l[4] src, l[5] its
         // stride, l[6] / l[7] the radii across and down

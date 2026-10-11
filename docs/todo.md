@@ -36,7 +36,9 @@ should follow what their perf.log shows.
   interpreter's thread, so a scene change waits for them. `ArcView` is not thread-safe: a
   loader thread needs its own view of the archives.
 - [ ] **`00A1`** (the incremental redraw of the message text, a character at a time as it
-  fades in): still on the list of slow spots; profile it and make it cheaper.
+  fades in): its glyphs are kept now (2026-10-11: 848 -> 307 ms over 282 calls in Bitch
+  Nee-chan); what is left is the font made and deleted every call and every shown character
+  drawn again. A font kept per request in the font engines would take most of the rest.
 - [ ] **Older phones, first.** Zooms and transitions dropped frames on a Galaxy S7 (Vulkan 1.0)
   before the vector routines and ParallelRows (2026-10-10, not built for Android yet). Build the
   APK, play Re:Rem Plus's prologue zoom, a scene change and a movie with perf.log on, and work
@@ -114,9 +116,10 @@ spaced as full-width.
   device, as it is without one), user32 GetMessageExtraInfo; 06D6 of a music file copied into a
   buffer (the length from its header); SSE2: its START will not run without it, so cpuid says
   SSE2 for a START with that refusal, the interpreter runs SSE / SSE2 (X86Cpu.Sse.cs) and X86Jit
-  translates it (the same X86Cpu.SseCompute); its SSE2 scale32 (only the save thumbnail) runs
-  translated - the MMX build's C# version gave other bytes, the translation the interpreter's -
-  its blur as C# (ScnVm.Blur32.cs, the same bytes as its x86 code in both calls checked), its
+  translates it (the same X86Cpu.SseCompute); its SSE2 scale32 as C# of its own
+  (ScnVm.Scale32Sse.cs; the MMX build's C# version gave other bytes; translated it took 700 ms a
+  call, every frame behind the menus: 1 fps) and its blur as C# (ScnVm.Blur32.cs; 290 -> 6 ms),
+  both the same bytes as their x86 code on random cases (scratch sse32test, blurtest), its
   C17B8 as subpixel32 v2.50 (1,330 calls the same); glyphs drawn into a layer are clipped to the frame
   (each character goes into a 28 x 29 frame; the overflow broke the next row's header). Next:
   play it on in the players.

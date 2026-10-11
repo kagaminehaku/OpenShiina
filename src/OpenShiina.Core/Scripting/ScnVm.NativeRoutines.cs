@@ -35,6 +35,10 @@ public sealed partial class ScnVm
 
     private void RegisterNativeRoutines()
     {
+        // Aneiro START 88717: a lone "ret" (the routine after it starts at 88718), called after
+        // each file the scripts load themselves (0154 / 0156): a step this build leaves empty
+        RegisterNative("381CEBC19F264AFD8F65390B065E73D7B30254FC", "ret", (vm, c, a) => { });
+
         // START 75A84 / 75EE4 / 85384: the CPU's features (CPUID: 1 Intel, 2 AMD, 10h MMX, 20h SSE,
         // 40h SSE2, 80h SSE3...) into l[0] and into the dword before the routine (gCPUID). The
         // CPU the interpreter reports (X86Cpu.Cpuid: an Intel with MMX, no SSE) gives 0x11, so

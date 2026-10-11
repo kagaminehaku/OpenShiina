@@ -399,7 +399,20 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     private static string? Swap(string name) =>
         s_swaps.FirstOrDefault(s => name.EndsWith(s.Name, StringComparison.OrdinalIgnoreCase)).File;
 
-    public byte[]? ReadFile(string name) => Swap(name) is { } swap ? File.ReadAllBytes(swap) : data.Read(name.Replace('/', '\\'));
+    // SCNBOOT_FILES=1: every file of the archives the scripts read, with its size and the time to
+    // decode it (to find files read over and over)
+    private static readonly bool s_traceFiles = Environment.GetEnvironmentVariable("SCNBOOT_FILES") == "1";
+
+    public byte[]? ReadFile(string name)
+    {
+        if (Swap(name) is { } swap)
+            return File.ReadAllBytes(swap);
+        long start = System.Diagnostics.Stopwatch.GetTimestamp();
+        var bytes = data.Read(name.Replace('/', '\\'));
+        if (s_traceFiles)
+            Console.WriteLine($"[file] {name} {bytes?.Length ?? -1} {System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds:F2} ms");
+        return bytes;
+    }
     public long? ArchiveFileSize(string name) => Swap(name) is { } swap ? new FileInfo(swap).Length : data.Size(name.Replace('/', '\\'));
 
     public long? LooseFileSize(string name) =>

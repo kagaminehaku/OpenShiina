@@ -71,15 +71,46 @@ public sealed partial class ScnVm
         return (false, path);
     }
 
-    /// <summary>A file the scripts open for reading: a save file, a file of the archives, or a loose file.</summary>
+    /// <summary>
+    /// A file the scripts open for reading: a save file, a file of the archives (kept decoded,
+    /// see <see cref="FileCacheBytes"/>), or a loose file. The arrays are only read.
+    /// </summary>
     public byte[]? ReadScriptFile(string path)
     {
         if (ResolvePath(path) is not { } p)
             return null;
         if (p.Save)
             return m_host.ReadSaveFile(p.Name);
-        return m_host.ReadFile(p.Name) ?? m_host.ReadLooseFile(p.Name);
+        if (m_fileCache.TryGetValue(p.Name, out var kept))
+        {
+            m_fileCacheOrder.Remove(kept);
+            m_fileCacheOrder.AddFirst(kept);
+            return kept.Value.Data;
+        }
+        if (m_host.ReadFile(p.Name) is not { } data)
+            return m_host.ReadLooseFile(p.Name);
+        if (data.Length <= FileCacheBytes / 4)
+        {
+            m_fileCache[p.Name] = m_fileCacheOrder.AddFirst((p.Name, data));
+            m_fileCacheSize += data.Length;
+            while (m_fileCacheSize > FileCacheBytes && m_fileCacheOrder.Last is { } oldest)
+            {
+                m_fileCacheOrder.RemoveLast();
+                m_fileCache.Remove(oldest.Value.Name);
+                m_fileCacheSize -= oldest.Value.Data.Length;
+            }
+        }
+        return data;
     }
+
+    // Files of the archives the scripts read, kept decoded, the last read first: scripts read a
+    // character's pictures again at every change of expression (Bitch Nee-chan's 2.6 MB sheet 28
+    // times in a scene, 10-40 ms each to decrypt and unpack). FileCacheBytes in all, files of up
+    // to a quarter of it.
+    private const long FileCacheBytes = 64L << 20;
+    private readonly Dictionary<string, LinkedListNode<(string Name, byte[] Data)>> m_fileCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly LinkedList<(string Name, byte[] Data)> m_fileCacheOrder = new();
+    private long m_fileCacheSize;
 
     /// <summary>The length ReadScriptFile gives, from the archive's index for a file of the archives.</summary>
     public long? ScriptFileSize(string path)
