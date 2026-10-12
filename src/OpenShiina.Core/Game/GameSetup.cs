@@ -10,6 +10,9 @@ namespace OpenShiina.Game;
 public sealed class GameSetup
 {
     public string Version { get; }
+
+    /// <summary>The game: its scheme's name.</summary>
+    public string Game { get; }
     public string StartScript { get; }
     public int Width { get; }
     public int Height { get; }
@@ -27,8 +30,9 @@ public sealed class GameSetup
     /// </summary>
     public bool? Joypad => Settings.JoypadForGame();
 
-    private GameSetup(string version, string start, int width, int height, string saves)
+    private GameSetup(string game, string version, string start, int width, int height, string saves)
     {
+        Game = game;
         Version = version;
         StartScript = start;
         Width = width;
@@ -48,7 +52,7 @@ public sealed class GameSetup
             start = "autoexec.scn";     // the engine's own default
         string saves = PlayerFolders.For("scn", data.SchemeName);
         Directory.CreateDirectory(saves);
-        return new GameSetup(version, start, Number(ini, "WindowWidth", 800), Number(ini, "WindowHeight", 600), saves);
+        return new GameSetup(data.SchemeName, version, start, Number(ini, "WindowWidth", 800), Number(ini, "WindowHeight", 600), saves);
     }
 
     private static int Number(string ini, string key, int fallback) =>
@@ -63,6 +67,7 @@ public sealed class GameSetup
     {
         var vm = new ScnVm(ScnOpcodes.ForVersion(Version), host)
         {
+            Game = Game,
             EngineVersion = (int)Math.Round(double.Parse(Version, System.Globalization.CultureInfo.InvariantCulture) * 100),
             ScreenWidth = Width,
             ScreenHeight = Height,

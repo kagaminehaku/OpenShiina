@@ -67,6 +67,7 @@ Directory.CreateDirectory(saves);
 var host = new Host(data, saves);
 var vm = new ScnVm(ScnOpcodes.ForVersion(version), host)
 {
+    Game = scheme.Name,
     EngineVersion = (int)Math.Round(double.Parse(version, System.Globalization.CultureInfo.InvariantCulture) * 100),
 };
 foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm.ScreenWidth = v), ("WindowHeight", v => vm.ScreenHeight = v) })

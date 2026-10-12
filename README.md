@@ -12,10 +12,10 @@ It reads the game's own files and runs the game's own scripts (the engine's SCN 
 x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
 game's own.
 
-**Status:** early. The interpreter runs ShiinaRio engine versions 2.47, 2.49 and 2.50, and 2.34
-in part. OpenShiina has the keys of 136 ShiinaRio games; 16 were tried and 12 play through (the
-eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start and play
-their stories. The Android player runs them on phones too (checked on a Galaxy S7). Every game,
+**Status:** early. The interpreter runs ShiinaRio engine versions 2.45, 2.47, 2.49 and 2.50,
+and 2.34 in part. OpenShiina has the keys of 136 ShiinaRio games; 17 were tried and 12 play
+through (the eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start
+and play their stories. The Android player runs them on phones too (checked on a Galaxy S7). Every game,
 with its engine version and VNDB page, and every platform's state is in
 [docs/compatibility.md](docs/compatibility.md); what is planned next is in
 [docs/todo.md](docs/todo.md).

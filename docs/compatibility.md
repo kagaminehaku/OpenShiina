@@ -16,7 +16,7 @@ row when something changes (see [Updating](#updating) at the end).
 Every game whose archives OpenShiina can open: the eleven GRAND†CROSS "Plus" games it started
 with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archives open, every
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
-version. The interpreter runs engine versions 2.47, 2.49 and 2.50, and 2.34 in part; see
+version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with ScnBoot (`tests/OpenShiina.ScnBoot`) first: it says the first opcode it does not
 run.
@@ -77,7 +77,7 @@ of those versions it does not list.
 | Yokorenbo ~Immoral Mother~ | 横恋母 ～Immoral Mother～ | 2008-07-18 | [v2970](https://vndb.org/v2970) | v2.44 | ⚪ Not tried |  |
 | Engage Links | Engage Links | 2008-10-24 | [v1090](https://vndb.org/v1090) | v2.45 | ⚪ Not tried |  |
 | Tsuyoimo x Yowaimo | 強妹×弱妹 | 2008-10-24 | [v2185](https://vndb.org/v2185) | v2.45 | ⚪ Not tried |  |
-| Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | ⚪ Not tried |  |
+| Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | 🟡 Starts | 2026-10-11 |
 | Manin Chijo Densha 2 | 満淫痴女電車2～姉とふたごと人妻と～ | 2008-11-28 | [v5511](https://vndb.org/v5511) | v2.45 | ⚪ Not tried |  |
 | Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 人妻喰い ～万引きGメン恥辱日記～ | 2008-12-16 | [v2897](https://vndb.org/v2897) | v2.45 | ⚪ Not tried |  |
 | Niizuma to Yuukaihan | 新妻と誘拐犯 ～寝取り孕ませ計画～ | 2008-12-19 | [v6456](https://vndb.org/v6456) | v2.45 | ⚪ Not tried |  |
@@ -255,6 +255,12 @@ through yet. Two opcodes only these games' START uses were added after the user'
 depth of field: checked in ScnBoot, the background blurred, the character sharp), and `0113`,
 whether a file is in a given archive (Gakuen asks its patch archives `BITCHES3_P?.WAR` for a
 picture's variant).
+
+**Chuuchuu Nurse** (engine v2.45, CHUCHU.EXE) Its executable's code is encrypted (a `.riox`
+stub decrypts it at start), and the game checks its checksum: START stopped with "Program
+Revision Error" until `03C2` gave this executable's value. Its 679 opcodes are v2.47's with the
+same operands. In ScnBoot: the title, a new game, the story with its pictures, text and music to
+frame 9,000.
 
 ## Updating
 

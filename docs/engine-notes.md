@@ -191,6 +191,18 @@ the script pointer `[ctx+10h]` along each handler.
 | Context register in handlers | EBP | EBX (EDI = &ctx->pc) |
 | Valid opcodes | 1,658 | 704 |
 
+**v2.45** (Chuuchuu Nurse's CHUCHU.EXE, 2008): its code is encrypted. The entry point is in a
+section `.riox` whose stub XORs `.text` (0x6DD30 bytes at 401000) and the first 0x30000 bytes of
+`.data` (at 475000) with the low byte of a key that goes k = k * 5 + 0x3711 a byte (from
+0xB319DD13), runs a CRC-32 over the decrypted bytes (~crc must be 0x83497733) and jumps to
+43E0F8. Decrypted that way (a scratch riox_decrypt.py), the interpreter is FUN_0041E4E0, laid out
+as Oreimo's (context in EBX, EDI = &ctx->pc; GetVar 412BF0, SetVar 4126A0, GetVarAdr 412A60,
+dispatch from 41E53C, invalid 424870): `ScnTools opscan <exe> 41e4e0 41e53c 41e503 424870 412bf0
+4126a0 412a60 <out> 41e58e EBX EDI` gives 679 opcodes, every one of them v2.47's with the same
+operands, so v2.45 uses ops_v247.tsv. The game also checks the executable (`03C2`, below): its
+START wants v ^ 306723180 = -462117567, the CRC-32 of the decrypted code (BaseOfCode, SizeOfCode)
+XOR that of 0x8000 bytes of `.data` at 47B774 (FUN_00430100 and the engine's init at 408A21).
+
 **v2.34** (Ao no Juuai's aoj.EXE, 2005, not packed; `ScnTools opscan aoj`, table Data/ScnOps/ops_v234.tsv):
 the tasks are a global array, not a context register: FUN_0041e5c0 takes a slot, its script
 pointer is at 71E0E4 + slot * 0x44 (the current slot at 7237B8), the opcode is read at 41E5E2
@@ -713,8 +725,10 @@ the functions they call from the decompile. First findings:
 - Azu Plus also checks the executable: `03C2 v` gives 0x13B41BC, a checksum the engine makes at
   start (FUN_004374D0 / FUN_004085C0: checksums of its code, its "riox" section and its version
   resource), and START 0x002F0 stops with "Program Revision Error" unless v ^ 306723180 is
-  1804523910 (or when bit 0 of 0x487F24 from `03C0` is set). OpenShiina gives the value of an
-  unchanged AZUPLUS.EXE (0x79C6E0EA). No other game reads it.
+  1804523910 (or when bit 0 of 0x487F24 from `03C0` is set). Each game's START has its own value
+  (Chuuchuu Nurse's: -462117567, section 4 "v2.45"): OpenShiina gives the unchanged executable's
+  checksum by game (`ScnVm.Game`, the scheme's name; ScnVm.System.cs), Azu Plus's for a game it
+  does not list.
 - Registry (`00FA` key, `00FF` exists, `00FE` string, `00FD` number): HKCU\software\<brand>\
   <title> (GrandCross for the eleven games), DataPath (the save folder; START appends `oreimoplus_save.bin`) and InstMode (0 - one
   install choice in SETUP.INI). OpenShiina emulates it: DataPath is the host's save folder.

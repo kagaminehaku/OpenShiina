@@ -58,6 +58,18 @@ public sealed partial class ScnVm
     /// <summary>The save folder as the scripts see it: a path ending with '\'.</summary>
     public string DataPath => m_host.SaveFolder.TrimEnd('\\', '/') + "\\";
 
+    /// <summary>The game being played (its scheme's name, "Azu Plus"): what the executable's own checks expect.</summary>
+    public string Game { get; set; } = "";
+
+    // 03C2's checksums of the unchanged executables, by game: Azu Plus (START 0x002F0 wants
+    // v ^ 306723180 = 1804523910), Chuuchuu Nurse (CHUCHU.EXE, v2.45: START 0x0033F wants
+    // -462117567, the CRC-32 of its decrypted code XOR that of 0x8000 bytes at 47B774)
+    private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Azu Plus"] = 306723180 ^ 1804523910,
+        ["Chuuchuu Nurse"] = unchecked((int)0xF63C9C2D),
+    };
+
     private void RegisterSystem()
     {
         // 03C0 v, w: engine version (247) and 0x487F24
@@ -67,13 +79,14 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], vm.EngineGlobal(0x487F24));
             return 0;
         });
-        // 03C2 v: 0x13B41BC, a checksum of the executable (FUN_004374D0 / FUN_004085C0: checksums of its
-        // code, its "riox" section and its version resource). Only Azu Plus reads it: START 0x002F0
-        // stops with "Program Revision Error" unless v ^ 306723180 is 1804523910 - the value of an
-        // unchanged AZUPLUS.EXE.
+        // 03C2 v: 0x13B41BC, a checksum of the executable made at start: the CRC-32 of its code as
+        // the .riox stub left it, XORed with another (of its "riox" section, then in v2.45 of
+        // 0x8000 bytes of its data). START stops with "Program Revision Error" unless v ^ 306723180
+        // is the value of the unchanged executable, a constant of each game's START: OpenShiina
+        // gives that value (ExeChecksums), Azu Plus's for a game not listed
         Register(0x03C2, (vm, c, i) =>
         {
-            vm.Store(c, i.Args[0], 306723180 ^ 1804523910);
+            vm.Store(c, i.Args[0], s_exeChecksums.GetValueOrDefault(vm.Game, s_exeChecksums["Azu Plus"]));
             return 0;
         });
         // 09F6 w, h: the window size
