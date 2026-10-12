@@ -250,7 +250,11 @@ title and the story (Nee-chan and Gakuen to frame 30,000, Shimai with its openin
 16,000), nothing missing. In the players their menus ran at 1 frame a second until their SSE2
 scaling and blur routines got C# versions (2026-10-11); every embedded x86 routine has one now.
 Bitch Nee-chan is the game the translations were tried on (README, "Translations"). Not played
-through yet.
+through yet. Two opcodes only these games' START uses were added after the user's crash logs
+(2026-10-11): `1072`, the engine's box blur of a picture into another (Shimai's `$EX,PPBLUR`
+depth of field: checked in ScnBoot, the background blurred, the character sharp), and `0113`,
+whether a file is in a given archive (Gakuen asks its patch archives `BITCHES3_P?.WAR` for a
+picture's variant).
 
 ## Updating
 

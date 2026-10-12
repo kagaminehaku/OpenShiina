@@ -132,9 +132,76 @@ public sealed class GameData : IDisposable
     /// <summary>The size <see cref="Read"/> gives for a script path, from the archive's index (nothing is decoded), or null.</summary>
     public long? Size(string path, params string[] extensions) => Find(path, extensions)?.Entry.UnpackedSize;
 
+    /// <summary>
+    /// The size of a file of one archive, named by its file ("BITCHES3_PA.WAR"; the same stem and
+    /// extension as <see cref="Find"/> takes), or null when that archive is not open or does not
+    /// have the file.
+    /// </summary>
+    public long? Size(string archive, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !m_byStem.TryGetValue(Stem(path), out var list))
+            return null;
+        string ext = Path.GetExtension(path.Trim());
+        foreach (var (warc, entry) in list)
+            if (Path.GetFileName(warc.File.Name).Equals(archive.Trim(), StringComparison.OrdinalIgnoreCase)
+                && (ext.Length == 0 || Path.GetExtension(entry.Name).Equals(ext, StringComparison.OrdinalIgnoreCase)))
+                return entry.UnpackedSize;
+        return null;
+    }
+
     /// <summary>Full path of a loose file of the game folder (movies: "mv\ev03a.mpg"), or null.</summary>
     public string? LooseFile(string path) =>
-        ResolvePath(Folder, path) ?? (path.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? EngineIni(Folder) : null);
+        ResolveListed(path) ?? (path.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? EngineIni(Folder) : null);
+
+    // The folders of the game folder as first listed (their files and folders by name, any case):
+    // the scripts ask for loose files all the time (every file read looks in translation\ first,
+    // a missing one included), and listing a folder costs milliseconds on a phone's shared
+    // storage. A folder is listed once a session: what is added later is seen the next time
+    private readonly Dictionary<string, (Dictionary<string, string> Files, Dictionary<string, string> Folders)?> m_listings = new(StringComparer.Ordinal);
+
+    private (Dictionary<string, string> Files, Dictionary<string, string> Folders)? Listing(string folder)
+    {
+        lock (m_listings)
+        {
+            if (m_listings.TryGetValue(folder, out var known))
+                return known;
+            (Dictionary<string, string>, Dictionary<string, string>)? listing = null;
+            try
+            {
+                var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var folders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var file in Directory.EnumerateFiles(folder))
+                    files.TryAdd(Path.GetFileName(file), file);
+                foreach (var sub in Directory.EnumerateDirectories(folder))
+                    folders.TryAdd(Path.GetFileName(sub), sub);
+                listing = (files, folders);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Not there, or not readable: no files
+            }
+            m_listings[folder] = listing;
+            return listing;
+        }
+    }
+
+    /// <summary><see cref="ResolvePath"/> under the game folder, from the folders' listings.</summary>
+    private string? ResolveListed(string path)
+    {
+        string current = Folder;
+        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string part = parts[i];
+            if (part is "." or ".." || part.Contains(':') || Listing(current) is not { } listing)
+                return null;
+            var names = i == parts.Length - 1 ? listing.Files : listing.Folders;
+            if (!names.TryGetValue(part, out var next))
+                return null;
+            current = next;
+        }
+        return parts.Length > 0 ? current : null;
+    }
 
     /// <summary>
     /// The engine's settings in <paramref name="folder"/>: RIO.INI, or for older builds the .INI

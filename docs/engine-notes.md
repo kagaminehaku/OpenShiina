@@ -1295,6 +1295,25 @@ the functions they call from the decompile. First findings:
   are found by them). Bitch Nee-chan: 23,450 message lines of 106 files and 73 names made into
   tables in 0.1 s; a few lines and two names translated in the tables and played in ScnBoot as
   the hand-made translation did.
+- Two v2.50 opcodes only the Bitch games' START uses (2026-10-11, ScnVm.Engine250.cs, from
+  REMPLUS.EXE, which has them too). `1072 dst, frame, x, y, w, h, src, frame, sx, sy, rx, ry`
+  (0x42F79A, FUN_0041F440): a box blur of the source rectangle at (sx, sy) into the destination
+  rectangle, clipped to the destination frame as FUN_0041C3A0 (= ClipRect) clips; rx along the
+  rows into a buffer the size of the source frame, then ry down the columns into the
+  destination (a radius of 1 copies), each window's sum of n bytes written as
+  ((0xFFFFFFFF / n) * sum + 0x10000) >> 32; the edges repeat the rectangle's first pixel and
+  the one 4 before its end, and after a line's first sum the pixels leaving and entering are
+  read one rectangle's left (top) further on, as the executable reads them. Bitch Shimai's
+  `$EX,PPBLUR` (depth of field) uses it. `0113 archive, file, v` (0x42ABE8): v = 1 when
+  FUN_00405640 opens the file for reading from that archive (closed again), else 0: Bitch
+  Gakuen asks its patch archives `BITCHES3_P?.WAR` (? a letter from a setting) for a picture's
+  variant and keeps the plain one when that archive is missing (IScnHost.ArchiveFileSize with an
+  archive, GameData.Size(archive, path)).
+- Loose files (2026-10-11, GameData.LooseFile): every file the scripts read looks in the game
+  folder's translation\ first, missing or not, and a missing folder was listed again each time;
+  on a phone's shared storage a listing takes milliseconds, and Bitch Nee-chan's picture loads
+  (00C9) and file sizes (0158) took 100-300 ms and 4 ms a call there. The game folder's folders
+  are now listed once a session and looked up by name.
 - A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
   by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
   to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest

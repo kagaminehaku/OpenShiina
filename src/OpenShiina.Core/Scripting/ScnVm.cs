@@ -26,6 +26,13 @@ public interface IScnHost
     /// <summary>The length ReadFile gives for a file of the archives, without reading it; null when it is not in them.</summary>
     long? ArchiveFileSize(string name) => ReadFile(name)?.Length;
 
+    /// <summary>
+    /// The length of a file of one archive of the game (its file name, "BITCHES3_PA.WAR"), without
+    /// reading it; null when that archive is missing or does not have the file. Without a better
+    /// answer: any archive's file, when that archive is in the game folder.
+    /// </summary>
+    long? ArchiveFileSize(string archive, string name) => LooseFileSize(archive) != null ? ArchiveFileSize(name) : null;
+
     /// <summary>A file of the game folder itself (RIO.INI, movies), or null.</summary>
     byte[]? ReadLooseFile(string name);
 
