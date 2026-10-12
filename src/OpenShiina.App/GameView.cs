@@ -118,6 +118,10 @@ public sealed partial class GameView : UserControl, IGameWindow
     {
         if (m_session == null)
             return;
+        if (active)
+            m_playClock.Start();
+        else
+            CountPlayTime();
         if (!active)
             ResetTouch();
         m_session.Input.Active = active;
@@ -329,6 +333,8 @@ public sealed partial class GameView : UserControl, IGameWindow
             Start(session);
             m_library.Message = "";
             GameLibrary.Played(folder);
+            m_playFolder = folder;
+            m_playClock.Restart();
         }
         catch (Exception ex)
         {
@@ -500,9 +506,24 @@ public sealed partial class GameView : UserControl, IGameWindow
         Dispatcher.UIThread.Post(GameMemory.CollectAfterGame, DispatcherPriority.Background);
     }
 
+    // The game's play time: counted while it is in front, added to the library when it goes
+    // behind (a phone's app may be closed there unseen) and when it ends
+    private readonly System.Diagnostics.Stopwatch m_playClock = new();
+    private string? m_playFolder;
+
+    private void CountPlayTime()
+    {
+        m_playClock.Stop();
+        if (m_playFolder != null && m_playClock.Elapsed >= TimeSpan.FromSeconds(1))
+            GameLibrary.AddPlayTime(m_playFolder, m_playClock.Elapsed);
+        m_playClock.Reset();
+    }
+
     /// <summary>Stops the game (the window closes).</summary>
     public void Close()
     {
+        CountPlayTime();
+        m_playFolder = null;
         m_animating = false;
         m_joystickTimer?.Stop();
         m_joystickTimer = null;

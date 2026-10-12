@@ -3,7 +3,10 @@
 // when it is opened (FormatManager's GameMap), with the name of its scheme and when it was
 // played last. A game whose .exe is not in GameMap keeps the scheme found for it
 // (SchemeDetector, or the user's choice among those that fit). The folder played last before
-// the library existed (last-game.txt) is taken in the first time the library is read.
+// the library existed (last-game.txt) is taken in the first time the library is read. Each game
+// keeps the time it was played (in front, counted by the player) and the size its folder had
+// when last measured. Delete takes a game's folder off the disk, after checks that it is the
+// game's own.
 
 using System.IO;
 using System.Text.Json;
@@ -14,9 +17,11 @@ namespace OpenShiina.Game;
 
 /// <summary>
 /// A game of the library: its folder, its name, its .exe (for the icon), when it was added and
-/// played last, and the scheme chosen for it when its .exe does not tell (else null).
+/// played last, the scheme chosen for it when its .exe does not tell (else null), the seconds it
+/// was played (since the players count it) and its folder's size when last measured (null: not yet).
 /// </summary>
-public sealed record LibraryGame(string Folder, string Name, string? Exe, DateTime Added, DateTime? LastPlayed, string? Scheme = null)
+public sealed record LibraryGame(string Folder, string Name, string? Exe, DateTime Added, DateTime? LastPlayed, string? Scheme = null,
+                                 long PlaySeconds = 0, long? Bytes = null)
 {
     /// <summary>The folder is still there (a drive may be gone, a folder renamed).</summary>
     [JsonIgnore]
@@ -132,6 +137,107 @@ public static class GameLibrary
         var games = Read() ?? [];
         if (games.RemoveAll(g => SameFolder(g.Folder, folder)) > 0)
             Write(games);
+    }
+
+    /// <summary>Puts a game taken out of the list back as it was (Undo).</summary>
+    public static void Restore(LibraryGame game)
+    {
+        var games = Read() ?? [];
+        if (games.Any(g => SameFolder(g.Folder, game.Folder)))
+            return;
+        games.Add(game);
+        Write(games);
+    }
+
+    /// <summary>Adds <paramref name="time"/> to the game's play time.</summary>
+    public static void AddPlayTime(string folder, TimeSpan time)
+    {
+        long seconds = (long)Math.Round(time.TotalSeconds);
+        if (seconds > 0)
+            Change(folder, g => g with { PlaySeconds = g.PlaySeconds + seconds });
+    }
+
+    /// <summary>The size of the game's folder, measured now.</summary>
+    public static void SetBytes(string folder, long bytes) => Change(folder, g => g with { Bytes = bytes });
+
+    private static void Change(string folder, Func<LibraryGame, LibraryGame> change)
+    {
+        if (Read() is not { } games)
+            return;
+        int at = games.FindIndex(g => SameFolder(g.Folder, folder));
+        if (at < 0)
+            return;
+        var changed = change(games[at]);
+        if (changed == games[at])
+            return;
+        games[at] = changed;
+        Write(games);
+    }
+
+    /// <summary>The bytes of the files under <paramref name="folder"/> (0 when it cannot be read).</summary>
+    public static long FolderBytes(string folder)
+    {
+        try
+        {
+            var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
+            return Directory.Exists(folder) ? new DirectoryInfo(folder).EnumerateFiles("*", options).Sum(f => f.Length) : 0;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Deletes the game's folder (and its saves when <paramref name="saves"/>) and takes it out of
+    /// the list; null when done, else why not. Only a folder with the game's .WAR archives in it,
+    /// never a drive, a user's or the system's own folder, one that holds the player's folder or
+    /// another game of the list.
+    /// </summary>
+    public static string? Delete(LibraryGame game, bool saves)
+    {
+        string folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(game.Folder));
+        if (!Directory.Exists(folder))
+            return "The folder is not there any more.";
+        if (GameData.FindArchive(folder) == null)
+            return "The folder has no .WAR archives in it any more, so it was left alone.";
+        if (Path.GetPathRoot(folder) is not { } root || SameFolder(root, folder))
+            return "The folder is a whole drive: it was left alone.";
+        var guarded = new[]
+        {
+            Environment.SpecialFolder.UserProfile, Environment.SpecialFolder.Desktop, Environment.SpecialFolder.MyDocuments,
+            Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.Windows,
+            Environment.SpecialFolder.System, Environment.SpecialFolder.ApplicationData, Environment.SpecialFolder.LocalApplicationData,
+            Environment.SpecialFolder.CommonApplicationData,
+        };
+        if (guarded.Select(Environment.GetFolderPath).Any(p => p.Length > 0 && SameFolder(p, folder)))
+            return "The folder is one of the system's own: it was left alone.";
+        if (Inside(PlayerFolders.Root, folder))
+            return "The folder holds OpenShiina's own (saves, settings): it was left alone.";
+        if ((Read() ?? []).Any(g => !SameFolder(g.Folder, folder) && Inside(g.Folder, folder)))
+            return "The folder holds another game of the list: it was left alone.";
+        try
+        {
+            Directory.Delete(folder, recursive: true);
+            if (saves && Directory.Exists(game.SaveFolder))
+                Directory.Delete(game.SaveFolder, recursive: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Remove(folder);
+            return $"Not everything could be deleted: {e.Message}";
+        }
+        Remove(folder);
+        return null;
+    }
+
+    /// <summary><paramref name="path"/> is <paramref name="folder"/> or under it.</summary>
+    private static bool Inside(string path, string folder)
+    {
+        string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        string parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return string.Equals(full, parent, comparison) || full.StartsWith(parent + Path.DirectorySeparatorChar, comparison);
     }
 
     private static LibraryGame? Update(string folder, bool played, string? scheme = null)

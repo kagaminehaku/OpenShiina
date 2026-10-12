@@ -72,11 +72,18 @@ signed with the keystore in the repository's secrets (`ANDROID_KEYSTORE_BASE64`,
 
 ## Usage
 
-Run `OpenShiina`: its home screen lists your games with the icons of their `.exe`. **Add a
-game…** takes the game's folder (the one with its `.exe` and `.WAR` files); then a click plays it,
-and its menu (right click) opens its save folder or takes it off the list. Passing a folder on the
-command line plays that game at once and adds it to the list. Quitting a game brings the list back;
-closing the list ends the player. The game is recognised by its
+Run `OpenShiina`: its home screen has a rail on the left (the library, **Add a game…** and
+the settings), your games as tiles, the one played last first, each with its `.exe`'s icon on that
+icon's own colour, and the chosen game's card on the right: when it was played last, for how
+long (counted while the game is in front), the size of its folder and saves, and **Play** in the
+corner. A tile chooses a game (a double click or tap plays it); the card plays it wherever it is
+clicked. **Add a game…** takes the game's folder (the one with its `.exe` and `.WAR` files). The
+card's **…** opens the save folder (and, on a desktop, the game's folder) or removes the game:
+from the list only (its files and saves stay, with Undo for a few seconds), or its folder deleted
+too, and its saves if asked; the player deletes only a folder with the game's `.WAR` archives in
+it, never a drive, a system folder, its own data or a folder holding another game of the list.
+Passing a folder on the command line plays that game at once and adds it to the list. Quitting a
+game brings the list back; closing the list ends the player. The game is recognised by its
 `.exe`. The list is kept in `library.json` next to the saves. The player runs the
 game's own SCN scripts, so the game looks and behaves as it does in its own engine.
 

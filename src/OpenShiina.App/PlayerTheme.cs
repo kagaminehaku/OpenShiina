@@ -204,6 +204,20 @@ public static class PlayerTheme
         return mark;
     }
 
+    /// <summary>
+    /// The theme's surface with <paramref name="amount"/> (0 to 1) of <paramref name="colour"/> in
+    /// it (a game's own colour: a deep shade on a dark theme, a pale one on a light theme); the
+    /// surface alone when there is no colour. Made again when the theme changes.
+    /// </summary>
+    public static IBrush Tint(Color? colour, double amount)
+    {
+        var surface = s_current.Surface;
+        if (colour is not { } c)
+            return new SolidColorBrush(surface);
+        byte Mix(byte from, byte to) => (byte)Math.Round(from + (to - from) * amount);
+        return new SolidColorBrush(Color.FromRgb(Mix(surface.R, c.R), Mix(surface.G, c.G), Mix(surface.B, c.B)));
+    }
+
     /// <summary>A theme's own colours whatever theme is applied (the settings' samples of each).</summary>
     public static (Color Background, Color Surface, Color Ink, Color Accent, Color Highlight) Sample(AppTheme theme)
     {
