@@ -32,6 +32,28 @@ should follow what their perf.log shows.
   opcode in C# and works its operands out (variables, named ones by name) every time it runs
   (the instructions themselves are decoded once). Script logic is rarely where the
   time goes, but profile the dispatch (SCNBOOT_PROFILE) on a busy scene and trim what shows up.
+- [ ] **Phones: are the vectors the processor's own?** Bitch Nee-chan on an Adreno 750 phone
+  (2026-10-11 perf.log): the compositor 5.5 ms a call where a PC core takes 0.45, blur32 60-140
+  ms where a PC takes 5-11: ten times and more, where the phone's cores are about as fast as the
+  PC's. The pixel routines are written with Vector128 / Vector<T>; Mono (the Android runtime,
+  compiled ahead of time with LLVM) may make some of their operations a lane at a time. Done
+  (2026-10-12): Shuffle's indices as constants at the call (a field's are not constants to a
+  compiler that runs ahead of time), lanes stored at once in blur32 and scale32 (the SSE2 build),
+  the compositor's alpha pixels timed both ways at the first picture and the faster kept, and
+  perf.log's second line says the runtime and its vectors, its "chose" lines the compositor's
+  times. The phone's perf.log with them (2026-10-12, the same skipping): `.NET 10 (Mono) ...
+  Vector128 on ... NEON no`, the alpha pixels 4.23 ns with vectors and 4.42 without (the PC:
+  1.12 and 1.97): Mono's vectors hardly help, and its plain code takes 2.2 times the PC's. The
+  compositor 3.33 ms a call as before, blur32 73 -> 62 ms; 0158 gone from the slow ones (the
+  folder listings, 2026-10-11). On CoreCLR (the same skipping): 40.2 frames a second against
+  26.9, the compositor 1.74 ms, the alpha pixels 2.02 ns: the Android app runs on CoreCLR now
+  (engine-notes.md, "CoreCLR on Android"). blur32 stays 87-93 ms a call on the phone (5.5 on
+  the PC) whatever the JIT does: something in its code is slow on arm64; time its pieces there.
+- [ ] **The compositor: compose only what changed.** In a scene of text (Bitch Nee-chan's
+  prologue in ScnBoot) 04C4 takes about 1 ms a call on a PC and is most of the frame: the whole
+  1280 x 720 list again every frame, where only the message window changes as its text fades in.
+  Composing only the rectangles whose entries or pictures changed needs to know when a picture's
+  pixels change (text drawn into a text surface, raw pictures drawn on, a picture loaded).
 - [ ] **Load files in the background.** The engine's own background loader (`00CE`) reads on
   another thread in the players now (2026-10-11), and files read again come from the cache; the
   pictures and sounds the scripts load with `00C9`, `04B0`, `06A6` are still read on the

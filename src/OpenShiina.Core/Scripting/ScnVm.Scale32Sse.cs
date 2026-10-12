@@ -371,11 +371,18 @@ public sealed partial class ScnVm
     /// <summary>A sum into its pixel: cvtps2dq (to nearest even), packssdw, packuswb.</summary>
     private static void Store(Span<byte> output, int c, Vector128<float> v)
     {
-        for (int k = 0; k < 4; k++)
-        {
-            float f = v.GetElement(k);
-            int i = f >= -2147483648f && f < 2147483648f ? (int)MathF.Round(f, MidpointRounding.ToEven) : int.MinValue;
-            output[c * 4 + k] = (byte)Math.Clamp(Math.Clamp(i, -32768, 32767), 0, 255);
-        }
+        // the lanes by constant indices (by a variable one, each goes through memory where the
+        // runtime keeps vectors there: Mono)
+        output[c * 4] = StoreLane(v.GetElement(0));
+        output[c * 4 + 1] = StoreLane(v.GetElement(1));
+        output[c * 4 + 2] = StoreLane(v.GetElement(2));
+        output[c * 4 + 3] = StoreLane(v.GetElement(3));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static byte StoreLane(float f)
+    {
+        int i = f >= -2147483648f && f < 2147483648f ? (int)MathF.Round(f, MidpointRounding.ToEven) : int.MinValue;
+        return (byte)Math.Clamp(Math.Clamp(i, -32768, 32767), 0, 255);
     }
 }

@@ -1354,6 +1354,18 @@ the functions they call from the decompile. First findings:
   codes the player does not draw (`_q-`, `_O`, `_n`, ruby `{...}`) are in no message of any TXT and
   in no string of the scripts that reaches text (Ao no Juuai looks for "_n" itself). Chuuchuu's
   eight embedded routines: three C#, five translated, none on the interpreter.
+- Phones (2026-10-12; todo.md, "Phones: are the vectors the processor's own?"). Vector128.Shuffle
+  with indices from a static readonly field (the compositor's alpha pixels, MPEG-1's colour
+  bytes) is one table lookup only where the compiler sees the indices as constants: CoreCLR's
+  JIT does for an initialised field, a compiler that works ahead of time (Mono on Android) does
+  not, and may go a byte at a time. The indices are written at the calls now. A lane read by a
+  variable index (blur32's rows, scale32's SSE2 build's stores) goes through memory each where
+  vectors are kept there: the lanes are stored at once. blur32 on a PC 11.2 -> 5.5 ms at 1280 x
+  720 (300 random cases against the x86 code, none differ; scale32 490, none). The compositor
+  times its alpha pixels both ways at its first picture (`ScnVm.AlphaVectors`: on the
+  i7-10750H 1.12 ns a pixel with vectors, 1.97 without) and keeps the faster; perf.log gives
+  the runtime, its vectors and that choice. Bitch Nee-chan's title, 6,000 frames: the same
+  pictures, 04C4 4.6 -> 4.4 s.
 - A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
   by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
   to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest

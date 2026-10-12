@@ -127,10 +127,10 @@ public sealed partial class ScnVm
                 head = 0;
             // truncated, saturated (lanes are 0 to 255 * (r + 1)^2: in range)
             var value = Vector128.Min(Vector128.Max(Vector128.ConvertToInt32(Vector128.ConvertToSingle(s1) * vScale), Vector128<int>.Zero), max);
-            output[x * 4] = (byte)value.GetElement(0);
-            output[x * 4 + 1] = (byte)value.GetElement(1);
-            output[x * 4 + 2] = (byte)value.GetElement(2);
-            output[x * 4 + 3] = (byte)value.GetElement(3);
+            // the four bytes in one store (the lanes are 0-255): a lane at a time goes through
+            // memory each where the runtime keeps vectors there (Mono)
+            var bytes = Vector128.Narrow(Vector128.Narrow(value, value), Vector128<short>.Zero);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(output.AsSpan(x * 4), bytes.AsUInt32().ToScalar());
             s1 -= s2;
             s2 -= At(ring, leave);
             Put(ring, leave, incoming);
@@ -204,6 +204,9 @@ public sealed partial class ScnVm
         int head = r;
         var vScale = new Vector<float>(scale);
         int vn = Vector<int>.Count;
+        // a vector's lanes for the output bytes, stored at once (a lane read at a time by a
+        // variable index costs a trip through memory each where vectors are kept there: Mono)
+        Span<int> outLanes = stackalloc int[vn];
         for (int y = 0; y < h; y++)
         {
             int leave = head - r;
@@ -231,8 +234,9 @@ public sealed partial class ScnVm
                     // the output: truncated, saturated (lanes are 0 to 255 * (r + 1)^2: in range)
                     var f = Vector.ConvertToInt32(Vector.ConvertToSingle(v1) * vScale);
                     var b = Vector.Min(Vector.Max(f, Vector<int>.Zero), new Vector<int>(255));
+                    b.CopyTo(outLanes);
                     for (int k = 0; k < vn; k++)
-                        output[i + k] = (byte)b[k];
+                        output[i + k] = (byte)outLanes[k];
                     v1 -= v2;
                     v2 -= new Vector<int>(ring, leaveAt + i);
                     vin.CopyTo(ring, leaveAt + i);

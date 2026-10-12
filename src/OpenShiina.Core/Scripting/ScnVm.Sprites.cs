@@ -7,6 +7,7 @@
 // increasing priority (unsigned), each one row by row through its S25 runs (FUN_0043A040 and the
 // path for CPUs with MMX and SSE, 0x4409E0 - the one every current PC takes).
 
+using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
 namespace OpenShiina.Scripting;
@@ -438,40 +439,54 @@ public sealed partial class ScnVm
             target[..Math.Min(done, target.Length - done)].CopyTo(target[done..]);
     }
 
-    // The colour bytes of four (alpha, b, g, r) pixels, and each pixel's alpha for its three bytes
-    private static readonly Vector128<byte> s_colourBytes = Vector128.Create((byte)1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 0, 0, 0, 0);
-    private static readonly Vector128<byte> s_alphaBytes = Vector128.Create((byte)0, 0, 0, 4, 4, 4, 8, 8, 8, 12, 12, 12, 0, 0, 0, 0);
-
     /// <summary>
     /// Pixels with an alpha each (method 4; the alpha through <paramref name="table"/> for blend
     /// 0x40000000): 0xFF copies the colour, 0 leaves the picture, else d + ((s - d) a >> 8). Four
-    /// pixels at a time with vectors: all opaque or all clear at once, else the formula on twelve
-    /// 32-bit lanes, opaque ones copied.
+    /// pixels at a time with vectors where they are faster here (<see cref="AlphaVectors"/>), the
+    /// rest a pixel at a time.
     /// </summary>
     private static void DrawAlphaPixels(int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, byte[]? table)
     {
+        int i = AlphaKernel.Vectors ? AlphaPixelsVector(n, src, ref s, row, ref d, table) : 0;
+        AlphaPixelsScalar(n - i, src, s, row, d, table);
+    }
+
+    /// <summary>
+    /// Four pixels at a time while they fit: all opaque or all clear at once, else the formula on
+    /// twelve 32-bit lanes, opaque ones copied. The pixels done; s and d moved past them.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static int AlphaPixelsVector(int n, ReadOnlySpan<byte> src, ref int s, Span<byte> row, ref int d, byte[]? table)
+    {
         int i = 0;
-        if (Vector128.IsHardwareAccelerated)
+        for (; i + 4 <= n && s + 16 <= src.Length && d + 16 <= row.Length; i += 4, s += 16, d += 12)
         {
-            for (; i + 4 <= n && s + 16 <= src.Length && d + 16 <= row.Length; i += 4, s += 16, d += 12)
+            var v = Vector128.Create(src.Slice(s, 16));
+            var alpha = table == null ? v : Vector128.Create(table[v[0]], 0, 0, 0, table[v[4]], 0, 0, 0, table[v[8]], 0, 0, 0, table[v[12]], 0, 0, 0);
+            var lanes = alpha.AsUInt32() & Vector128.Create(0xFFu);
+            if (Vector128.EqualsAll(lanes, Vector128<uint>.Zero))
+                continue;
+            // The colour bytes of the four (alpha, b, g, r) pixels, and each one's alpha for its
+            // three bytes. The indices are written here, not kept in fields: a compiler that
+            // works ahead of time (Mono's on Android) makes one table lookup of constant indices,
+            // and of a field's a byte at a time
+            var colours = Vector128.Shuffle(v, Vector128.Create((byte)1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 0, 0, 0, 0));
+            if (!Vector128.EqualsAll(lanes, Vector128.Create(0xFFu)))
             {
-                var v = Vector128.Create(src.Slice(s, 16));
-                var alpha = table == null ? v : Vector128.Create(table[v[0]], 0, 0, 0, table[v[4]], 0, 0, 0, table[v[8]], 0, 0, 0, table[v[12]], 0, 0, 0);
-                var lanes = alpha.AsUInt32() & Vector128.Create(0xFFu);
-                if (Vector128.EqualsAll(lanes, Vector128<uint>.Zero))
-                    continue;
-                var colours = Vector128.Shuffle(v, s_colourBytes);
-                if (!Vector128.EqualsAll(lanes, Vector128.Create(0xFFu)))
-                {
-                    var a = Vector128.Shuffle(alpha, s_alphaBytes);
-                    var mixed = Mix(colours, Vector128.Create(row.Slice(d, 16)), a);
-                    colours = Vector128.ConditionalSelect(Vector128.Equals(a, Vector128.Create((byte)0xFF)), colours, mixed);
-                }
-                System.Runtime.InteropServices.MemoryMarshal.Write(row[d..], colours.AsUInt64().ToScalar());
-                System.Runtime.InteropServices.MemoryMarshal.Write(row[(d + 8)..], colours.AsUInt32().GetElement(2));
+                var a = Vector128.Shuffle(alpha, Vector128.Create((byte)0, 0, 0, 4, 4, 4, 8, 8, 8, 12, 12, 12, 0, 0, 0, 0));
+                var mixed = Mix(colours, Vector128.Create(row.Slice(d, 16)), a);
+                colours = Vector128.ConditionalSelect(Vector128.Equals(a, Vector128.Create((byte)0xFF)), colours, mixed);
             }
+            System.Runtime.InteropServices.MemoryMarshal.Write(row[d..], colours.AsUInt64().ToScalar());
+            System.Runtime.InteropServices.MemoryMarshal.Write(row[(d + 8)..], colours.AsUInt32().GetElement(2));
         }
-        for (; i < n; i++, s += 4, d += 3)
+        return i;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static void AlphaPixelsScalar(int n, ReadOnlySpan<byte> src, int s, Span<byte> row, int d, byte[]? table)
+    {
+        for (int i = 0; i < n; i++, s += 4, d += 3)
         {
             int alpha = table == null ? src[s] : table[src[s]];
             if (alpha == 0xFF)
@@ -487,6 +502,67 @@ public sealed partial class ScnVm
                 BlendByte(row, d + 2, src[s + 3], alpha);
             }
         }
+    }
+
+    /// <summary>What the compositor's choice of <see cref="AlphaKernel"/> measured, for perf.log ("" before its first picture).</summary>
+    public static string AlphaVectors => AlphaKernel.Measured ? AlphaKernel.Report : "";
+
+    /// <summary>
+    /// Whether <see cref="DrawAlphaPixels"/> goes four pixels at a time: both ways timed once, at
+    /// the first picture with such pixels, on a test row (they give the same bytes), as vectors
+    /// may cost more than they save where the runtime does not make them the processor's own.
+    /// </summary>
+    private static class AlphaKernel
+    {
+        public static string Report = "";
+        public static volatile bool Measured;
+        public static readonly bool Vectors = Faster();
+
+        private static bool Faster()
+        {
+            bool faster = false;
+            if (Vector128.IsHardwareAccelerated)
+                faster = AlphaVectorsFaster(out Report);
+            else
+                Report = "compositor alpha pixels: no vectors in this runtime";
+            Measured = true;
+            return faster;
+        }
+    }
+
+    private static bool AlphaVectorsFaster(out string report)
+    {
+        // 4096 pixels: opaque, clear and half-transparent ones in runs, as in the games' pictures
+        const int n = 4096;
+        var src = new byte[n * 4];
+        var random = new Random(1);
+        for (int k = 0; k < n; k++)
+        {
+            src[4 * k] = (k / 64 % 4) switch { 0 or 1 => 0xFF, 2 => 0, _ => (byte)random.Next(256) };
+            src[4 * k + 1] = (byte)random.Next(256);
+            src[4 * k + 2] = (byte)random.Next(256);
+            src[4 * k + 3] = (byte)random.Next(256);
+        }
+        var row = new byte[n * 3 + 16];
+        double Time(bool vectors)
+        {
+            long best = long.MaxValue;
+            for (int run = 0; run < 7; run++)
+            {
+                long started = System.Diagnostics.Stopwatch.GetTimestamp();
+                for (int k = 0; k < 4; k++)
+                {
+                    int s = 0, d = 0;
+                    int done = vectors ? AlphaPixelsVector(n, src, ref s, row, ref d, null) : 0;
+                    AlphaPixelsScalar(n - done, src, s, row, d, null);
+                }
+                best = Math.Min(best, System.Diagnostics.Stopwatch.GetTimestamp() - started);
+            }
+            return best * 1e9 / System.Diagnostics.Stopwatch.Frequency / (4 * n);
+        }
+        double vector = Time(true), scalar = Time(false);
+        report = $"compositor alpha pixels: {vector:F2} ns a pixel with vectors, {scalar:F2} without -> {(vector < scalar ? "vectors" : "without")}";
+        return vector < scalar;
     }
 
     /// <summary>d + ((s - d) a >> 8) on each byte (BlendByte), in 32-bit lanes.</summary>

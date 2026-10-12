@@ -184,9 +184,6 @@ public sealed class MpegFrame
 
     private static byte Clamp(int v) => (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
 
-    // B, G and R of four pixels (lanes 0-3, 4-7, 8-11 after the two narrowings) in pixel order
-    private static readonly Vector128<byte> s_bgrOrder = Vector128.Create((byte)0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11, 12, 13, 14, 15);
-
     /// <summary>
     /// The pixels of a row four at a time, as the formula of ToBgr24 on 32-bit lanes; returns
     /// how many it did (it leaves at least the last four bytes of the row to the formula, as it
@@ -212,7 +209,11 @@ public sealed class MpegFrame
             b = Vector128.Min(Vector128.Max(b, zero), max);
             g = Vector128.Min(Vector128.Max(g, zero), max);
             r = Vector128.Min(Vector128.Max(r, zero), max);
-            var bytes = Vector128.Shuffle(Vector128.Narrow(Vector128.Narrow(b, g).AsUInt16(), Vector128.Narrow(r, zero).AsUInt16()), s_bgrOrder);
+            // B, G and R of the four pixels (lanes 0-3, 4-7, 8-11 after the two narrowings) in
+            // pixel order: constant indices, one table lookup also where code is compiled ahead
+            // of time (a field's would be a byte at a time there)
+            var bytes = Vector128.Shuffle(Vector128.Narrow(Vector128.Narrow(b, g).AsUInt16(), Vector128.Narrow(r, zero).AsUInt16()),
+                Vector128.Create((byte)0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11, 12, 13, 14, 15));
             System.Runtime.InteropServices.MemoryMarshal.Write(row[(x * 3)..], bytes.AsUInt64().ToScalar());
             System.Runtime.InteropServices.MemoryMarshal.Write(row[(x * 3 + 8)..], bytes.AsUInt32().GetElement(2));
         }
