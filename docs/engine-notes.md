@@ -1382,6 +1382,34 @@ the functions they call from the decompile. First findings:
   line names the runtime. perf.log also lists the file reads that held the interpreter 30 ms or
   more (`ScnVm.SlowReads`: file, KB, ms, whether read ahead or by
   the background loader and whether waited for) and the files read ahead so far.
+- Opening the app (2026-10-12): a phone (Red Magic 9 Pro+) took 6.5 s to the first frame of the
+  library on CoreCLR, Mono 0.46 s. startup.log in the player folder (Game/StartupLog.cs) gives each
+  step from the process's start: the runtime's own (on Android, until MainApplication.OnCreate),
+  Avalonia's steps and each of its platform services (AppBuilder's initialisers wrapped in
+  MainApplication.CustomizeAppBuilder), Avalonia's own log at the debug level (LogToTrace into a
+  TraceListener), the library read, the first frame. CoreCLR was ready in 0.1 s; all 6 s were
+  Avalonia's windowing (AndroidPlatform.Initialize), 6.05-6.06 s each time whichever renderer,
+  with nothing in its log, the main thread in C# or native code (its Java frames at
+  MainApplication.n_onCreate). Probes timed apart there (Skia, HarfBuzz, threads, a Java looper's
+  thread, a Runnable, a C# idle handler, EglPlatformGraphics.TryCreate) took milliseconds. What
+  waits there: the compositor's first frame (ServerCompositor joins the render loop, which sets
+  the frame timer's Tick) waits on the main thread for the timer's "Choreographer Thread" to
+  prepare a Java looper and take the NDK's choreographer (AChoreographer_getInstance, DllImport
+  "android"). The cause, in logcat: "Timeout while waiting for shared library 'libandroid.so'
+  to load", then the same for 'android', 3 s apart. CoreCLR's host on .NET 10 loads a library the
+  app does not ship by sending System.loadLibrary to the main thread when the first P/Invoke into
+  it comes from another thread, and gives up after 3 s for each name (then dlopen works): the main
+  thread waiting for that thread waits out both (dotnet/android#12826, the same with libGLESv2 and
+  GLSurfaceView; fixed for .NET 11 RC 2 by dotnet/android#12863, which dlopens such libraries
+  directly; no .NET 10 fix found). MainApplication.OnCreate calls AChoreographer_getInstance once
+  on the main thread before Avalonia starts (under 2 ms), so the library is loaded: the windowing
+  11-157 ms, the first frame at 0.27-0.34 s on the Red Magic (Mono's 0.46 s), 1.4 s on a
+  Galaxy S7 (LineageOS 14) where it was 7.6 s without the call. dotnet/android#10914 (Avalonia,
+  CoreCLR 6 s, Mono 1 s) was most likely the same. Any other system library the app's threads
+  P/Invoke first while the main thread waits for them would wait the same way. The library no
+  longer makes the settings when it is made (they named the GPU, which started Vulkan with the
+  app when the renderer was the GPU), and reads the games' .exe icons on a pool thread, the
+  cards showing the name's first letter until then.
 - Reading ahead (2026-10-12, ScnVm.ReadAhead.cs): each scenario the scripts read (by any opcode
   or by the background loader 00CE) is searched for the archives' pictures and sounds it names;
   when the scripts read one of them, the next six are read on pool threads (32 MB of the file

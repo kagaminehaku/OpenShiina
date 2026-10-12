@@ -45,7 +45,10 @@ public sealed class LibraryView : UserControl
     {
         var add = new Button { Content = "Add a game…", HorizontalAlignment = HorizontalAlignment.Right };
         add.Click += (_, _) => AddRequested?.Invoke();
-        var settings = new Button { Content = "Settings", Margin = new Thickness(0, 0, 8, 0), Flyout = SettingsFlyout() };
+        // The settings are made when they are opened: they may start the GPU (its name), which
+        // held the app's start for it
+        var settings = new Button { Content = "Settings", Margin = new Thickness(0, 0, 8, 0) };
+        settings.Click += (_, _) => SettingsFlyout().ShowAt(settings);
         var header = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
@@ -319,22 +322,24 @@ public sealed class LibraryView : UserControl
         foreach (var game in games)
             m_cards.Children.Add(Card(game));
         m_empty.IsVisible = games.Count == 0;
+        StartupLog.Mark($"the library read: {games.Count} games");
     }
 
     private Control Card(LibraryGame game)
     {
         bool available = game.Available;
-        Control icon = Icon(game) is { } bitmap
-            ? new Image { Source = bitmap, Width = 64, Height = 64 }
-            : new Border
+        // The name's first letter until the .exe's icon is read (on a pool thread: a phone reads
+        // each .exe, about 1 MB, from its shared storage)
+        var icon = new Border
+        {
+            Width = 64, Height = 64, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48)),
+            Child = new TextBlock
             {
-                Width = 64, Height = 64, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48)),
-                Child = new TextBlock
-                {
-                    Text = game.Name.Length > 0 ? game.Name[..1] : "?", FontSize = 30, Foreground = Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                },
-            };
+                Text = game.Name.Length > 0 ? game.Name[..1] : "?", FontSize = 30, Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        _ = ShowIconAsync(game, icon);
         var name = new TextBlock
         {
             Text = game.Name, FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White,
@@ -401,23 +406,35 @@ public sealed class LibraryView : UserControl
         return card;
     }
 
-    private static Bitmap? Icon(LibraryGame game)
+    /// <summary>The game's .exe icon in place of the letter, once read (on a pool thread, once per .exe).</summary>
+    private static async Task ShowIconAsync(LibraryGame game, Border icon)
     {
         if (game.Exe is not { } exe)
-            return null;
-        if (s_icons.TryGetValue(exe, out var cached))
-            return cached;
-        Bitmap? bitmap = null;
-        try
+            return;
+        Bitmap? bitmap;
+        lock (s_icons)
+            s_icons.TryGetValue(exe, out bitmap);
+        if (bitmap == null)
         {
-            if (File.Exists(exe) && ExeIcon.Read(exe) is { } ico)
-                bitmap = new Bitmap(new MemoryStream(ico));
+            bitmap = await Task.Run(() =>
+            {
+                try
+                {
+                    return File.Exists(exe) && ExeIcon.Read(exe) is { } ico ? new Bitmap(new MemoryStream(ico)) : null;
+                }
+                catch (Exception)
+                {
+                    // No icon: the card keeps the name's first letter
+                    return null;
+                }
+            });
+            if (bitmap == null)
+                return;
+            lock (s_icons)
+                s_icons[exe] = bitmap;
         }
-        catch (Exception)
-        {
-            // No icon: the card shows the name's first letter
-        }
-        return s_icons[exe] = bitmap;
+        icon.Background = null;
+        icon.Child = new Image { Source = bitmap, Width = 64, Height = 64 };
     }
 
     private async Task OpenFolderAsync(string path)

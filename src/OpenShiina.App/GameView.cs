@@ -47,6 +47,7 @@ public sealed partial class GameView : UserControl, IGameWindow
 
     public GameView()
     {
+        StartupLog.Mark("the library made (GameView)");
         Background = Brushes.Black;
         Focusable = true;
         m_library.Play += async folder => await OpenAsync(folder);
@@ -75,6 +76,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         base.OnAttachedToVisualTree(e);
         if (TopLevel.GetTopLevel(this) is not { } top)
             return;
+        top.RequestAnimationFrame(_ => StartupLog.Finish("the first frame on screen"));
         // Keys reach the game wherever the focus is
         top.AddHandler(KeyDownEvent, (_, k) => Key(k, true), RoutingStrategies.Tunnel, handledEventsToo: true);
         top.AddHandler(KeyUpEvent, (_, k) => Key(k, false), RoutingStrategies.Tunnel, handledEventsToo: true);
