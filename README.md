@@ -88,23 +88,29 @@ A game whose .exe the player does not know (renamed, or a version it does not li
 the keys that open its archives when it is added; when several games' keys fit, the player asks
 which game it is.
 
-Settings (the home screen's Settings button, saved in `settings.json` beside `library.json`;
-each counts from the next game started): the graphics level (Potato: nearest pixels; Low: sharp;
-Medium: FSR 1; High: FSR 1 sharpened; Max: Anime4K; Custom when the advanced settings match none
-of them), and under Advanced graphics drawing on the CPU or on the GPU (the GPU mode runs
-heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
-rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
-faster on its first large calls, with the same pictures; without a Vulkan driver the games run on the CPU), the frame
-rate (the game's own pace, up to 60 frames a second with the window drawing only new pictures,
-as the original keeps it; or every refresh of the screen, smoother on a fast screen but the
-scripts run as often: four times as much processor on a 240 Hz one), the scaling of the
-picture to the window (sharp: whole game pixels as far as they fit and the rest smooth, so text
-and lines stay even at any size; whole numbers only, with black around; smooth; nearest; or, on
-the GPU that draws the window, the upscalers FSR 1, with its sharpening from none to 10, and
-Anime4K, the heaviest), pausing the game while another window is in front (on by default; off, the game does as its
-RIO.INI says: most go on, sound included), the game controller, showing the frame rate (in the title; on phones over the game), and for bug reports
-writing `perf.log`, translating the games' x86 code (off: the interpreter only) and writing
-`draw-trace.log` (both logs go to the game's save folder).
+Settings (the home screen's Settings button opens their page, saved in `settings.json` beside
+`library.json`; each counts from the next game started), page by page:
+
+- **Appearance**: the theme, shown at once (OpenShiina Tools too): Shiina, the logo's wine red and
+  gold, by default; Parchment, light; Graphite, plain greys.
+- **Graphics**: the graphics level (Potato: nearest pixels; Low: sharp; Medium: FSR 1; High: FSR 1
+  sharpened; Max: Anime4K; Custom when the details match none of them), and its details: the
+  scaling of the picture to the window (sharp: whole game pixels as far as they fit and the rest
+  smooth, so text and lines stay even at any size; whole numbers only, with black around; smooth;
+  nearest; or, on the GPU that draws the window, the upscalers FSR 1, with its sharpening from
+  none to 10, and Anime4K, the heaviest), drawing on the CPU or on the GPU (the GPU mode runs
+  heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
+  rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
+  faster on its first large calls, with the same pictures; without a Vulkan driver the games run
+  on the CPU), the frame rate (the game's own pace, up to 60 frames a second with the window
+  drawing only new pictures, as the original keeps it; or every refresh of the screen, smoother
+  on a fast screen but the scripts run as often: four times as much processor on a 240 Hz one),
+  and showing the frame rate (in the title; on phones over the game).
+- **Game**: the game controller, and pausing the game while another window is in front (on by
+  default; off, the game does as its RIO.INI says: most go on, sound included).
+- **Storage**: the file cache, and on Android the backup of the saves (below).
+- **Debug**, for bug reports: writing `perf.log` and `draw-trace.log` (both into the game's save
+  folder), and translating the games' x86 code (off: the interpreter only).
 
 The environment variables of the settings still win over them, for tests: `OPENSHIINA_GPU=1` /
 `=0`, `OPENSHIINA_JOYPAD=0` / `=ini` (below), `OPENSHIINA_PERF=0` (no frame rate) / `=log` (also

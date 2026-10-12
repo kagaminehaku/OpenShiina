@@ -6,7 +6,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Themes.Fluent;
 
 namespace OpenShiina.Tools;
 
@@ -29,8 +28,9 @@ public sealed class ToolsApplication : Application
 
     public override void Initialize()
     {
-        Styles.Add(new FluentTheme());
-        RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        // The player's theme (its settings), so that both look alike
+        Styles.Add(OpenShiina.App.PlayerTheme.Fluent());
+        OpenShiina.App.PlayerTheme.Apply(this, OpenShiina.Game.PlayerSettings.Load().Theme);
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -59,6 +59,7 @@ public sealed class ToolsApplication : Application
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 Content = tabs,
             };
+            OpenShiina.App.PlayerTheme.Follow(window);
             window.Closing += (_, e) =>
             {
                 if (archives.Busy || translation.Busy)

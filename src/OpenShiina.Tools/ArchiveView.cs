@@ -101,11 +101,11 @@ public sealed class ArchiveView : UserControl
         var heading = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 8), Children = { m_name, m_details, m_frames, m_sound } };
         DockPanel.SetDock(heading, Dock.Top);
         preview.Children.Add(heading);
-        preview.Children.Add(new Panel { Children = { new Border { Background = new SolidColorBrush(Color.FromRgb(0x20, 0x20, 0x20)), Child = m_image }, m_text } });
+        preview.Children.Add(new Panel { Children = { new Border { Child = m_image }.Use(Border.BackgroundProperty, PlayerTheme.Keys.Surface), m_text } });
         m_image.IsVisible = m_text.IsVisible = false;
 
         var lists = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,Auto,3*") };
-        lists.Children.Add(new Border { BorderBrush = Brushes.DimGray, BorderThickness = new Thickness(1), Child = m_list });
+        lists.Children.Add(new Border { BorderThickness = new Thickness(1), Child = m_list }.Use(Border.BorderBrushProperty, PlayerTheme.Keys.Border));
         lists.Children.Add(Cell(new GridSplitter { Width = 6, Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Columns }, 1));
         lists.Children.Add(Cell(preview, 2));
 

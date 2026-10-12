@@ -28,9 +28,11 @@
     <PackageReference Include="ppy.SDL3-CS" Version="2026.1002.1" />
   </ItemGroup>
 
-  <!-- The windows' icon (tools/LogoGen draws it) -->
+  <!-- The windows' icon (tools/LogoGen draws it), and the wordmark's font (Cinzel, SIL OFL, as
+       the logo's: tools/LogoGen/Fonts) -->
   <ItemGroup>
     <EmbeddedResource Include="Resources\icon.png" LogicalName="OpenShiina.App.icon.png" />
+    <AvaloniaResource Include="Resources\Fonts\Cinzel-Bold.ttf" />
   </ItemGroup>
 
   <ItemGroup>

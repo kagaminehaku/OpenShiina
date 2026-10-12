@@ -47,6 +47,7 @@ public static class MessageDialog
                 button.Click += (_, _) => { done.TrySetResult(result); dialog.Close(); };
                 row.Children.Add(button);
             }
+            PlayerTheme.Follow(dialog);
             dialog.Closed += (_, _) => done.TrySetResult(cancel);
             await dialog.ShowDialog(window);
             return await done.Task;
@@ -58,12 +59,12 @@ public static class MessageDialog
             return cancel;
         var panel = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xE0, 0x20, 0x20, 0x20)),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(12),
+            BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Child = new StackPanel { Children = { new TextBlock { Text = caption, Margin = new Thickness(20, 16, 20, 0), FontWeight = FontWeight.Bold }, body } },
-        };
+        }.Use(Border.BackgroundProperty, PlayerTheme.Keys.Surface).Use(Border.BorderBrushProperty, PlayerTheme.Keys.Border);
         foreach (var (label, result) in buttons)
         {
             var button = new Button { Content = label, MinWidth = 80 };

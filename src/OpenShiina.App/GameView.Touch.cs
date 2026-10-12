@@ -182,8 +182,12 @@ public sealed partial class GameView
     /// <summary>Android's Back: a right click while a game plays (else the platform's own: leaving).</summary>
     private void OnBackRequested(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        // Home: back from the settings to the library (else the system's: the app goes)
         if (m_session == null)
+        {
+            e.Handled = m_library.CloseSettings();
             return;
+        }
         e.Handled = true;
         RightClick();
     }

@@ -15,6 +15,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using OpenShiina.App;
 using OpenShiina.Archives;
 using OpenShiina.Game;
 using OpenShiina.Scripting;
@@ -99,10 +100,10 @@ public sealed class TranslationView : UserControl
         var editor = new DockPanel { Margin = new Thickness(12, 0, 0, 0) };
         DockPanel.SetDock(filter, Dock.Top);
         editor.Children.Add(filter);
-        editor.Children.Add(new Border { BorderBrush = Brushes.DimGray, BorderThickness = new Thickness(1), Child = m_rows });
+        editor.Children.Add(new Border { BorderThickness = new Thickness(1), Child = m_rows }.Use(Border.BorderBrushProperty, PlayerTheme.Keys.Border));
 
         var lists = new Grid { ColumnDefinitions = new ColumnDefinitions("240,Auto,*") };
-        lists.Children.Add(new Border { BorderBrush = Brushes.DimGray, BorderThickness = new Thickness(1), Child = m_files });
+        lists.Children.Add(new Border { BorderThickness = new Thickness(1), Child = m_files }.Use(Border.BorderBrushProperty, PlayerTheme.Keys.Border));
         var splitter = new GridSplitter { Width = 6, Background = Brushes.Transparent, ResizeDirection = GridResizeDirection.Columns };
         Grid.SetColumn(splitter, 1);
         Grid.SetColumn(editor, 2);

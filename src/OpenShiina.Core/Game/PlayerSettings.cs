@@ -14,6 +14,19 @@ using OpenShiina.Scripting;
 
 namespace OpenShiina.Game;
 
+/// <summary>The players' colours (OpenShiina.App/PlayerTheme.cs); Shiina is the logo's.</summary>
+public enum AppTheme
+{
+    /// <summary>The logo's: the book's wine red, its gold lock, the pages' cream, on a dark ground.</summary>
+    Shiina,
+
+    /// <summary>The same light: wine-red ink on cream pages.</summary>
+    Parchment,
+
+    /// <summary>Plain dark greys, the red only for what is chosen.</summary>
+    Graphite,
+}
+
 public enum Renderer
 {
     /// <summary>Everything on the CPU (C# with SIMD on all cores).</summary>
@@ -42,6 +55,10 @@ public sealed class PlayerSettings
     /// <summary>How the game's picture is scaled to the window (PictureScaling).</summary>
     [JsonConverter(typeof(JsonStringEnumConverter<Scaling>))]
     public Scaling Scaling { get; set; } = Scaling.Sharp;
+
+    /// <summary>The players' colours, applied at once.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<AppTheme>))]
+    public AppTheme Theme { get; set; } = AppTheme.Shiina;
 
     /// <summary>The memory for the archives' decoded files (FileCachePresets).</summary>
     [JsonConverter(typeof(JsonStringEnumConverter<FileCacheSize>))]
@@ -167,34 +184,44 @@ public sealed class PlayerSettings
     /// <summary>draw-trace.log; OPENSHIINA_TRACE=draw turns it on.</summary>
     public bool DrawTraceForGame() => Environment.GetEnvironmentVariable("OPENSHIINA_TRACE") == "draw" || DrawTrace;
 
-    /// <summary>The on / off settings as the settings screens show them, in sections.</summary>
+    /// <summary>The on / off settings as the settings page shows them: on its page (SettingsPages), in their groups.</summary>
     public static IReadOnlyList<SettingSwitch> Switches { get; } =
     [
-        new("Game", "Game controller",
+        new(SettingsPages.Graphics, "On screen", "Show the frame rate",
+            "Frames a second and the slowest frame, in the window's title (on phones and tablets over the game).",
+            s => s.ShowFrameRate, (s, on) => s.ShowFrameRate = on),
+        new(SettingsPages.Game, "Controls", "Game controller",
             "The first joystick or gamepad plays: the stick moves, button 1 decides, button 2 cancels.",
             s => s.GameController, (s, on) => s.GameController = on),
-        new("Game", "Pause behind other windows",
+        new(SettingsPages.Game, "In the background", "Pause behind other windows",
             "The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).",
             s => s.PauseInBackground, (s, on) => s.PauseInBackground = on),
         .. (OperatingSystem.IsAndroid()
-            ? [new SettingSwitch("Game", "Back up saves",
+            ? [new SettingSwitch(SettingsPages.Storage, "Saves", "Back up saves",
                 "Your saves and settings go into Android's backup (Google), and come back when OpenShiina is installed again or on a new phone. Android keeps 25 MB: the games played last go first.",
                 s => s.AndroidBackup, (s, on) => s.AndroidBackup = on)]
             : Array.Empty<SettingSwitch>()),
-        new("Performance", "Show the frame rate",
-            "Frames a second and the slowest frame, in the window's title (on phones and tablets over the game).",
-            s => s.ShowFrameRate, (s, on) => s.ShowFrameRate = on),
-        new("Performance", "Write perf.log",
+        new(SettingsPages.Debug, "Logs", "Write perf.log",
             "Every second, where the time went, into the game's save folder. The game runs slower while it writes.",
             s => s.PerfLog, (s, on) => s.PerfLog = on),
-        new("Troubleshooting", "Translate the games' x86 code",
-            "Off runs it on the interpreter instead: much slower; only to tell whether a problem comes from the translation.",
-            s => s.TranslateX86, (s, on) => s.TranslateX86 = on),
-        new("Troubleshooting", "Write draw-trace.log",
+        new(SettingsPages.Debug, "Logs", "Write draw-trace.log",
             "What every frame draws, into the game's save folder when the game ends (for reports on flicker).",
             s => s.DrawTrace, (s, on) => s.DrawTrace = on),
+        new(SettingsPages.Debug, "Interpreter", "Translate the games' x86 code",
+            "Off runs it on the interpreter instead: much slower; only to tell whether a problem comes from the translation.",
+            s => s.TranslateX86, (s, on) => s.TranslateX86 = on),
     ];
 }
 
-/// <summary>An on / off setting: its section and name on the settings screens, a line about it, and its value.</summary>
-public sealed record SettingSwitch(string Section, string Label, string Help, Func<PlayerSettings, bool> Get, Action<PlayerSettings, bool> Set);
+/// <summary>The pages of the settings, in their order.</summary>
+public enum SettingsPages
+{
+    Appearance,
+    Graphics,
+    Game,
+    Storage,
+    Debug,
+}
+
+/// <summary>An on / off setting: its page and group on the settings page, its name, a line about it, and its value.</summary>
+public sealed record SettingSwitch(SettingsPages Page, string Group, string Label, string Help, Func<PlayerSettings, bool> Get, Action<PlayerSettings, bool> Set);

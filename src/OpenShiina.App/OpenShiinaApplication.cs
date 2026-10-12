@@ -25,8 +25,9 @@ public sealed class OpenShiinaApplication : Application
         // The GPU mode (Settings): Vulkan compute, made when a game first asks for it
         Game.PlayerSettings.AcceleratorFactory = () => (Gpu.VulkanAccelerator.TryCreate(out string? error), error);
         Game.StartupLog.Mark("Avalonia: the theme loads");
-        Styles.Add(new FluentTheme());
-        RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        // Fluent's controls in the colours of the theme the settings name (PlayerTheme.cs)
+        Styles.Add(PlayerTheme.Fluent());
+        PlayerTheme.Apply(this, Game.PlayerSettings.Load().Theme);
         Game.StartupLog.Mark("Avalonia: the theme loaded");
     }
 
@@ -46,6 +47,7 @@ public sealed class OpenShiinaApplication : Application
                 Background = Brushes.Black,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
             };
+            PlayerTheme.Follow(window);
             view.TitleChanged += title => window.Title = title;
             view.FullScreenChanged += full => window.WindowState = full ? WindowState.FullScreen : WindowState.Normal;
             // A game opens a game pixel to a screen pixel (Avalonia sizes in device-independent
