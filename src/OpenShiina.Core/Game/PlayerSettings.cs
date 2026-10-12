@@ -71,6 +71,13 @@ public sealed class PlayerSettings
     /// <summary>draw-trace.log in the save folder: what every frame drew (for bug reports on flicker).</summary>
     public bool DrawTrace { get; set; }
 
+    /// <summary>
+    /// Android: the saves and settings go into Android's backup (Google's cloud, a new phone), so
+    /// they come back when the app is installed again. Read by the app's backup agent (Java,
+    /// OpenShiina.Android/Java/BackupAgent.java) under this name.
+    /// </summary>
+    public bool AndroidBackup { get; set; } = true;
+
     private static string SettingsFile => Path.Combine(PlayerFolders.Root, "settings.json");
     private static readonly JsonSerializerOptions s_json = new() { WriteIndented = true };
 
@@ -169,6 +176,11 @@ public sealed class PlayerSettings
         new("Game", "Pause behind other windows",
             "The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).",
             s => s.PauseInBackground, (s, on) => s.PauseInBackground = on),
+        .. (OperatingSystem.IsAndroid()
+            ? [new SettingSwitch("Game", "Back up saves",
+                "Your saves and settings go into Android's backup (Google), and come back when OpenShiina is installed again or on a new phone. Android keeps 25 MB: the games played last go first.",
+                s => s.AndroidBackup, (s, on) => s.AndroidBackup = on)]
+            : Array.Empty<SettingSwitch>()),
         new("Performance", "Show the frame rate",
             "Frames a second and the slowest frame, in the window's title (on phones and tablets over the game).",
             s => s.ShowFrameRate, (s, on) => s.ShowFrameRate = on),

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and later: the same as backup_rules.xml, for Google's cloud backup and for the
+     transfer to a new device -->
+<data-extraction-rules>
+  <cloud-backup>
+    <exclude domain="external" path="library.json" />
+    <exclude domain="external" path="last-game.txt" />
+    <exclude domain="external" path="startup.log" />
+  </cloud-backup>
+  <device-transfer>
+    <exclude domain="external" path="library.json" />
+    <exclude domain="external" path="last-game.txt" />
+    <exclude domain="external" path="startup.log" />
+  </device-transfer>
+</data-extraction-rules>

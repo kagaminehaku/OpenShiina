@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and before: what the backup leaves out of the player folder (the app's folder on
+     the shared storage, "external"). The library names folders of this device (restored on
+     another, or after the games were moved, it listed games that are not there); the logs are
+     only of this device. The rest, saves and settings.json, is backed up. -->
+<full-backup-content>
+  <exclude domain="external" path="library.json" />
+  <exclude domain="external" path="last-game.txt" />
+  <exclude domain="external" path="startup.log" />
+</full-backup-content>

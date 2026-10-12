@@ -5,5 +5,11 @@
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
   <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
   <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-  <application android:label="OpenShiina" android:icon="@mipmap/icon" android:requestLegacyExternalStorage="true" />
+  <!-- Android's backup (Java/BackupAgent.java): the player folder, saves and settings, but not the
+       library or the logs (Resources/xml), and nothing when Settings > Back up saves is off -->
+  <application android:label="OpenShiina" android:icon="@mipmap/icon" android:requestLegacyExternalStorage="true"
+               android:allowBackup="true" android:fullBackupOnly="true"
+               android:backupAgent="com.kagaminehaku.openshiina.BackupAgent"
+               android:fullBackupContent="@xml/backup_rules"
+               android:dataExtractionRules="@xml/data_extraction_rules" />
 </manifest>

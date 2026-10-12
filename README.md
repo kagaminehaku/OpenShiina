@@ -120,8 +120,12 @@ the first two axes) moves, button 1 decides, button 2 cancels. The games turn it
 RIO.INI (Joypad=0) but the players read it anyway; the setting "Game controller" (or
 `OPENSHIINA_JOYPAD=0`) turns it off, `OPENSHIINA_JOYPAD=ini` follows RIO.INI.
 
-Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`); both
-players share them.
+Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`; Android:
+`Android/data/com.kagaminehaku.openshiina/files`); both players share them. On Android they go
+into Android's backup (Google's cloud, a new phone) and come back when the app is installed
+again; the game library and the logs do not. Android keeps 25 MB of an app (a GRAND†CROSS game's
+saves are about 3.5 MB): the settings go first, then the save folders of the games played last,
+as many as fit. Settings > Back up saves turns that off.
 
 ## OpenShiina Tools
 
