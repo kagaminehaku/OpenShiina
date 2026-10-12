@@ -76,19 +76,27 @@ public sealed class ScnOpcodes
     /// </summary>
     public static ScnOpcodes ForVersion(string version)
     {
-        string name = version.StartsWith("2.47") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
-            : version.StartsWith("2.34") ? "ops_v234"
-            : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
+        string name = TableName(version);
         lock (s_loaded)
         {
             if (!s_loaded.TryGetValue(name, out var table))
-            {
-                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"OpenShiina.ScnOps.{name}.tsv")
-                    ?? throw new InvalidOperationException($"The opcode table {name} is missing.");
-                using var reader = new StreamReader(stream);
-                s_loaded[name] = table = new ScnOpcodes(reader.ReadToEnd(), name);
-            }
+                s_loaded[name] = table = new ScnOpcodes(TableText(version), name);
             return table;
         }
+    }
+
+    /// <summary>The opcode table an engine version uses ("ops_v247" for "2.45"; see <see cref="ForVersion"/>).</summary>
+    public static string TableName(string version) =>
+        version.StartsWith("2.47") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
+            : version.StartsWith("2.34") ? "ops_v234"
+            : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
+
+    /// <summary>The text of that table as tools/ScnTools opscan wrote it (Data/ScnOps), for tools.</summary>
+    public static string TableText(string version)
+    {
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"OpenShiina.ScnOps.{TableName(version)}.tsv")
+            ?? throw new InvalidOperationException($"The opcode table {TableName(version)} is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

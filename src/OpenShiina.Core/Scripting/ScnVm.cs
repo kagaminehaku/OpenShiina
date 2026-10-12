@@ -267,6 +267,9 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>A handler for engines before 2.40 only (EngineVersion below 240), in place of the later one.</summary>
     public void Register234(int op, OpHandler handler) => m_handlers234[op] = handler;
 
+    /// <summary>Whether this engine version (<see cref="EngineVersion"/>) runs the opcode (tools/ScnTools opcheck).</summary>
+    public bool HasHandler(int op) => HandlerFor(op) != null;
+
     /// <summary>The handler of an opcode for this engine version.</summary>
     private OpHandler? HandlerFor(int op) =>
         EngineVersion < 240 && m_handlers234.TryGetValue(op, out var old) ? old : m_handlers.GetValueOrDefault(op);

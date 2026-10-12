@@ -18,8 +18,9 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
-Try a game with ScnBoot (`tests/OpenShiina.ScnBoot`) first: it says the first opcode it does not
-run.
+Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
+scripts the player does not run yet (none in the 17 games tried). Then ScnBoot
+(`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops.
 
 - **Release**: the game's first release, or the release the scheme is for (a compilation, a
   "The Motion" edition, a trial, an English version).

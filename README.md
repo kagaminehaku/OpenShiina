@@ -182,7 +182,8 @@ is one of the strings' or names' originals.
 - [`docs/todo.md`](docs/todo.md): what is planned and not done yet.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.
-- `tools/ScnTools`: disassembler for SCN bytecode.
+- `tools/ScnTools`: disassembler for SCN bytecode; `opcheck` lists what of a game's scripts the
+  player does not run yet.
 - `tools/LogoGen`: draws the logo (a locked book whose keyhole is a shii nut, 椎 as in Shiina;
   OpenShiina Tools' icon adds a quill; the wordmark's red S, i, n spell the sin in the name, in
   Cinzel, or Playfair Display with `--font playfair`) into `docs/logo`, the players' and the

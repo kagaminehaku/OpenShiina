@@ -330,7 +330,14 @@ in the git history. What it found about the engine is in sections 3, 8 and 9.
 ```
 dotnet run --project tools/ScnTools -- opscan oreimoplus <OREIMOPLUS_dump_SCY.exe> ops.tsv
 dotnet run --project tools/ScnTools -- dis tools/ScnTools/tables/ops_oreimoplus.tsv out.txt SRC_MAIN.SCN
+dotnet run --project tools/ScnTools -c Release -- opcheck [-o <folder>] <game folder>...
 ```
+
+`opcheck` (ScnTools/OpCheck.cs) reads every SCN of a game's archives, disassembles it with the
+player's own opcode table for the game's engine version, and lists the opcodes ScnVm has no
+handler for (ScnVm.HasHandler) and the DLL functions of 01A4 it does not do (ScnVm.HasDllFunction),
+with where they are; `-o` writes the disassembly. A handler that is there but wrong in a case
+does not show.
 
 Finding problems:
 
@@ -1328,6 +1335,25 @@ the functions they call from the decompile. First findings:
   on a phone's shared storage a listing takes milliseconds, and Bitch Nee-chan's picture loads
   (00C9) and file sizes (0158) took 100-300 ms and 4 ms a call there. The game folder's folders
   are now listed once a session and looked up by name.
+- Every opcode of every SCN of the 17 games tried (2026-10-12, `ScnTools opcheck`, section 7:
+  ScnDisasm now has Core's layouts and the sysvar operands). What the disassembly leaves out is
+  data: the embedded x86, zero-filled buffers, tables, file names and texts. Four opcodes had no
+  handler, all in code nothing reaches:
+  `0016 thread, slot, priority`, `0012 slot, v` and `000F slot` (Oreimo 0x423D15 / 0x423CA1 /
+  FUN_00415460): a slot run on a thread of its own (FUN_0040D070: _beginthreadex of 0x40CFE0,
+  which runs the slot's task record until its `end`, then SetThreadPriority), its flags read
+  (1 while it runs), and the slot freed (its thread waited for, flags 0, its code let go). Here
+  the thread is a task like the others. Chuuchuu Nurse's START has them in slot 191 (start slot
+  192, wait for it, free it), which loads a PFR font from a variable nothing sets; with a START
+  patched to gosub 191 and skip that load (SCNBOOT_FILE), the three run and the title follows.
+  `0140 program, arguments` (Sena Plus 0x429D00, FUN_00406C60): CreateProcess, a script error
+  when the program does not start; Aneiro's START has one for "krkrlt.exe", in code no label leads to.
+  The player starts no programs and goes on. Of the DLL functions (01A4) the scripts name, only
+  kernel32!GetDiskFreeSpaceExA was missing: Chuuchuu's screenshot (`zansho%02i.bmp` in the save
+  folder, a 54-byte header and 360,000 bytes) checks for 360,054 free bytes first (checked the same way: written). The text
+  codes the player does not draw (`_q-`, `_O`, `_n`, ruby `{...}`) are in no message of any TXT and
+  in no string of the scripts that reaches text (Ao no Juuai looks for "_n" itself). Chuuchuu's
+  eight embedded routines: three C#, five translated, none on the interpreter.
 - A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
   by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
   to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest

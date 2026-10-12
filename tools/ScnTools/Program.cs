@@ -5,6 +5,9 @@
 //       Derive the opcode table from an unpacked engine executable (addresses in hex).
 //   ScnTools dis <table.tsv> <out.txt> <file.scn>...
 //       Disassemble .SCN files with an opcode table (tables\ops_*.tsv).
+//   ScnTools opcheck [-o <folder>] <game folder>...
+//       The opcodes and DLL functions of a game's scripts the player does not run yet (OpCheck.cs);
+//       -o writes each game's disassembly there.
 
 // Engine builds already analysed. The executables are memory dumps of the unpacked games;
 // the addresses are those of that dump.
@@ -33,6 +36,8 @@ if (args.Length >= 11 && args[0] == "opscan")
     OpAnalyzer.Run(args.Skip(1).ToArray());
     return 0;
 }
+if (args.Length >= 2 && args[0] == "opcheck")
+    return OpCheck.Run(args.Skip(1).ToArray());
 if (args.Length >= 4 && args[0] == "dis")
 {
     ScnDisasm.Run(args.Skip(1).ToArray());
@@ -43,5 +48,6 @@ Console.WriteLine("""
     ScnTools opscan <preset> <exe> <out.tsv>        presets: senaplus, oreimoplus, aoj
     ScnTools opscan <exe> <interp> <dispStart> <loopHead> <invalid> <getVar> <setVar> <getVarAdr> <out.tsv> <dispEnd> [ctxReg] [pcPtrReg] [pcGlobal]
     ScnTools dis <table.tsv> <out.txt> <file.scn>...
+    ScnTools opcheck [-o <folder>] <game folder>...
     """);
 return 1;

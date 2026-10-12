@@ -66,6 +66,23 @@ public sealed partial class ScnVm
         });
     }
 
+    /// <summary>
+    /// Whether 01A4 runs dll!function (tools/ScnTools opcheck). The function is called with no
+    /// arguments, so only on a VM made for the question.
+    /// </summary>
+    public bool HasDllFunction(string dll, string function)
+    {
+        try
+        {
+            return DllCall(dll.ToLowerInvariant().Replace(".dll", ""), function, []) != null;
+        }
+        catch (Exception)
+        {
+            // It got as far as running it
+            return true;
+        }
+    }
+
     private int? DllCall(string dll, string function, int[] a)
     {
         int Arg(int k) => k < a.Length ? a[k] : 0;
@@ -110,6 +127,18 @@ public sealed partial class ScnVm
                 Write64(p + 40, 0x7FFE0000);
                 Write64(p + 48, 0x60000000);
                 Write64(p + 56, 0);
+                return 1;
+            }
+            case ("kernel32", "GetDiskFreeSpaceExA"):
+            {
+                // A disk of 256 GB with 64 GB free, where each pointer is not null (Chuuchuu Nurse
+                // saves a screenshot to its save folder when 360,054 bytes are free)
+                if (Arg(1) != 0)
+                    Write64(Arg(1), 64L << 30);
+                if (Arg(2) != 0)
+                    Write64(Arg(2), 256L << 30);
+                if (Arg(3) != 0)
+                    Write64(Arg(3), 64L << 30);
                 return 1;
             }
             case ("user32", "SetMenuItemInfoW"):

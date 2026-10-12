@@ -183,6 +183,46 @@ public sealed partial class ScnVm
             vm.TasksChanged();
             return 0;
         });
+        // 0016 thread, slot, priority (Oreimo 0x423D15, FUN_0040D070): the slot runs from its entry
+        // on a thread of its own (record `thread` of 24 bytes at 0x7F2BD0, SetThreadPriority) with
+        // its flags 1, until its `end`. Here it is a task like the others: the scripts that start
+        // one wait for it with 0012 and yield meanwhile (Chuuchuu Nurse's START loads a font that way)
+        Register(0x0016, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            int slot = vm.Value(c, i.Args[1]);
+            vm.Value(c, i.Args[2]);
+            if (slot is < 0 or > 1000)
+                return 2;
+            var s = vm.m_slots[slot];
+            s.Pc = s.Entry;
+            s.Sp = StackSize;
+            s.Flags = 1;
+            vm.TasksChanged();
+            return 0;
+        });
+        // 0012 slot, v: v = the slot's flags (1 while its thread runs, 0 after its end)
+        Register(0x0012, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]);
+            if (slot is < 0 or > 1000)
+                return 2;
+            vm.Store(c, i.Args[1], vm.m_slots[slot].Flags);
+            return 0;
+        });
+        // 000F slot (FUN_00415460): the slot stops (its thread waited for and closed) and lets its
+        // module go: no code, flags 0
+        Register(0x000F, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]);
+            if (slot is < 0 or > 1000)
+                return 2;
+            var s = vm.m_slots[slot];
+            s.Flags = 0;
+            s.Loaded = false;
+            vm.TasksChanged();
+            return 0;
+        });
         // 001E / 001F: set / clear task flag 4
         Register(0x001E, (vm, c, i) => { c.Flags |= 4; return 0; });
         Register(0x001F, (vm, c, i) => { c.Flags &= ~4; return 0; });

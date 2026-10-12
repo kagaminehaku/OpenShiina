@@ -5,11 +5,16 @@ using System.Text;
 static class ScnDisasm
 {
     public record OpInfo(string[] Sig, bool Jump, bool Special);
-    public static Dictionary<int, OpInfo> LoadTable(string tsv)
+    public static Dictionary<int, OpInfo> LoadTable(string tsv) => LoadTable(File.ReadLines(tsv));
+
+    /// <summary>A table from its lines (a header first), e.g. the player's own tables (OpCheck).</summary>
+    public static Dictionary<int, OpInfo> LoadTable(IEnumerable<string> lines)
     {
         var t = new Dictionary<int, OpInfo>();
-        foreach (var line in File.ReadLines(tsv).Skip(1))
+        foreach (var raw in lines.Skip(1))
         {
+            var line = raw.TrimEnd('\r');
+            if (line.Length < 5 || line[4] != '\t') continue;
             var f = line.Split('\t');
             var sig = f[2].Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
             // runs of "b8" come from a file loader that walks its own +10h structure, not from the script
@@ -62,10 +67,12 @@ static class ScnDisasm
                 }
             case 0x12: case 0x13:
                 {
-                    if (b[p] == 0x2E) throw new InvalidDataException($"sysvar operand at {at:X}");
                     int s = p;
                     while (p < b.Length && b[p] != 0 && b[p] != (byte)'}') p++;
-                    var name = Sjis.GetString(b, s, p - s); p++;
+                    var name = Sjis.GetString(b, s, p - s);
+                    // 2.34 names it up to the first '}' and goes on to the 0
+                    if (Version.StartsWith("2.34")) while (p < b.Length && b[p] != 0) p++;
+                    p++;
                     return $"{pre}{(k == 0x13 ? "*" : "")}{name}";
                 }
             default: throw new InvalidDataException($"bad operand type {t:X2} at {at:X}");
@@ -88,7 +95,18 @@ static class ScnDisasm
         [0x209] = new[] { "CASE" }, // u32 index operand address, u32 target, values..., FF, u32 next case
         [0x0001] = new[] { "V", "V" },   // load module (slot, file)
         [0x0002] = new[] { "V", "V" },   // u32 table end, index, then targets up to the end
+        [0x01A4] = new[] { "V", "V", "V", "VARGS", "V" },   // DLL call: -, dll, function, arguments, result
+        [0x05D2] = new[] { "M1V" },   // movies to play, up to a constant -1
+        [0x0213] = new[] { "b4", "b4" },   // loop: counter, target
+        [0x039C] = new[] { "V", "V" },   // rotate right n, v (the handler reads v twice)
+        [0x039D] = new[] { "V", "V" },
     };
+
+    /// <summary>The engine version being disassembled ("2.34"): layouts of one version only (as ScnOpcodes).</summary>
+    public static string Version = "";
+
+    /// <summary>Instructions whose length depends on a variable: decoded with the longer layout.</summary>
+    public static readonly List<string> Uncertain = new();
 
     // Mnemonics for opcodes whose handler was read; everything else prints as op_XXXX
     public static readonly Dictionary<int, string> Names = new()
@@ -108,6 +126,27 @@ static class ScnDisasm
         if (!table.TryGetValue(op, out var info)) throw new InvalidDataException($"unknown opcode {op:X4} at {at:X}");
         var ops = new List<string>(); var tg = new List<int>();
         var sig = Overrides.TryGetValue(op, out var ov) ? ov : info.Sig;
+        // 04BD of v2.34: seven operands, one more (an alpha) when the third has bits 0x60000000,
+        // three more (a tint) when it has 0x20000000
+        if (op == 0x04BD && Version.StartsWith("2.34"))
+        {
+            var a = new List<string>();
+            for (int k = 0; k < 7; k++) a.Add(Operand(b, ref p, out _));
+            int extra = 0;
+            if (int.TryParse(a[2], out int fl)) extra = ((fl & 0x60000000) != 0 ? 1 : 0) + ((fl & 0x20000000) != 0 ? 3 : 0);
+            else Uncertain.Add($"04BD flags {a[2]} at {at:X}");
+            for (int k = 0; k < extra; k++) a.Add(Operand(b, ref p, out _));
+            return (p - at, $"{op:X4}  op_04BD   {string.Join(", ", a)}", tg);
+        }
+        // 009C of v2.50: two operands, three more unless the second is 0
+        if (op == 0x009C && Version.StartsWith("2.50"))
+        {
+            var a = new List<string> { Operand(b, ref p, out _), Operand(b, ref p, out _) };
+            bool more = !int.TryParse(a[1], out int tv) || tv != 0;
+            if (!int.TryParse(a[1], out _)) Uncertain.Add($"009C text {a[1]} at {at:X}");
+            if (more) for (int k = 0; k < 3; k++) a.Add(Operand(b, ref p, out _));
+            return (p - at, $"{op:X4}  op_009C   {string.Join(", ", a)}", tg);
+        }
         foreach (var item in sig)
         {
             if (item == "SW")
@@ -137,6 +176,14 @@ static class ScnDisasm
                 var args = new List<string>();
                 while (p < b.Length && b[p] != 0xFF) args.Add(Operand(b, ref p, out _));
                 p++;
+                ops.Add(string.Join(", ", args));
+                continue;
+            }
+            if (item == "M1V")
+            {
+                // operands up to the first constant -1
+                var args = new List<string>();
+                while (true) { string o = Operand(b, ref p, out _); args.Add(o); if (o == "-1" || args.Count >= 0x100) break; }
                 ops.Add(string.Join(", ", args));
                 continue;
             }

@@ -133,6 +133,16 @@ public sealed partial class ScnVm
         });
         // 06C3: release the movie player's DirectShow objects
         Register(0x06C3, (vm, c, i) => 0);
+        // 0140 program, arguments (Sena Plus 0x429D00, FUN_00406C60): CreateProcess of a program of
+        // the game folder with its command line, shown normally; a script error when it does not
+        // start. Aneiro's START has one for "krkrlt.exe", which its folder does not have. The player
+        // starts no programs: the scripts go on as after one that started
+        Register(0x0140, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            vm.Value(c, i.Args[1]);
+            return 0;
+        });
         // 0A30 file, dest: "X:\" of the CD-ROM drive holding the file, or "" (no disc here)
         Register(0x0A30, (vm, c, i) =>
         {

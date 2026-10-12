@@ -12,6 +12,11 @@
     <PackageReference Include="Iced" Version="1.21.0" />
   </ItemGroup>
 
+  <!-- opcheck: the player's opcode tables, archives and handlers -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenShiina.Core\OpenShiina.Core.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="tables\*.tsv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
