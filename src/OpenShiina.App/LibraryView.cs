@@ -88,7 +88,7 @@ public sealed class LibraryView : UserControl
         var wordmark = PlayerTheme.Wordmark(26);
         wordmark.Margin = new Thickness(8, 0, 0, 10);
         m_wordmark = wordmark;
-        var list = new StackPanel { Children = { m_wordmark, m_tiles, m_empty } };
+        var list = new StackPanel { Children = { m_tiles, m_empty } };
         var tiles = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
         var messages = new ScrollViewer
         {
@@ -97,12 +97,14 @@ public sealed class LibraryView : UserControl
         };
         var detail = new Grid { RowDefinitions = new RowDefinitions("*,Auto"), Children = { m_detail, messages } };
         Grid.SetRow(messages, 1);
+        // The wordmark over both columns, so that the tiles and the card start on one line
         m_home = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), m_detailColumn },
-            Children = { tiles, detail },
+            RowDefinitions = new RowDefinitions("Auto,*"),
+            Children = { m_wordmark, At(tiles, 0, 1), At(detail, 1, 1) },
         };
-        Grid.SetColumn(detail, 1);
+        Grid.SetColumnSpan(m_wordmark, 2);
         m_page.Content = m_home;
         var layout = new Grid { ColumnDefinitions = { m_railColumn, new ColumnDefinition(GridLength.Star) }, Children = { rail, m_page } };
         Grid.SetColumn(m_page, 1);
@@ -128,7 +130,8 @@ public sealed class LibraryView : UserControl
         m_detailColumn.Width = new GridLength(detail);
         double gap = compact ? 12 : 20;
         m_home.Margin = new Thickness(gap);
-        m_detail.Margin = new Thickness(gap / 2, 0, 0, 0);
+        // (level with the tiles' tops: they stand 5 inside their places)
+        m_detail.Margin = new Thickness(gap / 2, 5, 0, 0);
         m_wordmark.IsVisible = !compact;
         // The tiles: two columns on a phone, as many as fit at about 150 wide on a desktop
         double list = room - detail - 2 * gap - 12;
