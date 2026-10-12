@@ -12,8 +12,12 @@ It reads the game's own files and runs the game's own scripts (the engine's SCN 
 x86 code embedded in it), so the title screen, effects, text, menus, saves and settings are the
 game's own.
 
+<p align="center">
+  <img src="docs/images/home.png" alt="OpenShiina's home screen: the games as tiles, the chosen one's card with Play" width="860">
+</p>
+
 **Status:** early. The interpreter runs ShiinaRio engine versions 2.45, 2.47, 2.49 and 2.50,
-and 2.34 in part. OpenShiina has the keys of 136 ShiinaRio games; 17 were tried and 12 play
+and 2.34 in part. OpenShiina has the keys of 136 ShiinaRio games; 18 were tried and 12 play
 through (the eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start
 and play their stories. The Android player runs them on phones too (checked on a Galaxy S7). Every game,
 with its engine version and VNDB page, and every platform's state is in
@@ -21,6 +25,20 @@ with its engine version and VNDB page, and every platform's state is in
 [docs/todo.md](docs/todo.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Maki Fes!'s title screen, run by OpenShiina at 60 frames a second](docs/images/game-maki-fes.png) | ![The settings page, its Graphics section](docs/images/settings.png) |
+| Maki Fes! (GRAND†CROSS, 2014) running its own scripts | Settings, page by page |
+| ![The home screen on an Android phone held sideways](docs/images/android-home.png) | ![Maki Fes!'s title screen on a Galaxy S7, at 60 frames a second](docs/images/android-maki-fes.png) |
+| On Android: a Galaxy S7, from 2016 | Maki Fes! on the same phone, 60 frames a second |
+
+| | | |
+|---|---|---|
+| ![The home screen in the Shiina theme](docs/images/home.png) | ![The home screen in the Parchment theme](docs/images/theme-parchment.png) | ![The home screen in the Graphite theme](docs/images/theme-graphite.png) |
+| Shiina, the default | Parchment | Graphite |
 
 ## Platforms
 
