@@ -93,12 +93,13 @@ Settings (the home screen's Settings button opens their page, saved in `settings
 
 - **Appearance**: the theme, shown at once (OpenShiina Tools too): Shiina, the logo's wine red and
   gold, by default; Parchment, light; Graphite, plain greys.
-- **Graphics**: the graphics level (Potato: nearest pixels; Low: sharp; Medium: FSR 1; High: FSR 1
+- **Graphics**: on phones and tablets first two profiles, Battery saver (sharp scaling at the
+  game's own pace) and Pretty (FSR 1 sharpened, a frame every refresh of the screen); then the graphics level (Potato: nearest pixels; Low: sharp; Medium: FSR 1; High: FSR 1
   sharpened; Max: Anime4K; Custom when the details match none of them), and its details: the
   scaling of the picture to the window (sharp: whole game pixels as far as they fit and the rest
   smooth, so text and lines stay even at any size; whole numbers only, with black around; smooth;
   nearest; or, on the GPU that draws the window, the upscalers FSR 1, with its sharpening from
-  none to 10, and Anime4K, the heaviest), drawing on the CPU or on the GPU (the GPU mode runs
+  none to 10, and Anime4K, the heaviest), drawing on the GPU (the default) or on the CPU (the GPU mode runs
   heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
   rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
   faster on its first large calls, with the same pictures; without a Vulkan driver the games run
@@ -119,7 +120,8 @@ The environment variables of the settings still win over them, for tests: `OPENS
 most pieces a pixel routine is cut into; 1 runs them all on the interpreter's thread),
 `OPENSHIINA_DATA=<folder>`
 (the player's data instead of %AppData%\OpenShiina), `OPENSHIINA_WAYLAND=1` (Avalonia's own
-Wayland backend on Linux).
+Wayland backend on Linux), `OPENSHIINA_TOUCH=1` (the desktop player laid out as on a phone or
+tablet).
 
 Game controllers: the first joystick or gamepad works as the engine reads it: the stick (or
 the first two axes) moves, button 1 decides, button 2 cancels. The games turn it off in their

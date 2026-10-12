@@ -1,6 +1,6 @@
 // The players' settings: settings.json in the player folder (PlayerFolders.Root), shared by both
 // players, each counting from the next game started: where the interpreter's pixel work runs
-// (the CPU or the GPU through Vulkan, OpenShiina.Gpu), how often it runs a frame (the game's pace
+// (the GPU through Vulkan by default, OpenShiina.Gpu, or the CPU), how often it runs a frame (the game's pace
 // or the screen's), how the picture is scaled to the window (PictureScaling), the game controller,
 // the frame rate, and
 // for bug reports perf.log, the x86 translation and draw-trace.log. The environment variables
@@ -31,7 +31,11 @@ public enum Renderer
 {
     /// <summary>Everything on the CPU (C# with SIMD on all cores).</summary>
     Cpu,
-    /// <summary>The heavy pixel routines on the GPU through Vulkan; the CPU where there is no Vulkan.</summary>
+    /// <summary>
+    /// The heavy pixel routines on the GPU through Vulkan, each where its first large calls ran
+    /// faster (the CPU or the GPU); everything on the CPU where there is no Vulkan. The default:
+    /// it falls back on its own, so a new install need not know the device.
+    /// </summary>
     Gpu,
 }
 
@@ -47,7 +51,7 @@ public enum FramePacing
 public sealed class PlayerSettings
 {
     [JsonConverter(typeof(JsonStringEnumConverter<Renderer>))]
-    public Renderer Renderer { get; set; } = Renderer.Cpu;
+    public Renderer Renderer { get; set; } = Renderer.Gpu;
 
     [JsonConverter(typeof(JsonStringEnumConverter<FramePacing>))]
     public FramePacing FramePacing { get; set; } = FramePacing.Game;
@@ -193,8 +197,10 @@ public sealed class PlayerSettings
         new(SettingsPages.Game, "Controls", "Game controller",
             "The first joystick or gamepad plays: the stick moves, button 1 decides, button 2 cancels.",
             s => s.GameController, (s, on) => s.GameController = on),
-        new(SettingsPages.Game, "In the background", "Pause behind other windows",
-            "The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).",
+        new(SettingsPages.Game, "In the background", OperatingSystem.IsAndroid() ? "Pause in the background" : "Pause behind other windows",
+            OperatingSystem.IsAndroid()
+                ? "The game stands still, sound included, while another app is in front or the screen is off. Off: as the game itself says (most go on)."
+                : "The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).",
             s => s.PauseInBackground, (s, on) => s.PauseInBackground = on),
         .. (OperatingSystem.IsAndroid()
             ? [new SettingSwitch(SettingsPages.Storage, "Saves", "Back up saves",

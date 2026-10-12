@@ -146,24 +146,7 @@ public sealed class SettingsView : UserControl
                     },
                 },
             };
-            var button = new Button
-            {
-                Width = 160, Margin = new Thickness(0, 0, 10, 10), Padding = new Thickness(8),
-                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Top,
-                Content = new StackPanel
-                {
-                    Spacing = 6,
-                    Children =
-                    {
-                        picture,
-                        new TextBlock { Text = label, FontWeight = FontWeight.SemiBold }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink),
-                        Muted(help),
-                    },
-                },
-            };
-            button.Classes.Add("card");
-            AutomationProperties.SetName(button, label);
+            var button = ChoiceCard(label, help, picture, 160);
             button.Click += (_, _) =>
             {
                 if (m_settings.Theme != theme)
@@ -184,10 +167,11 @@ public sealed class SettingsView : UserControl
     }
 
     /// <summary>
-    /// The graphics level (GraphicsPresets), with what it sets one by one under Details (where the
-    /// games' pictures are scaled and mixed, the scaling, FSR's sharpening, the frame rate); each
-    /// shows the other's changes (showing is set while they are shown, so their handlers leave the
-    /// settings be).
+    /// The graphics level (GraphicsPresets), with what it sets one by one under Details (the
+    /// scaling, FSR's sharpening, where the games' pictures are scaled and mixed, the frame rate);
+    /// phones and tablets show their two profiles (PhoneProfiles) first, the level among the
+    /// details. Each shows the others' changes (showing is set while they are shown, so their
+    /// handlers leave the settings be).
     /// </summary>
     private List<Control> GraphicsGroups()
     {
@@ -206,6 +190,19 @@ public sealed class SettingsView : UserControl
         var scalingHelp = Muted("");
         var sharpness = new Slider { Minimum = 0, Maximum = 10, TickFrequency = 1, IsSnapToTickEnabled = true, Width = Wide };
         var sharpnessHelp = Muted("");
+
+        var paces = new (FramePacing Pacing, string Label, string Help)[]
+        {
+            (FramePacing.Game, "The game's pace", "As the original: up to 60 frames a second, little processor while it waits."),
+            (FramePacing.Display, "Every screen refresh", "Smoother on a fast screen, more processor."),
+        };
+        var pacing = new ComboBox { Width = Wide };
+        foreach (var (_, label, _) in paces)
+            pacing.Items.Add(new ComboBoxItem { Content = label });
+        var paceHelp = Muted("");
+
+        var profiles = new List<(PhoneProfile Profile, Button Card)>();
+        var profileNote = Muted("Your own, set under Details.");
         void Show()
         {
             showing = true;
@@ -219,23 +216,33 @@ public sealed class SettingsView : UserControl
             sharpness.Value = s.FsrSharpness;
             sharpness.IsEnabled = s.Scaling == Scaling.Fsr;
             sharpnessHelp.Text = s.Scaling != Scaling.Fsr ? "With FSR 1 scaling." : s.FsrSharpness == 0 ? "None." : $"{s.FsrSharpness} of 10.";
+            int paced = Array.FindIndex(paces, p => p.Pacing == s.FramePacing);
+            pacing.SelectedIndex = paced;
+            paceHelp.Text = paced >= 0 ? paces[paced].Help : "";
+            var profile = PhoneProfiles.Of(s);
+            foreach (var (p, card) in profiles)
+                card.Classes.Set("chosen", p == profile);
+            profileNote.IsVisible = profile == null;
             showing = false;
+        }
+        void Changed()
+        {
+            s.Save();
+            Show();
         }
         level.SelectionChanged += (_, _) =>
         {
             if (showing || level.SelectedIndex < 0 || levels[level.SelectedIndex].Item1 == GraphicsQuality.Custom)
                 return;
             GraphicsPresets.Apply(s, levels[level.SelectedIndex].Item1);
-            s.Save();
-            Show();
+            Changed();
         };
         scaling.SelectionChanged += (_, _) =>
         {
             if (showing || scaling.SelectedIndex < 0)
                 return;
             s.Scaling = PictureScaling.Choices[scaling.SelectedIndex].Scaling;
-            s.Save();
-            Show();
+            Changed();
         };
         sharpness.ValueChanged += (_, _) =>
         {
@@ -243,10 +250,15 @@ public sealed class SettingsView : UserControl
             if (showing || value == s.FsrSharpness)
                 return;
             s.FsrSharpness = value;
-            s.Save();
-            Show();
+            Changed();
         };
-        Show();
+        pacing.SelectionChanged += (_, _) =>
+        {
+            if (showing || pacing.SelectedIndex < 0)
+                return;
+            s.FramePacing = paces[pacing.SelectedIndex].Pacing;
+            Changed();
+        };
 
         // Where the pictures are drawn, and the GPU it would be
         var device = Muted("");
@@ -260,29 +272,36 @@ public sealed class SettingsView : UserControl
             ShowDevice();
         });
 
-        var paceHelp = new Dictionary<FramePacing, string>
+        var levelRow = Row("Graphics level", "How the game's picture is scaled to the window, from the lightest to the heaviest. FSR and Anime4K run on the GPU that draws the window (without one, as Low).", level, levelHelp);
+        var details = new List<Control>
         {
-            [FramePacing.Game] = "As the original: up to 60 frames a second, little processor while it waits.",
-            [FramePacing.Display] = "Smoother on a fast screen, more processor.",
+            Row("Scaling", null, scaling, scalingHelp),
+            Row("FSR sharpening", null, sharpness, sharpnessHelp),
+            Row("Drawing", "Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.", drawing, device),
+            Row("Frame rate", null, pacing, paceHelp),
         };
-        var paceDetail = Muted(paceHelp[s.FramePacing]);
-        var pacing = Choice([(FramePacing.Game, "The game's pace"), (FramePacing.Display, "Every screen refresh")], s.FramePacing, pace =>
+        List<Control> groups;
+        if (PlayerPlatform.Touch)
         {
-            s.FramePacing = pace;
-            s.Save();
-            paceDetail.Text = paceHelp[pace];
-        });
-
-        return
-        [
-            Group("Quality",
-                Row("Graphics level", "How the game's picture is scaled to the window, from the lightest to the heaviest. FSR and Anime4K run on the GPU that draws the window (without one, as Low).", level, levelHelp)),
-            Group("Details",
-                Row("Scaling", null, scaling, scalingHelp),
-                Row("FSR sharpening", null, sharpness, sharpnessHelp),
-                Row("Drawing", "Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.", drawing, device),
-                Row("Frame rate", null, pacing, paceDetail)),
-        ];
+            var cards = new WrapPanel { Orientation = Orientation.Horizontal };
+            foreach (var (profile, label, help) in PhoneProfiles.Choices)
+            {
+                var card = ChoiceCard(label, help, null, 220);
+                card.Click += (_, _) =>
+                {
+                    PhoneProfiles.Apply(s, profile);
+                    Changed();
+                };
+                profiles.Add((profile, card));
+                cards.Children.Add(card);
+            }
+            details.Insert(0, levelRow);
+            groups = [Group("Quality", new StackPanel { Children = { cards, profileNote } }), Group("Details", details.ToArray())];
+        }
+        else
+            groups = [Group("Quality", levelRow), Group("Details", details.ToArray())];
+        Show();
+        return groups;
     }
 
     /// <summary>The memory for the archives' decoded files (FileCachePresets).</summary>
@@ -346,7 +365,8 @@ public sealed class SettingsView : UserControl
         control.VerticalAlignment = VerticalAlignment.Center;
         control.Margin = new Thickness(16, 0, 0, 0);
         AutomationProperties.SetName(control, title);
-        return new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), MinHeight = 44, Children = { text, At(control, 1) } };
+        // (a finger's room on phones and tablets)
+        return new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), MinHeight = PlayerPlatform.Touch ? 56 : 44, Children = { text, At(control, 1) } };
     }
 
     /// <summary>An on / off setting's row.</summary>
@@ -374,6 +394,26 @@ public sealed class SettingsView : UserControl
                 chosen(options[box.SelectedIndex].Value);
         };
         return box;
+    }
+
+    /// <summary>A card to choose (a theme, a profile): its picture, its name and a line about it; "chosen" marks it.</summary>
+    private static Button ChoiceCard(string label, string help, Control? picture, double width)
+    {
+        var content = new StackPanel { Spacing = 6 };
+        if (picture != null)
+            content.Children.Add(picture);
+        content.Children.Add(new TextBlock { Text = label, FontWeight = FontWeight.SemiBold }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink));
+        content.Children.Add(Muted(help));
+        var card = new Button
+        {
+            Width = width, Margin = new Thickness(0, 0, 10, 10), Padding = new Thickness(PlayerPlatform.Touch ? 12 : 8),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Top,
+            Content = content,
+        };
+        card.Classes.Add("card");
+        AutomationProperties.SetName(card, label);
+        return card;
     }
 
     /// <summary>A line on a page of its own, above its groups.</summary>
@@ -406,7 +446,7 @@ public sealed class SettingsView : UserControl
             Setters =
             {
                 new Setter(TemplatedControl.CornerRadiusProperty, new CornerRadius(8)),
-                new Setter(TemplatedControl.PaddingProperty, new Thickness(14, 10)),
+                new Setter(TemplatedControl.PaddingProperty, PlayerPlatform.Touch ? new Thickness(16, 14) : new Thickness(14, 10)),
                 new Setter(TemplatedControl.FontSizeProperty, 15.0),
                 new Setter(MarginProperty, new Thickness(0, 2)),
             },
