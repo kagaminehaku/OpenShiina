@@ -75,6 +75,7 @@ public sealed class GameSetup
             Accelerator = Settings.AcceleratorForGame(),
             PauseInBackground = Settings.PauseInBackground,
             LoadInBackground = true,
+            FileCacheBytes = FileCachePresets.Bytes(Settings.FileCache),
         };
         if (!Settings.X86JitForGame())
             vm.JitX86 = false;

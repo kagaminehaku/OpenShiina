@@ -43,6 +43,10 @@ public sealed class PlayerSettings
     [JsonConverter(typeof(JsonStringEnumConverter<Scaling>))]
     public Scaling Scaling { get; set; } = Scaling.Sharp;
 
+    /// <summary>The memory for the archives' decoded files (FileCachePresets).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<FileCacheSize>))]
+    public FileCacheSize FileCache { get; set; } = FileCacheSize.Auto;
+
     /// <summary>FSR's sharpening (RCAS): 0 none, 1 to 10 more and more (10: AMD's strongest, 0 stops).</summary>
     public int FsrSharpness { get; set; } = 8;
 

@@ -49,15 +49,26 @@ should follow what their perf.log shows.
   26.9, the compositor 1.74 ms, the alpha pixels 2.02 ns: the Android app runs on CoreCLR now
   (engine-notes.md, "CoreCLR on Android"). blur32 stays 87-93 ms a call on the phone (5.5 on
   the PC) whatever the JIT does: something in its code is slow on arm64; time its pieces there.
+- [ ] **`00C9` on phones**: still the slowest frames of that log (16-19 ms a call, some 150-400
+  ms, 6-16 fps for seconds while skipping). The CoreCLR log's slow reads named it: Bitch
+  Nee-chan's event pictures, larger than the 16 MB the cache kept (e\eva01.s25, 22 MB, read 29
+  times at about 160 ms; e\eva01d.s25, 66 MB, 5 times at 450 ms). The cache is a setting now
+  ("File cache", Auto by the device's memory: a 12 GB phone keeps 384 MB, files of up to half of
+  it), and sounds of a folder the game skips are not read ahead (ScnBoot holding Ctrl: 342 files
+  read ahead, 64 used -> 93, 81). Left: the first read of each, 7 ms a MB on the phone (2.4 on a
+  PC): see whether decrypting or unpacking takes it.
 - [ ] **The compositor: compose only what changed.** In a scene of text (Bitch Nee-chan's
   prologue in ScnBoot) 04C4 takes about 1 ms a call on a PC and is most of the frame: the whole
   1280 x 720 list again every frame, where only the message window changes as its text fades in.
   Composing only the rectangles whose entries or pictures changed needs to know when a picture's
   pixels change (text drawn into a text surface, raw pictures drawn on, a picture loaded).
 - [ ] **Load files in the background.** The engine's own background loader (`00CE`) reads on
-  another thread in the players now (2026-10-11), and files read again come from the cache; the
-  pictures and sounds the scripts load with `00C9`, `04B0`, `06A6` are still read on the
-  interpreter's thread the first time (a scene change waits for them).
+  another thread in the players now (2026-10-11), files read again come from the cache, and the
+  pictures and sounds a scenario names are read ahead (2026-10-12, ScnVm.ReadAhead.cs: in
+  Bitch Nee-chan's prologue 23 of 29 used, the scripts' polls for the loader 103 -> 53). Left:
+  files no scenario names (the system pictures and sounds START loads at the start: Nee-chan's
+  45 sounds, 145 ms on the phone) and a picture's decoding, which stays on the interpreter's
+  thread.
 - [ ] **`00A1`** (the incremental redraw of the message text, a character at a time as it
   fades in): its glyphs and the fonts' ascents are kept now (2026-10-11: 848 -> 298 ms over
   282 calls in Bitch Nee-chan, about 1 ms a call); what is left is every shown character drawn

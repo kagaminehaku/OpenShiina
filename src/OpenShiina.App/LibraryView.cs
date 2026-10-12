@@ -70,8 +70,8 @@ public sealed class LibraryView : UserControl
     /// The settings, saved as they change, counting from the next game started: the graphics level
     /// (GraphicsPresets), with what it sets one by one under Advanced graphics (where the games'
     /// pictures are scaled and mixed, the CPU or the GPU through Vulkan, the frame rate, the
-    /// scaling, FSR's sharpening), then the on / off settings (PlayerSettings.Switches) in their
-    /// sections; it scrolls on small screens.
+    /// scaling, FSR's sharpening), the file cache (FileCachePresets), then the on / off settings
+    /// (PlayerSettings.Switches) in their sections; it scrolls on small screens.
     /// </summary>
     private static Flyout SettingsFlyout()
     {
@@ -224,6 +224,28 @@ public sealed class LibraryView : UserControl
             Content = advanced,
         });
         Show();
+
+        // The memory for the archives' decoded files
+        page.Children.Add(Heading("File cache"));
+        page.Children.Add(Help("Memory kept for the pictures and sounds a game read, so that it does not decode them again. Bigger is smoother on scene changes and event pictures.", 0));
+        foreach (var (size, label, help) in FileCachePresets.Choices)
+        {
+            string text = size == FileCacheSize.Auto ? $"{label} ({FileCachePresets.Auto() >> 20} MB here)" : label;
+            var choice = new RadioButton
+            {
+                Content = new StackPanel { Children = { new TextBlock { Text = text }, Help(help, 0) } },
+                GroupName = "filecache", IsChecked = settings.FileCache == size,
+            };
+            AutomationProperties.SetName(choice, label);
+            choice.IsCheckedChanged += (_, _) =>
+            {
+                if (choice.IsChecked != true)
+                    return;
+                settings.FileCache = size;
+                settings.Save();
+            };
+            page.Children.Add(choice);
+        }
 
         string? section = null;
         foreach (var item in PlayerSettings.Switches)

@@ -87,11 +87,20 @@ public sealed partial class ScnVm
         {
             m_fileCacheOrder.Remove(kept);
             m_fileCacheOrder.AddFirst(kept);
+            ReadAheadAfter(p.Name);
+            if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                LearnScenario(p.Name, kept.Value.Data);
             return kept.Value.Data;
         }
-        if (ReadArchiveFile(p.Name) is not { } data)
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        if ((TakeAhead(p.Name, out string how) ?? ReadArchiveFile(p.Name)) is not { } data)
             return m_host.ReadLooseFile(p.Name);
-        return Kept(p.Name, data);
+        ReadAheadAfter(p.Name);
+        data = Kept(p.Name, data);
+        NoteRead(p.Name, data.Length, started, how);
+        if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            LearnScenario(p.Name, data);
+        return data;
     }
 
     /// <summary>
@@ -148,7 +157,7 @@ public sealed partial class ScnVm
             if (m_host.Fonts is { } fonts)
                 fonts.Gaiji = m_gaiji.Texts;
         }
-        if (data.Length <= FileCacheBytes / 4 && !m_fileCache.ContainsKey(name))
+        if (data.Length <= FileCacheBytes / 2 && !m_fileCache.ContainsKey(name))
         {
             m_fileCache[name] = m_fileCacheOrder.AddFirst((name, data));
             m_fileCacheSize += data.Length;
@@ -162,11 +171,14 @@ public sealed partial class ScnVm
         return data;
     }
 
-    // Files of the archives the scripts read, kept decoded, the last read first: scripts read a
-    // character's pictures again at every change of expression (Bitch Nee-chan's 2.6 MB sheet 28
-    // times in a scene, 10-40 ms each to decrypt and unpack). FileCacheBytes in all, files of up
-    // to a quarter of it.
-    private const long FileCacheBytes = 64L << 20;
+    /// <summary>
+    /// The memory the archives' files the scripts read are kept in, decoded, the last read first
+    /// (the setting "File cache", Game/FileCacheSize.cs); a file of up to half of it is kept.
+    /// Scripts read a character's pictures again at every change of expression (Bitch Nee-chan's
+    /// 2.6 MB sheet 28 times in a scene, 10-40 ms each to decrypt and unpack) and an event picture
+    /// at every variant of it (its 22 MB e\eva01.s25).
+    /// </summary>
+    public long FileCacheBytes { get; set; } = 64L << 20;
 
     // Files of a translation, in place of the archives' files of the same names
     private const string TranslationFolder = "translation\\";

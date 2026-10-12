@@ -75,8 +75,13 @@ foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm
         set(int.Parse(m.Groups[1].Value));
 vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
 // SCNBOOT_BGLOAD=1: the background loader (00CE) reads on another thread, as in the players
+// (and the files a scenario names are read ahead: ScnVm.ReadAhead.cs; SCNBOOT_AHEAD=0 turns that off)
 // (the frames then depend on the machine's timing: off by default)
 vm.LoadInBackground = Environment.GetEnvironmentVariable("SCNBOOT_BGLOAD") == "1";
+vm.ReadAhead = Environment.GetEnvironmentVariable("SCNBOOT_AHEAD") != "0";
+// SCNBOOT_CACHE=n: the file cache n MB (default as the players' Auto: by the machine's memory)
+vm.FileCacheBytes = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_CACHE"), out int cacheMb) && cacheMb > 0
+    ? (long)cacheMb << 20 : FileCachePresets.Auto();
 // SCNBOOT_GPU=1: the GPU mode (Vulkan)
 if (Environment.GetEnvironmentVariable("SCNBOOT_GPU") == "1")
 {
@@ -263,6 +268,13 @@ if (pictures != null)
 if (areaCopy != null)
     Console.WriteLine($"  [areas] tenths of the screen: {string.Join(" ", areaSizes)}; {areaMisses} frames missed; {areaFrames} frames changed, {(areaFrames == 0 ? 0 : areaPixels / areaFrames)} pixels a changed frame on average ({vm.ScreenWidth * vm.ScreenHeight} in all)");
 Console.WriteLine($"gCPUID = {vm.Read32(vm.GlobalAddress("gCPUID")):X}, x86 instructions run: {vm.Cpu.Executed}");
+if (ScnVm.AlphaVectors.Length > 0)
+    Console.WriteLine("  " + ScnVm.AlphaVectors);
+Console.WriteLine($"  file cache {vm.FileCacheBytes >> 20} MB (memory {FileCachePresets.TotalMemory() >> 20} MB)");
+if (vm.LoadInBackground)
+    Console.WriteLine($"  read ahead: {vm.ReadAheadCounts.Read} files, {vm.ReadAheadCounts.Used} of them used");
+foreach (string read in vm.SlowReads.Take(12))
+    Console.WriteLine($"  slow file read: {read}");
 if (vm.OpTimes != null)
     foreach (var (op, ticks) in vm.OpTimes.OrderByDescending(t => t.Value).Take(12))
         Console.WriteLine($"  op {op:X4}: {ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F0} ms ({vm.OpCounts[op]} runs)");

@@ -1366,6 +1366,12 @@ the functions they call from the decompile. First findings:
   i7-10750H 1.12 ns a pixel with vectors, 1.97 without) and keeps the faster; perf.log gives
   the runtime, its vectors and that choice. Bitch Nee-chan's title, 6,000 frames: the same
   pictures, 04C4 4.6 -> 4.4 s.
+- Reading ahead (2026-10-12, ScnVm.ReadAhead.cs): each scenario the scripts read (by any opcode
+  or by the background loader 00CE) is searched for the archives' pictures and sounds it names;
+  when the scripts read one of them, the next six are read on pool threads (32 MB of the file
+  cache's at most waiting), so a scene's loads find them ready. Only with LoadInBackground (the
+  players; ScnBoot SCNBOOT_BGLOAD=1, SCNBOOT_AHEAD=0 without it). The background loader makes a
+  run's pictures depend on time (two runs without reading ahead differ as much as one with it).
 - A game whose .exe is not in GameMap (renamed, or a version GARbro-Mod does not list) is found
   by its keys (2026-10-11, Core `Game/SchemeDetector.cs`): every scheme with keys is tried on up
   to 6 files with a known start once decoded (S25, Ogg, RIFF), 3 an archive, the smallest

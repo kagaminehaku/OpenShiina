@@ -2,7 +2,8 @@
 // "Show the frame rate" and "Write perf.log", or OPENSHIINA_PERF): frames a second and the
 // slowest frame for the title; the log gets, every second, the slowest engine and picture times, the most main-loop rounds in a
 // frame and the heap in use, and the opcodes, C# routines and embedded x86 routines (translated:
-// "jit <offset>", interpreted: "x86 <offset>") that took the most time, to perf.log in the save
+// "jit <offset>", interpreted: "x86 <offset>") that took the most time, the file reads that held
+// the interpreter 30 ms or more and how many files were read ahead, to perf.log in the save
 // folder. Timing every opcode makes the interpreter about half as fast, so only "log" does it.
 // Called on the thread that runs the interpreter.
 
@@ -20,6 +21,8 @@ public sealed class PerfMeter : IDisposable
     private readonly Stopwatch m_clock = Stopwatch.StartNew(), m_run = Stopwatch.StartNew();
     private double m_worst, m_worstEngine, m_worstPicture;
     private int m_frames, m_rounds;
+    private bool m_alphaLogged;
+    private (int Read, int Used) m_readAhead;
 
     private PerfMeter(ScnVm vm, string name, StreamWriter? log, bool title)
     {
@@ -31,7 +34,22 @@ public sealed class PerfMeter : IDisposable
         {
             vm.OpTimes = new();
             log.WriteLine($"Drawing on {(vm.Accelerator is { } gpu ? $"the GPU: {gpu.Name}" : "the CPU")}");
+            log.WriteLine(Machine() + $"; file cache {vm.FileCacheBytes >> 20} MB (memory {FileCachePresets.TotalMemory() >> 20} MB)");
         }
+    }
+
+    /// <summary>
+    /// The runtime and what its vectors are on this processor: the pixel routines are written
+    /// with Vector128 / Vector&lt;T&gt;, which only some runtimes make the processor's own (NEON, SSE).
+    /// </summary>
+    private static string Machine()
+    {
+        bool mono = Type.GetType("Mono.RuntimeStructs") != null;
+        return $"{System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}{(mono ? " (Mono)" : "")}, " +
+            $"{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}, {Environment.ProcessorCount} processors " +
+            $"(pieces of a call: up to {ParallelRows.MaxParts}); vectors: Vector128 {(System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated ? "on" : "off")}, " +
+            $"Vector<T> {(System.Numerics.Vector.IsHardwareAccelerated ? "on" : "off")} ({System.Numerics.Vector<byte>.Count} bytes), " +
+            $"NEON {(System.Runtime.Intrinsics.Arm.AdvSimd.IsSupported ? "yes" : "no")}, SSSE3 {(System.Runtime.Intrinsics.X86.Ssse3.IsSupported ? "yes" : "no")}";
     }
 
     /// <summary>A meter as the settings ask for, or null when they want neither the title nor the log.</summary>
@@ -76,6 +94,21 @@ public sealed class PerfMeter : IDisposable
                 foreach (string choice in m_vm.GpuChoices)
                     m_log.WriteLine("  chose " + choice);
                 m_vm.GpuChoices.Clear();
+            }
+            if (m_vm.SlowReads.Count > 0)
+            {
+                m_log.WriteLine("  slow file reads: " + string.Join("; ", m_vm.SlowReads));
+                m_vm.SlowReads.Clear();
+            }
+            if (m_vm.ReadAheadCounts != m_readAhead)
+            {
+                m_readAhead = m_vm.ReadAheadCounts;
+                m_log.WriteLine($"  read ahead so far: {m_readAhead.Read} files, {m_readAhead.Used} of them used");
+            }
+            if (!m_alphaLogged && ScnVm.AlphaVectors is { Length: > 0 } alpha)
+            {
+                m_log.WriteLine("  chose " + alpha);
+                m_alphaLogged = true;
             }
             m_log.Flush();
             ops.Clear();

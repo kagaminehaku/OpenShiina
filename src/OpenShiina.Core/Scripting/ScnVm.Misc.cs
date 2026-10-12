@@ -53,6 +53,8 @@ public sealed partial class ScnVm
             return;
         m_loading = null;
         byte[]? data;
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        string how = loading.Read.IsCompleted ? ", background loader" : ", background loader, waited for";
         try
         {
             data = loading.Read.Result;
@@ -66,7 +68,12 @@ public sealed partial class ScnVm
             m_loaded = 0;
             return;
         }
-        Loaded(Kept(loading.Name, data));
+        data = Kept(loading.Name, data);
+        NoteRead(loading.Name, data.Length, started, how);
+        ReadAheadAfter(loading.Name);
+        if (loading.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            LearnScenario(loading.Name, data);
+        Loaded(data);
     }
 
     private void Loaded(byte[] data)
@@ -111,7 +118,7 @@ public sealed partial class ScnVm
                 && vm.m_host.ArchiveFileSize(p.Name) != null)
             {
                 vm.m_loaded = 0;
-                vm.m_loading = (p.Name, Task.Run(() => vm.ReadArchiveFile(p.Name)));
+                vm.m_loading = (p.Name, vm.TakeAheadRead(p.Name) ?? Task.Run(() => vm.ReadArchiveFile(p.Name)));
                 return 0;
             }
             if (vm.ReadScriptFile(file) is not { } data)
