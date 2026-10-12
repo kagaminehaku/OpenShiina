@@ -18,6 +18,14 @@
 // for every destination pixel of the row but the first.
 // The tables are made here with the same integer steps; the sums are the same modulo 65536 in
 // any order, so the pixels come out byte for byte (SCNBOOT_VERIFY_NATIVE compares them).
+//
+// Can Fes! START 73A40 is the same code but for three "add dl,dl" the first-column copy of the
+// general loop (0x20) lacks: its test of the partly covered last source pixel looks at 0x80,
+// which a 0x20 entry always has. So every destination row taking that loop adds the first
+// column's last source pixel even when the entry has no 0x40, with the weight its table entry
+// does not hold then: whatever the work buffer had there (a pair of dwords, one for channels 0
+// and 2, one for 1 and 3). This build writes its tables into the work buffers as the x86 code
+// does and reads that pair after (lastAlways).
 
 namespace OpenShiina.Scripting;
 
@@ -189,7 +197,16 @@ public sealed partial class ScnVm
     /// destination rectangle (left, top, right, bottom) and the source one. False when the
     /// x86 code would not end (it only scales down).
     /// </summary>
-    public bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb)
+    public bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb) =>
+        Scale32(dst, dstPitch, dl, dt, dr, db, src, srcPitch, sl, st, sr, sb, 0, 0, lastAlways: false);
+
+    /// <summary>
+    /// Scale32, with the tables also written to <paramref name="columnTable"/> and
+    /// <paramref name="rowTable"/> (the scripts' work buffers) when they are given, and
+    /// <paramref name="lastAlways"/> for Can Fes!'s build (see the top of the file).
+    /// </summary>
+    public bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb,
+                        int columnTable, int rowTable, bool lastAlways)
     {
         uint dw = (uint)(dr - dl), dh = (uint)(db - dt), sw = (uint)(sr - sl), sh = (uint)(sb - st);
         if (dw == 0 || dh == 0 || sw == 0 || sh == 0)
@@ -201,6 +218,14 @@ public sealed partial class ScnVm
         if (!ScaleTable(sh, dh, (uint)st, (uint)dt, (uint)db, 0x5ADC, columns: false, rows)
             || !ScaleTable(sw, dw, (uint)sl, (uint)dl, (uint)dr, 0x5ADD, columns: true, cols))
             return false;
+        if (columnTable != 0)
+            WriteScaleTable(columnTable, cols);
+        if (rowTable != 0)
+            WriteScaleTable(rowTable, rows);
+        // Can Fes!'s build: the first column's last source pixel with the work buffer's weights
+        (uint Lo, uint Hi)? firstLast = null;
+        if (lastAlways && cols.Count > 0 && (cols[0].Flags & 0x60) == 0x20)
+            firstLast = ((uint)Read32(columnTable + 16), (uint)Read32(columnTable + 20));
         var divRows = new ScaleDivider(sh, 0x5ADC);
         var divCols = new ScaleDivider(sw, 0x5ADD);
         uint fullRow = divRows.Divide(dh), fullCol = divCols.Divide(dw);
@@ -221,6 +246,8 @@ public sealed partial class ScnVm
             width = Math.Max(width, colB[c] + ((e.Flags & 0x40) != 0 ? 1 : 0));
             x += e.Count + ((e.Flags & 0x80) != 0 ? 1 : 0);
         }
+        if (firstLast != null)
+            width = Math.Max(width, colB[0] + 1);
 
         int srcX = src + (int)((uint)st >> 4) * srcPitch + (int)((uint)sl >> 4) * 4;
         int dstRow = dst + (int)((uint)dt >> 4) * dstPitch + (int)((uint)dl >> 4) * 4;
@@ -243,7 +270,7 @@ public sealed partial class ScnVm
         for (int r = 0; r < nr; r++)
             rowY[r + 1] = rowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
         var timing = ChooseGpu("scale32", (long)nr * nc);
-        if (timing.Gpu)
+        if (timing.Gpu && firstLast == null)
         {
             if (ScaleOnGpu(Accelerator!, 0, rows, rowY, cols, colFrom, width, srcX, srcPitch, dstRow, dstPitch, fullRow, fullCol))
             {
@@ -289,15 +316,16 @@ public sealed partial class ScnVm
 
                 // the general loop's register copy of the shared first column (see the top)
                 bool ownLoop = e.Flags == 0xC0 && e.Count <= 1;
+                var extra = ownLoop ? null : firstLast;
                 Array.Clear(accLo);
                 Array.Clear(accHi);
                 Array.Clear(clear);
                 if (hasFirst)
-                    first.AddTo(e.First, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop);
+                    first.AddTo(e.First, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop, extra);
                 if (e.Count > 0)
-                    whole.AddTo(fullRow, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: false);
+                    whole.AddTo(fullRow, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: false, extra);
                 if (hasLast)
-                    last.AddTo(e.Last, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop);
+                    last.AddTo(e.Last, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop, extra);
                 var output = Bytes(dstRow + r * dstPitch, nc * 4);
                 for (int c = 0; c < nc; c++)
                 {
@@ -313,6 +341,38 @@ public sealed partial class ScnVm
         ParallelRows.For(nr, (long)nr * nc, RunRows);
         GpuDone("scale32", timing);
         return true;
+    }
+
+    /// <summary>
+    /// A table as the x86 code leaves it in a work buffer: 24 bytes an entry, the flags and the
+    /// count, then each weight twice when its flag is set (the x86 code leaves the others as
+    /// they were).
+    /// </summary>
+    private void WriteScaleTable(int at, List<ScaleEntry> table)
+    {
+        foreach (var e in table)
+        {
+            Write32(at, e.Flags);
+            Write32(at + 4, e.Count);
+            if ((e.Flags & 0x80) != 0)
+            {
+                Write32(at + 8, (int)e.First);
+                Write32(at + 12, (int)e.First);
+            }
+            if ((e.Flags & 0x40) != 0)
+            {
+                Write32(at + 16, (int)e.Last);
+                Write32(at + 20, (int)e.Last);
+            }
+            at += 24;
+        }
+    }
+
+    /// <summary>The number of table entries of an axis from its destination start and end (1/16 pixels).</summary>
+    internal static int ScaleEntryCount(int start, int end)
+    {
+        uint d = (uint)(end - start), lead = (0 - (uint)start) & 15;
+        return (int)Math.Min(((d - lead) >> 4) + (lead != 0 ? 1u : 0) + (((uint)end & 15) != 0 ? 1u : 0), 0x10002);
     }
 
     [ThreadStatic]
@@ -388,9 +448,11 @@ public sealed partial class ScnVm
         /// Every destination column's parts of this row, each times its weight with the row
         /// weight wy, into accLo / accHi (mod 65536 a lane); counts the pixels that are not
         /// opaque. With skipShared the shared first column of every column but the first is left
-        /// out of the count (the general loop's register copy).
+        /// out of the count (the general loop's register copy). With firstLast the first column
+        /// also gets its last source pixel with those weights (Can Fes!'s build, without 0x40).
         /// </summary>
-        public void AddTo(uint wy, uint fullCol, uint[] colWx, int[] shape, ulong[] accLo, ulong[] accHi, int[] clear, bool skipShared)
+        public void AddTo(uint wy, uint fullCol, uint[] colWx, int[] shape, ulong[] accLo, ulong[] accHi, int[] clear, bool skipShared,
+                          (uint Lo, uint Hi)? firstLast)
         {
             ulong[] lo = m_lo, hi = m_hi;
             int[] cl = m_clear;
@@ -419,6 +481,12 @@ public sealed partial class ScnVm
                     uint w = ScaleWeight(colWx[2 * c + 1], wy);
                     l += (lo[b + 1] - lo[b]) * w;
                     h += (hi[b + 1] - hi[b]) * w;
+                    nonOpaque += cl[b + 1] - cl[b];
+                }
+                if (c == 0 && firstLast is { } extra)
+                {
+                    l += (lo[b + 1] - lo[b]) * ScaleWeight(extra.Lo, wy);
+                    h += (hi[b + 1] - hi[b]) * ScaleWeight(extra.Hi, wy);
                     nonOpaque += cl[b + 1] - cl[b];
                 }
                 accLo[c] = l & Lanes;

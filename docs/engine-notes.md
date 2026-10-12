@@ -1165,7 +1165,13 @@ the functions they call from the decompile. First findings:
   Fes! and Re: Rem Plus have the v2.49 blend32 and a third scale32 (Re: Rem START 87920, Maki
   86DB0): v2.47's blocks ending with `ret`. It ran translated, 200-260 ms a call, in their zoomed
   scenes (`$A_CHR` 40 / 41: a 1600 x 900 picture scaled to 1280 x 720 every frame); as C# about
-  5 ms (checked on 218 calls), the frame about 15 ms.
+  5 ms (checked on 218 calls), the frame about 15 ms. Can Fes! (v2.47, START 73A40) has a fourth:
+  Re: Rem's with `ret 4` and without three `add dl,dl` of the general loop's first-column copy
+  (0x20), whose test of the last source pixel then looks at 0x80: every row taking that loop
+  adds the first column's last source pixel with the pair of weights at l[12] + 16, which the
+  entry does not set without 0x40 (the work buffer's earlier bytes). Scale32(lastAlways) writes
+  its tables into l[12] / l[13] as the x86 code does and reads that pair (s32test: 505 random
+  cases, 117 of them with that entry, the same as the x86 code; without the quirk 94 differ).
 - **Ero-On!'s own zoom routines** (2026-10-07): the first v2.49 build has other code for the
   zoom and pan of 0x14A3B (case 0 START 5DCCA, the same size; case 1 5DFA5 when both sides grow;
   case 2 5E2D6 otherwise). 5E2D6 scales down with weight tables counted in steps of 0x100 and

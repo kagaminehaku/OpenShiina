@@ -60,6 +60,8 @@ public sealed partial class ScnVm
         RegisterNative(["DCEE38C4FB3BC259CFB217ABD2D2F712B23BB57A", "1444F8C617F489497F12A55553446AC99F217C14"], "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75));
         RegisterNative("1174F52A9A080EAEF9B086E491846FF3D5B35EB8", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 50, 16, 12));
+        // Can Fes! START 71211: 68 x 51 from blocks of 11 x 11 (the rest of the 800 x 600 picture left out)
+        RegisterNative("4D0B738FCFB0B45B214E4DFE0C8F5F46129F0B09", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 11, 68, 51));
         // Ao no Juuai 188BE (START2 18950; v2.34): the same 100 x 75 thumbnail, f[0] src, f[1] dst
         RegisterNative("FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F)));
@@ -111,6 +113,9 @@ public sealed partial class ScnVm
         RegisterNative("9721452713208958DEE71DA51F85540180359028", "block", (vm, c, a) => vm.BlockCopy(c, a, 12, 48, 2400));
         RegisterNative("C4839FCEF4CF13538D043A595B66E1D7B9B04E21", "block", (vm, c, a) => vm.BlockCopy(c, a, 90, 480, 3840));
         RegisterNative("0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
+        // Can Fes! START 71583: 51 rows of 204 bytes, 2400 apart (its 68 x 51 thumbnail into an
+        // 800 x 600 picture)
+        RegisterNative("1249F52FDF84986E2917C68EBA9DC210A93F1B1C", "block", (vm, c, a) => vm.BlockCopy(c, a, 51, 204, 2400));
         // Bitch Nee-chan C11C4: 128 rows of 684 bytes (0xAB dwords), 3840 apart; Bitch Gakuen
         // C3724: 128 rows of 681 bytes (0xAA dwords and a byte), 3840 apart (every frame of text)
         RegisterNative("796FFAA089B4BBA15CDDB190D35F8529B95949A7", "block", (vm, c, a) => vm.BlockCopy(c, a, 128, 684, 3840));

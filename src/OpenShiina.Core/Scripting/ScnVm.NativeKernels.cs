@@ -173,6 +173,22 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
         });
 
+        // Can Fes! START 73A40: scale32 but for three instructions (see ScnVm.Scale32.cs: the first
+        // column's last source pixel), its tables in the work buffers l[12] (columns) and l[13]
+        // (rows) as the x86 code leaves them
+        RegisterNative("3A1DE43A021F4FED38650FE58BF37857FA1AEED5", "scale32 (Can Fes!)", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
+            int columnTable = vm.NativeArg(a, 12), rowTable = vm.NativeArg(a, 13);
+            int length = right < 0 || bottom < 0 ? 0 : pitch * ((bottom >> 4) + 1) + ((right >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegions(c, a, (dst, length), (columnTable, ScaleEntryCount(dl, right) * 24),
+                                                (rowTable, ScaleEntryCount(dt, bottom) * 24));
+            if (!vm.Scale32(dst, pitch, dl, dt, right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7),
+                            vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11), columnTable, rowTable, lastAlways: true))
+                throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
+        });
+
         // Bitch Nee-chan START C7C70 (Bitch Gakuen CA1E0): scale32's SSE2 build, written out in
         // ScnVm.Scale32Sse.cs (700 ms a call translated, every frame behind the menus).
         // Arguments as scale32's; cases the C# version does not take run as x86 code
@@ -208,44 +224,9 @@ public sealed partial class ScnVm
         // strides, l[6] width, l[7] height, l[8] imax, l[9] imin, l[10] dir
         // Re: Rem Plus 88C84 and Maki Fes! 88114 are the same instructions (padding and ret apart)
         RegisterNative(["42BE6C919F9A6508C03AAA5B66020C3951CC7C05", "5D646499AC90624AAED39ACAC0A3AD67B53C2A81",
-                        "60E811498D402206EC8562EE495A115C4A828B79"], "rulealpha", (vm, c, a) =>
-        {
-            int dst = vm.NativeArg(a, 0), ps = vm.NativeArg(a, 1), pm = vm.NativeArg(a, 2);
-            int sd = vm.NativeArg(a, 3), ss = vm.NativeArg(a, 4), sm = vm.NativeArg(a, 5);
-            int width = vm.NativeArg(a, 6), height = vm.NativeArg(a, 7);
-            int imax = vm.NativeArg(a, 8), imin = vm.NativeArg(a, 9);
-            bool invert = vm.NativeArg(a, 10) != 0;
-            if (width == 0 || height == 0)
-                return;
-            uint divisor = (uint)(imax - imin + 1);
-            if (divisor == 0)
-                throw vm.Error(c, "Embedded x86 routine (rule alpha): division by zero");
-            ushort q = (ushort)(0x8080u / divisor);
-            ushort bias = (ushort)(imin == 0 ? 0 : imin - 1);
-            short max = (short)imax, min = (short)imin;
-            using var verify = vm.VerifyRegion(c, a, dst, sd * (height - 1) + width * 4);
-            int bytes = width * 4;
-            byte[]? spareS = null, spareM = null;
-            for (int y = 0; y < height; y++, dst += sd, ps += ss, pm += sm)
-            {
-                // S's row into the destination row, then its alpha bytes from the mask (the rows
-                // in place; copied when they share bytes with the row written)
-                var rowS = vm.ReadView(ps, bytes, ref spareS, dst, bytes);
-                var rowM = vm.ReadView(pm, bytes, ref spareM, dst, bytes);
-                var output = vm.Bytes(dst, bytes);
-                rowS.CopyTo(output);
-                for (int p = 0; p < bytes; p += 4)
-                {
-                    short m = (short)(invert ? 255 - rowM[p + 3] : rowM[p + 3]);
-                    bool belowMax = max > m, inside = belowMax && m > min;
-                    int s = rowS[p];
-                    ushort w = inside ? (ushort)(m - bias) : (ushort)0;
-                    int product = (short)(ushort)(w * q) * s;
-                    uint v = (uint)product >> 15;
-                    output[p] = (byte)(v | (belowMax ? 0u : (uint)s));
-                }
-            }
-        });
+                        "60E811498D402206EC8562EE495A115C4A828B79"], "rulealpha", (vm, c, a) => vm.RuleAlpha(c, a, vm.NativeArg(a, 10) != 0));
+        // Can Fes! START 74D95: the same without dir (ten arguments, the mask never inverted)
+        RegisterNative("8100FD05AC66CFA023418D590A8F2FA1C8B678D1", "rulealpha", (vm, c, a) => vm.RuleAlpha(c, a, invert: false));
 
         // Ero-On! START 5E2D6 (MMX, the scaling-down case of 0x14CC0): the first v2.49 build's
         // own way of Oreimo's scale32, written out in ScnVm.Scale16.cs. l[0] dst, l[1] its stride,
@@ -293,5 +274,44 @@ public sealed partial class ScnVm
             if (!vm.Enlarge16(dst, pitch, dl, dt, dr, db, vm.NativeArg(a, 6), vm.NativeArg(a, 7), sl, st, sr, sb, vm.NativeArg(a, 12)))
                 throw vm.Error(c, "Embedded x86 routine (enlarge16): rectangles too large");
         });
+    }
+
+    /// <summary>The rule fade's alpha (rulealpha, see RegisterNativeKernels); the mask's byte is 255 - m when <paramref name="invert"/>.</summary>
+    private void RuleAlpha(ScnContext c, ScnNativeArgs a, bool invert)
+    {
+        int dst = NativeArg(a, 0), ps = NativeArg(a, 1), pm = NativeArg(a, 2);
+        int sd = NativeArg(a, 3), ss = NativeArg(a, 4), sm = NativeArg(a, 5);
+        int width = NativeArg(a, 6), height = NativeArg(a, 7);
+        int imax = NativeArg(a, 8), imin = NativeArg(a, 9);
+        if (width == 0 || height == 0)
+            return;
+        uint divisor = (uint)(imax - imin + 1);
+        if (divisor == 0)
+            throw Error(c, "Embedded x86 routine (rule alpha): division by zero");
+        ushort q = (ushort)(0x8080u / divisor);
+        ushort bias = (ushort)(imin == 0 ? 0 : imin - 1);
+        short max = (short)imax, min = (short)imin;
+        using var verify = VerifyRegion(c, a, dst, sd * (height - 1) + width * 4);
+        int bytes = width * 4;
+        byte[]? spareS = null, spareM = null;
+        for (int y = 0; y < height; y++, dst += sd, ps += ss, pm += sm)
+        {
+            // S's row into the destination row, then its alpha bytes from the mask (the rows
+            // in place; copied when they share bytes with the row written)
+            var rowS = ReadView(ps, bytes, ref spareS, dst, bytes);
+            var rowM = ReadView(pm, bytes, ref spareM, dst, bytes);
+            var output = Bytes(dst, bytes);
+            rowS.CopyTo(output);
+            for (int p = 0; p < bytes; p += 4)
+            {
+                short m = (short)(invert ? 255 - rowM[p + 3] : rowM[p + 3]);
+                bool belowMax = max > m, inside = belowMax && m > min;
+                int s = rowS[p];
+                ushort w = inside ? (ushort)(m - bias) : (ushort)0;
+                int product = (short)(ushort)(w * q) * s;
+                uint v = (uint)product >> 15;
+                output[p] = (byte)(v | (belowMax ? 0u : (uint)s));
+            }
+        }
     }
 }

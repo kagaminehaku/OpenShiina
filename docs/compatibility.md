@@ -110,7 +110,7 @@ of those versions it does not list.
 | Yume Miru Egoist | 夢みるエゴイスト | 2010-05-14 | [v4045](https://vndb.org/v4045) | v2.47 | ⚪ Not tried |  |
 | Oshikake! Entremets | おしかけ！アントルメ | 2010-05-28 | [v3824](https://vndb.org/v3824) | v2.47 | ⚪ Not tried |  |
 | You~Gaku | よう∽ガク | 2010-05-28 | [v3810](https://vndb.org/v3810) | v2.47 | ⚪ Not tried |  |
-| Can Fes! ~Itazura Majo to Naisho no Gakuensai~ | きゃん☆フェス！～いたずら魔女とナイショの学園祭～ | 2010-06-25 | [v4143](https://vndb.org/v4143) | v2.47 | ⚪ Not tried |  |
+| Can Fes! ~Itazura Majo to Naisho no Gakuensai~ | きゃん☆フェス！～いたずら魔女とナイショの学園祭～ | 2010-06-25 | [v4143](https://vndb.org/v4143) | v2.47 | 🟡 Starts | 2026-10-12 |
 | Tenki Ane | 天気姉 | 2010-07-09 | [v4543](https://vndb.org/v4543) | v2.47 | ⚪ Not tried |  |
 | Ran→Sem | RAN→SEM～白濁デルモ妻のミイラ捕り～ | 2010-07-23 | [v4645](https://vndb.org/v4645) | v2.47 | ⚪ Not tried |  |
 | Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ⚪ Not tried |  |
@@ -262,6 +262,25 @@ stub decrypts it at start), and the game checks its checksum: START stopped with
 Revision Error" until `03C2` gave this executable's value. Its 679 opcodes are v2.47's with the
 same operands. In ScnBoot: the title, a new game, the story with its pictures, text and music to
 frame 9,000.
+
+**Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
+itself three ways before its title. `03C2` gives this executable's checksum (it wants
+v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
+reads whole (737,280 bytes) and compares with `ogv.ogv` of CANFES_D.WAR, a copy of it: the
+player gives the .exe's name in the game folder (GameMap). `00DF` unmounts that archive. Then
+`0A30` looks for its DVD: a drive holding `canfes.bin` of 1,744,830,464 bytes (without it the
+original asks for the disc again and again). START reads nothing from the disc (every
+file is installed): the player looks in the machine's CD / DVD drives (Windows), and without the
+disc answers for it, a drive of its own whose canfes.bin is the size START then compares it with
+(read from START itself; no disc image or table needed). `0A31` then names that drive as an extra
+folder, where nothing is looked for. In ScnBoot: the warning, the opening movie,
+the title, a new game and the story's first scenes with their pictures, text and music to frame
+21,500. Its embedded x86 routines all run as C#: scale32 (START 73A40) is a build of its own
+whose first column of a row adds its last source pixel when it should not (written out in
+ScnVm.Scale32.cs; 505 random cases the same as its x86 code; SCNBOOT_VERIFY_NATIVE=1 to frame
+13,231 found no call that differs), and its thumbnail (68 x 51 from blocks of 11 x 11), the
+thumbnail's copy into a picture and the rule fade without inversion are the known routines with
+other numbers. opcheck: nothing missing.
 
 ## Updating
 
