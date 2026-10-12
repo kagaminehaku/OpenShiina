@@ -55,8 +55,11 @@ dotnet workload install android
 dotnet build src/OpenShiina.Android -c Release
 ```
 
-The APK is written to `bin/Release/OpenShiina.Android/`; a Release build compiles everything
-ahead of time with LLVM, which takes several minutes (about 9 on a 6-core laptop). It reads the games from the device's
+The APK is written to `bin/Release/OpenShiina.Android/`. It runs on CoreCLR (experimental in
+.NET 10; arm64 and x64), which played Bitch Nee-chan at 40 frames a second on a phone where Mono
+gave 27. `-p:OpenShiinaMono=true` builds it on Mono instead, for 32-bit Android too, compiled
+ahead of time with LLVM, which takes several minutes (about 9 on a 6-core laptop); that APK goes
+to `bin/Release/OpenShiina.Android.Mono/`. It reads the games from the device's
 storage, so Android 11 and later ask for all files access the first time a game is added. On
 the screen: a tap clicks, dragging holds the left button, two fingers moved up or down turn
 the wheel (down opens the backlog); the bar on the right has Menu (a right click, as is Back),

@@ -14,20 +14,43 @@
     <AssemblyName>OpenShiina</AssemblyName>
     <ApplicationId>com.kagaminehaku.openshiina</ApplicationId>
     <ApplicationTitle>OpenShiina</ApplicationTitle>
-    <ApplicationVersion>1</ApplicationVersion>
+    <!-- The version code Android compares to install over an older APK: the hour of the build,
+         UTC, as yyMMddHH (2026-10-12 10:xx -> 26101210), so a newer build always goes over an
+         older one, whether made here or by the release workflow (a lower code is refused as a
+         downgrade, "package invalid", and uninstalling deletes the saves). Two builds in one
+         hour have the same code, which Android takes when the key is the same -->
+    <ApplicationVersion>$([System.DateTime]::UtcNow.ToString('yyMMddHH'))</ApplicationVersion>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <!-- Phones and tablets of today, the emulator, and 32-bit Android (Android Go phones, TV
-         boxes), where the scripts' memory is mapped in 16 MB parts (Scripting/ScnAddressSpace.cs) -->
-    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Android\</OutputPath>
   </PropertyGroup>
 
-  <!-- Release: every assembly compiled ahead of time with LLVM's optimiser instead of Mono's own
-       code generator (better loops and registers, Vector128 as NEON) - the interpreter and the
-       picture routines are what a phone's CPU spends its time on. Builds take minutes longer. -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+  <!-- The runtime: CoreCLR (experimental in .NET 10, the only runtime for phones from .NET 11 on),
+       the desktop's JIT with Vector128 as NEON and tiered PGO. A phone's perf.log of the same
+       skipping in Bitch Nee-chan (2026-10-12): Mono ahead of time with LLVM 26.9 frames a second,
+       the compositor 3.33 ms a call, its alpha pixels 4.23 ns (AdvSimd not there, the vectors
+       hardly faster than plain code); CoreCLR 40.2, 1.74 ms, 2.02 ns. Phones and tablets of
+       today and the emulator (CoreCLR has no 32-bit ARM there). A Release build is ReadyToRun
+       already (composite: Microsoft.Android.Sdk.CoreCLR.targets sets PublishReadyToRun and
+       PublishReadyToRunComposite), the hot methods compiled again by the JIT. Its own
+       intermediate folder, apart from the Mono build's. -->
+  <PropertyGroup Condition="'$(OpenShiinaMono)' != 'true'">
+    <UseMonoRuntime>false</UseMonoRuntime>
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+    <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Android\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)-coreclr\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <!-- -p:OpenShiinaMono=true: Mono, as before 2026-10-12, for 32-bit Android too (Android Go
+       phones, TV boxes, where the scripts' memory is mapped in 16 MB parts:
+       Scripting/ScnAddressSpace.cs). Release compiles every assembly ahead of time with LLVM's
+       optimiser (minutes longer). Its own output and intermediate folders. -->
+  <PropertyGroup Condition="'$(OpenShiinaMono)' == 'true'">
+    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+    <OutputPath>..\..\bin\$(Configuration)\OpenShiina.Android.Mono\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)-mono\</IntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OpenShiinaMono)' == 'true' and '$(Configuration)' == 'Release'">
     <RunAOTCompilation>true</RunAOTCompilation>
     <EnableLLVM>true</EnableLLVM>
   </PropertyGroup>

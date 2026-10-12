@@ -1366,6 +1366,22 @@ the functions they call from the decompile. First findings:
   i7-10750H 1.12 ns a pixel with vectors, 1.97 without) and keeps the faster; perf.log gives
   the runtime, its vectors and that choice. Bitch Nee-chan's title, 6,000 frames: the same
   pictures, 04C4 4.6 -> 4.4 s.
+- CoreCLR on Android (2026-10-12, OpenShiina.Android.csproj): the app runs on CoreCLR
+  (UseMonoRuntime false, arm64 and x64) instead of Mono ahead of time with LLVM
+  (`-p:OpenShiinaMono=true`, which also builds 32-bit ARM). A phone's perf.log on Mono gave its
+  plain pixel code 2.2 times the PC's time and its vectors hardly anything over plain code
+  (AdvSimd not supported there). The same skipping in Bitch Nee-chan on an Adreno 750 phone:
+  Mono 26.9 frames a second, CoreCLR 40.2; the compositor 3.33 -> 1.74 ms a call, 00A1 2.01 ->
+  1.17, subpixel32 3.9 -> 1.7 (now faster on the phone's CPU than on its GPU), the alpha pixels
+  4.23 -> 2.02 ns; blur32 62 -> 93 ms. Compiling methods with loops optimised at once
+  (TieredCompilationQuickJitForLoops false) changed nothing measurable: blur32 stayed at 87 ms
+  (its code, not the JIT's first pass), and a game's first seconds go as what the run shows
+  (00A1 takes about 4.5 ms a call while its first glyphs are made, then 1); not set. With the
+  file cache by memory and the reads ahead by folder, 00C9 went 12.3 -> 3.4 s over the same
+  skipping (59 reads of 30 ms or more -> 13), 36.7 -> 42.9 frames a second. perf.log's second
+  line names the runtime. perf.log also lists the file reads that held the interpreter 30 ms or
+  more (`ScnVm.SlowReads`: file, KB, ms, whether read ahead or by
+  the background loader and whether waited for) and the files read ahead so far.
 - Reading ahead (2026-10-12, ScnVm.ReadAhead.cs): each scenario the scripts read (by any opcode
   or by the background loader 00CE) is searched for the archives' pictures and sounds it names;
   when the scripts read one of them, the next six are read on pool threads (32 MB of the file

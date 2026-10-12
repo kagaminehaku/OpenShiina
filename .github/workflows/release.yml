@@ -3,7 +3,7 @@
 #   OpenShiina-<version>-linux-x64.tar.gz      the Avalonia player for Linux
 #   OpenShiinaTools-<version>-windows-x64.zip  OpenShiina Tools (archives, translations) for Windows
 #   OpenShiinaTools-<version>-linux-x64.tar.gz OpenShiina Tools for Linux
-#   OpenShiina-<version>-android.apk           the Android player (arm64, arm, x64)
+#   OpenShiina-<version>-android.apk           the Android player (CoreCLR: arm64, x64)
 # The version is the tag's (v0.2.0 -> 0.2.0). Run by hand (Actions > Release > Run workflow),
 # it only builds, and the files are kept as the run's artifacts.
 #
@@ -12,7 +12,9 @@
 #   ANDROID_KEY_ALIAS         its key's alias
 #   ANDROID_KEY_PASSWORD      the key's password (also used for the store)
 # Without them it is signed with a debug key made for the run: fine to try, but an APK signed
-# with another key cannot be installed over it.
+# with another key cannot be installed over it. The APK's version code is the hour of the build
+# (the Android project's ApplicationVersion), as for a build made by hand, so either installs
+# over an older one.
 
 name: Release
 
@@ -125,7 +127,7 @@ jobs:
           fi
           dotnet publish src/OpenShiina.Android -c Release -f net10.0-android \
             -p:AndroidSdkDirectory="$ANDROID_HOME" \
-            -p:Version=$VERSION -p:ApplicationDisplayVersion=$VERSION -p:ApplicationVersion=$GITHUB_RUN_NUMBER \
+            -p:Version=$VERSION -p:ApplicationDisplayVersion=$VERSION \
             "${signing[@]}" -o out/android
           mkdir -p dist
           cp out/android/*-Signed.apk "dist/OpenShiina-$VERSION-android.apk"
