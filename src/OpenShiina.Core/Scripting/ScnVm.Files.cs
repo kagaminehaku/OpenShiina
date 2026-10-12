@@ -193,6 +193,9 @@ public sealed partial class ScnVm
     /// </summary>
     public long? ScriptFileSize(string path)
     {
+        // A file on the game's disc in a drive (0A30)
+        if (m_disc is { Virtual: false } disc && path.StartsWith(disc.Root, StringComparison.OrdinalIgnoreCase))
+            return File.Exists(path) ? new FileInfo(path).Length : null;
         if (ResolvePath(path) is not { } p)
             return null;
         if (p.Save)
@@ -242,7 +245,7 @@ public sealed partial class ScnVm
         Register(0x0158, (vm, c, i) =>
         {
             string path = vm.ReadString(vm.Value(c, i.Args[0]));
-            if (vm.ScriptFileSize(path) is not { } size)
+            if ((vm.VirtualDiscSize(c, i, path) ?? vm.ScriptFileSize(path)) is not { } size)
                 return 2;
             vm.Store(c, i.Args[1], (int)size);
             vm.Store(c, i.Args[2], (int)size);

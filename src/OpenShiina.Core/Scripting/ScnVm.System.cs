@@ -61,13 +61,25 @@ public sealed partial class ScnVm
     /// <summary>The game being played (its scheme's name, "Azu Plus"): what the executable's own checks expect.</summary>
     public string Game { get; set; } = "";
 
+    /// <summary>
+    /// The game's .exe as GameMap names it for <see cref="Game"/>, the one in the game folder when
+    /// it names several (Chikan Circle 2's CHIKAN2.exe / CHIKAN2_.exe); null for a game not listed.
+    /// </summary>
+    private string? ExeFileName()
+    {
+        var names = Archives.FormatManager.Instance.GameMap.Where(e => e.Value == Game).Select(e => e.Key).ToList();
+        return names.FirstOrDefault(n => m_host.LooseFileSize(n) != null) ?? names.FirstOrDefault();
+    }
+
     // 03C2's checksums of the unchanged executables, by game: Azu Plus (START 0x002F0 wants
     // v ^ 306723180 = 1804523910), Chuuchuu Nurse (CHUCHU.EXE, v2.45: START 0x0033F wants
-    // -462117567, the CRC-32 of its decrypted code XOR that of 0x8000 bytes at 47B774)
+    // -462117567, the CRC-32 of its decrypted code XOR that of 0x8000 bytes at 47B774), Can Fes!
+    // (CANFES.EXE, v2.47: START 0x004EE wants v ^ 306723180 = -1948973168)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
         ["Chuuchuu Nurse"] = unchecked((int)0xF63C9C2D),
+        ["Can Fes! ~Itazura Majo to Naisho no Gakuensai~"] = 306723180 ^ -1948973168,
     };
 
     private void RegisterSystem()

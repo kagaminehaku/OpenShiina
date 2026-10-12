@@ -141,6 +141,20 @@ public sealed partial class ScnVm
                     Write64(Arg(3), 64L << 30);
                 return 1;
             }
+            case ("kernel32", "GetModuleFileNameA"):
+            {
+                // The game's .exe (Can Fes!'s START reads it whole and compares it with a copy in
+                // CANFES_D.WAR): its name in the game folder, which the file opcodes read as a
+                // loose file (a full path, with its drive, they would not)
+                int buffer = Arg(1), size = Arg(2);
+                if (buffer == 0 || size <= 0 || ExeFileName() is not { } exe)
+                    return 0;
+                byte[] name = Encodings.cp932.GetBytes(exe);
+                int n = Math.Min(name.Length, size - 1);
+                WriteBytes(buffer, name.AsSpan(0, n));
+                WriteByte(buffer + n, 0);
+                return n;
+            }
             case ("user32", "SetMenuItemInfoW"):
                 // The window has no menu of the system's here (Bitch Gakuen's START renames
                 // the items of its window menu): done

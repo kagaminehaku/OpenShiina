@@ -5,6 +5,93 @@ namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
 {
+    /// <summary>
+    /// The disc 0A30 found: the root of its drive ("E:\"), which the scripts put before its files'
+    /// names to ask for their size (0158); Virtual when the player answers for a disc that is not
+    /// there (see 0A30).
+    /// </summary>
+    private (string Root, bool Virtual)? m_disc;
+
+    /// <summary>
+    /// The CD / DVD drive of the machine holding the file (Windows; a mounted disc image is one
+    /// too), else a disc of the player's own, seen as drive Q: (any letter: the scripts only put it
+    /// before the names).
+    /// </summary>
+    private static (string Root, bool Virtual) DiscHolding(string file)
+    {
+        if (OperatingSystem.IsWindows() && file.Length > 0)
+        {
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                try
+                {
+                    if (drive.DriveType == DriveType.CDRom && drive.IsReady && File.Exists(Path.Combine(drive.RootDirectory.FullName, file)))
+                        return (drive.RootDirectory.FullName, false);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    // A drive that cannot be read holds no disc for the game
+                }
+            }
+        }
+        return (@"Q:\", true);
+    }
+
+    // Instructions looked through after 0158 for the comparison of the size it gave
+    private const int DiscCheckLookAhead = 8;
+
+    /// <summary>
+    /// The size 0158 gives a file on the player's own disc, whatever its name: the number the
+    /// scripts then compare the size with, so that the check holds (Can Fes!'s START: "0158 path,
+    /// l[0], l[1]", then "if l[0] == 1744830464"). The next few instructions are looked through,
+    /// up to a jump, for an if (01F4 unsigned, 01FE signed) between a variable 0158 set and a
+    /// number: == >= <= give the number, > one more, < one less, != the number too (a script asks
+    /// again when the size is not the one it wants), "&" the number, "|" 1. Without one, 1: the
+    /// file is there. Null when the path is not on that disc.
+    /// </summary>
+    private int? VirtualDiscSize(ScnContext c, ScnInstruction i, string path)
+    {
+        if (m_disc is not { Virtual: true } disc || !path.StartsWith(disc.Root, StringComparison.OrdinalIgnoreCase))
+            return null;
+        int at = i.Address + i.Length;
+        for (int n = 0; n < DiscCheckLookAhead; n++)
+        {
+            ScnInstruction next;
+            try
+            {
+                next = Decode(c, at);
+            }
+            catch (ScnException)
+            {
+                // data after the code
+                break;
+            }
+            at += next.Length;
+            if (next.Op is 0x01F4 or 0x01FE && next.Args.Length >= 2)
+            {
+                bool left = Sets(next.Args[0]), right = Sets(next.Args[1]);
+                if (left == right)
+                    continue;
+                int number = Value(c, next.Args[left ? 1 : 0]);
+                // the comparison as "size cmp number"
+                int cmp = left ? next.Raw[0] : next.Raw[0] switch { 2 => 4, 3 => 5, 4 => 2, 5 => 3, var same => same };
+                return cmp switch
+                {
+                    3 => number + 1,
+                    5 => number - 1,
+                    7 => 1,
+                    _ => number,
+                };
+            }
+            // a jump, call or end: the check goes on elsewhere
+            if (next.Targets.Length > 0 || next.Op is 0x0000 or 0x0258 or 0x0267 or 0x026D)
+                break;
+        }
+        return 1;
+
+        bool Sets(ScnOperand operand) => i.Args.Skip(1).Any(a => a == operand);
+    }
+
     // DirectInput scan code -> virtual key, for op_03EC (main keys only)
     private static readonly Dictionary<int, int> s_dikToVk = BuildDikTable();
 
@@ -150,18 +237,26 @@ public sealed partial class ScnVm
             vm.Value(c, i.Args[1]);
             return 0;
         });
-        // 0A30 file, dest: "X:\" of the CD-ROM drive holding the file, or "" (no disc here)
+        // 0A30 file, dest: "X:\" of the CD / DVD drive holding the file, or "" (none). Can Fes!'s
+        // START asks for its disc so (canfes.bin, its size read with 0158 and compared with a
+        // number) until there is one, and reads nothing from it (every file is installed). The
+        // machine's drives are looked in, as the engine does; without the disc the player answers
+        // for it: a drive of its own, whose files are the size the scripts check for
+        // (VirtualDiscSize)
         Register(0x0A30, (vm, c, i) =>
         {
-            vm.Value(c, i.Args[0]);
-            vm.WriteByte(vm.Value(c, i.Args[1]), 0);
+            string file = vm.ReadString(vm.Value(c, i.Args[0]));
+            vm.m_disc = DiscHolding(file);
+            vm.WriteString(vm.Value(c, i.Args[1]), vm.m_disc.Value.Root);
             return 0;
         });
-        // 0A31 path: an extra folder files are looked for in (the disc); "" for none
+        // 0A31 path: an extra folder files are looked for in; "" for none. Can Fes!'s START gives
+        // the disc 0A30 found, once it has checked it: every file of the game is installed, so
+        // none is looked for there
         Register(0x0A31, (vm, c, i) =>
         {
             string path = vm.ReadString(vm.Value(c, i.Args[0]));
-            if (path.Length > 0)
+            if (path.Length > 0 && !(vm.m_disc is { } disc && path.Equals(disc.Root, StringComparison.OrdinalIgnoreCase)))
                 throw vm.Error(c, $"An extra data folder ({path}) is not supported");
             return 0;
         });

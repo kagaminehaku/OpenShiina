@@ -136,6 +136,9 @@ public sealed partial class ScnVm
         Register(0x04B6, (vm, c, i) => { vm.m_tables.Remove(vm.Value(c, i.Args[0])); return 0; });
         // 00DD archive: mount a WAR archive - the host has opened every archive of the game
         Register(0x00DD, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
+        // 00DF archive: unmount it (the engine takes its name off its list; Can Fes!'s START, once
+        // it has read a file of CANFES_D.WAR) - the host keeps every archive open
+        Register(0x00DF, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
         // 0A8D: detach the input method from the window
         Register(0x0A8D, (vm, c, i) => 0);
     }

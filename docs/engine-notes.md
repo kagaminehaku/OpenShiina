@@ -735,7 +735,8 @@ the functions they call from the decompile. First findings:
   1804523910 (or when bit 0 of 0x487F24 from `03C0` is set). Each game's START has its own value
   (Chuuchuu Nurse's: -462117567, section 4 "v2.45"): OpenShiina gives the unchanged executable's
   checksum by game (`ScnVm.Game`, the scheme's name; ScnVm.System.cs), Azu Plus's for a game it
-  does not list.
+  does not list. Can Fes! also reads its executable whole (kernel32 GetModuleFileNameA: the
+  .exe's name in the game folder, from GameMap) and compares it with a copy in CANFES_D.WAR.
 - Registry (`00FA` key, `00FF` exists, `00FE` string, `00FD` number): HKCU\software\<brand>\
   <title> (GrandCross for the eleven games), DataPath (the save folder; START appends `oreimoplus_save.bin`) and InstMode (0 - one
   install choice in SETUP.INI). OpenShiina emulates it: DataPath is the host's save folder.
@@ -967,7 +968,14 @@ the functions they call from the decompile. First findings:
   bytes 2, 3, 1); `055C slot, surface` copies a surface into a new picture; `0560` / `0561` set /
   get a frame's offset; `0FD4` row bytes; `0BCF` strncmp, `0BD4` strstr; `02C1` GlobalMemoryStatus;
   `03EC` DirectInput key with repeat; `00CE`-`00D1` background file loader (see "0158" below);
-  `0A30` / `0A31` disc check / extra folder.
+  `0A30` / `0A31` disc check / extra folder (`0A30 file, dest`: "X:\" of the CD / DVD drive
+  holding the file; Can Fes! then wants canfes.bin's size from `0158`, compares it with a
+  number, and gives the drive to `0A31`. The machine's CD / DVD drives are looked in (Windows);
+  without the disc the player answers with a drive of its own (Q:), whose files, any name, are
+  the size the scripts compare them with: the next instructions after `0158` are looked through
+  (up to 8, to a jump) for an `if` (01F4 / 01FE) between the size and a number, and the size is
+  that number (one more for >, one less for <; 1 without a comparison: ScnVm.VirtualDiscSize);
+  `00DF archive` unmounts one (the engine's list of mounted archives).
 - **32-bit pictures** (text and button layers): `0562 picture, frame, x, y, slot, frame` draws a
   frame over one (FUN_004436F0 / 004437C0, one entry): source alpha 0 skips, 255 or a transparent
   destination copies, else a = (0xFE01 - (255-sa)(255-da)) * 0x10203 >> 24 (32 bits) and each
