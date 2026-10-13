@@ -47,17 +47,15 @@ public static class FileCachePresets
     };
 
     /// <summary>
-    /// A thirty-second of the device's memory, in steps of 16 MB, from 64 MB to 512 MB (128 MB at
-    /// most in a 32-bit process, whose 4 GB also hold the scripts' memory): 12 GB gives 384 MB, 4 GB
-    /// 128 MB. 64 MB when the memory is not known.
+    /// A thirty-second of the device's memory, in steps of 16 MB, from 64 MB to 512 MB: 12 GB
+    /// gives 384 MB, 4 GB 128 MB. 64 MB when the memory is not known.
     /// </summary>
     public static long Auto()
     {
         long total = TotalMemory();
         if (total <= 0)
             return 64 * MB;
-        long bytes = Math.Clamp(total / 32 / (16 * MB) * (16 * MB), 64 * MB, 512 * MB);
-        return Environment.Is64BitProcess ? bytes : Math.Min(bytes, 128 * MB);
+        return Math.Clamp(total / 32 / (16 * MB) * (16 * MB), 64 * MB, 512 * MB);
     }
 
     /// <summary>The device's memory: what the GC was told it has, else Linux's (Android's) MemTotal; 0 when neither says.</summary>

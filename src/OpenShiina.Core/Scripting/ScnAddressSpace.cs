@@ -1,15 +1,10 @@
-// The scripts' memory (docs/engine-notes.md, section 10, "Flat memory"). Physical memory is used
-// only for the pages written. Two ways, chosen by the process:
-//   - 64-bit: the whole 32-bit address space as one block of virtual memory, a script address
-//     being Base + address. Linux, Android, macOS: mmap with MAP_NORESERVE, every address
-//     readable and writable at once; Windows: the 4 GB reserved, each 1 MB part committed on
-//     first use (commit counts against RAM + page file), which every access checks - a table of
-//     4096 flags.
-//   - 32-bit (Segmented): a process has no 4 GB to spare, so the address space is 256 parts of
-//     16 MB, each mapped on its first use wherever the system puts it (next to the part before
-//     when it can): a script address is part[address >> 24] + (address & 0xFFFFFF). Heap blocks
-//     never cross a 16 MB boundary (ScnVm.Fit), so a picture is one piece of memory either way;
-//     an access of a few bytes across a boundary goes a byte at a time (ScnVm).
+// The scripts' memory (docs/engine-notes.md, section 10, "Flat memory"): the whole 32-bit
+// address space as one block of virtual memory, a script address being Base + address, physical
+// memory used only for the pages written. Linux, Android, macOS: mmap with MAP_NORESERVE, every
+// address readable and writable at once; Windows: the 4 GB reserved, each 1 MB part committed on
+// first use (commit counts against RAM + page file), which every access checks - a table of 4096
+// flags. A 64-bit process only: a 32-bit one has no 4 GB to spare (the players are built 64-bit;
+// the 32-bit way, 16 MB parts mapped one at a time, is kept on the branch legacy-32bit).
 // Given back memory reads as zero again and gives its pages back to the system (Discard).
 
 using System.Runtime.CompilerServices;
@@ -22,40 +17,28 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
     /// <summary>The 4 GB of the 32-bit addresses.</summary>
     public const long Size = 1L << 32;
 
-    /// <summary>Bytes past the 4 GB (64-bit), so that an access of a few bytes at the top stays inside.</summary>
+    /// <summary>Bytes past the 4 GB, so that an access of a few bytes at the top stays inside.</summary>
     private const long Guard = 1 << 16;
 
-    /// <summary>The parts mapped one at a time in 32-bit (16 MB); heap blocks never cross their boundaries.</summary>
-    public const int SegmentBits = 24;
-
-    /// <summary>The parts committed one at a time on 64-bit Windows: 1 MB (16 MB committed about twice the RAM used).</summary>
+    /// <summary>The parts committed one at a time on Windows: 1 MB (16 MB committed about twice the RAM used).</summary>
     private const int CommitBits = 20;
 
     private const long CommitSize = 1L << CommitBits;
 
-    public const long SegmentSize = 1L << SegmentBits;
-
-    private const uint SegmentMask = (uint)SegmentSize - 1;
-
     private const int OsPage = 4096;
 
-    /// <summary>A 32-bit process: the parts are mapped one at a time (see above).</summary>
-    public static readonly bool Segmented = !Environment.Is64BitProcess;
-
-    /// <summary>64-bit Windows: parts are committed on first use (elsewhere everything is there at once).</summary>
-    private static readonly bool LazyCommit = OperatingSystem.IsWindows() && !Segmented;
+    /// <summary>Windows: parts are committed on first use (elsewhere everything is there at once).</summary>
+    private static readonly bool LazyCommit = OperatingSystem.IsWindows();
 
     private byte* m_base;
     private readonly byte[] m_committed = new byte[1 << (32 - CommitBits)];
-    private readonly nint[] m_segments = new nint[1 << (32 - SegmentBits)];
-    private readonly List<(nint Start, long Length)> m_mappings = new();
     private readonly Lock m_commitLock = new();
     private bool m_released;
 
     public ScnAddressSpace()
     {
-        if (Segmented)
-            return;
+        if (!Environment.Is64BitProcess)
+            throw new PlatformNotSupportedException("OpenShiina runs in a 64-bit process only: the games' 4 GB of memory do not fit in a 32-bit one.");
         if (LazyCommit)
         {
             m_base = (byte*)VirtualAlloc(null, unchecked((nuint)(Size + Guard)), MemReserve, PageNoAccess);
@@ -86,14 +69,6 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
         if (m_released)
             return;
         m_released = true;
-        if (Segmented)
-        {
-            foreach (var (start, length) in m_mappings)
-                Unmap((void*)start, length);
-            m_mappings.Clear();
-            Array.Clear(m_segments);
-            return;
-        }
         if (m_base == null)
             return;
         if (LazyCommit)
@@ -103,77 +78,30 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
         m_base = null;
     }
 
-    /// <summary>
-    /// The memory of script address <paramref name="address"/>, for an access of up to 8 bytes
-    /// that does not cross a 16 MB boundary when <see cref="Segmented"/> (<see cref="Crosses"/>).
-    /// </summary>
+    /// <summary>The memory of script address <paramref name="address"/>, for an access of up to 8 bytes.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte* At(uint address)
     {
-        if (Segmented)
-        {
-            nint part = Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(m_segments), (int)(address >> SegmentBits));
-            return (byte*)(part != 0 ? part : MapSegment(address >> SegmentBits)) + (address & SegmentMask);
-        }
         if (LazyCommit && Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(m_committed), (int)(address >> CommitBits)) == 0)
             CommitParts(address, 1);
         return m_base + address;
     }
 
-    /// <summary>An access of <paramref name="bytes"/> at <paramref name="address"/> needs two parts (Segmented only).</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool Crosses(uint address, int bytes) => Segmented && (address & SegmentMask) > SegmentSize - bytes;
+    /// <summary>How many of the <paramref name="length"/> bytes from <paramref name="address"/> are one piece of memory: up to the top of the 4 GB (at least 1).</summary>
+    public long Contiguous(uint address, long length) => Math.Min(length, Size - address);
 
-    /// <summary>How many of the <paramref name="length"/> bytes from <paramref name="address"/> are one piece of memory (at least 1).</summary>
-    public long Contiguous(uint address, long length)
-    {
-        long n = Math.Min(length, Size - address);
-        if (!Segmented)
-            return n;
-        long done = SegmentSize - (address & SegmentMask);
-        // parts mapped one after the other are one piece too
-        for (uint part = address >> SegmentBits; done < n; part++, done += SegmentSize)
-        {
-            byte* end = At(part << SegmentBits) + SegmentSize;
-            if (At((part + 1) << SegmentBits) != end)
-                break;
-        }
-        return Math.Min(done, n);
-    }
-
-    /// <summary>The memory of [address, address + length), which must be one piece of memory (<see cref="Contiguous"/>).</summary>
+    /// <summary>The memory of [address, address + length), which must not run past the top of the 4 GB (<see cref="Contiguous"/>).</summary>
     public byte* Block(uint address, long length)
     {
         if (length <= 0)
             return At(address);
-        if (Segmented)
-        {
-            if (Contiguous(address, length) < length)
-                throw new InvalidOperationException($"{length} bytes at {address:X8} are not one piece of script memory (a 32-bit process maps 16 MB parts apart)");
-            return At(address);
-        }
         if (LazyCommit)
             CommitParts(address, length);
         return m_base + address;
     }
 
-    /// <summary>
-    /// A block was made at [address, address + length): in 32-bit, the parts of a block over
-    /// 16 MB are mapped now, one after the other where the system lets them be, so that it is one
-    /// piece of memory.
-    /// </summary>
-    public void Prepare(uint address, long length)
-    {
-        if (!Segmented || length <= SegmentSize)
-            return;
-        long end = Math.Min(address + length, Size);
-        for (long part = address >> SegmentBits; part << SegmentBits < end; part++)
-            if (Volatile.Read(ref m_segments[part]) == 0)
-                MapSegment((uint)part);
-    }
-
-    // 64-bit Windows: commits the parts [address, address + length) touches, each with the first
-    // page of the next, for accesses across the boundary
+    // Windows: commits the parts [address, address + length) touches, each with the first page
+    // of the next, for accesses across the boundary
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void CommitParts(uint address, long length)
     {
@@ -195,51 +123,6 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
         }
     }
 
-    // 32-bit: maps a part of 16 MB, next to the part before when that place is free
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private nint MapSegment(uint part)
-    {
-        lock (m_commitLock)
-        {
-            if (m_segments[part] != 0)
-                return m_segments[part];
-            void* hint = part > 0 && m_segments[part - 1] != 0 ? (byte*)m_segments[part - 1] + SegmentSize : null;
-            void* p = Map(hint, SegmentSize);
-            if (p == null && hint != null)
-                p = Map(null, SegmentSize);
-            if (p == null)
-                throw new OutOfMemoryException($"Could not map 16 MB of script memory for {part << SegmentBits:X8} (error {Marshal.GetLastPInvokeError()})");
-            m_mappings.Add(((nint)p, SegmentSize));
-            Volatile.Write(ref m_segments[part], (nint)p);
-            return (nint)p;
-        }
-    }
-
-    // Fresh zero memory of the system, at the hint when it is free (null: it is not)
-    private static void* Map(void* hint, long length)
-    {
-        if (OperatingSystem.IsWindows())
-            return VirtualAlloc(hint, (nuint)length, MemReserve | MemCommit, PageReadWrite);
-        void* p = mmap(hint, (nuint)length, ProtRead | ProtWrite, MapPrivate | MapAnonymous | MapNoReserve, -1, 0);
-        if (p == MapFailed)
-            return null;
-        if (hint != null && p != hint)
-        {
-            // mmap put it elsewhere: the caller asks again without a place
-            munmap(p, (nuint)length);
-            return null;
-        }
-        return p;
-    }
-
-    private static void Unmap(void* start, long length)
-    {
-        if (OperatingSystem.IsWindows())
-            VirtualFree(start, 0, MemRelease);
-        else
-            munmap(start, (nuint)length);
-    }
-
     /// <summary>
     /// [address, address + length) reads as zero again: whole pages go back to the system
     /// (their physical memory freed), the bytes of the pages at either end are cleared.
@@ -249,18 +132,6 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
         long start = address, end = Math.Min(start + length, Size);
         if (end <= start)
             return;
-        if (Segmented)
-        {
-            // a part at a time; a part never mapped has nothing to give back
-            while (start < end)
-            {
-                long part = start >> SegmentBits, partEnd = Math.Min((part + 1) << SegmentBits, end);
-                if (m_segments[part] != 0)
-                    DiscardBlock((byte*)m_segments[part] + (start & SegmentMask), partEnd - start);
-                start = partEnd;
-            }
-            return;
-        }
         long first = (start + OsPage - 1) & ~(long)(OsPage - 1), last = end & ~(long)(OsPage - 1);
         // small blocks are only cleared: a system call costs more
         if (last - first < 16 * OsPage)
@@ -288,21 +159,6 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
             GiveBack(m_base + first, last - first);
     }
 
-    // 32-bit: Discard inside one mapped part (its memory is page aligned like its addresses)
-    private static void DiscardBlock(byte* p, long length)
-    {
-        long start = (long)p, end = start + length;
-        long first = (start + OsPage - 1) & ~(long)(OsPage - 1), last = end & ~(long)(OsPage - 1);
-        if (last - first < 16 * OsPage)
-        {
-            new Span<byte>(p, (int)length).Clear();
-            return;
-        }
-        new Span<byte>(p, (int)(first - start)).Clear();
-        new Span<byte>((byte*)last, (int)(end - last)).Clear();
-        GiveBack((byte*)first, last - first);
-    }
-
     // Whole pages (committed, or mapped) go back to the system and read as zero again
     private static void GiveBack(byte* p, long length)
     {
@@ -316,7 +172,7 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
             throw new OutOfMemoryException($"Could not map script memory (errno {Marshal.GetLastPInvokeError()})");
     }
 
-    /// <summary>64-bit: zeroes [start, start + length) where memory is there (Windows: nothing is to clear in an uncommitted part).</summary>
+    /// <summary>Zeroes [start, start + length) where memory is there (Windows: nothing is to clear in an uncommitted part).</summary>
     private void Clear(long start, long length)
     {
         long end = start + length;

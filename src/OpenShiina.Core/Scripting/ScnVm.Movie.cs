@@ -50,6 +50,9 @@ public sealed partial class ScnVm
 
     private Movie? MovieSlot(int n) => n is >= 0 and < MovieSlots ? m_movies[n] : null;
 
+    /// <summary>A movie of either player runs (ScnBoot's sweep does not count its time as standing still).</summary>
+    public bool MoviePlaying => m_movies.Any(m => m.State == 3) || m_graphMovies.Any(m => m.State == 3);
+
     /// <summary>
     /// Opens the movie file of a record (FUN_0040B450); false when it cannot be played. Windows
     /// Media files (v2.50's ending, mv\ed.wmv) play as the MPEG-1 movie of the same name the games

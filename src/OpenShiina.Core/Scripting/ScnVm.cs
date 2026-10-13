@@ -7,7 +7,7 @@
 // or an opcode that returns to the scheduler).
 //
 // Scripts use real pointers: variables, strings and code live in one flat 32-bit memory (a 4 GB
-// block of virtual memory, or 16 MB parts in a 32-bit process: ScnAddressSpace). Layout:
+// block of virtual memory: ScnAddressSpace). Layout:
 // g / b / a arrays, s flags, f (1,000 per slot), the stacks (1,000 dwords per slot, "l" variables
 // and salloc live on it), named variables, a heap for loaded files, and the module code.
 //
@@ -194,8 +194,7 @@ public sealed partial class ScnVm : IDisposable
     private const int HeapRegion = 0x10000000, CodeRegion = 0x40000000;
 
     // The 32-bit address space (ScnAddressSpace: one block of virtual memory, an address being
-    // Base + (uint)address; in a 32-bit process 16 MB parts mapped one at a time), physical
-    // memory only for the pages written
+    // Base + (uint)address), physical memory only for the pages written
     private readonly ScnAddressSpace m_memory = new();
     private int m_heapTop = HeapRegion, m_codeTop = CodeRegion, m_namedTop = NamedRegion;
 
@@ -279,15 +278,14 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>The script memory's pages go back to the system (the VM is not used any more).</summary>
     public void Dispose() => m_memory.Dispose();
 
-    // A pointer to script memory for an access of up to 8 bytes (in a 32-bit process, one that
-    // does not cross a 16 MB boundary: ScnAddressSpace.Crosses)
+    // A pointer to script memory for an access of up to 8 bytes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private unsafe byte* At(int address) => m_memory.At((uint)address);
 
     /// <summary>
     /// The bytes [address, address + length) of script memory, for code that works on them in
-    /// place: a block of the heap or a part of one (in a 32-bit process, a block that is not one
-    /// piece of memory throws; <see cref="IsContiguous"/>). It must not run past the top of the 4 GB.
+    /// place: a block of the heap or a part of one. It must not run past the top of the 4 GB
+    /// (<see cref="IsContiguous"/>).
     /// </summary>
     public unsafe Span<byte> Bytes(int address, int length)
     {
@@ -296,7 +294,7 @@ public sealed partial class ScnVm : IDisposable
         return new Span<byte>(m_memory.Block((uint)address, length), length);
     }
 
-    /// <summary>[address, address + length) is one piece of memory (always in a 64-bit process, below the top of the 4 GB).</summary>
+    /// <summary>[address, address + length) is one piece of memory: it does not run past the top of the 4 GB.</summary>
     public bool IsContiguous(int address, int length) => m_memory.Contiguous((uint)address, length) >= length;
 
     /// <summary>
@@ -324,42 +322,18 @@ public sealed partial class ScnVm : IDisposable
 
     public unsafe void WriteByte(int address, byte value) => *At(address) = value;
 
-    // Accesses of 2 and 4 bytes across a 16 MB boundary (32-bit process only) go a byte at a time
+    // Accesses of 2 and 4 bytes at the top of the 4 GB read the guard past it (ScnAddressSpace)
 
-    public unsafe ushort Read16(int address) =>
-        ScnAddressSpace.Crosses((uint)address, 2) ? (ushort)(ReadByte(address) | ReadByte(address + 1) << 8) : Unsafe.ReadUnaligned<ushort>(At(address));
+    public unsafe ushort Read16(int address) => Unsafe.ReadUnaligned<ushort>(At(address));
 
-    public unsafe void Write16(int address, int value)
-    {
-        if (ScnAddressSpace.Crosses((uint)address, 2))
-        {
-            WriteByte(address, (byte)value);
-            WriteByte(address + 1, (byte)(value >> 8));
-            return;
-        }
-        Unsafe.WriteUnaligned(At(address), (ushort)value);
-    }
+    public unsafe void Write16(int address, int value) => Unsafe.WriteUnaligned(At(address), (ushort)value);
 
-    public unsafe int Read32(int address)
-    {
-        if (ScnAddressSpace.Crosses((uint)address, 4))
-            return ReadByte(address) | ReadByte(address + 1) << 8 | ReadByte(address + 2) << 16 | ReadByte(address + 3) << 24;
-        return Unsafe.ReadUnaligned<int>(At(address));
-    }
+    public unsafe int Read32(int address) => Unsafe.ReadUnaligned<int>(At(address));
 
-    public unsafe void Write32(int address, int value)
-    {
-        if (ScnAddressSpace.Crosses((uint)address, 4))
-        {
-            for (int i = 0; i < 4; i++)
-                WriteByte(address + i, (byte)(value >> (8 * i)));
-            return;
-        }
-        Unsafe.WriteUnaligned(At(address), value);
-    }
+    public unsafe void Write32(int address, int value) => Unsafe.WriteUnaligned(At(address), value);
 
-    // Blocks go a piece of memory at a time (to the top of the 4 GB, or a 16 MB part in a 32-bit
-    // process); past the top they go on at address 0, as 32-bit addresses do
+    // Blocks go a piece of memory at a time (to the top of the 4 GB); past the top they go on at
+    // address 0, as 32-bit addresses do
 
     public void WriteBytes(int address, ReadOnlySpan<byte> bytes)
     {
@@ -437,7 +411,7 @@ public sealed partial class ScnVm : IDisposable
             Buffer.MemoryCopy(from, to, count, count);
             return;
         }
-        // across the top of the 4 GB, or parts apart in a 32-bit process: through a buffer
+        // across the top of the 4 GB: through a buffer
         WriteBytes(dst, ReadBytes(src, count));
     }
 
@@ -480,15 +454,14 @@ public sealed partial class ScnVm : IDisposable
     {
         int size = (Math.Max(bytes, 4) + 15) & ~15;
         // The smallest free range it fits in
-        int best = -1, bestSize = int.MaxValue, bestAt = 0;
+        int best = -1, bestSize = int.MaxValue;
         for (int i = 0; i < m_freeRanges.Count; i++)
         {
             int length = m_freeRanges.Values[i];
-            if (length >= size && length < bestSize && Fit(m_freeRanges.Keys[i], size) is long fit && fit + size <= (long)m_freeRanges.Keys[i] + length)
+            if (length >= size && length < bestSize)
             {
                 best = m_freeRanges.Keys[i];
                 bestSize = length;
-                bestAt = (int)fit;
                 if (length == size)
                     break;
             }
@@ -497,42 +470,21 @@ public sealed partial class ScnVm : IDisposable
         if (best >= 0)
         {
             m_freeRanges.Remove(best);
-            if (bestAt > best)
-                m_freeRanges.Add(best, bestAt - best);
-            if (best + bestSize > bestAt + size)
-                m_freeRanges.Add(bestAt + size, best + bestSize - (bestAt + size));
-            at = bestAt;
+            if (bestSize > size)
+                m_freeRanges.Add(best + size, bestSize - size);
+            at = best;
         }
         else
         {
-            long fit = Fit(m_heapTop, size);
             // The heap must not grow into the code of the modules
-            if (fit + size > CodeRegion)
+            if ((long)m_heapTop + size > CodeRegion)
                 throw new ScnException($"Out of script memory: {HeapInUse >> 20} MB in use, {size} bytes asked for", -1, 0, 0);
-            at = (int)fit;
-            if (at > m_heapTop)
-                m_freeRanges.Add(m_heapTop, at - m_heapTop);   // the gap to the boundary (zero, as above the top)
+            at = m_heapTop;
             m_heapTop = at + size;
         }
         m_blocks[at] = size;
         HeapInUse += size;
-        m_memory.Prepare((uint)at, size);
         return at;
-    }
-
-    /// <summary>
-    /// Where a block of <paramref name="size"/> bytes goes from <paramref name="start"/> on: no
-    /// block crosses a 16 MB boundary (one over 16 MB starts on one), so that in a 32-bit process,
-    /// where the 16 MB parts of the address space are mapped one at a time (ScnAddressSpace), the
-    /// C# routines, which take a block as one piece of memory, need not know.
-    /// </summary>
-    private static long Fit(long start, int size)
-    {
-        const long Part = 1L << ScnAddressSpace.SegmentBits;
-        long end = start + size;
-        if (size > Part)
-            return (start + Part - 1) & ~(Part - 1);
-        return (start & ~(Part - 1)) == ((end - 1) & ~(Part - 1)) ? start : (start + Part - 1) & ~(Part - 1);
     }
 
     /// <summary>The address is the start of a block in use.</summary>

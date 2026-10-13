@@ -54,26 +54,31 @@ public sealed partial class ScnVm
         string file = name[(name.LastIndexOfAny(['\\', '/']) + 1)..];
         if (m_playAlias == null)
         {
-            if (!load || m_playFrom is not { } from || m_playScenarios?.Contains(file) != true)
+            if (m_playFrom is not { } from || m_playScenarios?.Contains(file) != true)
                 return null;
             // Its folder is the one of the scenario asked for (or none)
             string folder = name[..(name.Length - file.Length)];
-            m_playAlias = name;
             m_playTarget = (ReadArchiveFile(folder + from.File) != null ? folder : "") + from.File;
             m_playLine = from.Line;
+            // Asked for its length (START does before it loads one, and makes room for that
+            // much): the length of the one to be put in place, else it was cut short at that
+            if (!load)
+                return PlayFromData() is { } length ? (m_playTarget, length) : null;
+            m_playAlias = name;
             m_playFrom = null;
             m_playSkip = true;
         }
         if (!name.Equals(m_playAlias, StringComparison.OrdinalIgnoreCase))
             return null;
-        if (m_playData == null)
-        {
-            if (ReadArchiveFile(m_playTarget!) is not { } data)
-                return null;
-            data = Translate(m_playTarget!, data);
-            m_playData = FromLine(data, m_playLine);
-        }
-        return (m_playTarget!, m_playData);
+        return PlayFromData() is { } data ? (m_playTarget!, data) : null;
+    }
+
+    /// <summary>The scenario to put in place, as the scripts read it, made once (again after the translation changed).</summary>
+    private byte[]? PlayFromData()
+    {
+        if (m_playData == null && ReadArchiveFile(m_playTarget!) is { } data)
+            m_playData = FromLine(Translate(m_playTarget!, data), m_playLine);
+        return m_playData;
     }
 
     /// <summary>
@@ -151,18 +156,43 @@ public sealed partial class ScnVm
     /// has set the game up before it; the title's choices end in one block (it frees the title,
     /// sets the new game up, Gevnum = 1, launch.scn), which reads the choice from a word of the
     /// module ("store L_S, a[990]; goto block"... "load L_S, a[927]" after Gevnum = 1): that word
-    /// is 0, the first choice (START). 17 of the 18 games tried have it (all but Ao no Juuai,
-    /// whose title is elsewhere: there the title shows and a new game is started by hand).
+    /// is 0, the first choice (START). 17 of the 18 games tried have it; Ao no Juuai's TOPMENU
+    /// calls its title instead (<see cref="SkipTitleCall"/>).
     /// </summary>
     private void PlayFromModule(ScnContext c, string file)
     {
         if (m_playFrom == null || m_titleSkipped || !file.EndsWith("topmenu.scn", StringComparison.OrdinalIgnoreCase))
             return;
         m_titleSkipped = true;
-        if (NewGameBlock(ReadBytes(c.CodeBase, c.CodeSize)) is not { } found)
+        if (NewGameBlock(ReadBytes(c.CodeBase, c.CodeSize)) is { } found)
+        {
+            Write32(c.Base + found.Choice, 0);
+            c.Pc = c.Base + found.Block;
             return;
-        Write32(c.Base + found.Choice, 0);
-        c.Pc = c.Base + found.Block;
+        }
+        SkipTitleCall(c);
+    }
+
+    /// <summary>
+    /// Ao no Juuai (v2.34): its TOPMENU.SCN calls the title (a gosub to START's), then by the
+    /// choice loads the replay's module (b[43] 6) or the game's. The call becomes a jump to the
+    /// instruction after it, so the game's module starts at once (a new game, b[43] 0 at boot).
+    /// </summary>
+    private void SkipTitleCall(ScnContext c)
+    {
+        int at = c.CodeBase, end = c.CodeBase + c.CodeSize;
+        for (int i = 0; i < 8 && at < end; i++)
+        {
+            var instruction = Decode(c, at);
+            // gosub (7 bytes, as a goto: 58 02, 84 = a label, the offset) and an "if" after it
+            if (instruction.Op == 0x0267 && instruction.Length == 7 && at + 7 < end && Decode(c, at + 7).Op == 0x01F4)
+            {
+                m_decoded.Remove(at);
+                WriteBytes(at, [0x58, 0x02, 0x84, .. BitConverter.GetBytes(at + 7 - c.Base)]);
+                return;
+            }
+            at += instruction.Length;
+        }
     }
 
     /// <summary>The new game's block in a TOPMENU.SCN and the word it reads the title's choice from (offsets), or null.</summary>

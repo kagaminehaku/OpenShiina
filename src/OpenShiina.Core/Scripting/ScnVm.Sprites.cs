@@ -332,8 +332,7 @@ public sealed partial class ScnVm
     /// <summary>
     /// The row of a frame from its row pointer (its 16-bit length and the runs after it), read
     /// in place; copied first when it shares bytes with the destination row [dst, dst + bytes)
-    /// (or, in a 32-bit process, is not one piece of memory: the 16 bytes read past its runs
-    /// can reach the next 16 MB part).
+    /// (or runs past the top of the 4 GB with the 16 bytes read past its runs).
     /// </summary>
     private ReadOnlySpan<byte> ReadRow(int p, int dst, int bytes)
     {

@@ -199,8 +199,8 @@ public sealed partial class ScnVm
             }
             remaining -= n;
         }
-        // A method 1 run at the end can take the drawing past the row (even past the picture:
-        // in a 32-bit process maybe into the next 16 MB part, then through a copy)
+        // A method 1 run at the end can take the drawing past the row (even past the picture,
+        // and past the top of the 4 GB: then through a copy)
         if (pending > 0 && IsContiguous(dst + d, pending * 3))
             PaintPending(pending, Bytes(dst + d, pending * 3), 0, dst + d, blend);
         else if (pending > 0)

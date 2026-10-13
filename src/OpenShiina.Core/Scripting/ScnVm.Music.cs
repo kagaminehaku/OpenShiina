@@ -300,13 +300,17 @@ public sealed partial class ScnVm
 
     /// <summary>
     /// The length of the music file at <paramref name="address"/> from its header: a RIFF's
-    /// size, or an Ogg stream's pages up to the one that ends it; 0 for anything else.
+    /// size, an OGV's, or an Ogg stream's pages up to the one that ends it; 0 for anything else.
     /// </summary>
     private int MusicLength(int address)
     {
         uint magic = (uint)Read32(address);
         if (magic == 0x46464952)
             return Read32(address + 4) + 8;
+        // OGV: "OGV", the PCM's length + 52, the file's - 52 (Chuuni Hime no Teikoku's START
+        // copies its m\*.ogv music so; m\bgm01.ogv 4,315,703 + 52 bytes)
+        if ((magic & 0xFFFFFF) == 0x56474F)
+            return Read32(address + 8) + 52;
         if (magic != 0x5367674F)
             return 0;
         int at = address;
