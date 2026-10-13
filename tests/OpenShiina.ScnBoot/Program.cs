@@ -18,7 +18,9 @@
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
 // SCNBOOT_PLAYFROM="MAK00.TXT:64" starts the game at that line of a scenario, as OpenShiina
-// Tools' "Play from here" (ScnVm.Warp.cs), and prints the scenario lines shown ("[line]").
+// Tools' "Play from here" (ScnVm.Warp.cs), and prints the scenario lines shown ("[line]");
+// SCNBOOT_SWEEP=1 runs that scenario through and says how it ended (below; tests/sweep.ps1 runs
+// every scenario of a game so). SCNBOOT_LIST=1 only lists the scenarios with message lines.
 // SCNBOOT_DUMP="frame:address:length:file,..." writes the scripts' memory (hex address) to a file
 // after that frame.
 // SCNBOOT_AREAS=1 checks ScnVm.TakeChangedArea: a copy of the window's picture updated only in the
@@ -61,6 +63,15 @@ if (scheme == null)
     return 1;
 }
 using var data = GameData.Open(folder, scheme);
+// SCNBOOT_LIST=1: the scenarios with message lines, a line each ("name<tab>lines"), for tests/sweep.ps1
+if (Environment.GetEnvironmentVariable("SCNBOOT_LIST") == "1")
+{
+    var sjis = Encoding.GetEncoding(932);
+    foreach (var (name, scenario) in ScenarioText.ReadScenarios(folder, scheme))
+        if (sjis.GetString(scenario).Split('\n').Count(l => l.Trim() is { Length: > 0 } t && t[0] is not (';' or '$' or '【')) is > 0 and int lines)
+            Console.WriteLine($"{name}\t{lines}");
+    return 0;
+}
 Console.WriteLine($"{scheme.Name}, engine v{version}, first script {start}");
 
 // Save data of the test run: a temporary folder, never the player's real data
@@ -103,10 +114,45 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1" || profileFrame
     vm.OpTimes = new();
 // SCNBOOT_PLAYFROM="FILE.TXT:line": OpenShiina Tools' "Play from here" (ScnVm.Warp.cs), the game
 // started at that line of a scenario; the scenario lines it shows are printed as they come
+// SCNBOOT_SWEEP=1 with it runs that scenario through: Ctrl held (the games' skip; let go 24
+// frames of 48, for choices), Return pressed every 12 frames (text the skip stops at, choices)
+// and a click every 48 (the choices Return does not make: a grid of 3 x 3 places, 28-72% of
+// the screen's height, clear of the buttons at its foot, one after another), until a line of
+// another scenario shows or every line of this one has, or none new for SCNBOOT_SWEEP_STUCK
+// frames (default 9000: 2.5 minutes; a movie playing is not counted); then a "[sweep]" line:
+// how it ended, the frames, the lines shown of all, the last, the slowest frame, the heap's peak
+bool sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
+// (SCNBOOT_SWEEP_CLICKS="x,y;x,y..." clicks there instead)
+host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") is { Length: > 0 } clicks
+    ? clicks.Split(';').Select(c => c.Split(',')).Select(c => (int.Parse(c[0]), int.Parse(c[1]))).ToArray()
+    : [.. from y in new[] { 28, 50, 72 } from x in new[] { 50, 25, 75 } select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)];
+int sweepStuck = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_STUCK"), out int stuckFrames) ? stuckFrames : 9000;
+string? sweepFile = null, sweepEnd = null, sweepLast = null, slowestAt = null;
+int sweepTotal = 0, sweepLastNew = 0;
+long slowestMs = 0, heapPeak = 0;
+var sweepSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && playFrom.LastIndexOf(':') is > 0 and int colon)
 {
-    vm.PlayFrom(playFrom[..colon], int.Parse(playFrom[(colon + 1)..]), ScenarioText.ReadScenarios(folder, scheme).Select(s => s.Name).ToList());
-    vm.LineShown += id => Console.WriteLine($"  [line] {id} at {host.Frame}");
+    var scenarios = ScenarioText.ReadScenarios(folder, scheme);
+    sweepFile = playFrom[..colon];
+    vm.PlayFrom(sweepFile, int.Parse(playFrom[(colon + 1)..]), scenarios.Select(s => s.Name).ToList());
+    // Message lines as text.tsv counts them: not empty, not a comment, command or speaker
+    if (scenarios.FirstOrDefault(s => s.Name.Equals(sweepFile, StringComparison.OrdinalIgnoreCase)).Data is { } scenario)
+        sweepTotal = Encoding.GetEncoding(932).GetString(scenario).Split('\n').Count(l => l.Trim() is { Length: > 0 } t && t[0] is not (';' or '$' or '【'));
+    vm.LineShown += id =>
+    {
+        Console.WriteLine($"  [line] {id} at {host.Frame}");
+        if (!sweep)
+            return;
+        if (!id.StartsWith(sweepFile + ":", StringComparison.OrdinalIgnoreCase))
+            sweepEnd ??= "done (next scenario)";
+        else
+        {
+            sweepLast = id;
+            if (sweepSeen.Add(id))
+                sweepLastNew = host.Frame;
+        }
+    };
 }
 if (!vm.LoadModule(0, start, start: true))
 {
@@ -240,6 +286,24 @@ try
         }
         if (frameTime.ElapsedMilliseconds >= 1000)
             Console.WriteLine($"  [slow] frame {frame}: {frameTime.ElapsedMilliseconds} ms, {vm.FrameRounds} rounds");
+        // SCNBOOT_HEAP=1: the scripts' memory in use every 60 frames
+        if (frame % 60 == 0 && Environment.GetEnvironmentVariable("SCNBOOT_HEAP") == "1")
+            Console.WriteLine($"  [heap] frame {frame}: {vm.HeapInUse >> 20} MB{(vm.ShownLine is { } heapLine ? $" at {heapLine}" : "")}");
+        heapPeak = Math.Max(heapPeak, vm.HeapInUse);
+        if (sweep)
+        {
+            if (frameTime.ElapsedMilliseconds > slowestMs)
+                (slowestMs, slowestAt) = (frameTime.ElapsedMilliseconds, vm.ShownLine ?? $"frame {frame}");
+            if (sweepEnd == null && sweepTotal > 0 && sweepSeen.Count >= sweepTotal)
+                sweepEnd = "done (every line)";
+            // A movie playing (an ending of minutes) is not standing still
+            if (vm.MoviePlaying)
+                sweepLastNew = frame;
+            if (sweepEnd == null && frame - sweepLastNew > sweepStuck)
+                sweepEnd = "stuck";
+            if (sweepEnd != null)
+                break;
+        }
         else if (frame >= traceFrom && frame <= traceTo)
             Console.WriteLine($"  [frame] {frame}: {frameTime.Elapsed.TotalMilliseconds:F2} ms, {vm.FrameRounds} rounds");
         if (pictures != null && frame % every == 0)
@@ -253,6 +317,8 @@ try
 catch (ScnException ex)
 {
     Console.WriteLine($"Frame {frame}: {ex.Message}");
+    if (ex.Message.StartsWith("Out of script memory", StringComparison.Ordinal))
+        Console.WriteLine($"  [heap] {vm.HeapReport()}");
     var c = ex.Slot >= 0 ? vm.Slot(ex.Slot) : null;
     if (c != null)
     {
@@ -272,6 +338,8 @@ catch (Exception ex)
     Console.WriteLine($"Frame {frame}: {vm.CrashReport(ex)}");
 }
 
+if (sweep)
+    Console.WriteLine($"[sweep]\t{sweepFile}\t{sweepEnd ?? (frame >= frames ? "out of frames" : "stopped")}\t{frame}\t{sweepSeen.Count}/{sweepTotal}\t{sweepLast}\t{slowestMs} ms at {slowestAt}\theap peak {heapPeak >> 20} MB");
 if (pictures != null)
     SaveScreen(frame);
 if (areaCopy != null)
@@ -476,7 +544,15 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
                 Convert.ToInt32(p[1], p[1].StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16 : 10)))
             .ToList();
 
-    public bool KeyDown(int virtualKey) => m_presses.Any(p => p.Key == virtualKey && Frame >= p.From && Frame <= p.To);
+    // SCNBOOT_SWEEP: Ctrl held but for frames 12-35 of every 48 (a game may not let a choice be
+    // made while it skips: Ero-On), Return down 2 frames of every 12
+    private readonly bool m_sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
+
+    private bool SweepCtrl => m_sweep && Frame % 48 is < 12 or >= 36;
+
+    public bool KeyDown(int virtualKey) =>
+        virtualKey is 0x11 or 0xA2 && SweepCtrl || m_sweep && virtualKey == 0x0D && Frame % 12 < 2
+        || m_presses.Any(p => p.Key == virtualKey && Frame >= p.From && Frame <= p.To);
 
     // SCNBOOT_MOUSE: (first frame, x, y, buttons, last frame the buttons are held)
     private readonly List<(int From, int X, int Y, int Buttons, int To)> m_mouse =
@@ -492,20 +568,46 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
             .OrderBy(m => m.Item1)
             .ToList();
 
+    /// <summary>
+    /// SCNBOOT_SWEEP: where the mouse clicks, 2 frames of every 48, a place after another (the
+    /// choices: Ero-On's under the top, Yuru Plus's heroines left and right, the menu Maki Fes!
+    /// shows after a scenario); text goes on too.
+    /// </summary>
+    public (int X, int Y)[] SweepClicks { get; set; } = [(0, 0)];
+
+    private bool SweepClicking => m_sweep && Frame % 48 is 24 or 25;
+
     public (int X, int Y) MousePosition
     {
         get
         {
+            if (m_sweep)
+                return SweepClicks[Frame / 48 % SweepClicks.Length];
             var started = m_mouse.Where(m => m.From <= Frame).ToList();
             return started.Count > 0 ? (started[^1].X, started[^1].Y) : (0, 0);
         }
     }
 
-    public int MouseButtons => m_mouse.Where(m => m.From <= Frame && Frame <= m.To).Select(m => m.Buttons).FirstOrDefault();
+    public int MouseButtons => SweepClicking ? 1 : m_mouse.Where(m => m.From <= Frame && Frame <= m.To).Select(m => m.Buttons).FirstOrDefault();
 
     /// <summary>The window messages of this frame: keys and buttons that go down or up.</summary>
     public IEnumerable<(int Message, int WParam)> Messages()
     {
+        if (m_sweep)
+        {
+            if (Frame == 0 || Frame % 48 == 36)
+                yield return (ScnMessage.KeyDown, 0x11);
+            if (Frame % 48 == 12)
+                yield return (ScnMessage.KeyUp, 0x11);
+            if (Frame % 12 == 0)
+                yield return (ScnMessage.KeyDown, 0x0D);
+            if (Frame % 12 == 2)
+                yield return (ScnMessage.KeyUp, 0x0D);
+            if (Frame % 48 == 24)
+                yield return (ScnMessage.LButtonDown, 1);
+            if (Frame % 48 == 26)
+                yield return (ScnMessage.LButtonUp, 0);
+        }
         foreach (var p in m_presses)
         {
             if (p.From == Frame)
