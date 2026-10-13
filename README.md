@@ -16,6 +16,20 @@ game's own.
   <img src="docs/images/home.png" alt="OpenShiina's home screen: the games as tiles, the chosen one's card with Play" width="860">
 </p>
 
+## Why OpenShiina
+
+The ShiinaRio engine runs only on 32-bit Windows, through old Windows APIs, and some of its games
+ask for their disc. OpenShiina keeps these games playable:
+
+- **On today's machines and on phones:** Windows, Linux and Android, from the same game files,
+  with no Windows layer or emulator in between.
+- **As the games were made:** it runs their own scripts rather than retelling the story, so the
+  effects, menus and saves are the original ones.
+- **In other languages:** translations sit beside the game and are read as it plays, without
+  touching its files.
+- **For keeping:** the engine's behaviour is written down in
+  [docs/engine-notes.md](docs/engine-notes.md), so these games do not depend on one old executable.
+
 **Status:** early. The interpreter runs ShiinaRio engine versions 2.45, 2.47, 2.49 and 2.50,
 and 2.34 in part. OpenShiina has the keys of 136 ShiinaRio games; 18 were tried and 12 play
 through (the eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start
