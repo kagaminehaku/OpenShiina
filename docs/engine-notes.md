@@ -999,7 +999,7 @@ the functions they call from the decompile. First findings:
 
 - The compositor's remaining modes (path 0x4409E0), checked byte for byte against the
   executable's own code on the x86 interpreter (random sprite lists of every run method, clip
-  rectangles, every mode; scratchpad blendtest):
+  rectangles, every mode; a test program, blendtest):
   - bit 28 set (0x10000000, 0x30000000, 0x50000000, 0x70000000; 0x442930) adds, saturated:
     BGR runs d + T1[c] (from 5 pixels on, 8-byte groups from an 8-byte aligned byte take MMX:
     (c a & 0xFFFF) >> 8), one-colour runs d + T1[c], alpha runs d + (T1[c] alpha >> 8).
@@ -1150,7 +1150,7 @@ the functions they call from the decompile. First findings:
   of a row the general loop takes the shared first column of partly covered source rows from a
   register and leaves it out of the FF test. Since the sums wrap at 16 bits, the whole source
   rows are added first (Vector<ushort>) and multiplied once; columns use prefix sums; rows run
-  on all cores. Checked against the x86 code on 500 random rectangles (scratchpad scaletest)
+  on all cores. Checked against the x86 code on 500 random rectangles (a test program, scaletest)
   and in the game.
 - ScnBoot with SCNBOOT_VERIFY_NATIVE=1 runs the interpreter as well and compares the bytes written;
   SCNBOOT_PROFILE=1 also times each C# routine; SCNBOOT_PROFILE_FRAME=n gives the opcodes and
@@ -1238,7 +1238,7 @@ the functions they call from the decompile. First findings:
   through memory (blocks that overlap other than in place) or its count would wrap round to 4
   billion, a C# version leaves the call to the x86 code (`RunX86`: translated when X86Jit takes
   the routine, else interpreted). Each build was compared with its x86 code on the interpreter on
-  random cases, the whole test memory after each (scratchpad nativetest: 54 builds and offsets, 3
+  random cases, the whole test memory after each (a test program, nativetest: 54 builds and offsets, 3
   to 300 cases each, overlapping blocks among them), and in ScnBoot with SCNBOOT_VERIFY_NATIVE
   (which now checks every place a routine writes). Left to the x86 code: the SSE2 build of the
   zoom (Oreimo 79A20, Sena 79E70, Re: Rem Plus 8BDE0), which START takes only when the CPU

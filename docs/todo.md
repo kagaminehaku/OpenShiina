@@ -177,7 +177,7 @@ Vietnamese included, words wrapped at the window's edge; files in the game folde
   game has none. Their files are an FA2 archive in the resource "UPDATE" (records of 0x118
   bytes: name 260, flags 2 = packed with GARbro's Fa2 LZ, file time, unpacked size, size);
   1.03a has all of 1.01's, newer (ANEIRO.EXE, ANEIRO_S / _T / _U1.WAR, SETUP.INI). Taken out
-  with a script (scratchpad aneiro_update_103a) and copied into the game.
+  with a script (aneiro_update_103a) and copied into the game.
 - [ ] Try a real WARC 1.0-1.6 game (1.0 / 1.1 only on archives made for the test, 1.2-1.6's
   range decoder only against GARbro's on random input).
 - [ ] Ao no Juuai (engine v2.34, D:\SusGame\Guilty\青の獣愛 here; aoj.EXE, not packed). State
