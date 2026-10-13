@@ -4,6 +4,13 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.5.1 (2026-10-13)
+
+- **Bitch Nee-chan no longer hangs when its sound effect SE_M004 plays** (skipping through the
+  story, the window stood still with a processor core busy): the end its last Ogg page gives
+  falls inside the packet before the last, which NVorbis 0.10.5 reads past and then loops on
+  for ever (NVorbis issue #40). Ogg sounds are now read only up to their length.
+
 ## 0.5.0 (2026-10-13)
 
 The player in your language.

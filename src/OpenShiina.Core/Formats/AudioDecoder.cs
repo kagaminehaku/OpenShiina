@@ -85,12 +85,13 @@ public class AudioDecoder
         int channels = vorbis.Channels;
         int sampleRate = vorbis.SampleRate;
 
-        // ReadSamples may return fewer samples than requested and TotalSamples is only an
-        // estimate, so read in chunks until the stream is exhausted.
+        // ReadSamples may return fewer samples than requested, so read in chunks until the stream
+        // is exhausted (ReadVorbis: never past its length).
         var samples = new List<float>();
         var chunk = new float[4096 * channels];
+        long length = vorbis.TotalSamples;
         int n;
-        while ((n = vorbis.ReadSamples(chunk, 0, chunk.Length)) > 0)
+        while ((n = ReadVorbis(vorbis, length, chunk, 0, chunk.Length)) > 0)
             samples.AddRange(new ArraySegment<float>(chunk, 0, n));
         var buffer = samples.ToArray();
         int readSamples = buffer.Length;
@@ -121,6 +122,26 @@ public class AudioDecoder
         }
 
         return outMs.ToArray();
+    }
+
+    /// <summary>
+    /// NVorbis's ReadSamples, never past <paramref name="length"/> (the reader's TotalSamples, the
+    /// last page's granule position). Where that end falls inside the packet before the last
+    /// (Bitch Nee-chan's SE_M004.OGG: 45,740, that packet's samples going to 46,080), NVorbis
+    /// 0.10.5 reads past it and its next read never returns: the last packet's valid length
+    /// comes out negative and StreamDecoder.Read loops without reading (NVorbis issue #40, fixed
+    /// only after 0.10.5).
+    /// </summary>
+    public static int ReadVorbis(NVorbis.VorbisReader reader, long length, float[] buffer, int offset, int count)
+    {
+        if (length > 0)
+        {
+            long left = (length - reader.SamplePosition) * reader.Channels;
+            if (left <= 0)
+                return 0;
+            count = (int)Math.Min(count, left);
+        }
+        return reader.ReadSamples(buffer, offset, count);
     }
 
     private class PadDecoder

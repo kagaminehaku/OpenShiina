@@ -102,6 +102,7 @@ public sealed class ScnMusic(ScnMixer mixer) : IScnMusic, IDisposable
     internal sealed class Source : ISampleProvider, IDisposable
     {
         private readonly NVorbis.VorbisReader? m_vorbis;
+        private readonly long m_vorbisLength;
         private readonly WaveFileReader? m_wave;
         private readonly ISampleProvider? m_waveSamples;
         private readonly bool m_loop;
@@ -117,6 +118,7 @@ public sealed class ScnMusic(ScnMixer mixer) : IScnMusic, IDisposable
             if (ogg != null)
             {
                 m_vorbis = new NVorbis.VorbisReader(new MemoryStream(ogg), true);
+                m_vorbisLength = m_vorbis.TotalSamples;
                 WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(m_vorbis.SampleRate, m_vorbis.Channels);
                 return;
             }
@@ -133,7 +135,7 @@ public sealed class ScnMusic(ScnMixer mixer) : IScnMusic, IDisposable
             while (total < count)
             {
                 int n = m_vorbis != null
-                    ? m_vorbis.ReadSamples(buffer, offset + total, count - total)
+                    ? AudioDecoder.ReadVorbis(m_vorbis, m_vorbisLength, buffer, offset + total, count - total)
                     : m_waveSamples!.Read(buffer, offset + total, count - total);
                 if (n == 0)
                 {
