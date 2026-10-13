@@ -4,12 +4,19 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.5.0 (2026-10-13)
+
+The player in your language.
 
 - **The player's screens in other languages:** Settings → Appearance → Language picks the
-  device's language, English or Vietnamese, and changes the screens at once. The words live in
-  `src/OpenShiina.Core/Localization/Strings.resx`; a translation is a `Strings.<language>.resx`
-  beside it and shows in the list by itself.
+  device's language (the default), English or Vietnamese, and changes the screens at once, on
+  the desktop and on Android. OpenShiina Tools stays in English for now.
+- **For translators:** the words live in `src/OpenShiina.Core/Localization/Strings.resx`
+  (English); a translation is a `Strings.<language>.resx` beside it and shows in the list by
+  itself. Words not translated yet show in English.
+- Titles in the wordmark's font (Cinzel) only when it has all their letters, so a Vietnamese
+  title is not drawn in two fonts.
+- The README has screenshots, why OpenShiina exists, and this changelog.
 
 ## 0.4.1 (2026-10-13)
 
