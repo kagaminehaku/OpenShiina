@@ -205,63 +205,50 @@ as many as fit. Settings > Back up saves turns that off.
 
 ## OpenShiina Tools
 
-`OpenShiinaTools [archive or game folder]` (it was [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor),
-now on Avalonia and the player's engine, so it opens every game the player knows):
+OpenShiina Tools opens a game's archives and translates games. **The full guide, with pictures,
+is [docs/tools.md](docs/tools.md).** It was [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor);
+it now runs on Avalonia and the player's engine, so it opens every game the player knows.
 
-- **Archives**: opens a game's `.WAR` archive (the game found by its `.exe` next to it, else by
-  its keys, or chosen under Scheme) or a standalone `.S25` picture; lists, filters and searches
-  its files; previews pictures (S25 frames, MI4, PNG, JPEG, BMP), plays sounds (OGV, OGG, PAD,
-  WAV) and shows scripts as text, anything else as bytes.
-- **Extract** a file, the selection or everything, as stored or converted (on by default):
-  S25 / MI4 to PNG (an S25 a file per frame), OGV to OGG, PAD to WAV. **Compose layers** saves
-  each layered S25 (event CGs and sprites: a base and eyes, mouth, effect layers) as the whole
-  pictures the scenario scripts show, read from the archives next to it.
-- **Repack** (WARC 1.7 archives): the files of a folder named as entries of the open archive
-  (extracted without converting, then edited) are packed and encrypted into a new archive, the
-  other entries copied as they are. Every packed entry is read back and compared with its file
-  before the archive is saved; the open archive itself cannot be written over. Pictures cannot
-  be made from PNG yet (no S25 encoder).
-- **Translation**: translate a game in the tab itself, see below.
+<p align="center">
+  <img src="docs/images/tools-archives.png" alt="OpenShiina Tools, Archives tab: Maki Fes!'s pictures, a character's sprite previewed" width="860">
+</p>
+
+- **Browse** a game's `.WAR` archives (or a single `.S25` picture): search the files, see the
+  pictures frame by frame, play the sounds, read the scripts.
+- **Extract** files as they are stored or converted: S25 / MI4 to PNG, OGV to OGG, PAD to WAV.
+  **Compose layers** saves event pictures and sprites whole, as the story shows them.
+- **Repack** edited files into a new archive (WARC 1.7). Each one is checked before it is saved.
+- **Translate** a game in the Translation tab, below.
 
 ## Translations
 
-To translate a game, open the **Translation** tab of OpenShiina Tools (or run
-`OpenShiinaTools <game folder>`) and choose the game's folder:
+To translate a game, open the **Translation** tab of OpenShiina Tools and choose the game's
+folder:
 
-1. The first time, the tools read the game's scenarios and make the tables of its translation in
-   the game folder's `translation` folder: `text.tsv` (every message line: id `FILE.TXT:line`,
-   speaker, original, translation), `names.tsv` (the speakers' names) and `strings.tsv` (texts
-   the scripts write themselves, such as choices and menus, added by hand: the text exactly as the
-   game shows it and its translation).
-2. Translate in the tab: the scenarios a file at a time (or every line at once), with a search
-   and "untranslated only"; the names; the strings. Every change is saved a moment later.
-   **Check** says how far the translation is, how many of the 2,820 codes for letters it uses
-   (beyond them a letter shows as `?`) and which lines do not fit the game's (another version).
-   **▶ Play** opens the game in OpenShiina with the translation as it is.
-3. That is all: the player reads the tables as they are. To share the translation, share the
-   `translation` folder; the game's own files stay as they are.
+1. The tools read the game's scenarios and make the translation's tables in a `translation`
+   folder inside the game folder.
+2. Translate line by line in the tab, then the speakers' names and the texts the scripts draw
+   themselves (choices, menus). Every change is saved as you type.
+3. **▶ Play** plays the game in a window of the tools, as OpenShiina does, with the translation
+   as it is. While it plays, what you save reaches it from its next scenario, and a button goes
+   to the line it shows. Right-click a line, **▶ Play from here**: the game opens straight at that line.
 
-The tables are UTF-8 with tabs between the fields, so they can also be filled in a spreadsheet
-(Excel, LibreOffice, Google Sheets) or by a translation tool; more columns after the
-translation (notes, who translated a line) are kept. **Update from the game** reads the game
-again (after an update of it) and keeps the translations of the lines that did not change. The
-scenarios keep the original speakers' names, which games find voices and name plates by; the
-player draws the translated names. Keep the game's own symbols such as `①` (pictures the game
-draws in their place, a heart in the Bitch games).
+| | |
+|---|---|
+| ![The Translation tab: Maki Fes!'s first lines translated into English](docs/images/tools-translation.png) | ![Maki Fes! played from the tools with the translation: Maki's name and line in English](docs/images/tools-translation-play.png) |
+| The Translation tab | The same lines in the game |
 
-What the player reads, all in the game folder's `translation` folder: `text.tsv`, `names.tsv` and
-`strings.tsv`; a scenario file of its own (`.TXT`, UTF-8 **with a byte order mark**, found by the
-path the game reads it by, `translation\p\pro01_01.txt`, or by its name alone,
-`translation\PRO01_01.TXT`), which comes before `text.tsv` for that scenario; and
-`strings.txt` (a line each: the original, a tab, the translation; `#` comments). Translated
-lines may use any letters, Vietnamese included, drawn half-width with their own widths and
-wrapped at the window's edge by words. A text the scripts draw is replaced when the whole of it
-is one of the strings' or names' originals.
+To share a translation, share the `translation` folder: it goes into the game's folder, and the
+game's own files stay as they are. The tables are plain text (UTF-8, tabs between the fields), so
+they can also be filled in a spreadsheet or a translation tool. Every step, and the files the
+player reads, are in [docs/tools.md](docs/tools.md#translation-translate-a-game).
 
 ## Documentation
 
 - [`docs/compatibility.md`](docs/compatibility.md): which games play, and how far each was checked,
   on which platforms.
+- [`docs/tools.md`](docs/tools.md): how to use OpenShiina Tools, with pictures: archives,
+  extracting, repacking, translating a game.
 - [`docs/todo.md`](docs/todo.md): what is planned and not done yet.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.

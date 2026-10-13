@@ -4,6 +4,27 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **OpenShiina Tools plays the game it translates, in a window of its own:** ▶ Play no longer
+  starts OpenShiina (nor asks where it is, as it did with the release downloads). Each save of the
+  translation reaches the game playing from its next scenario.
+- **Which line is this?** The game played from the tools shows the id of its line in a corner
+  (`MAK00.TXT:64`), and a button in the tools goes to that line in the table.
+- **Play from here:** right-click a line: the game opens at that line in a few seconds, without
+  its logos or title, the scene set as the story sets it (what earlier scenarios and choices set
+  is not there). Tried on all 18 games: 16 go straight there, Yuru Plus asks for its heroine
+  first, Ao no Juuai shows its title. Such a game's saves stay in memory; the player's own saves
+  are left alone. `ScnBoot` runs it too (`SCNBOOT_PLAYFROM=MAK00.TXT:64`).
+- **The Translation tab checks by itself:** after each save, the line at the bottom says how far
+  the translation is and how many of the 2,820 letter codes it uses (⚠ from nine tenths). The
+  Check and Update from the game buttons are gone: a button shows when lines do not fit, or when
+  the game's scenarios differ from the table (after an update of the game), and that one asks
+  before it updates the table.
+- **A guide to OpenShiina Tools, with pictures** ([docs/tools.md](docs/tools.md)): opening,
+  previewing and extracting a game's archives, repacking, and translating a game step by step.
+  The README shows the tools and a translation in the game.
+
 ## 0.5.1 (2026-10-13)
 
 - **Bitch Nee-chan no longer hangs when its sound effect SE_M004 plays** (skipping through the
