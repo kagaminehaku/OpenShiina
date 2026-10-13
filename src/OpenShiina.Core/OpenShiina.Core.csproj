@@ -33,32 +33,40 @@
     <EmbeddedResource Include="Data\ScnOps\*.tsv" LogicalName="OpenShiina.ScnOps.%(Filename).tsv" />
   </ItemGroup>
 
-  <!-- The players' words (Localization/Strings.resx, English; Strings.<language>.resx the
-       translations), with a typed class to read them by name -->
+  <!-- The players' words: Localization/Strings.resx in English, Strings.<language>.resx the
+       translations. All of them go into this assembly (no satellite assemblies: Android's
+       packaging leaves those out), each as OpenShiina.Localization.Strings[.<language>].resources,
+       read by Localization/Languages.cs. The class Strings, a property a word, is written from
+       Strings.resx's names (OpenShiinaStrings); Languages.Translated lists the translations. -->
   <ItemGroup>
-    <EmbeddedResource Update="Localization\Strings.resx">
-      <StronglyTypedFileName>$(IntermediateOutputPath)Strings.Designer.cs</StronglyTypedFileName>
-      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
-      <StronglyTypedNamespace>OpenShiina.Localization</StronglyTypedNamespace>
-      <StronglyTypedClassName>Strings</StronglyTypedClassName>
-      <PublicClass>true</PublicClass>
-    </EmbeddedResource>
+    <EmbeddedResource Update="Localization\Strings.*.resx" WithCulture="false" LogicalName="OpenShiina.Localization.%(Filename).resources" />
   </ItemGroup>
 
-  <!-- Languages.Translated: the codes of the translations there are (Strings.vi.resx -> "vi") -->
-  <Target Name="OpenShiinaLanguages" BeforeTargets="BeforeCompile;CoreCompile">
+  <Target Name="OpenShiinaStrings" BeforeTargets="BeforeCompile;CoreCompile">
+    <XmlPeek XmlInputPath="Localization\Strings.resx" Query="/root/data/@name">
+      <Output TaskParameter="Result" ItemName="_OpenShiinaWord" />
+    </XmlPeek>
     <ItemGroup>
       <_OpenShiinaTranslation Include="Localization\Strings.*.resx" />
       <_OpenShiinaLanguage Include="$([System.String]::Copy('%(_OpenShiinaTranslation.Filename)').Substring(8))" />
+      <_OpenShiinaStringsLine Include="// Written by the build from Localization/Strings.resx (OpenShiina.Core.csproj)%3B do not edit." />
+      <_OpenShiinaStringsLine Include="namespace OpenShiina.Localization%3B" />
+      <_OpenShiinaStringsLine Include="/// &lt;summary&gt;The players' words, in the screens' language (Languages.Text).&lt;/summary&gt;" />
+      <_OpenShiinaStringsLine Include="public static class Strings" />
+      <_OpenShiinaStringsLine Include="{" />
+      <_OpenShiinaStringsLine Include="@(_OpenShiinaWord->'    public static string %(Identity) => Languages.Text(&quot;%(Identity)&quot;)%3B')" />
+      <_OpenShiinaStringsLine Include="}" />
     </ItemGroup>
     <PropertyGroup>
-      <_OpenShiinaLanguages>@(_OpenShiinaLanguage->'"%(Identity)"', ', ')</_OpenShiinaLanguages>
+      <_OpenShiinaLanguages>@(_OpenShiinaLanguage->'&quot;%(Identity)&quot;', ', ')</_OpenShiinaLanguages>
     </PropertyGroup>
-    <WriteLinesToFile File="$(IntermediateOutputPath)Languages.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
-                      Lines="namespace OpenShiina.Localization%3B public static partial class Languages { public static readonly string[] Translated = [$(_OpenShiinaLanguages)]%3B }" />
     <ItemGroup>
-      <Compile Include="$(IntermediateOutputPath)Languages.g.cs" />
-      <FileWrites Include="$(IntermediateOutputPath)Languages.g.cs" />
+      <_OpenShiinaStringsLine Include="public static partial class Languages { public static readonly string[] Translated = [$(_OpenShiinaLanguages)]%3B }" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)Strings.g.cs" Lines="@(_OpenShiinaStringsLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)Strings.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)Strings.g.cs" />
     </ItemGroup>
   </Target>
 

@@ -52,7 +52,7 @@
   <data name="AgoYesterday" xml:space="preserve"><value>hôm qua</value></data>
   <data name="AgoDays" xml:space="preserve"><value>{0} ngày trước</value></data>
   <data name="AgoDate" xml:space="preserve"><value>ngày {0}</value></data>
-  <data name="DurationUnderMinute" xml:space="preserve"><value>Chưa tới 1 phút</value></data>
+  <data name="PlayTimeUnderMinute" xml:space="preserve"><value>Mới chơi chưa tới 1 phút</value></data>
   <data name="DurationMinutes" xml:space="preserve"><value>{0} phút</value></data>
   <data name="DurationHours" xml:space="preserve"><value>{0} giờ</value></data>
   <data name="DurationHoursMinutes" xml:space="preserve"><value>{0} giờ {1} phút</value></data>

@@ -77,6 +77,13 @@ public static class PlayerTheme
     /// <summary>The wordmark's font: Cinzel (bold), as the logo's.</summary>
     public static FontFamily WordmarkFont { get; } = new("avares://OpenShiina.App/Resources/Fonts#Cinzel");
 
+    /// <summary>
+    /// The wordmark's font for a title in it, when Cinzel has all its letters (plain Latin);
+    /// else the screens' own font (Cinzel has no Vietnamese, Japanese... letters: a few of them
+    /// drawn in another font would not match).
+    /// </summary>
+    public static FontFamily TitleFont(string text) => text.All(c => c < 0x80) ? WordmarkFont : FontFamily.Default;
+
     private static readonly ColorPaletteResources s_fluentDark = new(), s_fluentLight = new();
 
     // The theme applied last (for the windows' title bars)

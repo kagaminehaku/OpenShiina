@@ -19,7 +19,7 @@
 {1}</value></data>
   <data name="PlayedWhen" xml:space="preserve"><value>Played {0}</value></data>
   <data name="NotPlayedYet" xml:space="preserve"><value>Not played yet</value></data>
-  <data name="PlayTime" xml:space="preserve"><value>{0} played</value></data>
+  <data name="PlayTime" xml:space="preserve"><value>Played for {0}</value></data>
   <data name="Measuring" xml:space="preserve"><value>Measuring…</value></data>
   <data name="SavesSize" xml:space="preserve"><value>saves {0}</value></data>
   <data name="SavesOnly" xml:space="preserve"><value>Saves {0}</value></data>
@@ -52,7 +52,7 @@
   <data name="AgoYesterday" xml:space="preserve"><value>yesterday</value></data>
   <data name="AgoDays" xml:space="preserve"><value>{0} days ago</value></data>
   <data name="AgoDate" xml:space="preserve"><value>on {0}</value></data>
-  <data name="DurationUnderMinute" xml:space="preserve"><value>Under a minute</value></data>
+  <data name="PlayTimeUnderMinute" xml:space="preserve"><value>Played for under a minute</value></data>
   <data name="DurationMinutes" xml:space="preserve"><value>{0} min</value></data>
   <data name="DurationHours" xml:space="preserve"><value>{0} h</value></data>
   <data name="DurationHoursMinutes" xml:space="preserve"><value>{0} h {1} min</value></data>

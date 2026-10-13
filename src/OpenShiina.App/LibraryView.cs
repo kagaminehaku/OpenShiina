@@ -242,7 +242,7 @@ public sealed class LibraryView : UserControl
         var facts = new StackPanel { Spacing = 4, Margin = new Thickness(0, 14, 0, 0) };
         facts.Children.Add(Fact(!available ? Strings.FolderGone : game.LastPlayed is { } played ? string.Format(Strings.PlayedWhen, Ago(played)) : Strings.NotPlayedYet));
         if (game.PlaySeconds > 0)
-            facts.Children.Add(Fact(string.Format(Strings.PlayTime, Duration(game.PlaySeconds))));
+            facts.Children.Add(Fact(game.PlaySeconds < 60 ? Strings.PlayTimeUnderMinute : string.Format(Strings.PlayTime, Duration(game.PlaySeconds))));
         var size = Fact(SizeText(game));
         size.IsVisible = size.Text!.Length > 0;
         facts.Children.Add(size);
@@ -601,7 +601,7 @@ public sealed class LibraryView : UserControl
                 CornerRadius = new CornerRadius(size / 6),
                 Child = new TextBlock
                 {
-                    Text = game.Name.Length > 0 ? game.Name[..1] : "?", FontSize = size * 0.47, FontFamily = PlayerTheme.WordmarkFont, FontWeight = FontWeight.Bold,
+                    Text = game.Name.Length > 0 ? game.Name[..1] : "?", FontSize = size * 0.47, FontFamily = PlayerTheme.TitleFont(game.Name.Length > 0 ? game.Name[..1] : "?"), FontWeight = FontWeight.Bold,
                     HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                 }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Highlight),
             }.Use(Border.BackgroundProperty, PlayerTheme.Keys.SurfaceHigh),
@@ -671,11 +671,9 @@ public sealed class LibraryView : UserControl
         return days == 1 ? Strings.AgoYesterday : days < 7 ? string.Format(Strings.AgoDays, days) : string.Format(Strings.AgoDate, when.ToString("yyyy-MM-dd"));
     }
 
-    /// <summary>A play time: "Under a minute", "45 min", "14 h 20 min".</summary>
+    /// <summary>A play time of a minute or more: "45 min", "14 h 20 min".</summary>
     private static string Duration(long seconds)
     {
-        if (seconds < 60)
-            return Strings.DurationUnderMinute;
         long minutes = seconds / 60, hours = minutes / 60;
         return hours == 0 ? string.Format(Strings.DurationMinutes, minutes)
             : minutes % 60 == 0 ? string.Format(Strings.DurationHours, hours) : string.Format(Strings.DurationHoursMinutes, hours, minutes % 60);

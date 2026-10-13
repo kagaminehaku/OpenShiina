@@ -48,7 +48,7 @@ public sealed class SettingsView : UserControl
         Styles.AddRange(PageListStyles());
         var back = new Button { Content = Strings.BackToLibrary, VerticalAlignment = VerticalAlignment.Center };
         back.Click += (_, _) => Close();
-        m_title = new TextBlock { Text = Strings.Settings, FontSize = 26, FontFamily = PlayerTheme.WordmarkFont, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center }
+        m_title = new TextBlock { Text = Strings.Settings, FontSize = 26, FontFamily = PlayerTheme.TitleFont(Strings.Settings), FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center }
             .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink);
         var note = new TextBlock { Text = Strings.SettingsNote, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap }
             .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
