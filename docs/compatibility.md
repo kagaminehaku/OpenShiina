@@ -108,7 +108,7 @@ of those versions it does not list.
 | Saimin Seikatsu | 催眠生活 ～校則だから仕方ない！？～ | 2010-02-26 | [v3370](https://vndb.org/v3370) | v2.47 | ⚪ Not tried |  |
 | Najimi no Oba-chan | 馴染みのオバちゃん | 2010-03-19 | [v3815](https://vndb.org/v3815) | v2.47 | ⚪ Not tried |  |
 | Danchi Wife ~Hitozuma Nude Model no Kenshin~ | 団地ワイフ～人妻ヌードモデルの献身～ | 2010-04-23 | [v3917](https://vndb.org/v3917) | v2.47 | ⚪ Not tried |  |
-| Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Yume Miru Egoist | 夢みるエゴイスト | 2010-05-14 | [v4045](https://vndb.org/v4045) | v2.47 | ⚪ Not tried |  |
 | Oshikake! Entremets | おしかけ！アントルメ | 2010-05-28 | [v3824](https://vndb.org/v3824) | v2.47 | ⚪ Not tried |  |
 | You~Gaku | よう∽ガク | 2010-05-28 | [v3810](https://vndb.org/v3810) | v2.47 | ⚪ Not tried |  |
@@ -116,34 +116,34 @@ of those versions it does not list.
 | Tenki Ane | 天気姉 | 2010-07-09 | [v4543](https://vndb.org/v4543) | v2.47 | ⚪ Not tried |  |
 | Ran→Sem | RAN→SEM～白濁デルモ妻のミイラ捕り～ | 2010-07-23 | [v4645](https://vndb.org/v4645) | v2.47 | ⚪ Not tried |  |
 | Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ⚪ Not tried |  |
-| Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-07 |
+| Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Ryoumaden ~Houkago no Rakuen~ | 凌魔伝 ～放課後の楽園～ | 2010-10-15 | [v5325](https://vndb.org/v5325) | v2.47 | ⚪ Not tried |  |
 | Ren'ai Saimin ~Tsun na Kanojo ga dereru Saimin~ | 恋愛催眠～ツンな彼女がデレる催眠～ | 2010-11-26 | [v5108](https://vndb.org/v5108) | v2.47 | ⚪ Not tried |  |
 | Saint ~Aa Shu yo | セイント ～あぁ主よ、教え子達に堕とされた私をお許し下さい～ | 2010-12-10 | [v5773](https://vndb.org/v5773) | v2.47 | ⚪ Not tried |  |
-| Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-07 |
+| Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ⚪ Not tried |  |
 | Damatte Watashi no Muko ni Nare! | 黙って私のムコになれ！ | 2011-01-28 | [v5289](https://vndb.org/v5289) | v2.47 | ⚪ Not tried |  |
 | Gakushoku no Oba-san The Motion | 学食のおばさん The Motion ～母さんの汁の味～ | 2011-02-25 | [r12508](https://vndb.org/r12508) | v2.48 | ⚪ Not tried |  |
 | Tanetsuke Mura | 種憑け村 ～白濁神、念仏講ノ儀～ | 2011-02-25 | [v6353](https://vndb.org/v6353) | v2.48 | ⚪ Not tried |  |
 | Sensei! Shite Ageru | 先生っ！ シてあげる | 2011-03-04 | [v6444](https://vndb.org/v6444) | v2.48 | ⚪ Not tried |  |
 | Onegan! | おねガン！ | 2011-04-22 | [v6585](https://vndb.org/v6585) | v2.48 | ⚪ Not tried |  |
-| Aneiro | アネイロ | 2011-06-24 | [v6590](https://vndb.org/v6590) | v2.49 | ✅ Plays through | 2026-10-10 |
-| Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Aneiro | アネイロ | 2011-06-24 | [v6590](https://vndb.org/v6590) | v2.49 | ✅ Plays through | 2026-10-13 |
+| Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Doushite Daite Kurenai no!? | どうして抱いてくれないのっ!?～女の子だってヤりたいの！～ | 2011-08-26 | [v6991](https://vndb.org/v6991) | v2.49 | ⚪ Not tried |  |
 | Shojo Mama | 処女ママ | 2011-11-04 | [v8077](https://vndb.org/v8077) | v2.49 | ⚪ Not tried |  |
-| Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | ✅ Plays through | 2026-10-07 |
-| Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | ✅ Plays through | 2026-10-13 |
+| Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Puchipuchi Idol Kouhosei | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012-02-24 | [v9973](https://vndb.org/v9973) | v2.49 | ⚪ Not tried |  |
 | Shinigami no Testament | 死神のテスタメント ～menuet of epistula～ | 2012-02-24 | [v7650](https://vndb.org/v7650) | v2.49 | ⚪ Not tried |  |
-| Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Intruder | イントルーダー ～侵入者～ | 2012-06-22 | [v10533](https://vndb.org/v10533) | v2.49 | ⚪ Not tried |  |
-| Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Hin wa Bokura no Fuku no Kami | 貧は僕らの福の神 | 2012-08-24 | [v10042](https://vndb.org/v10042) | v2.49 | ⚪ Not tried |  |
 | Boku Igai no Otoko o Shiranai Kanojo | 僕以外の男を知らない彼女が他の男に抱かれていた | 2012-08-31 | [v10816](https://vndb.org/v10816) | v2.49 | ⚪ Not tried |  |
 | Son of a ☆ Bitch | サノバ☆ビッチ ～早乙女野薔薇ちゃん、マジ天使!～ | 2012-09-07 | [v11089](https://vndb.org/v11089) | v2.49 | ⚪ Not tried |  |
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | 2012-09-28 | [v10217](https://vndb.org/v10217) | v2.49 | ⚪ Not tried |  |
 | Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | 2012-12-14 | [v11603](https://vndb.org/v11603) | v2.49 | ⚪ Not tried |  |
-| Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-07 |
+| Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Gensou no Idea ~Oratorio Phantasm Historia~ | 幻創のイデア～Oratorio Phantasm Historia～ | 2013-06-28 | [v11881](https://vndb.org/v11881) | v2.49 | ⚪ Not tried |  |
 | Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ⚪ Not tried |  |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | 2014-05-30 | [v14614](https://vndb.org/v14614) | v2.49 | ⚪ Not tried |  |
@@ -151,7 +151,7 @@ of those versions it does not list.
 | Kanojo ga Ore ni Kureta Mono | 彼女が俺にくれたもの。俺が彼女にあげるもの。 | 2014-09-26 | [v14321](https://vndb.org/v14321) | v2.50 | ⚪ Not tried |  |
 | Kinpatsu Tarou Monogatari | 金髪太郎物語 | 2014-10-03 | [v16102](https://vndb.org/v16102) | v2.50 | ⚪ Not tried |  |
 | Gyaku Katei Kyoushi | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014-12-12 | [v16306](https://vndb.org/v16306) | v2.50 | ⚪ Not tried |  |
-| Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-07 |
+| Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Shuukatsu Katei Kyoushi | シュウカツ家庭教師 | 2015-03-13 | [v16904](https://vndb.org/v16904) | v2.50 | ⚪ Not tried |  |
 | Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ⚪ Not tried |  |
 | Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | ⚪ Not tried |  |
@@ -167,7 +167,7 @@ of those versions it does not list.
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Sorcery Jokers [English] | ソーサリージョーカーズ (English) | 2018-01-12 | [r47518](https://vndb.org/r47518) | v2.50 | ⚪ Not tried |  |
 | Chuuni Hime no Teikoku | 厨二姫の帝国 | 2018-02-23 | [v17900](https://vndb.org/v17900) | v2.50 | ✅ Plays through | 2026-10-13 |
-| Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-07 |
+| Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Nukige Mitai na Shima ni Sunderu [Trial] | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 体験版 | 2018-06-22 | [r57518](https://vndb.org/r57518) | v2.50 | ⚪ Not tried |  |
 | Kiki Mimi | ききミミ | 2018-07-26 | [v23506](https://vndb.org/v23506) | v2.50 | ⚪ Not tried |  |
 | Nukige Mitai na Shima ni Sunderu | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? | 2018-07-27 | [v22899](https://vndb.org/v22899) | v2.50 | ⚪ Not tried |  |
