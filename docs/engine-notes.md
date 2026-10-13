@@ -261,7 +261,9 @@ game's own. It is split in two projects:
   then), and at once when the game no longer runs or on a second try before they answer.
 - `OpenShiina.App` (Avalonia, every platform) with the head `OpenShiina.Desktop` (Windows,
   Linux, macOS): `GameSession` holds the GameThread and the host;
-  `GameView` shows the picture scaled and passes on keys, mouse, touch, the wheel and joystick 0
+  `GameView` shows the picture scaled and passes on keys, mouse, touch (a tap counted in the
+  game's frames, not ms, so a slow phone's scripts see it: the pointer there for 2 frames, then
+  the button down for 2; a finger held still 0.3 s holds the left button), the wheel and joystick 0
   (`SdlJoystick`: SDL3's first joystick, axes 0 / 1 and buttons 1 / 2, polled each frame the
   window draws) (`InputState`, Windows virtual keys; `0457` moves the system pointer with `PointerWarp`: SetCursorPos, XWarpPointer,
   CGWarpMouseCursorPosition, none on Wayland and phones, where the scripts see the new position
@@ -940,8 +942,7 @@ the functions they call from the decompile. First findings:
   with its cached loader (callmod 215), `04B2`s them and frees them only with `04B1`, never
   `02BD` - `02BD` frees a block of `02BC` / `00C9` / `00CE` (slots showing it no longer own it,
   so it is not freed twice), `0547` and a surface made again free the surface's bitmap. Free ranges are
-  merged and used again (best fit) and kept zero (whole pages given back to the system). No
-  block crosses a 16 MB boundary (one over 16 MB starts on one; see "Flat memory"). Before, the heap
+  merged and used again (best fit) and kept zero (whole pages given back to the system). Before, the heap
   only grew: after a long play it reached the modules' code at 0x40000000 and pictures were
   written over START.SCN (unknown opcodes in START). Running into the code now stops with "Out
   of script memory".
@@ -1368,7 +1369,7 @@ the functions they call from the decompile. First findings:
   codes the player does not draw (`_q-`, `_O`, `_n`, ruby `{...}`) are in no message of any TXT and
   in no string of the scripts that reaches text (Ao no Juuai looks for "_n" itself). Chuuchuu's
   eight embedded routines: three C#, five translated, none on the interpreter.
-- Phones (2026-10-12; todo.md, "Phones: are the vectors the processor's own?"). Vector128.Shuffle
+- Phones (2026-10-12; what is left: todo.md, "blur32 on arm64"). Vector128.Shuffle
   with indices from a static readonly field (the compositor's alpha pixels, MPEG-1's colour
   bytes) is one table lookup only where the compiler sees the indices as constants: CoreCLR's
   JIT does for an initialised field, a compiler that works ahead of time (Mono on Android) does

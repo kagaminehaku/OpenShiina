@@ -287,19 +287,35 @@ window size) is not shown: the players' own window does both.
 **Ao no Juuai** (engine v2.34, aoj.EXE) The oldest engine tried: an opcode table of its own
 (Data/ScnOps/ops_v234.tsv) and the handlers where v2.34's differ (ScnVm.Engine234.cs); its
 settings are in aoj.INI. In ScnBoot it plays its story to frame 30,000 with choices, and it was
-played in the Avalonia player; every embedded x86 routine has a C# version. What is left for it
-and other 2.34 games is in docs/todo.md ("Other ShiinaRio games").
+played in the Avalonia player; every embedded x86 routine has a C# version. What v2.34 does
+otherwise: its menus poll the mouse in a loop that draws nothing, so a task reading `0456` /
+`0458` (or the clock, `03BC` / `03BD`) twice in a frame waits for the next; a frame ends where a
+task waits, not at the first picture; music has one stream (`06E3` volume, `06EC` fade); a named
+operand is named up to its first `}`; its first music file is a RIFF WAVE. It also needed `0A28`,
+`0A5C`, `0502`, `0028`, `03A2`-`03A5`, `03AD`, `03BB`-`03BE` and `02EE` / `02EF` fixed for every
+version. What is left for other 2.34 games is in docs/todo.md ("Other ShiinaRio games").
 
 **Aneiro** (engine v2.49, ver 1.03a) Skipped to the end by the user (2026-10-10). Every embedded
-x86 routine has a C# version.
+x86 routine has a C# version. It needed `010E` finding the save folder itself, `06E6` (a music
+stream's sample rate, for loop points in ms), `02CB` (memcmp) and kernel32 CreateDirectoryA,
+MultiByteToWideChar / WideCharToMultiByte. ALcot's updaters find the game by the installer's
+registry key (a copied game has none); their files are an FA2 archive in the resource "UPDATE"
+(records of 0x118 bytes, packed with GARbro's Fa2 LZ), taken out and copied into the game.
 
 **Bitch Nee-chan ga Seijun na Hazu ga Nai! (ver 1.02), Bitch Shimai ga Seijun na Hazu ga Nai!!
 (ver 1.01), Bitch Gakuen ga Seijun na Hazu ga Nai!!? (ver 1.00)** (engine v2.50) In ScnBoot: the
 title and the story (Nee-chan and Gakuen to frame 30,000, Shimai with its opening movie to frame
 16,000), nothing missing. In the players their menus ran at 1 frame a second until their SSE2
 scaling and blur routines got C# versions (2026-10-11); every embedded x86 routine has one now.
-Bitch Nee-chan is the game the translations were tried on (README, "Translations"). Not played
-through yet. Two opcodes only these games' START uses were added after the user's crash logs
+Bitch Nee-chan is the game the translations were tried on (README, "Translations"). Nee-chan
+needed BITCHES.EXE in GameMap (GARbro's has only BITCHES2/3), a DecodeBin for its scheme (without
+it start.scn had garbage at 0x200) and its date at 0x1020, 0x20160409 (worked out from the 16
+pictures whose bytes use that slot; the exe's build date breaks their row tables). Its START
+wants SSE2 (cpuid says so for a START with that refusal; the interpreter and X86Jit run SSE /
+SSE2), `0410`, kernel32 GetVersionExA / LoadLibraryA (HID_ONAHOLE.dll, its USB device, as if
+absent), user32 GetMessageExtraInfo, and glyphs clipped to their 28 x 29 frame. Gakuen needed
+user32 SetMenuItemInfoW and `009C` read as v2.50 reads it (pixels only after a text other than
+0). Two opcodes only these games' START uses were added after the user's crash logs
 (2026-10-11): `1072`, the engine's box blur of a picture into another (Shimai's `$EX,PPBLUR`
 depth of field: checked in ScnBoot, the background blurred, the character sharp), and `0113`,
 whether a file is in a given archive (Gakuen asks its patch archives `BITCHES3_P?.WAR` for a
