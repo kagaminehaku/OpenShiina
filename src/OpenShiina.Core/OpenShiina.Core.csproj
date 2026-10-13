@@ -19,6 +19,8 @@
     <Authors>kagaminehaku</Authors>
     <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- Strings.resx is English: English needs no satellite assembly -->
+    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
   <!-- Scheme data (keys of each game, their ShiinaImage inside), copied next to the program that uses the engine -->
@@ -30,6 +32,35 @@
   <ItemGroup>
     <EmbeddedResource Include="Data\ScnOps\*.tsv" LogicalName="OpenShiina.ScnOps.%(Filename).tsv" />
   </ItemGroup>
+
+  <!-- The players' words (Localization/Strings.resx, English; Strings.<language>.resx the
+       translations), with a typed class to read them by name -->
+  <ItemGroup>
+    <EmbeddedResource Update="Localization\Strings.resx">
+      <StronglyTypedFileName>$(IntermediateOutputPath)Strings.Designer.cs</StronglyTypedFileName>
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>OpenShiina.Localization</StronglyTypedNamespace>
+      <StronglyTypedClassName>Strings</StronglyTypedClassName>
+      <PublicClass>true</PublicClass>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Languages.Translated: the codes of the translations there are (Strings.vi.resx -> "vi") -->
+  <Target Name="OpenShiinaLanguages" BeforeTargets="BeforeCompile;CoreCompile">
+    <ItemGroup>
+      <_OpenShiinaTranslation Include="Localization\Strings.*.resx" />
+      <_OpenShiinaLanguage Include="$([System.String]::Copy('%(_OpenShiinaTranslation.Filename)').Substring(8))" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_OpenShiinaLanguages>@(_OpenShiinaLanguage->'"%(Identity)"', ', ')</_OpenShiinaLanguages>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)Languages.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace OpenShiina.Localization%3B public static partial class Languages { public static readonly string[] Translated = [$(_OpenShiinaLanguages)]%3B }" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)Languages.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)Languages.g.cs" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="NLayer" Version="3.0.0" />

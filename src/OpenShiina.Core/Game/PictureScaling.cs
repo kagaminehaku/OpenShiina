@@ -8,6 +8,8 @@
 // (WPF) draws them as Sharp (ForCopy). Placement gives where the picture goes in the window, for
 // drawing and for the pointer. GraphicsPresets (GraphicsQuality.cs) picks them by level.
 
+using OpenShiina.Localization;
+
 namespace OpenShiina.Game;
 
 public enum Scaling
@@ -29,18 +31,18 @@ public enum Scaling
 public static class PictureScaling
 {
     /// <summary>The choices as the settings screens show them.</summary>
-    public static IReadOnlyList<(Scaling Scaling, string Label)> Choices { get; } =
+    public static IReadOnlyList<(Scaling Scaling, string Label, string Help)> Choices =>
     [
-        (Scaling.Sharp, "Sharp: whole game pixels as far as they fit, the rest smooth (even text and lines)"),
-        (Scaling.WholeNumbers, "Whole numbers only: x2, x3... with black around (exact)"),
-        (Scaling.Smooth, "Smooth: filtered, soft"),
-        (Scaling.Nearest, "Nearest: the window's size, pixels as they fall (uneven when not a whole number)"),
-        (Scaling.Fsr, "FSR 1: AMD's upscaler, clean edges, sharpened as set below (the GPU's work)"),
-        (Scaling.Anime4K, "Anime4K: an upscaler made for drawn art (heaviest: a desktop GPU)"),
+        (Scaling.Sharp, Strings.ScalingSharp, Strings.ScalingSharpHelp),
+        (Scaling.WholeNumbers, Strings.ScalingWholeNumbers, Strings.ScalingWholeNumbersHelp),
+        (Scaling.Smooth, Strings.ScalingSmooth, Strings.ScalingSmoothHelp),
+        (Scaling.Nearest, Strings.ScalingNearest, Strings.ScalingNearestHelp),
+        (Scaling.Fsr, Strings.ScalingFsr, Strings.ScalingFsrHelp),
+        (Scaling.Anime4K, Strings.ScalingAnime4K, Strings.ScalingAnime4KHelp),
     ];
 
     /// <summary>The choices a player that draws without shaders (WPF) offers.</summary>
-    public static IReadOnlyList<(Scaling Scaling, string Label)> CopyChoices { get; } = Choices.Where(c => !c.Scaling.NeedsShader()).ToList();
+    public static IReadOnlyList<(Scaling Scaling, string Label, string Help)> CopyChoices => Choices.Where(c => !c.Scaling.NeedsShader()).ToList();
 
     /// <summary>The upscalers that need a shader (FSR, Anime4K).</summary>
     public static bool NeedsShader(this Scaling scaling) => scaling is Scaling.Fsr or Scaling.Anime4K;

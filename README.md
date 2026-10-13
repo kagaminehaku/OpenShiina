@@ -131,7 +131,10 @@ Settings (the home screen's Settings button opens their page, saved in `settings
 `library.json`; each counts from the next game started), page by page:
 
 - **Appearance**: the theme, shown at once (OpenShiina Tools too): Shiina, the logo's wine red and
-  gold, by default; Parchment, light; Graphite, plain greys.
+  gold, by default; Parchment, light; Graphite, plain greys. And the language of the player's own
+  screens: the device's by default, English or Vietnamese (the words are in
+  `src/OpenShiina.Core/Localization`: `Strings.resx` in English, a `Strings.<language>.resx` for
+  each translation, which shows in the list by itself).
 - **Graphics**: on phones and tablets first two profiles, Battery saver (sharp scaling at the
   game's own pace) and Pretty (FSR 1 sharpened, a frame every refresh of the screen); then the graphics level (Potato: nearest pixels; Low: sharp; Medium: FSR 1; High: FSR 1
   sharpened; Max: Anime4K; Custom when the details match none of them), and its details: the

@@ -28,6 +28,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using OpenShiina.Scripting;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
@@ -76,7 +77,7 @@ public sealed partial class GameView
         }
         var skipButton = new Button
         {
-            Content = "Skip", Width = 64, Height = 44, Padding = new Thickness(0), FontSize = 14,
+            Content = Strings.TouchSkip, Width = 64, Height = 44, Padding = new Thickness(0), FontSize = 14,
             HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
             Background = Brushes.Transparent, Foreground = Brushes.White, Focusable = false,
         };
@@ -102,11 +103,11 @@ public sealed partial class GameView
             Spacing = 2,
             Children =
             {
-                Make("Menu", RightClick),
-                Make("Auto", () => TypeKey(Avalonia.Input.Key.A)),
+                Make(Strings.TouchMenu, RightClick),
+                Make(Strings.TouchAuto, () => TypeKey(Avalonia.Input.Key.A)),
                 skipButton,
-                Make("Log", () => Wheel(1)),
-                Make("Exit", () => AllowClose()),
+                Make(Strings.TouchLog, () => Wheel(1)),
+                Make(Strings.TouchExit, () => AllowClose()),
             },
         };
         m_barFold = Make("›", () =>
@@ -166,7 +167,7 @@ public sealed partial class GameView
         {
             try
             {
-                var keepAwake = await top.RequestPlatformInhibition(PlatformInhibitionType.AppSleep, "Playing a game");
+                var keepAwake = await top.RequestPlatformInhibition(PlatformInhibitionType.AppSleep, Strings.PlayingAGame);
                 if (m_session != null && m_keepAwake == null)
                     m_keepAwake = keepAwake;
                 else

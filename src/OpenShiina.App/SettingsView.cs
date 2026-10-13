@@ -3,7 +3,8 @@
 // setting's name and a line about it, its switch, list or slider beside it. Saved as they change
 // (Game/PlayerSettings.cs), counting from the next game started; the theme shows at once. Back
 // (the button, Escape, a phone's back) returns to the library. The pages are made when shown: the
-// GPU's name starts the GPU (which held the app's start for it).
+// GPU's name starts the GPU (which held the app's start for it). Appearance also picks the
+// language of the screens (Localization/Languages.cs): the host makes them again in it.
 
 using Avalonia;
 using Avalonia.Animation;
@@ -17,6 +18,7 @@ using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Styling;
 using OpenShiina.Game;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
@@ -36,22 +38,25 @@ public sealed class SettingsView : UserControl
     /// <summary>Back to the library.</summary>
     public event Action? Closed;
 
+    /// <summary>The language was changed (and applied): the screens are to be made again in it.</summary>
+    public event Action? LanguageChanged;
+
     public SettingsView()
     {
         this.Use(BackgroundProperty, PlayerTheme.Keys.Background);
         Styles.AddRange(PlayerTheme.CardStyles());
         Styles.AddRange(PageListStyles());
-        var back = new Button { Content = "← Library", VerticalAlignment = VerticalAlignment.Center };
+        var back = new Button { Content = Strings.BackToLibrary, VerticalAlignment = VerticalAlignment.Center };
         back.Click += (_, _) => Close();
-        m_title = new TextBlock { Text = "Settings", FontSize = 26, FontFamily = PlayerTheme.WordmarkFont, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center }
+        m_title = new TextBlock { Text = Strings.Settings, FontSize = 26, FontFamily = PlayerTheme.WordmarkFont, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center }
             .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink);
-        var note = new TextBlock { Text = "Saved as you change them, for the next game started.", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap }
+        var note = new TextBlock { Text = Strings.SettingsNote, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap }
             .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
         m_header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, Margin = new Thickness(24, 20, 24, 12), Children = { back, m_title, note } };
 
         foreach (var page in Enum.GetValues<SettingsPages>())
         {
-            var item = new ListBoxItem { Content = page.ToString() };
+            var item = new ListBoxItem { Content = PageName(page) };
             item.Classes.Add("page");
             m_pages.Items.Add(item);
         }
@@ -87,6 +92,18 @@ public sealed class SettingsView : UserControl
 
     public void Close() => Closed?.Invoke();
 
+    /// <summary>Shows <paramref name="page"/> (the language's page, after the screens were made again in a new language).</summary>
+    public void Show(SettingsPages page) => m_pages.SelectedIndex = (int)page;
+
+    private static string PageName(SettingsPages page) => page switch
+    {
+        SettingsPages.Appearance => Strings.PageAppearance,
+        SettingsPages.Graphics => Strings.PageGraphics,
+        SettingsPages.Game => Strings.PageGame,
+        SettingsPages.Storage => Strings.PageStorage,
+        _ => Strings.PageDebug,
+    };
+
     private void ShowPage()
     {
         if (m_pages.SelectedIndex < 0)
@@ -97,7 +114,7 @@ public sealed class SettingsView : UserControl
             SettingsPages.Appearance => AppearanceGroups(),
             SettingsPages.Graphics => GraphicsGroups(),
             SettingsPages.Storage => StorageGroups(),
-            SettingsPages.Debug => [Note("For bug reports: what these write goes into the game's save folder (its menu in the library opens it).")],
+            SettingsPages.Debug => [Note(Strings.DebugNote)],
             _ => [],
         };
         var content = new StackPanel { Spacing = 20, Margin = new Thickness(8, 0, 24, 24) };
@@ -112,7 +129,10 @@ public sealed class SettingsView : UserControl
 
     // ---- The pages
 
-    /// <summary>The theme: a sample of each, the chosen one with a gold line; it shows at once.</summary>
+    /// <summary>
+    /// The theme: a sample of each, the chosen one with a gold line; it shows at once. The language
+    /// of the screens: the device's, English or a translation; the screens are made again in it.
+    /// </summary>
     private List<Control> AppearanceGroups()
     {
         var samples = new WrapPanel { Orientation = Orientation.Horizontal };
@@ -163,7 +183,17 @@ public sealed class SettingsView : UserControl
             buttons.Add((theme, button));
             samples.Children.Add(button);
         }
-        return [Group("Theme", samples)];
+        var languages = Languages.Choices();
+        var language = Choice(languages.Select(l => (l.Code, l.Name)).ToList(), m_settings.Language, code =>
+        {
+            if (code == m_settings.Language)
+                return;
+            m_settings.Language = code;
+            m_settings.Save();
+            Languages.Apply(code);
+            LanguageChanged?.Invoke();
+        });
+        return [Group(Strings.GroupTheme, samples), Group(Strings.GroupLanguage, Row(Strings.Language, Strings.LanguageHelp, language))];
     }
 
     /// <summary>
@@ -177,15 +207,15 @@ public sealed class SettingsView : UserControl
     {
         var s = m_settings;
         bool showing = false;
-        var levels = GraphicsPresets.Choices.Append((GraphicsQuality.Custom, "Custom", "Set one by one under Details.")).ToList();
+        var levels = GraphicsPresets.Choices.Append((GraphicsQuality.Custom, Strings.Custom, Strings.CustomHelp)).ToList();
         var level = new ComboBox { Width = Wide };
         foreach (var (quality, label, _) in levels)
             level.Items.Add(new ComboBoxItem { Content = label, IsEnabled = quality != GraphicsQuality.Custom });
         var levelHelp = Muted("");
 
-        var scalings = PictureScaling.Choices.Select(c => Split(c.Label)).ToList();
+        var scalings = PictureScaling.Choices;
         var scaling = new ComboBox { Width = Wide };
-        foreach (var (name, _) in scalings)
+        foreach (var (_, name, _) in scalings)
             scaling.Items.Add(new ComboBoxItem { Content = name });
         var scalingHelp = Muted("");
         var sharpness = new Slider { Minimum = 0, Maximum = 10, TickFrequency = 1, IsSnapToTickEnabled = true, Width = Wide };
@@ -193,8 +223,8 @@ public sealed class SettingsView : UserControl
 
         var paces = new (FramePacing Pacing, string Label, string Help)[]
         {
-            (FramePacing.Game, "The game's pace", "As the original: up to 60 frames a second, little processor while it waits."),
-            (FramePacing.Display, "Every screen refresh", "Smoother on a fast screen, more processor."),
+            (FramePacing.Game, Strings.PaceGame, Strings.PaceGameHelp),
+            (FramePacing.Display, Strings.PaceDisplay, Strings.PaceDisplayHelp),
         };
         var pacing = new ComboBox { Width = Wide };
         foreach (var (_, label, _) in paces)
@@ -202,7 +232,7 @@ public sealed class SettingsView : UserControl
         var paceHelp = Muted("");
 
         var profiles = new List<(PhoneProfile Profile, Button Card)>();
-        var profileNote = Muted("Your own, set under Details.");
+        var profileNote = Muted(Strings.ProfileOwn);
         void Show()
         {
             showing = true;
@@ -210,12 +240,12 @@ public sealed class SettingsView : UserControl
             int at = levels.FindIndex(l => l.Item1 == current);
             level.SelectedIndex = at;
             levelHelp.Text = at >= 0 ? levels[at].Item3 : "";
-            int scaled = PictureScaling.Choices.ToList().FindIndex(c => c.Scaling == s.Scaling);
+            int scaled = scalings.ToList().FindIndex(c => c.Scaling == s.Scaling);
             scaling.SelectedIndex = scaled;
             scalingHelp.Text = scaled >= 0 ? scalings[scaled].Help : "";
             sharpness.Value = s.FsrSharpness;
             sharpness.IsEnabled = s.Scaling == Scaling.Fsr;
-            sharpnessHelp.Text = s.Scaling != Scaling.Fsr ? "With FSR 1 scaling." : s.FsrSharpness == 0 ? "None." : $"{s.FsrSharpness} of 10.";
+            sharpnessHelp.Text = s.Scaling != Scaling.Fsr ? Strings.FsrOnlyWithFsr : s.FsrSharpness == 0 ? Strings.FsrNone : string.Format(Strings.FsrOf, s.FsrSharpness);
             int paced = Array.FindIndex(paces, p => p.Pacing == s.FramePacing);
             pacing.SelectedIndex = paced;
             paceHelp.Text = paced >= 0 ? paces[paced].Help : "";
@@ -241,7 +271,7 @@ public sealed class SettingsView : UserControl
         {
             if (showing || scaling.SelectedIndex < 0)
                 return;
-            s.Scaling = PictureScaling.Choices[scaling.SelectedIndex].Scaling;
+            s.Scaling = scalings[scaling.SelectedIndex].Scaling;
             Changed();
         };
         sharpness.ValueChanged += (_, _) =>
@@ -262,23 +292,23 @@ public sealed class SettingsView : UserControl
 
         // Where the pictures are drawn, and the GPU it would be
         var device = Muted("");
-        void ShowDevice() => device.Text = s.Renderer != Renderer.Gpu ? "The processor's cores, with SIMD."
-            : PlayerSettings.Gpu(out string? error) is { } gpu ? gpu.Name : $"No GPU to use ({error}): the games run on the CPU.";
+        void ShowDevice() => device.Text = s.Renderer != Renderer.Gpu ? Strings.DrawingCpu
+            : PlayerSettings.Gpu(out string? error) is { } gpu ? gpu.Name : string.Format(Strings.NoGpu, error);
         ShowDevice();
-        var drawing = Choice([(Renderer.Cpu, "CPU"), (Renderer.Gpu, "GPU (Vulkan)")], s.Renderer, renderer =>
+        var drawing = Choice([(Renderer.Cpu, Strings.Cpu), (Renderer.Gpu, Strings.GpuVulkan)], s.Renderer, renderer =>
         {
             s.Renderer = renderer;
             s.Save();
             ShowDevice();
         });
 
-        var levelRow = Row("Graphics level", "How the game's picture is scaled to the window, from the lightest to the heaviest. FSR and Anime4K run on the GPU that draws the window (without one, as Low).", level, levelHelp);
+        var levelRow = Row(Strings.GraphicsLevel, Strings.GraphicsLevelHelp, level, levelHelp);
         var details = new List<Control>
         {
-            Row("Scaling", null, scaling, scalingHelp),
-            Row("FSR sharpening", null, sharpness, sharpnessHelp),
-            Row("Drawing", "Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.", drawing, device),
-            Row("Frame rate", null, pacing, paceHelp),
+            Row(Strings.Scaling, null, scaling, scalingHelp),
+            Row(Strings.FsrSharpening, null, sharpness, sharpnessHelp),
+            Row(Strings.Drawing, Strings.DrawingHelp, drawing, device),
+            Row(Strings.FrameRate, null, pacing, paceHelp),
         };
         List<Control> groups;
         if (PlayerPlatform.Touch)
@@ -296,10 +326,10 @@ public sealed class SettingsView : UserControl
                 cards.Children.Add(card);
             }
             details.Insert(0, levelRow);
-            groups = [Group("Quality", new StackPanel { Children = { cards, profileNote } }), Group("Details", details.ToArray())];
+            groups = [Group(Strings.GroupQuality, new StackPanel { Children = { cards, profileNote } }), Group(Strings.GroupDetails, details.ToArray())];
         }
         else
-            groups = [Group("Quality", levelRow), Group("Details", details.ToArray())];
+            groups = [Group(Strings.GroupQuality, levelRow), Group(Strings.GroupDetails, details.ToArray())];
         Show();
         return groups;
     }
@@ -311,7 +341,7 @@ public sealed class SettingsView : UserControl
         var help = FileCachePresets.Choices.ToDictionary(c => c.Size, c => c.Help);
         var detail = Muted(help[s.FileCache]);
         var cache = Choice(
-            FileCachePresets.Choices.Select(c => (c.Size, c.Size == FileCacheSize.Auto ? $"{c.Label} ({FileCachePresets.Auto() >> 20} MB here)" : c.Label)).ToList(),
+            FileCachePresets.Choices.Select(c => (c.Size, c.Size == FileCacheSize.Auto ? string.Format(Strings.FileCacheAutoHere, c.Label, FileCachePresets.Auto() >> 20) : c.Label)).ToList(),
             s.FileCache, size =>
             {
                 s.FileCache = size;
@@ -320,8 +350,7 @@ public sealed class SettingsView : UserControl
             });
         return
         [
-            Group("Memory",
-                Row("File cache", "Memory kept for the pictures and sounds a game read, so that it does not decode them again. Bigger is smoother on scene changes and event pictures.", cache, detail)),
+            Group(Strings.GroupMemory, Row(Strings.FileCache, Strings.FileCacheHelp, cache, detail)),
         ];
     }
 
@@ -372,7 +401,7 @@ public sealed class SettingsView : UserControl
     /// <summary>An on / off setting's row.</summary>
     private Control Switch(SettingSwitch item)
     {
-        var toggle = new ToggleSwitch { IsChecked = item.Get(m_settings), OnContent = "On", OffContent = "Off" };
+        var toggle = new ToggleSwitch { IsChecked = item.Get(m_settings), OnContent = Strings.On, OffContent = Strings.Off };
         toggle.IsCheckedChanged += (_, _) =>
         {
             item.Set(m_settings, toggle.IsChecked == true);
@@ -421,16 +450,6 @@ public sealed class SettingsView : UserControl
 
     private static TextBlock Muted(string text) =>
         new TextBlock { Text = text, FontSize = 12.5, TextWrapping = TextWrapping.Wrap }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
-
-    /// <summary>"Name: what it does" as the name and the rest, a sentence.</summary>
-    private static (string Name, string Help) Split(string label)
-    {
-        int colon = label.IndexOf(": ", StringComparison.Ordinal);
-        if (colon < 0)
-            return (label, "");
-        string rest = label[(colon + 2)..];
-        return (label[..colon], char.ToUpperInvariant(rest[0]) + rest[1..] + ".");
-    }
 
     private static T At<T>(T control, int column) where T : Control
     {

@@ -3,6 +3,8 @@
 // them one by one; settings that match no level show as Custom. Phones and tablets show two
 // profiles first (PhoneProfiles): the battery or the picture.
 
+using OpenShiina.Localization;
+
 namespace OpenShiina.Game;
 
 public enum GraphicsQuality
@@ -18,14 +20,14 @@ public enum GraphicsQuality
 
 public static class GraphicsPresets
 {
-    /// <summary>The levels as the settings screens show them: name, what it does.</summary>
-    public static IReadOnlyList<(GraphicsQuality Quality, string Label, string Help)> Choices { get; } =
+    /// <summary>The levels as the settings screens show them, in the screens' language: name, what it does.</summary>
+    public static IReadOnlyList<(GraphicsQuality Quality, string Label, string Help)> Choices =>
     [
-        (GraphicsQuality.Potato, "Potato", "Nearest pixels, no filtering: the least work, for the slowest phones."),
-        (GraphicsQuality.Low, "Low", "Sharp: whole game pixels, smooth only where they meet. Light."),
-        (GraphicsQuality.Medium, "Medium", "FSR 1 upscaling, no sharpening: clean edges on any GPU."),
-        (GraphicsQuality.High, "High", "FSR 1 upscaling and sharpening."),
-        (GraphicsQuality.Max, "Max", "Anime4K, made for drawn art: the heaviest, for a desktop GPU."),
+        (GraphicsQuality.Potato, Strings.LevelPotato, Strings.LevelPotatoHelp),
+        (GraphicsQuality.Low, Strings.LevelLow, Strings.LevelLowHelp),
+        (GraphicsQuality.Medium, Strings.LevelMedium, Strings.LevelMediumHelp),
+        (GraphicsQuality.High, Strings.LevelHigh, Strings.LevelHighHelp),
+        (GraphicsQuality.Max, Strings.LevelMax, Strings.LevelMaxHelp),
     ];
 
     /// <summary>What a level sets.</summary>
@@ -76,11 +78,11 @@ public enum PhoneProfile
 
 public static class PhoneProfiles
 {
-    /// <summary>The profiles as the settings page shows them: name, what it does.</summary>
-    public static IReadOnlyList<(PhoneProfile Profile, string Label, string Help)> Choices { get; } =
+    /// <summary>The profiles as the settings page shows them, in the screens' language: name, what it does.</summary>
+    public static IReadOnlyList<(PhoneProfile Profile, string Label, string Help)> Choices =>
     [
-        (PhoneProfile.BatterySaver, "Battery saver", "Sharp scaling at the game's own pace: the least work for the phone."),
-        (PhoneProfile.Pretty, "Pretty", "FSR 1 upscaling and sharpening, a frame every refresh of the screen: cleaner and smoother, more battery."),
+        (PhoneProfile.BatterySaver, Strings.ProfileBatterySaver, Strings.ProfileBatterySaverHelp),
+        (PhoneProfile.Pretty, Strings.ProfilePretty, Strings.ProfilePrettyHelp),
     ];
 
     private static (GraphicsQuality Quality, FramePacing Pacing) Settings(PhoneProfile profile) => profile switch

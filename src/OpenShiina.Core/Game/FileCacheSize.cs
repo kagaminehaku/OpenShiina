@@ -5,6 +5,8 @@
 // each, as the cache was 64 MB and kept files of up to a quarter of it. A file may now take up to
 // half of the cache. Auto sizes it by the device's memory.
 
+using OpenShiina.Localization;
+
 namespace OpenShiina.Game;
 
 public enum FileCacheSize
@@ -22,15 +24,15 @@ public static class FileCachePresets
 {
     private const long MB = 1L << 20;
 
-    /// <summary>The sizes as the settings screens show them: name, what it does.</summary>
-    public static IReadOnlyList<(FileCacheSize Size, string Label, string Help)> Choices { get; } =
+    /// <summary>The sizes as the settings screens show them, in the screens' language: name, what it does.</summary>
+    public static IReadOnlyList<(FileCacheSize Size, string Label, string Help)> Choices =>
     [
-        (FileCacheSize.Auto, "Auto", "By the device's memory: a thirty-second of it, 64 MB to 512 MB."),
-        (FileCacheSize.Potato, "Potato (32 MB)", "For the oldest devices: pictures over 16 MB are read again each time."),
-        (FileCacheSize.Low, "Low (64 MB)", "Light: pictures over 32 MB are read again each time."),
-        (FileCacheSize.Medium, "Medium (128 MB)", "Pictures of up to 64 MB are kept."),
-        (FileCacheSize.High, "High (256 MB)", "The largest event pictures are kept too."),
-        (FileCacheSize.Max, "Max (512 MB)", "For devices with plenty of memory."),
+        (FileCacheSize.Auto, Strings.CacheAuto, Strings.CacheAutoHelp),
+        (FileCacheSize.Potato, Strings.CachePotato, Strings.CachePotatoHelp),
+        (FileCacheSize.Low, Strings.CacheLow, Strings.CacheLowHelp),
+        (FileCacheSize.Medium, Strings.CacheMedium, Strings.CacheMediumHelp),
+        (FileCacheSize.High, Strings.CacheHigh, Strings.CacheHighHelp),
+        (FileCacheSize.Max, Strings.CacheMax, Strings.CacheMaxHelp),
     ];
 
     /// <summary>The bytes a setting gives.</summary>

@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
@@ -16,10 +17,10 @@ public static class MessageDialog
     {
         (string Label, int Result)[] buttons = (type & 0xF) switch
         {
-            1 => [("OK", 1), ("Cancel", 2)],
-            3 => [("Yes", 6), ("No", 7), ("Cancel", 2)],
-            4 => [("Yes", 6), ("No", 7)],
-            _ => [("OK", 1)],
+            1 => [(Strings.Ok, 1), (Strings.Cancel, 2)],
+            3 => [(Strings.Yes, 6), (Strings.No, 7), (Strings.Cancel, 2)],
+            4 => [(Strings.Yes, 6), (Strings.No, 7)],
+            _ => [(Strings.Ok, 1)],
         };
         int cancel = buttons.Any(b => b.Result == 2) ? 2 : buttons[^1].Result;
         var done = new TaskCompletionSource<int>();

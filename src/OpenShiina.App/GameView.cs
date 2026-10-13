@@ -18,13 +18,15 @@ using Avalonia.Threading;
 using OpenShiina.Archives;
 using OpenShiina.Game;
 using OpenShiina.Scripting;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
 public sealed partial class GameView : UserControl, IGameWindow
 {
     private readonly GamePicture m_image = new() { IsVisible = false };
-    private readonly LibraryView m_library = new();
+    private LibraryView m_library;
+    private readonly Grid m_layers;
     private GameSession? m_session;
     private IPlayerJoystick? m_joystick;
     // Closing: asked the scripts and waiting for their answer / they let the window close
@@ -50,9 +52,9 @@ public sealed partial class GameView : UserControl, IGameWindow
         StartupLog.Mark("the library made (GameView)");
         Background = Brushes.Black;
         Focusable = true;
-        m_library.Play += async folder => await OpenAsync(folder);
-        m_library.AddRequested += async () => await AddGameAsync();
-        Content = new Grid { Children = { m_image, m_frameRate, TouchBar(), m_library } };
+        m_library = NewLibrary();
+        m_layers = new Grid { Children = { m_image, m_frameRate, TouchBar(), m_library } };
+        Content = m_layers;
 
         m_image.PointerMoved += (_, e) => Pointer(e);
         m_image.PointerPressed += (_, e) => Pointer(e);
@@ -69,6 +71,34 @@ public sealed partial class GameView : UserControl, IGameWindow
             if (m_session != null && e.Delta.Y != 0)
                 m_session.PostMessage(ScnMessage.MouseWheel, (int)Math.Round(e.Delta.Y * 120) << 16 | MouseKeys(e), PointOf(e));
         };
+    }
+
+    /// <summary>The home screen, wired to the view.</summary>
+    private LibraryView NewLibrary()
+    {
+        var library = new LibraryView();
+        library.Play += async folder => await OpenAsync(folder);
+        library.AddRequested += async () => await AddGameAsync();
+        library.LanguageChanged += () => Dispatcher.UIThread.Post(Relanguage);
+        return library;
+    }
+
+    /// <summary>
+    /// The language changed in the settings: the home screen and the touch bar are made again in
+    /// it, the settings open where they were (on their Appearance page).
+    /// </summary>
+    private void Relanguage()
+    {
+        var old = m_library;
+        m_library = NewLibrary();
+        m_library.IsVisible = old.IsVisible;
+        m_layers.Children[m_layers.Children.IndexOf(old)] = m_library;
+        if (m_bar != null)
+        {
+            m_layers.Children[m_layers.Children.IndexOf(m_bar)] = TouchBar();
+            UpdateTouchBar();
+        }
+        m_library.OpenSettings(SettingsPages.Appearance);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -233,7 +263,7 @@ public sealed partial class GameView : UserControl, IGameWindow
     {
         if (TopLevel.GetTopLevel(this) is not { } top)
             return null;
-        var options = new FolderPickerOpenOptions { Title = "Choose the folder of an installed game", AllowMultiple = false };
+        var options = new FolderPickerOpenOptions { Title = Strings.ChooseFolderTitle, AllowMultiple = false };
         try
         {
             if (GameLibrary.Load().FirstOrDefault(g => g.Available) is { } last && Path.GetDirectoryName(last.Folder) is { } near)
@@ -248,7 +278,7 @@ public sealed partial class GameView : UserControl, IGameWindow
             return null;
         if (PlayerPlatform.FolderPath(folders[0]) is { } path)
             return path;
-        m_library.Message = "The player cannot read that folder: choose a folder on the device's storage or a memory card.";
+        m_library.Message = Strings.CannotReadFolder;
         return null;
     }
 
@@ -265,14 +295,14 @@ public sealed partial class GameView : UserControl, IGameWindow
         var game = await Task.Run(() => GameLibrary.Add(folder));
         if (game == null && GameData.FindArchive(folder) != null)
         {
-            m_library.Message = "The game's .exe is not one the player knows: looking for the keys that open its archives…";
+            m_library.Message = Strings.UnknownExeLooking;
             var found = await Task.Run(() => SchemeDetector.Detect(folder));
             string? chosen = found.Count switch
             {
                 0 => null,
                 1 => found[0].Name,
                 _ => await m_library.ChooseAsync(
-                    $"These {found.Count} games' keys all open the archives in {folder}. Which game is it?",
+                    string.Format(Strings.WhichGame, found.Count, folder),
                     found.Select(c => c.Name).ToList()),
             };
             if (chosen != null)
@@ -284,7 +314,7 @@ public sealed partial class GameView : UserControl, IGameWindow
             }
         }
         m_library.Message = game == null
-            ? $"No game was recognised in {folder}: choose the folder with the game's .WAR files (no keys the player knows open them)."
+            ? string.Format(Strings.NoGameRecognised, folder)
             : "";
         m_library.Refresh();
     }
@@ -301,7 +331,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         {
             // Asked below
         }
-        m_library.Message = "OpenShiina needs access to the files to read the games: allow it, then try again.";
+        m_library.Message = Strings.NeedFileAccess;
         return false;
     }
 
@@ -310,14 +340,14 @@ public sealed partial class GameView : UserControl, IGameWindow
     {
         if (!await FileAccessAsync())
             return;
-        m_library.Message = "Opening the game…";
+        m_library.Message = Strings.OpeningGame;
         try
         {
             var data = await Task.Run(() =>
             {
-                _ = GameData.FindArchive(folder) ?? throw new InvalidDataException("The folder has no .WAR archives.");
+                _ = GameData.FindArchive(folder) ?? throw new InvalidDataException(Strings.NoWarArchives);
                 var scheme = GameLibrary.SchemeFor(folder)
-                    ?? throw new InvalidDataException("The game was not recognised: keep the game's own .exe in the folder, or add it again.");
+                    ?? throw new InvalidDataException(Strings.GameNotRecognised);
                 return GameData.Open(folder, scheme);
             });
             GameSession session;
@@ -338,7 +368,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         }
         catch (Exception ex)
         {
-            m_library.Message = $"Could not play the game in {folder}:\n{ex.Message}";
+            m_library.Message = string.Format(Strings.CouldNotPlay, folder, ex.Message);
         }
     }
 

@@ -11,6 +11,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenShiina.Scripting;
+using OpenShiina.Localization;
 
 namespace OpenShiina.Game;
 
@@ -59,6 +60,9 @@ public sealed class PlayerSettings
     /// <summary>How the game's picture is scaled to the window (PictureScaling).</summary>
     [JsonConverter(typeof(JsonStringEnumConverter<Scaling>))]
     public Scaling Scaling { get; set; } = Scaling.Sharp;
+
+    /// <summary>The language of the players' own screens (Localization.Languages): a code ("en", "vi"...), or empty for the device's.</summary>
+    public string Language { get; set; } = "";
 
     /// <summary>The players' colours, applied at once.</summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AppTheme>))]
@@ -188,33 +192,26 @@ public sealed class PlayerSettings
     /// <summary>draw-trace.log; OPENSHIINA_TRACE=draw turns it on.</summary>
     public bool DrawTraceForGame() => Environment.GetEnvironmentVariable("OPENSHIINA_TRACE") == "draw" || DrawTrace;
 
-    /// <summary>The on / off settings as the settings page shows them: on its page (SettingsPages), in their groups.</summary>
-    public static IReadOnlyList<SettingSwitch> Switches { get; } =
+    /// <summary>The on / off settings as the settings page shows them, in the screens' language: on its page (SettingsPages), in their groups.</summary>
+    public static IReadOnlyList<SettingSwitch> Switches =>
     [
-        new(SettingsPages.Graphics, "On screen", "Show the frame rate",
-            "Frames a second and the slowest frame, in the window's title (on phones and tablets over the game).",
+        new(SettingsPages.Graphics, Strings.GroupOnScreen, Strings.ShowFrameRate, Strings.ShowFrameRateHelp,
             s => s.ShowFrameRate, (s, on) => s.ShowFrameRate = on),
-        new(SettingsPages.Game, "Controls", "Game controller",
-            "The first joystick or gamepad plays: the stick moves, button 1 decides, button 2 cancels.",
+        new(SettingsPages.Game, Strings.GroupControls, Strings.GameController, Strings.GameControllerHelp,
             s => s.GameController, (s, on) => s.GameController = on),
-        new(SettingsPages.Game, "In the background", OperatingSystem.IsAndroid() ? "Pause in the background" : "Pause behind other windows",
-            OperatingSystem.IsAndroid()
-                ? "The game stands still, sound included, while another app is in front or the screen is off. Off: as the game itself says (most go on)."
-                : "The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).",
+        new(SettingsPages.Game, Strings.GroupInBackground,
+            OperatingSystem.IsAndroid() ? Strings.PauseInBackground : Strings.PauseBehindWindows,
+            OperatingSystem.IsAndroid() ? Strings.PauseInBackgroundHelp : Strings.PauseBehindWindowsHelp,
             s => s.PauseInBackground, (s, on) => s.PauseInBackground = on),
         .. (OperatingSystem.IsAndroid()
-            ? [new SettingSwitch(SettingsPages.Storage, "Saves", "Back up saves",
-                "Your saves and settings go into Android's backup (Google), and come back when OpenShiina is installed again or on a new phone. Android keeps 25 MB: the games played last go first.",
+            ? [new SettingSwitch(SettingsPages.Storage, Strings.GroupSaves, Strings.BackUpSaves, Strings.BackUpSavesHelp,
                 s => s.AndroidBackup, (s, on) => s.AndroidBackup = on)]
             : Array.Empty<SettingSwitch>()),
-        new(SettingsPages.Debug, "Logs", "Write perf.log",
-            "Every second, where the time went, into the game's save folder. The game runs slower while it writes.",
+        new(SettingsPages.Debug, Strings.GroupLogs, Strings.WritePerfLog, Strings.WritePerfLogHelp,
             s => s.PerfLog, (s, on) => s.PerfLog = on),
-        new(SettingsPages.Debug, "Logs", "Write draw-trace.log",
-            "What every frame draws, into the game's save folder when the game ends (for reports on flicker).",
+        new(SettingsPages.Debug, Strings.GroupLogs, Strings.WriteDrawTrace, Strings.WriteDrawTraceHelp,
             s => s.DrawTrace, (s, on) => s.DrawTrace = on),
-        new(SettingsPages.Debug, "Interpreter", "Translate the games' x86 code",
-            "Off runs it on the interpreter instead: much slower; only to tell whether a problem comes from the translation.",
+        new(SettingsPages.Debug, Strings.GroupInterpreter, Strings.TranslateX86, Strings.TranslateX86Help,
             s => s.TranslateX86, (s, on) => s.TranslateX86 = on),
     ];
 }

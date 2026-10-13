@@ -19,6 +19,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Path = Avalonia.Controls.Shapes.Path;
 using OpenShiina.Game;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
@@ -34,7 +35,7 @@ public sealed class LibraryView : UserControl
     private readonly Button m_railLibrary, m_railSettings;
     private readonly TextBlock m_empty = new()
     {
-        Text = "No games yet. Add the folder of an installed game: the one with its .exe and .WAR files.",
+        Text = Strings.NoGamesYet,
         TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 16),
     };
     private readonly TextBlock m_message = new() { TextWrapping = TextWrapping.Wrap, IsVisible = false };
@@ -57,6 +58,9 @@ public sealed class LibraryView : UserControl
     /// <summary>"Add a game…": the host asks for a folder and opens it.</summary>
     public event Action? AddRequested;
 
+    /// <summary>The language was changed in the settings: the host makes the screens again in it.</summary>
+    public event Action? LanguageChanged;
+
     public LibraryView()
     {
         this.Use(BackgroundProperty, PlayerTheme.Keys.Background);
@@ -64,12 +68,12 @@ public sealed class LibraryView : UserControl
         m_empty.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
         m_message.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink);
 
-        m_railLibrary = RailButton(Icons.Library, "Library", PlayerTheme.Keys.Ink);
+        m_railLibrary = RailButton(Icons.Library, Strings.Library, PlayerTheme.Keys.Ink);
         m_railLibrary.Click += (_, _) => ShowHome();
-        var add = RailButton(Icons.Add, "Add a game…", PlayerTheme.Keys.Accent);
+        var add = RailButton(Icons.Add, Strings.AddGame, PlayerTheme.Keys.Accent);
         add.Click += (_, _) => AddRequested?.Invoke();
-        m_railSettings = RailButton(Icons.Settings, "Settings", PlayerTheme.Keys.Ink);
-        m_railSettings.Click += (_, _) => OpenSettings();
+        m_railSettings = RailButton(Icons.Settings, Strings.Settings, PlayerTheme.Keys.Ink);
+        m_railSettings.Click += (_, _) => OpenSettings(SettingsPages.Appearance);
         var rail = new Border
         {
             BorderThickness = new Thickness(0, 0, 1, 0),
@@ -213,7 +217,7 @@ public sealed class LibraryView : UserControl
 
         var heading = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 4, 0) };
         if (game.LastPlayed != null && m_games.FirstOrDefault()?.Folder == game.Folder)
-            heading.Children.Add(new TextBlock { Text = "Continue", FontSize = 13, FontWeight = FontWeight.SemiBold }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Highlight));
+            heading.Children.Add(new TextBlock { Text = Strings.Continue, FontSize = 13, FontWeight = FontWeight.SemiBold }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Highlight));
         heading.Children.Add(new TextBlock
         {
             Text = game.Name, FontSize = m_compact ? 19 : 22, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap,
@@ -226,7 +230,7 @@ public sealed class LibraryView : UserControl
             HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
             Background = Brushes.Transparent, VerticalAlignment = VerticalAlignment.Top,
         };
-        AutomationProperties.SetName(more, "More");
+        AutomationProperties.SetName(more, Strings.More);
         var menu = Menu(game);
         more.Click += (_, e) =>
         {
@@ -236,9 +240,9 @@ public sealed class LibraryView : UserControl
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Children = { icon, At(heading, 1), At(more, 2) } };
 
         var facts = new StackPanel { Spacing = 4, Margin = new Thickness(0, 14, 0, 0) };
-        facts.Children.Add(Fact(!available ? "The folder is not there any more" : game.LastPlayed is { } played ? $"Played {Ago(played)}" : "Not played yet"));
+        facts.Children.Add(Fact(!available ? Strings.FolderGone : game.LastPlayed is { } played ? string.Format(Strings.PlayedWhen, Ago(played)) : Strings.NotPlayedYet));
         if (game.PlaySeconds > 0)
-            facts.Children.Add(Fact($"{Duration(game.PlaySeconds)} played"));
+            facts.Children.Add(Fact(string.Format(Strings.PlayTime, Duration(game.PlaySeconds))));
         var size = Fact(SizeText(game));
         size.IsVisible = size.Text!.Length > 0;
         facts.Children.Add(size);
@@ -257,7 +261,7 @@ public sealed class LibraryView : UserControl
                 {
                     new Path { Data = Icons.Play, Width = 14, Height = 16, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Center }
                         .Use(Shape.FillProperty, PlayerTheme.Keys.OnHighlight),
-                    new TextBlock { Text = "Play", FontSize = 16, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center }
+                    new TextBlock { Text = Strings.Play, FontSize = 16, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center }
                         .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.OnHighlight),
                 },
             },
@@ -278,7 +282,7 @@ public sealed class LibraryView : UserControl
         };
         card.Classes.Add("card");
         card.Classes.Add("chosen");
-        AutomationProperties.SetName(card, $"Play {game.Name}");
+        AutomationProperties.SetName(card, string.Format(Strings.PlayGame, game.Name));
         card.ContextFlyout = menu;
         card.Click += (_, _) => PlayGame(game);
         return card;
@@ -287,7 +291,7 @@ public sealed class LibraryView : UserControl
     /// <summary>No games yet: what to do, and the button to do it.</summary>
     private Control Welcome()
     {
-        var add = new Button { Content = "Add a game…", HorizontalAlignment = HorizontalAlignment.Left };
+        var add = new Button { Content = Strings.AddGame, HorizontalAlignment = HorizontalAlignment.Left };
         add.Classes.Add("accent");
         add.Click += (_, _) => AddRequested?.Invoke();
         return new Border
@@ -300,7 +304,7 @@ public sealed class LibraryView : UserControl
                 Children =
                 {
                     PlayerTheme.Wordmark(24),
-                    new TextBlock { Text = "Add the folder of an installed game (the one with its .exe and .WAR files), on this device or a memory card.", TextWrapping = TextWrapping.Wrap }
+                    new TextBlock { Text = Strings.WelcomeText, TextWrapping = TextWrapping.Wrap }
                         .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted),
                     add,
                 },
@@ -313,23 +317,23 @@ public sealed class LibraryView : UserControl
         if (game.Available)
             Play?.Invoke(game.Folder);
         else
-            Message = $"The folder of {game.Name} is not there any more:\n{game.Folder}";
+            Message = string.Format(Strings.FolderGoneMessage, game.Name, game.Folder);
     }
 
     private MenuFlyout Menu(LibraryGame game)
     {
         var menu = new MenuFlyout();
-        var saves = new MenuItem { Header = "Open the save folder" };
+        var saves = new MenuItem { Header = Strings.OpenSaveFolder };
         saves.Click += async (_, _) => await OpenFolderAsync(game.SaveFolder);
         menu.Items.Add(saves);
         if (!PlayerPlatform.Touch)
         {
-            var folder = new MenuItem { Header = "Open the game's folder", IsEnabled = game.Available };
+            var folder = new MenuItem { Header = Strings.OpenGameFolder, IsEnabled = game.Available };
             folder.Click += async (_, _) => await OpenFolderAsync(game.Folder);
             menu.Items.Add(folder);
         }
         menu.Items.Add(new Separator());
-        var remove = new MenuItem { Header = "Remove…" }.Use(MenuItem.ForegroundProperty, PlayerTheme.Keys.Accent);
+        var remove = new MenuItem { Header = Strings.RemoveMenu }.Use(MenuItem.ForegroundProperty, PlayerTheme.Keys.Accent);
         remove.Click += (_, _) => ShowRemove(game);
         menu.Items.Add(remove);
         return menu;
@@ -360,10 +364,10 @@ public sealed class LibraryView : UserControl
     {
         (long Game, long Saves)? known = m_sizes.TryGetValue(game.Folder, out var sizes) ? sizes : null;
         if (!game.Available)
-            return known is { } k && k.Saves > 0 ? $"Saves {Bytes(k.Saves)}" : "";
+            return known is { } k && k.Saves > 0 ? string.Format(Strings.SavesOnly, Bytes(k.Saves)) : "";
         long? folder = known?.Game ?? game.Bytes;
         if (folder == null)
-            return "Measuring…";
+            return Strings.Measuring;
         return known is { } m ? $"{Bytes(folder.Value)} · {Saves(m.Saves)}" : Bytes(folder.Value);
     }
 
@@ -376,27 +380,27 @@ public sealed class LibraryView : UserControl
     private void ShowRemove(LibraryGame game)
     {
         var sizes = m_sizes.TryGetValue(game.Folder, out var s) ? s : (Game: game.Bytes ?? 0, Saves: 0L);
-        var listOnly = new RadioButton { Content = "Only from the list (its files and saves stay)", GroupName = "remove", IsChecked = true };
+        var listOnly = new RadioButton { Content = Strings.RemoveListOnly, GroupName = "remove", IsChecked = true };
         var delete = new RadioButton
         {
-            Content = sizes.Game > 0 ? $"Delete the game's folder too (frees {Bytes(sizes.Game)})" : "Delete the game's folder too",
+            Content = sizes.Game > 0 ? string.Format(Strings.RemoveDeleteFrees, Bytes(sizes.Game)) : Strings.RemoveDelete,
             GroupName = "remove", IsVisible = game.Available,
         };
         var path = new TextBlock { Text = game.Folder, TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(28, 0, 0, 0), IsVisible = false }
             .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
         var saves = new CheckBox
         {
-            Content = sizes.Saves > 0 ? $"Delete its saves too ({Bytes(sizes.Saves)})" : "Delete its saves too",
+            Content = sizes.Saves > 0 ? string.Format(Strings.RemoveSavesSize, Bytes(sizes.Saves)) : Strings.RemoveSaves,
             Margin = new Thickness(28, 0, 0, 0), IsVisible = false,
         };
-        var cancel = new Button { Content = "Cancel" };
-        var go = new Button { Content = "Remove" };
+        var cancel = new Button { Content = Strings.Cancel };
+        var go = new Button { Content = Strings.Remove };
         go.Classes.Add("accent");
         void Update()
         {
             bool deleting = delete.IsChecked == true;
             path.IsVisible = saves.IsVisible = deleting;
-            go.Content = !deleting ? "Remove" : sizes.Game > 0 ? $"Delete {Bytes(sizes.Game)}" : "Delete";
+            go.Content = !deleting ? Strings.Remove : sizes.Game > 0 ? string.Format(Strings.DeleteSize, Bytes(sizes.Game)) : Strings.Delete;
         }
         listOnly.IsCheckedChanged += (_, _) => Update();
         delete.IsCheckedChanged += (_, _) => Update();
@@ -409,7 +413,7 @@ public sealed class LibraryView : UserControl
             {
                 GameLibrary.Remove(game.Folder);
                 Refresh();
-                Toast($"{game.Name} was taken off the list.", () =>
+                Toast(string.Format(Strings.Removed, game.Name), () =>
                 {
                     GameLibrary.Restore(game);
                     m_chosen = game.Folder;
@@ -417,12 +421,12 @@ public sealed class LibraryView : UserControl
                 });
                 return;
             }
-            Message = $"Deleting {game.Name}…";
+            Message = string.Format(Strings.Deleting, game.Name);
             string? error = await Task.Run(() => GameLibrary.Delete(game, withSaves));
             Message = error ?? "";
             Refresh();
             if (error == null)
-                Toast(sizes.Game > 0 ? $"{game.Name} was deleted: {Bytes(sizes.Game)} freed." : $"{game.Name} was deleted.", null);
+                Toast(sizes.Game > 0 ? string.Format(Strings.DeletedFreed, game.Name, Bytes(sizes.Game)) : string.Format(Strings.Deleted, game.Name), null);
         };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 6, 0, 0), Children = { cancel, go } };
         var dialog = new Border
@@ -435,7 +439,7 @@ public sealed class LibraryView : UserControl
                 Spacing = 10,
                 Children =
                 {
-                    new TextBlock { Text = $"Remove {game.Name}", FontSize = 18, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap }
+                    new TextBlock { Text = string.Format(Strings.RemoveTitle, game.Name), FontSize = 18, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap }
                         .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink),
                     listOnly, delete, path, saves, buttons,
                 },
@@ -471,7 +475,7 @@ public sealed class LibraryView : UserControl
         };
         if (undo != null)
         {
-            var button = new Button { Content = "Undo", Background = Brushes.Transparent }.Use(ForegroundProperty, PlayerTheme.Keys.Highlight);
+            var button = new Button { Content = Strings.Undo, Background = Brushes.Transparent }.Use(ForegroundProperty, PlayerTheme.Keys.Highlight);
             button.Click += (_, _) =>
             {
                 m_toast.IsVisible = false;
@@ -500,12 +504,15 @@ public sealed class LibraryView : UserControl
 
     // ---- The settings, in the page's place
 
-    private void OpenSettings()
+    /// <summary>Shows the settings in the page's place, at <paramref name="page"/>.</summary>
+    public void OpenSettings(SettingsPages page)
     {
         if (m_page.Content is SettingsView)
             return;
         var settings = new SettingsView();
         settings.Closed += ShowHome;
+        settings.LanguageChanged += () => LanguageChanged?.Invoke();
+        settings.Show(page);
         m_page.Content = settings;
         Chosen(m_railLibrary, false);
         Chosen(m_railSettings, true);
@@ -558,7 +565,7 @@ public sealed class LibraryView : UserControl
             button.Click += (_, _) => Answer(answer);
             m_choice.Children.Add(button);
         }
-        var cancel = new Button { Content = "Cancel", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
+        var cancel = new Button { Content = Strings.Cancel, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
         cancel.Click += (_, _) => Answer(null);
         m_choice.Children.Add(cancel);
         m_choice.IsVisible = true;
@@ -655,30 +662,31 @@ public sealed class LibraryView : UserControl
     {
         var past = DateTime.Now - when;
         if (past < TimeSpan.FromMinutes(1))
-            return "just now";
+            return Strings.AgoJustNow;
         if (past < TimeSpan.FromHours(1))
-            return past.Minutes == 1 ? "a minute ago" : $"{past.Minutes} minutes ago";
+            return past.Minutes == 1 ? Strings.AgoMinute : string.Format(Strings.AgoMinutes, past.Minutes);
         if (when.Date == DateTime.Today)
-            return (int)past.TotalHours == 1 ? "an hour ago" : $"{(int)past.TotalHours} hours ago";
+            return (int)past.TotalHours == 1 ? Strings.AgoHour : string.Format(Strings.AgoHours, (int)past.TotalHours);
         int days = (DateTime.Today - when.Date).Days;
-        return days == 1 ? "yesterday" : days < 7 ? $"{days} days ago" : $"on {when:yyyy-MM-dd}";
+        return days == 1 ? Strings.AgoYesterday : days < 7 ? string.Format(Strings.AgoDays, days) : string.Format(Strings.AgoDate, when.ToString("yyyy-MM-dd"));
     }
 
     /// <summary>A play time: "Under a minute", "45 min", "14 h 20 min".</summary>
     private static string Duration(long seconds)
     {
         if (seconds < 60)
-            return "Under a minute";
+            return Strings.DurationUnderMinute;
         long minutes = seconds / 60, hours = minutes / 60;
-        return hours == 0 ? $"{minutes} min" : minutes % 60 == 0 ? $"{hours} h" : $"{hours} h {minutes % 60} min";
+        return hours == 0 ? string.Format(Strings.DurationMinutes, minutes)
+            : minutes % 60 == 0 ? string.Format(Strings.DurationHours, hours) : string.Format(Strings.DurationHoursMinutes, hours, minutes % 60);
     }
 
-    private static string Saves(long bytes) => bytes > 0 ? $"saves {Bytes(bytes)}" : "no saves yet";
+    private static string Saves(long bytes) => bytes > 0 ? string.Format(Strings.SavesSize, Bytes(bytes)) : Strings.NoSavesYet;
 
     /// <summary>A size: "2.1 GB", "350 MB", "3.5 MB", "12 KB".</summary>
     private static string Bytes(long bytes)
     {
-        string[] units = ["bytes", "KB", "MB", "GB", "TB"];
+        string[] units = ["", "KB", "MB", "GB", "TB"];
         double value = bytes;
         int unit = 0;
         while (value >= 1024 && unit < units.Length - 1)
@@ -686,7 +694,7 @@ public sealed class LibraryView : UserControl
             value /= 1024;
             unit++;
         }
-        return unit == 0 ? $"{bytes} bytes" : value >= 100 ? $"{value:F0} {units[unit]}" : $"{value:0.#} {units[unit]}";
+        return unit == 0 ? string.Format(Strings.SizeBytes, bytes) : value >= 100 ? $"{value:F0} {units[unit]}" : $"{value:0.#} {units[unit]}";
     }
 
     /// <summary>The logo (the windows' icon) as a picture for the rail.</summary>
@@ -706,7 +714,7 @@ public sealed class LibraryView : UserControl
         }
         catch (Exception ex)
         {
-            Message = $"Could not open {path}:\n{ex.Message}";
+            Message = string.Format(Strings.CouldNotOpen, path, ex.Message);
         }
     }
 

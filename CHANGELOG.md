@@ -4,6 +4,13 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **The player's screens in other languages:** Settings → Appearance → Language picks the
+  device's language, English or Vietnamese, and changes the screens at once. The words live in
+  `src/OpenShiina.Core/Localization/Strings.resx`; a translation is a `Strings.<language>.resx`
+  beside it and shows in the list by itself.
+
 ## 0.4.1 (2026-10-13)
 
 - The home screen's card stands level with the first row of tiles.

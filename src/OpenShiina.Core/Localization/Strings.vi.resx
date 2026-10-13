@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vietnamese. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Library" xml:space="preserve"><value>Thư viện</value></data>
+  <data name="AddGame" xml:space="preserve"><value>Thêm game…</value></data>
+  <data name="Settings" xml:space="preserve"><value>Cài đặt</value></data>
+  <data name="NoGamesYet" xml:space="preserve"><value>Chưa có game nào. Hãy thêm thư mục của một game đã cài: thư mục có file .exe và các file .WAR của game.</value></data>
+  <data name="WelcomeText" xml:space="preserve"><value>Thêm thư mục của một game đã cài (thư mục có file .exe và các file .WAR), trên máy hoặc trên thẻ nhớ.</value></data>
+  <data name="Continue" xml:space="preserve"><value>Chơi tiếp</value></data>
+  <data name="More" xml:space="preserve"><value>Thêm</value></data>
+  <data name="PlayGame" xml:space="preserve"><value>Chơi {0}</value></data>
+  <data name="Play" xml:space="preserve"><value>Chơi</value></data>
+  <data name="FolderGone" xml:space="preserve"><value>Thư mục không còn nữa</value></data>
+  <data name="FolderGoneMessage" xml:space="preserve"><value>Thư mục của {0} không còn nữa:
+{1}</value></data>
+  <data name="PlayedWhen" xml:space="preserve"><value>Chơi {0}</value></data>
+  <data name="NotPlayedYet" xml:space="preserve"><value>Chưa chơi</value></data>
+  <data name="PlayTime" xml:space="preserve"><value>Đã chơi {0}</value></data>
+  <data name="Measuring" xml:space="preserve"><value>Đang đo…</value></data>
+  <data name="SavesSize" xml:space="preserve"><value>save {0}</value></data>
+  <data name="SavesOnly" xml:space="preserve"><value>Save {0}</value></data>
+  <data name="NoSavesYet" xml:space="preserve"><value>chưa có save</value></data>
+  <data name="OpenSaveFolder" xml:space="preserve"><value>Mở thư mục save</value></data>
+  <data name="OpenGameFolder" xml:space="preserve"><value>Mở thư mục game</value></data>
+  <data name="RemoveMenu" xml:space="preserve"><value>Gỡ game…</value></data>
+  <data name="RemoveTitle" xml:space="preserve"><value>Gỡ {0}</value></data>
+  <data name="RemoveListOnly" xml:space="preserve"><value>Chỉ gỡ khỏi danh sách (file và save giữ nguyên)</value></data>
+  <data name="RemoveDelete" xml:space="preserve"><value>Xóa luôn thư mục game</value></data>
+  <data name="RemoveDeleteFrees" xml:space="preserve"><value>Xóa luôn thư mục game (giải phóng {0})</value></data>
+  <data name="RemoveSaves" xml:space="preserve"><value>Xóa cả save</value></data>
+  <data name="RemoveSavesSize" xml:space="preserve"><value>Xóa cả save ({0})</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Hủy</value></data>
+  <data name="Remove" xml:space="preserve"><value>Gỡ</value></data>
+  <data name="Delete" xml:space="preserve"><value>Xóa</value></data>
+  <data name="DeleteSize" xml:space="preserve"><value>Xóa {0}</value></data>
+  <data name="Removed" xml:space="preserve"><value>Đã gỡ {0} khỏi danh sách.</value></data>
+  <data name="Undo" xml:space="preserve"><value>Hoàn tác</value></data>
+  <data name="Deleting" xml:space="preserve"><value>Đang xóa {0}…</value></data>
+  <data name="Deleted" xml:space="preserve"><value>Đã xóa {0}.</value></data>
+  <data name="DeletedFreed" xml:space="preserve"><value>Đã xóa {0}: giải phóng {1}.</value></data>
+  <data name="CouldNotOpen" xml:space="preserve"><value>Không mở được {0}:
+{1}</value></data>
+  <data name="AgoJustNow" xml:space="preserve"><value>vừa xong</value></data>
+  <data name="AgoMinute" xml:space="preserve"><value>1 phút trước</value></data>
+  <data name="AgoMinutes" xml:space="preserve"><value>{0} phút trước</value></data>
+  <data name="AgoHour" xml:space="preserve"><value>1 giờ trước</value></data>
+  <data name="AgoHours" xml:space="preserve"><value>{0} giờ trước</value></data>
+  <data name="AgoYesterday" xml:space="preserve"><value>hôm qua</value></data>
+  <data name="AgoDays" xml:space="preserve"><value>{0} ngày trước</value></data>
+  <data name="AgoDate" xml:space="preserve"><value>ngày {0}</value></data>
+  <data name="DurationUnderMinute" xml:space="preserve"><value>Chưa tới 1 phút</value></data>
+  <data name="DurationMinutes" xml:space="preserve"><value>{0} phút</value></data>
+  <data name="DurationHours" xml:space="preserve"><value>{0} giờ</value></data>
+  <data name="DurationHoursMinutes" xml:space="preserve"><value>{0} giờ {1} phút</value></data>
+  <data name="SizeBytes" xml:space="preserve"><value>{0} byte</value></data>
+  <data name="DeleteGone" xml:space="preserve"><value>Thư mục không còn nữa.</value></data>
+  <data name="DeleteNoArchives" xml:space="preserve"><value>Thư mục không còn file .WAR nào nên đã được giữ nguyên.</value></data>
+  <data name="DeleteDrive" xml:space="preserve"><value>Đây là cả một ổ đĩa: đã được giữ nguyên.</value></data>
+  <data name="DeleteSystem" xml:space="preserve"><value>Đây là thư mục của hệ thống: đã được giữ nguyên.</value></data>
+  <data name="DeletePlayerData" xml:space="preserve"><value>Thư mục này chứa dữ liệu của OpenShiina (save, cài đặt): đã được giữ nguyên.</value></data>
+  <data name="DeleteOtherGame" xml:space="preserve"><value>Thư mục này chứa một game khác trong danh sách: đã được giữ nguyên.</value></data>
+  <data name="DeletePartly" xml:space="preserve"><value>Không xóa được hết: {0}</value></data>
+  <data name="ChooseFolderTitle" xml:space="preserve"><value>Chọn thư mục của một game đã cài</value></data>
+  <data name="CannotReadFolder" xml:space="preserve"><value>Không đọc được thư mục đó: hãy chọn một thư mục trong bộ nhớ máy hoặc trên thẻ nhớ.</value></data>
+  <data name="UnknownExeLooking" xml:space="preserve"><value>Không nhận ra file .exe của game: đang tìm khóa mở các file archive của nó…</value></data>
+  <data name="WhichGame" xml:space="preserve"><value>Khóa của {0} game sau đều mở được các archive trong {1}. Đây là game nào?</value></data>
+  <data name="NoGameRecognised" xml:space="preserve"><value>Không nhận ra game nào trong {0}: hãy chọn thư mục có các file .WAR của game (không có khóa nào đã biết mở được chúng).</value></data>
+  <data name="NeedFileAccess" xml:space="preserve"><value>OpenShiina cần quyền truy cập file để đọc game: hãy cho phép rồi thử lại.</value></data>
+  <data name="OpeningGame" xml:space="preserve"><value>Đang mở game…</value></data>
+  <data name="NoWarArchives" xml:space="preserve"><value>Thư mục không có file .WAR nào.</value></data>
+  <data name="GameNotRecognised" xml:space="preserve"><value>Không nhận ra game: hãy giữ file .exe của game trong thư mục, hoặc thêm game lại.</value></data>
+  <data name="CouldNotPlay" xml:space="preserve"><value>Không chơi được game trong {0}:
+{1}</value></data>
+  <data name="PlayingAGame" xml:space="preserve"><value>Đang chơi game</value></data>
+  <data name="TouchMenu" xml:space="preserve"><value>Menu</value></data>
+  <data name="TouchAuto" xml:space="preserve"><value>Auto</value></data>
+  <data name="TouchSkip" xml:space="preserve"><value>Skip</value></data>
+  <data name="TouchLog" xml:space="preserve"><value>Log</value></data>
+  <data name="TouchExit" xml:space="preserve"><value>Thoát</value></data>
+  <data name="Ok" xml:space="preserve"><value>OK</value></data>
+  <data name="Yes" xml:space="preserve"><value>Có</value></data>
+  <data name="No" xml:space="preserve"><value>Không</value></data>
+  <data name="BackToLibrary" xml:space="preserve"><value>← Thư viện</value></data>
+  <data name="SettingsNote" xml:space="preserve"><value>Lưu ngay khi đổi, áp dụng từ game mở tiếp theo.</value></data>
+  <data name="PageAppearance" xml:space="preserve"><value>Giao diện</value></data>
+  <data name="PageGraphics" xml:space="preserve"><value>Đồ họa</value></data>
+  <data name="PageGame" xml:space="preserve"><value>Game</value></data>
+  <data name="PageStorage" xml:space="preserve"><value>Bộ nhớ</value></data>
+  <data name="PageDebug" xml:space="preserve"><value>Gỡ lỗi</value></data>
+  <data name="DebugNote" xml:space="preserve"><value>Dùng khi báo lỗi: các file này được ghi vào thư mục save của game (mở từ menu của game trong thư viện).</value></data>
+  <data name="On" xml:space="preserve"><value>Bật</value></data>
+  <data name="Off" xml:space="preserve"><value>Tắt</value></data>
+  <data name="GroupTheme" xml:space="preserve"><value>Theme</value></data>
+  <data name="GroupLanguage" xml:space="preserve"><value>Ngôn ngữ</value></data>
+  <data name="Language" xml:space="preserve"><value>Ngôn ngữ</value></data>
+  <data name="LanguageHelp" xml:space="preserve"><value>Ngôn ngữ của các màn hình OpenShiina. Game vẫn giữ ngôn ngữ của game (bản dịch của game thì đổi được).</value></data>
+  <data name="LanguageSystem" xml:space="preserve"><value>Theo máy ({0})</value></data>
+  <data name="GroupQuality" xml:space="preserve"><value>Chất lượng</value></data>
+  <data name="GroupDetails" xml:space="preserve"><value>Chi tiết</value></data>
+  <data name="GroupMemory" xml:space="preserve"><value>Bộ nhớ</value></data>
+  <data name="GraphicsLevel" xml:space="preserve"><value>Mức đồ họa</value></data>
+  <data name="GraphicsLevelHelp" xml:space="preserve"><value>Cách phóng hình game ra cửa sổ, từ nhẹ nhất đến nặng nhất. FSR và Anime4K chạy trên GPU vẽ cửa sổ (không có GPU thì như mức Low).</value></data>
+  <data name="Custom" xml:space="preserve"><value>Tùy chỉnh</value></data>
+  <data name="CustomHelp" xml:space="preserve"><value>Đặt từng mục ở phần Chi tiết.</value></data>
+  <data name="Scaling" xml:space="preserve"><value>Cách phóng hình</value></data>
+  <data name="FsrSharpening" xml:space="preserve"><value>Độ nét FSR</value></data>
+  <data name="FsrOnlyWithFsr" xml:space="preserve"><value>Chỉ dùng khi phóng hình bằng FSR 1.</value></data>
+  <data name="FsrNone" xml:space="preserve"><value>Không làm nét.</value></data>
+  <data name="FsrOf" xml:space="preserve"><value>{0} trên 10.</value></data>
+  <data name="Drawing" xml:space="preserve"><value>Xử lý hình</value></data>
+  <data name="DrawingHelp" xml:space="preserve"><value>Nơi hình của game được phóng và trộn. Cả hai cho hình như nhau; GPU gánh phần việc nặng thay cho CPU.</value></data>
+  <data name="DrawingCpu" xml:space="preserve"><value>Các nhân của CPU, có SIMD.</value></data>
+  <data name="NoGpu" xml:space="preserve"><value>Không có GPU dùng được ({0}): game chạy trên CPU.</value></data>
+  <data name="Cpu" xml:space="preserve"><value>CPU</value></data>
+  <data name="GpuVulkan" xml:space="preserve"><value>GPU (Vulkan)</value></data>
+  <data name="FrameRate" xml:space="preserve"><value>Tốc độ khung hình</value></data>
+  <data name="PaceGame" xml:space="preserve"><value>Theo nhịp của game</value></data>
+  <data name="PaceGameHelp" xml:space="preserve"><value>Như bản gốc: tối đa 60 khung hình mỗi giây, ít tốn CPU lúc chờ.</value></data>
+  <data name="PaceDisplay" xml:space="preserve"><value>Mỗi lần màn hình làm mới</value></data>
+  <data name="PaceDisplayHelp" xml:space="preserve"><value>Mượt hơn trên màn hình tần số cao, tốn CPU hơn.</value></data>
+  <data name="ProfileOwn" xml:space="preserve"><value>Thiết lập riêng của bạn, ở phần Chi tiết.</value></data>
+  <data name="FileCache" xml:space="preserve"><value>Bộ nhớ đệm file</value></data>
+  <data name="FileCacheHelp" xml:space="preserve"><value>Bộ nhớ giữ lại hình và âm thanh game đã đọc để khỏi giải mã lại. Càng lớn thì chuyển cảnh và hình sự kiện càng mượt.</value></data>
+  <data name="FileCacheAutoHere" xml:space="preserve"><value>{0} ({1} MB trên máy này)</value></data>
+  <data name="ThemeShiina" xml:space="preserve"><value>Shiina</value></data>
+  <data name="ThemeShiinaHelp" xml:space="preserve"><value>Đỏ rượu và vàng của logo, nền tối.</value></data>
+  <data name="ThemeParchment" xml:space="preserve"><value>Parchment</value></data>
+  <data name="ThemeParchmentHelp" xml:space="preserve"><value>Cùng bộ màu trên nền giấy kem, sáng.</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>Graphite</value></data>
+  <data name="ThemeGraphiteHelp" xml:space="preserve"><value>Xám tối trung tính.</value></data>
+  <data name="LevelPotato" xml:space="preserve"><value>Potato</value></data>
+  <data name="LevelPotatoHelp" xml:space="preserve"><value>Điểm ảnh gần nhất, không lọc: nhẹ nhất, cho điện thoại yếu nhất.</value></data>
+  <data name="LevelLow" xml:space="preserve"><value>Low</value></data>
+  <data name="LevelLowHelp" xml:space="preserve"><value>Sắc nét: giữ nguyên điểm ảnh game, chỉ làm mịn chỗ giáp nhau. Nhẹ.</value></data>
+  <data name="LevelMedium" xml:space="preserve"><value>Medium</value></data>
+  <data name="LevelMediumHelp" xml:space="preserve"><value>Phóng bằng FSR 1, không làm nét: viền sạch trên mọi GPU.</value></data>
+  <data name="LevelHigh" xml:space="preserve"><value>High</value></data>
+  <data name="LevelHighHelp" xml:space="preserve"><value>Phóng bằng FSR 1 và làm nét.</value></data>
+  <data name="LevelMax" xml:space="preserve"><value>Max</value></data>
+  <data name="LevelMaxHelp" xml:space="preserve"><value>Anime4K, làm riêng cho tranh vẽ: nặng nhất, dành cho GPU máy bàn.</value></data>
+  <data name="ProfileBatterySaver" xml:space="preserve"><value>Tiết kiệm pin</value></data>
+  <data name="ProfileBatterySaverHelp" xml:space="preserve"><value>Phóng sắc nét theo nhịp của game: điện thoại làm ít việc nhất.</value></data>
+  <data name="ProfilePretty" xml:space="preserve"><value>Đẹp</value></data>
+  <data name="ProfilePrettyHelp" xml:space="preserve"><value>Phóng bằng FSR 1 có làm nét, mỗi lần màn hình làm mới là một khung hình: sạch và mượt hơn, tốn pin hơn.</value></data>
+  <data name="ScalingSharp" xml:space="preserve"><value>Sắc nét</value></data>
+  <data name="ScalingSharpHelp" xml:space="preserve"><value>Giữ nguyên điểm ảnh game trong phần vừa khít, phần còn lại làm mịn (chữ và nét đều nhau).</value></data>
+  <data name="ScalingWholeNumbers" xml:space="preserve"><value>Chỉ số nguyên</value></data>
+  <data name="ScalingWholeNumbersHelp" xml:space="preserve"><value>x2, x3… có viền đen xung quanh (chính xác).</value></data>
+  <data name="ScalingSmooth" xml:space="preserve"><value>Mịn</value></data>
+  <data name="ScalingSmoothHelp" xml:space="preserve"><value>Có lọc, mềm.</value></data>
+  <data name="ScalingNearest" xml:space="preserve"><value>Gần nhất</value></data>
+  <data name="ScalingNearestHelp" xml:space="preserve"><value>Vừa kích thước cửa sổ, điểm ảnh rơi đâu lấy đó (không đều khi tỉ lệ không nguyên).</value></data>
+  <data name="ScalingFsr" xml:space="preserve"><value>FSR 1</value></data>
+  <data name="ScalingFsrHelp" xml:space="preserve"><value>Bộ phóng hình của AMD, viền sạch, làm nét theo mức bên dưới (GPU xử lý).</value></data>
+  <data name="ScalingAnime4K" xml:space="preserve"><value>Anime4K</value></data>
+  <data name="ScalingAnime4KHelp" xml:space="preserve"><value>Bộ phóng hình làm riêng cho tranh vẽ (nặng nhất: cần GPU máy bàn).</value></data>
+  <data name="CacheAuto" xml:space="preserve"><value>Tự động</value></data>
+  <data name="CacheAutoHelp" xml:space="preserve"><value>Theo RAM của máy: 1/32 dung lượng, từ 64 MB đến 512 MB.</value></data>
+  <data name="CachePotato" xml:space="preserve"><value>Potato (32 MB)</value></data>
+  <data name="CachePotatoHelp" xml:space="preserve"><value>Cho máy cũ nhất: hình trên 16 MB phải đọc lại mỗi lần.</value></data>
+  <data name="CacheLow" xml:space="preserve"><value>Low (64 MB)</value></data>
+  <data name="CacheLowHelp" xml:space="preserve"><value>Nhẹ: hình trên 32 MB phải đọc lại mỗi lần.</value></data>
+  <data name="CacheMedium" xml:space="preserve"><value>Medium (128 MB)</value></data>
+  <data name="CacheMediumHelp" xml:space="preserve"><value>Giữ lại hình đến 64 MB.</value></data>
+  <data name="CacheHigh" xml:space="preserve"><value>High (256 MB)</value></data>
+  <data name="CacheHighHelp" xml:space="preserve"><value>Giữ cả những hình sự kiện lớn nhất.</value></data>
+  <data name="CacheMax" xml:space="preserve"><value>Max (512 MB)</value></data>
+  <data name="CacheMaxHelp" xml:space="preserve"><value>Cho máy nhiều RAM.</value></data>
+  <data name="GroupOnScreen" xml:space="preserve"><value>Trên màn hình</value></data>
+  <data name="GroupControls" xml:space="preserve"><value>Điều khiển</value></data>
+  <data name="GroupInBackground" xml:space="preserve"><value>Khi chạy nền</value></data>
+  <data name="GroupSaves" xml:space="preserve"><value>Save</value></data>
+  <data name="GroupLogs" xml:space="preserve"><value>Log</value></data>
+  <data name="GroupInterpreter" xml:space="preserve"><value>Trình thông dịch</value></data>
+  <data name="ShowFrameRate" xml:space="preserve"><value>Hiện tốc độ khung hình</value></data>
+  <data name="ShowFrameRateHelp" xml:space="preserve"><value>Số khung hình mỗi giây và khung hình chậm nhất, trên thanh tiêu đề (trên điện thoại và máy tính bảng thì hiện đè lên game).</value></data>
+  <data name="GameController" xml:space="preserve"><value>Tay cầm chơi game</value></data>
+  <data name="GameControllerHelp" xml:space="preserve"><value>Dùng joystick hoặc tay cầm đầu tiên: cần gạt để di chuyển, nút 1 để chọn, nút 2 để hủy.</value></data>
+  <data name="PauseInBackground" xml:space="preserve"><value>Tạm dừng khi chạy nền</value></data>
+  <data name="PauseInBackgroundHelp" xml:space="preserve"><value>Game đứng yên, kể cả âm thanh, khi app khác ở phía trước hoặc màn hình tắt. Tắt: làm theo cài đặt của game (đa số vẫn chạy tiếp).</value></data>
+  <data name="PauseBehindWindows" xml:space="preserve"><value>Tạm dừng khi bị cửa sổ khác che</value></data>
+  <data name="PauseBehindWindowsHelp" xml:space="preserve"><value>Game đứng yên, kể cả âm thanh, khi cửa sổ khác ở phía trước. Tắt: làm theo cài đặt của game (đa số vẫn chạy tiếp).</value></data>
+  <data name="BackUpSaves" xml:space="preserve"><value>Sao lưu save</value></data>
+  <data name="BackUpSavesHelp" xml:space="preserve"><value>Save và cài đặt được đưa vào bản sao lưu của Android (Google) và tự quay về khi cài lại OpenShiina hoặc sang điện thoại mới. Android giữ 25 MB: game chơi gần nhất được ưu tiên.</value></data>
+  <data name="WritePerfLog" xml:space="preserve"><value>Ghi perf.log</value></data>
+  <data name="WritePerfLogHelp" xml:space="preserve"><value>Mỗi giây ghi lại thời gian đã đi đâu, vào thư mục save của game. Game chạy chậm hơn khi đang ghi.</value></data>
+  <data name="WriteDrawTrace" xml:space="preserve"><value>Ghi draw-trace.log</value></data>
+  <data name="WriteDrawTraceHelp" xml:space="preserve"><value>Những gì mỗi khung hình vẽ, ghi vào thư mục save của game khi game kết thúc (dùng khi báo lỗi nhấp nháy).</value></data>
+  <data name="TranslateX86" xml:space="preserve"><value>Dịch mã x86 của game</value></data>
+  <data name="TranslateX86Help" xml:space="preserve"><value>Tắt thì chạy bằng trình thông dịch: chậm hơn nhiều; chỉ dùng để xem lỗi có phải do bản dịch mã hay không.</value></data>
+</root>

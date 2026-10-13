@@ -12,6 +12,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenShiina.Archives;
+using OpenShiina.Localization;
 
 namespace OpenShiina.Game;
 
@@ -198,11 +199,11 @@ public static class GameLibrary
     {
         string folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(game.Folder));
         if (!Directory.Exists(folder))
-            return "The folder is not there any more.";
+            return Strings.DeleteGone;
         if (GameData.FindArchive(folder) == null)
-            return "The folder has no .WAR archives in it any more, so it was left alone.";
+            return Strings.DeleteNoArchives;
         if (Path.GetPathRoot(folder) is not { } root || SameFolder(root, folder))
-            return "The folder is a whole drive: it was left alone.";
+            return Strings.DeleteDrive;
         var guarded = new[]
         {
             Environment.SpecialFolder.UserProfile, Environment.SpecialFolder.Desktop, Environment.SpecialFolder.MyDocuments,
@@ -211,11 +212,11 @@ public static class GameLibrary
             Environment.SpecialFolder.CommonApplicationData,
         };
         if (guarded.Select(Environment.GetFolderPath).Any(p => p.Length > 0 && SameFolder(p, folder)))
-            return "The folder is one of the system's own: it was left alone.";
+            return Strings.DeleteSystem;
         if (Inside(PlayerFolders.Root, folder))
-            return "The folder holds OpenShiina's own (saves, settings): it was left alone.";
+            return Strings.DeletePlayerData;
         if ((Read() ?? []).Any(g => !SameFolder(g.Folder, folder) && Inside(g.Folder, folder)))
-            return "The folder holds another game of the list: it was left alone.";
+            return Strings.DeleteOtherGame;
         try
         {
             Directory.Delete(folder, recursive: true);
@@ -225,7 +226,7 @@ public static class GameLibrary
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Remove(folder);
-            return $"Not everything could be deleted: {e.Message}";
+            return string.Format(Strings.DeletePartly, e.Message);
         }
         Remove(folder);
         return null;

@@ -15,6 +15,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using OpenShiina.Game;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
@@ -65,12 +66,12 @@ public static class PlayerTheme
                  C("#C8102E"), C("#FBF6EC"), C("#D4A649"), C("#2A0A12"), C("#F3E6C8"), C("#E23B4E")),
     };
 
-    /// <summary>The choices of the settings: each theme with its name and a line about it.</summary>
-    public static IReadOnlyList<(AppTheme Theme, string Label, string Help)> Choices { get; } =
+    /// <summary>The choices of the settings, in the screens' language: each theme with its name and a line about it.</summary>
+    public static IReadOnlyList<(AppTheme Theme, string Label, string Help)> Choices =>
     [
-        (AppTheme.Shiina, "Shiina", "The logo's wine red and gold, dark."),
-        (AppTheme.Parchment, "Parchment", "The same colours on cream pages, light."),
-        (AppTheme.Graphite, "Graphite", "Plain dark greys."),
+        (AppTheme.Shiina, Strings.ThemeShiina, Strings.ThemeShiinaHelp),
+        (AppTheme.Parchment, Strings.ThemeParchment, Strings.ThemeParchmentHelp),
+        (AppTheme.Graphite, Strings.ThemeGraphite, Strings.ThemeGraphiteHelp),
     ];
 
     /// <summary>The wordmark's font: Cinzel (bold), as the logo's.</summary>

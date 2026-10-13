@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OpenShiina's words in English, the source of every translation. Translations: Strings.<language>.resx beside it. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Library" xml:space="preserve"><value>Library</value></data>
+  <data name="AddGame" xml:space="preserve"><value>Add a game…</value></data>
+  <data name="Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="NoGamesYet" xml:space="preserve"><value>No games yet. Add the folder of an installed game: the one with its .exe and .WAR files.</value></data>
+  <data name="WelcomeText" xml:space="preserve"><value>Add the folder of an installed game (the one with its .exe and .WAR files), on this device or a memory card.</value></data>
+  <data name="Continue" xml:space="preserve"><value>Continue</value></data>
+  <data name="More" xml:space="preserve"><value>More</value></data>
+  <data name="PlayGame" xml:space="preserve"><value>Play {0}</value></data>
+  <data name="Play" xml:space="preserve"><value>Play</value></data>
+  <data name="FolderGone" xml:space="preserve"><value>The folder is not there any more</value></data>
+  <data name="FolderGoneMessage" xml:space="preserve"><value>The folder of {0} is not there any more:
+{1}</value></data>
+  <data name="PlayedWhen" xml:space="preserve"><value>Played {0}</value></data>
+  <data name="NotPlayedYet" xml:space="preserve"><value>Not played yet</value></data>
+  <data name="PlayTime" xml:space="preserve"><value>{0} played</value></data>
+  <data name="Measuring" xml:space="preserve"><value>Measuring…</value></data>
+  <data name="SavesSize" xml:space="preserve"><value>saves {0}</value></data>
+  <data name="SavesOnly" xml:space="preserve"><value>Saves {0}</value></data>
+  <data name="NoSavesYet" xml:space="preserve"><value>no saves yet</value></data>
+  <data name="OpenSaveFolder" xml:space="preserve"><value>Open the save folder</value></data>
+  <data name="OpenGameFolder" xml:space="preserve"><value>Open the game's folder</value></data>
+  <data name="RemoveMenu" xml:space="preserve"><value>Remove…</value></data>
+  <data name="RemoveTitle" xml:space="preserve"><value>Remove {0}</value></data>
+  <data name="RemoveListOnly" xml:space="preserve"><value>Only from the list (its files and saves stay)</value></data>
+  <data name="RemoveDelete" xml:space="preserve"><value>Delete the game's folder too</value></data>
+  <data name="RemoveDeleteFrees" xml:space="preserve"><value>Delete the game's folder too (frees {0})</value></data>
+  <data name="RemoveSaves" xml:space="preserve"><value>Delete its saves too</value></data>
+  <data name="RemoveSavesSize" xml:space="preserve"><value>Delete its saves too ({0})</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="DeleteSize" xml:space="preserve"><value>Delete {0}</value></data>
+  <data name="Removed" xml:space="preserve"><value>{0} was taken off the list.</value></data>
+  <data name="Undo" xml:space="preserve"><value>Undo</value></data>
+  <data name="Deleting" xml:space="preserve"><value>Deleting {0}…</value></data>
+  <data name="Deleted" xml:space="preserve"><value>{0} was deleted.</value></data>
+  <data name="DeletedFreed" xml:space="preserve"><value>{0} was deleted: {1} freed.</value></data>
+  <data name="CouldNotOpen" xml:space="preserve"><value>Could not open {0}:
+{1}</value></data>
+  <data name="AgoJustNow" xml:space="preserve"><value>just now</value></data>
+  <data name="AgoMinute" xml:space="preserve"><value>a minute ago</value></data>
+  <data name="AgoMinutes" xml:space="preserve"><value>{0} minutes ago</value></data>
+  <data name="AgoHour" xml:space="preserve"><value>an hour ago</value></data>
+  <data name="AgoHours" xml:space="preserve"><value>{0} hours ago</value></data>
+  <data name="AgoYesterday" xml:space="preserve"><value>yesterday</value></data>
+  <data name="AgoDays" xml:space="preserve"><value>{0} days ago</value></data>
+  <data name="AgoDate" xml:space="preserve"><value>on {0}</value></data>
+  <data name="DurationUnderMinute" xml:space="preserve"><value>Under a minute</value></data>
+  <data name="DurationMinutes" xml:space="preserve"><value>{0} min</value></data>
+  <data name="DurationHours" xml:space="preserve"><value>{0} h</value></data>
+  <data name="DurationHoursMinutes" xml:space="preserve"><value>{0} h {1} min</value></data>
+  <data name="SizeBytes" xml:space="preserve"><value>{0} bytes</value></data>
+  <data name="DeleteGone" xml:space="preserve"><value>The folder is not there any more.</value></data>
+  <data name="DeleteNoArchives" xml:space="preserve"><value>The folder has no .WAR archives in it any more, so it was left alone.</value></data>
+  <data name="DeleteDrive" xml:space="preserve"><value>The folder is a whole drive: it was left alone.</value></data>
+  <data name="DeleteSystem" xml:space="preserve"><value>The folder is one of the system's own: it was left alone.</value></data>
+  <data name="DeletePlayerData" xml:space="preserve"><value>The folder holds OpenShiina's own (saves, settings): it was left alone.</value></data>
+  <data name="DeleteOtherGame" xml:space="preserve"><value>The folder holds another game of the list: it was left alone.</value></data>
+  <data name="DeletePartly" xml:space="preserve"><value>Not everything could be deleted: {0}</value></data>
+  <data name="ChooseFolderTitle" xml:space="preserve"><value>Choose the folder of an installed game</value></data>
+  <data name="CannotReadFolder" xml:space="preserve"><value>The player cannot read that folder: choose a folder on the device's storage or a memory card.</value></data>
+  <data name="UnknownExeLooking" xml:space="preserve"><value>The game's .exe is not one the player knows: looking for the keys that open its archives…</value></data>
+  <data name="WhichGame" xml:space="preserve"><value>These {0} games' keys all open the archives in {1}. Which game is it?</value></data>
+  <data name="NoGameRecognised" xml:space="preserve"><value>No game was recognised in {0}: choose the folder with the game's .WAR files (no keys the player knows open them).</value></data>
+  <data name="NeedFileAccess" xml:space="preserve"><value>OpenShiina needs access to the files to read the games: allow it, then try again.</value></data>
+  <data name="OpeningGame" xml:space="preserve"><value>Opening the game…</value></data>
+  <data name="NoWarArchives" xml:space="preserve"><value>The folder has no .WAR archives.</value></data>
+  <data name="GameNotRecognised" xml:space="preserve"><value>The game was not recognised: keep the game's own .exe in the folder, or add it again.</value></data>
+  <data name="CouldNotPlay" xml:space="preserve"><value>Could not play the game in {0}:
+{1}</value></data>
+  <data name="PlayingAGame" xml:space="preserve"><value>Playing a game</value></data>
+  <data name="TouchMenu" xml:space="preserve"><value>Menu</value></data>
+  <data name="TouchAuto" xml:space="preserve"><value>Auto</value></data>
+  <data name="TouchSkip" xml:space="preserve"><value>Skip</value></data>
+  <data name="TouchLog" xml:space="preserve"><value>Log</value></data>
+  <data name="TouchExit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Ok" xml:space="preserve"><value>OK</value></data>
+  <data name="Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="No" xml:space="preserve"><value>No</value></data>
+  <data name="BackToLibrary" xml:space="preserve"><value>← Library</value></data>
+  <data name="SettingsNote" xml:space="preserve"><value>Saved as you change them, for the next game started.</value></data>
+  <data name="PageAppearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="PageGraphics" xml:space="preserve"><value>Graphics</value></data>
+  <data name="PageGame" xml:space="preserve"><value>Game</value></data>
+  <data name="PageStorage" xml:space="preserve"><value>Storage</value></data>
+  <data name="PageDebug" xml:space="preserve"><value>Debug</value></data>
+  <data name="DebugNote" xml:space="preserve"><value>For bug reports: what these write goes into the game's save folder (its menu in the library opens it).</value></data>
+  <data name="On" xml:space="preserve"><value>On</value></data>
+  <data name="Off" xml:space="preserve"><value>Off</value></data>
+  <data name="GroupTheme" xml:space="preserve"><value>Theme</value></data>
+  <data name="GroupLanguage" xml:space="preserve"><value>Language</value></data>
+  <data name="Language" xml:space="preserve"><value>Language</value></data>
+  <data name="LanguageHelp" xml:space="preserve"><value>The words of OpenShiina's own screens. The games keep their own (a translation of a game changes them).</value></data>
+  <data name="LanguageSystem" xml:space="preserve"><value>The device's ({0})</value></data>
+  <data name="GroupQuality" xml:space="preserve"><value>Quality</value></data>
+  <data name="GroupDetails" xml:space="preserve"><value>Details</value></data>
+  <data name="GroupMemory" xml:space="preserve"><value>Memory</value></data>
+  <data name="GraphicsLevel" xml:space="preserve"><value>Graphics level</value></data>
+  <data name="GraphicsLevelHelp" xml:space="preserve"><value>How the game's picture is scaled to the window, from the lightest to the heaviest. FSR and Anime4K run on the GPU that draws the window (without one, as Low).</value></data>
+  <data name="Custom" xml:space="preserve"><value>Custom</value></data>
+  <data name="CustomHelp" xml:space="preserve"><value>Set one by one under Details.</value></data>
+  <data name="Scaling" xml:space="preserve"><value>Scaling</value></data>
+  <data name="FsrSharpening" xml:space="preserve"><value>FSR sharpening</value></data>
+  <data name="FsrOnlyWithFsr" xml:space="preserve"><value>With FSR 1 scaling.</value></data>
+  <data name="FsrNone" xml:space="preserve"><value>None.</value></data>
+  <data name="FsrOf" xml:space="preserve"><value>{0} of 10.</value></data>
+  <data name="Drawing" xml:space="preserve"><value>Drawing</value></data>
+  <data name="DrawingHelp" xml:space="preserve"><value>Where the games' pictures are scaled and mixed. Both give the same pictures; the GPU takes the heavy work off the processor.</value></data>
+  <data name="DrawingCpu" xml:space="preserve"><value>The processor's cores, with SIMD.</value></data>
+  <data name="NoGpu" xml:space="preserve"><value>No GPU to use ({0}): the games run on the CPU.</value></data>
+  <data name="Cpu" xml:space="preserve"><value>CPU</value></data>
+  <data name="GpuVulkan" xml:space="preserve"><value>GPU (Vulkan)</value></data>
+  <data name="FrameRate" xml:space="preserve"><value>Frame rate</value></data>
+  <data name="PaceGame" xml:space="preserve"><value>The game's pace</value></data>
+  <data name="PaceGameHelp" xml:space="preserve"><value>As the original: up to 60 frames a second, little processor while it waits.</value></data>
+  <data name="PaceDisplay" xml:space="preserve"><value>Every screen refresh</value></data>
+  <data name="PaceDisplayHelp" xml:space="preserve"><value>Smoother on a fast screen, more processor.</value></data>
+  <data name="ProfileOwn" xml:space="preserve"><value>Your own, set under Details.</value></data>
+  <data name="FileCache" xml:space="preserve"><value>File cache</value></data>
+  <data name="FileCacheHelp" xml:space="preserve"><value>Memory kept for the pictures and sounds a game read, so that it does not decode them again. Bigger is smoother on scene changes and event pictures.</value></data>
+  <data name="FileCacheAutoHere" xml:space="preserve"><value>{0} ({1} MB here)</value></data>
+  <data name="ThemeShiina" xml:space="preserve"><value>Shiina</value></data>
+  <data name="ThemeShiinaHelp" xml:space="preserve"><value>The logo's wine red and gold, dark.</value></data>
+  <data name="ThemeParchment" xml:space="preserve"><value>Parchment</value></data>
+  <data name="ThemeParchmentHelp" xml:space="preserve"><value>The same colours on cream pages, light.</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>Graphite</value></data>
+  <data name="ThemeGraphiteHelp" xml:space="preserve"><value>Plain dark greys.</value></data>
+  <data name="LevelPotato" xml:space="preserve"><value>Potato</value></data>
+  <data name="LevelPotatoHelp" xml:space="preserve"><value>Nearest pixels, no filtering: the least work, for the slowest phones.</value></data>
+  <data name="LevelLow" xml:space="preserve"><value>Low</value></data>
+  <data name="LevelLowHelp" xml:space="preserve"><value>Sharp: whole game pixels, smooth only where they meet. Light.</value></data>
+  <data name="LevelMedium" xml:space="preserve"><value>Medium</value></data>
+  <data name="LevelMediumHelp" xml:space="preserve"><value>FSR 1 upscaling, no sharpening: clean edges on any GPU.</value></data>
+  <data name="LevelHigh" xml:space="preserve"><value>High</value></data>
+  <data name="LevelHighHelp" xml:space="preserve"><value>FSR 1 upscaling and sharpening.</value></data>
+  <data name="LevelMax" xml:space="preserve"><value>Max</value></data>
+  <data name="LevelMaxHelp" xml:space="preserve"><value>Anime4K, made for drawn art: the heaviest, for a desktop GPU.</value></data>
+  <data name="ProfileBatterySaver" xml:space="preserve"><value>Battery saver</value></data>
+  <data name="ProfileBatterySaverHelp" xml:space="preserve"><value>Sharp scaling at the game's own pace: the least work for the phone.</value></data>
+  <data name="ProfilePretty" xml:space="preserve"><value>Pretty</value></data>
+  <data name="ProfilePrettyHelp" xml:space="preserve"><value>FSR 1 upscaling and sharpening, a frame every refresh of the screen: cleaner and smoother, more battery.</value></data>
+  <data name="ScalingSharp" xml:space="preserve"><value>Sharp</value></data>
+  <data name="ScalingSharpHelp" xml:space="preserve"><value>Whole game pixels as far as they fit, the rest smooth (even text and lines).</value></data>
+  <data name="ScalingWholeNumbers" xml:space="preserve"><value>Whole numbers only</value></data>
+  <data name="ScalingWholeNumbersHelp" xml:space="preserve"><value>x2, x3... with black around (exact).</value></data>
+  <data name="ScalingSmooth" xml:space="preserve"><value>Smooth</value></data>
+  <data name="ScalingSmoothHelp" xml:space="preserve"><value>Filtered, soft.</value></data>
+  <data name="ScalingNearest" xml:space="preserve"><value>Nearest</value></data>
+  <data name="ScalingNearestHelp" xml:space="preserve"><value>The window's size, pixels as they fall (uneven when not a whole number).</value></data>
+  <data name="ScalingFsr" xml:space="preserve"><value>FSR 1</value></data>
+  <data name="ScalingFsrHelp" xml:space="preserve"><value>AMD's upscaler, clean edges, sharpened as set below (the GPU's work).</value></data>
+  <data name="ScalingAnime4K" xml:space="preserve"><value>Anime4K</value></data>
+  <data name="ScalingAnime4KHelp" xml:space="preserve"><value>An upscaler made for drawn art (heaviest: a desktop GPU).</value></data>
+  <data name="CacheAuto" xml:space="preserve"><value>Auto</value></data>
+  <data name="CacheAutoHelp" xml:space="preserve"><value>By the device's memory: a thirty-second of it, 64 MB to 512 MB.</value></data>
+  <data name="CachePotato" xml:space="preserve"><value>Potato (32 MB)</value></data>
+  <data name="CachePotatoHelp" xml:space="preserve"><value>For the oldest devices: pictures over 16 MB are read again each time.</value></data>
+  <data name="CacheLow" xml:space="preserve"><value>Low (64 MB)</value></data>
+  <data name="CacheLowHelp" xml:space="preserve"><value>Light: pictures over 32 MB are read again each time.</value></data>
+  <data name="CacheMedium" xml:space="preserve"><value>Medium (128 MB)</value></data>
+  <data name="CacheMediumHelp" xml:space="preserve"><value>Pictures of up to 64 MB are kept.</value></data>
+  <data name="CacheHigh" xml:space="preserve"><value>High (256 MB)</value></data>
+  <data name="CacheHighHelp" xml:space="preserve"><value>The largest event pictures are kept too.</value></data>
+  <data name="CacheMax" xml:space="preserve"><value>Max (512 MB)</value></data>
+  <data name="CacheMaxHelp" xml:space="preserve"><value>For devices with plenty of memory.</value></data>
+  <data name="GroupOnScreen" xml:space="preserve"><value>On screen</value></data>
+  <data name="GroupControls" xml:space="preserve"><value>Controls</value></data>
+  <data name="GroupInBackground" xml:space="preserve"><value>In the background</value></data>
+  <data name="GroupSaves" xml:space="preserve"><value>Saves</value></data>
+  <data name="GroupLogs" xml:space="preserve"><value>Logs</value></data>
+  <data name="GroupInterpreter" xml:space="preserve"><value>Interpreter</value></data>
+  <data name="ShowFrameRate" xml:space="preserve"><value>Show the frame rate</value></data>
+  <data name="ShowFrameRateHelp" xml:space="preserve"><value>Frames a second and the slowest frame, in the window's title (on phones and tablets over the game).</value></data>
+  <data name="GameController" xml:space="preserve"><value>Game controller</value></data>
+  <data name="GameControllerHelp" xml:space="preserve"><value>The first joystick or gamepad plays: the stick moves, button 1 decides, button 2 cancels.</value></data>
+  <data name="PauseInBackground" xml:space="preserve"><value>Pause in the background</value></data>
+  <data name="PauseInBackgroundHelp" xml:space="preserve"><value>The game stands still, sound included, while another app is in front or the screen is off. Off: as the game itself says (most go on).</value></data>
+  <data name="PauseBehindWindows" xml:space="preserve"><value>Pause behind other windows</value></data>
+  <data name="PauseBehindWindowsHelp" xml:space="preserve"><value>The game stands still, sound included, while another window is in front. Off: as the game itself says (most go on).</value></data>
+  <data name="BackUpSaves" xml:space="preserve"><value>Back up saves</value></data>
+  <data name="BackUpSavesHelp" xml:space="preserve"><value>Your saves and settings go into Android's backup (Google), and come back when OpenShiina is installed again or on a new phone. Android keeps 25 MB: the games played last go first.</value></data>
+  <data name="WritePerfLog" xml:space="preserve"><value>Write perf.log</value></data>
+  <data name="WritePerfLogHelp" xml:space="preserve"><value>Every second, where the time went, into the game's save folder. The game runs slower while it writes.</value></data>
+  <data name="WriteDrawTrace" xml:space="preserve"><value>Write draw-trace.log</value></data>
+  <data name="WriteDrawTraceHelp" xml:space="preserve"><value>What every frame draws, into the game's save folder when the game ends (for reports on flicker).</value></data>
+  <data name="TranslateX86" xml:space="preserve"><value>Translate the games' x86 code</value></data>
+  <data name="TranslateX86Help" xml:space="preserve"><value>Off runs it on the interpreter instead: much slower; only to tell whether a problem comes from the translation.</value></data>
+</root>

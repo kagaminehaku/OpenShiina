@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.Themes.Fluent;
+using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
@@ -25,9 +26,12 @@ public sealed class OpenShiinaApplication : Application
         // The GPU mode (Settings): Vulkan compute, made when a game first asks for it
         Game.PlayerSettings.AcceleratorFactory = () => (Gpu.VulkanAccelerator.TryCreate(out string? error), error);
         Game.StartupLog.Mark("Avalonia: the theme loads");
-        // Fluent's controls in the colours of the theme the settings name (PlayerTheme.cs)
+        // Fluent's controls in the colours of the theme the settings name (PlayerTheme.cs), the
+        // screens in their language (Localization/Languages.cs)
+        var settings = Game.PlayerSettings.Load();
+        Languages.Apply(settings.Language);
         Styles.Add(PlayerTheme.Fluent());
-        PlayerTheme.Apply(this, Game.PlayerSettings.Load().Theme);
+        PlayerTheme.Apply(this, settings.Theme);
         Game.StartupLog.Mark("Avalonia: the theme loaded");
     }
 
