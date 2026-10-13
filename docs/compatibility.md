@@ -5,11 +5,12 @@ row when something changes (see [Updating](#updating) at the end).
 
 | Status | Meaning |
 |---|---|
-| ✅ Plays through | Every route was played or skipped to its end |
+| ✅ Plays through | Every route was played or skipped to its end, or every scenario swept to its end (see [Sweeping](#sweeping)) |
 | 🟢 Plays | Starts and its routes play, but not all of them were checked |
 | 🟡 Starts | Boots to the title screen; the story was not tried yet |
 | 🔴 Stops | Stops before the title screen |
 | ⚪ Not tried | Not run yet |
+| 🔒 No keys | VNDB lists it as a ShiinaRio game; OpenShiina has no keys for its archives yet |
 
 ## Games
 
@@ -19,8 +20,9 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 17 games tried). Then ScnBoot
-(`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops.
+scripts the player does not run yet (none in the 19 games tried). Then ScnBoot
+(`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
+`tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
 - **Release**: the game's first release, or the release the scheme is for (a compilation, a
   "The Motion" edition, a trial, an English version).
@@ -47,7 +49,7 @@ of those versions it does not list.
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ⚪ Not tried |  |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.39 | ⚪ Not tried |  |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ⚪ Not tried |  |
-| Ao no Juuai | 青の獣愛 | 2005-06-24 | [v4048](https://vndb.org/v4048) | v2.34 | 🟡 Starts | 2026-10-11 |
+| Ao no Juuai | 青の獣愛 | 2005-06-24 | [v4048](https://vndb.org/v4048) | v2.34 | ✅ Plays through | 2026-10-13 |
 | ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | ⚪ Not tried |  |
 | Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | ⚪ Not tried |  |
 | Gibo to Oba ~Soshite Yuujin no Haha~ | 義母と叔母 ～そして友人の母～ | 2005-12-22 | [v2498](https://vndb.org/v2498) | v2.36 | ⚪ Not tried |  |
@@ -78,7 +80,7 @@ of those versions it does not list.
 | Yokorenbo ~Immoral Mother~ | 横恋母 ～Immoral Mother～ | 2008-07-18 | [v2970](https://vndb.org/v2970) | v2.44 | ⚪ Not tried |  |
 | Engage Links | Engage Links | 2008-10-24 | [v1090](https://vndb.org/v1090) | v2.45 | ⚪ Not tried |  |
 | Tsuyoimo x Yowaimo | 強妹×弱妹 | 2008-10-24 | [v2185](https://vndb.org/v2185) | v2.45 | ⚪ Not tried |  |
-| Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | 🟡 Starts | 2026-10-11 |
+| Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | ✅ Plays through | 2026-10-13 |
 | Manin Chijo Densha 2 | 満淫痴女電車2～姉とふたごと人妻と～ | 2008-11-28 | [v5511](https://vndb.org/v5511) | v2.45 | ⚪ Not tried |  |
 | Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 人妻喰い ～万引きGメン恥辱日記～ | 2008-12-16 | [v2897](https://vndb.org/v2897) | v2.45 | ⚪ Not tried |  |
 | Niizuma to Yuukaihan | 新妻と誘拐犯 ～寝取り孕ませ計画～ | 2008-12-19 | [v6456](https://vndb.org/v6456) | v2.45 | ⚪ Not tried |  |
@@ -110,7 +112,7 @@ of those versions it does not list.
 | Yume Miru Egoist | 夢みるエゴイスト | 2010-05-14 | [v4045](https://vndb.org/v4045) | v2.47 | ⚪ Not tried |  |
 | Oshikake! Entremets | おしかけ！アントルメ | 2010-05-28 | [v3824](https://vndb.org/v3824) | v2.47 | ⚪ Not tried |  |
 | You~Gaku | よう∽ガク | 2010-05-28 | [v3810](https://vndb.org/v3810) | v2.47 | ⚪ Not tried |  |
-| Can Fes! ~Itazura Majo to Naisho no Gakuensai~ | きゃん☆フェス！～いたずら魔女とナイショの学園祭～ | 2010-06-25 | [v4143](https://vndb.org/v4143) | v2.47 | 🟡 Starts | 2026-10-12 |
+| Can Fes! ~Itazura Majo to Naisho no Gakuensai~ | きゃん☆フェス！～いたずら魔女とナイショの学園祭～ | 2010-06-25 | [v4143](https://vndb.org/v4143) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Tenki Ane | 天気姉 | 2010-07-09 | [v4543](https://vndb.org/v4543) | v2.47 | ⚪ Not tried |  |
 | Ran→Sem | RAN→SEM～白濁デルモ妻のミイラ捕り～ | 2010-07-23 | [v4645](https://vndb.org/v4645) | v2.47 | ⚪ Not tried |  |
 | Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ⚪ Not tried |  |
@@ -155,16 +157,16 @@ of those versions it does not list.
 | Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | ⚪ Not tried |  |
 | Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | 2015-09-18 | [v17971](https://vndb.org/v17971) | v2.50 | ⚪ Not tried |  |
 | Kyuuketsuki no Libra | 吸血姫のリブラ | 2015-10-30 | [v17825](https://vndb.org/v17825) | v2.50 | ⚪ Not tried |  |
-| Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | 2016-04-28 | [v18781](https://vndb.org/v18781) | v2.50 | 🟡 Starts | 2026-10-11 |
+| Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | 2016-04-28 | [v18781](https://vndb.org/v18781) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Lovecha ~Tsumasakidachi de, Hitomi o Tojite~ | らぶちゃ ～つま先立ちで、瞳をとじて～ | 2016-04-28 | [v18590](https://vndb.org/v18590) | v2.50 | ⚪ Not tried |  |
 | Signalist Stars!! | しぐなリストスタ～ズ!! | 2016-10-28 | [v19590](https://vndb.org/v19590) | v2.50 | ⚪ Not tried |  |
-| Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | 2017-01-27 | [v20429](https://vndb.org/v20429) | v2.50 | 🟡 Starts | 2026-10-11 |
+| Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | 2017-01-27 | [v20429](https://vndb.org/v20429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Libra of the Vampire Princess | 吸血姫のリブラ (English) | 2017-05-03 | [r44159](https://vndb.org/r44159) | v2.50 | ⚪ Not tried |  |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ⚪ Not tried |  |
 | Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ⚪ Not tried |  |
-| Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | 🟡 Starts | 2026-10-11 |
+| Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Sorcery Jokers [English] | ソーサリージョーカーズ (English) | 2018-01-12 | [r47518](https://vndb.org/r47518) | v2.50 | ⚪ Not tried |  |
-| Chuuni Hime no Teikoku | 厨二姫の帝国 | 2018-02-23 | [v17900](https://vndb.org/v17900) | v2.50 | ⚪ Not tried |  |
+| Chuuni Hime no Teikoku | 厨二姫の帝国 | 2018-02-23 | [v17900](https://vndb.org/v17900) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-07 |
 | Nukige Mitai na Shima ni Sunderu [Trial] | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 体験版 | 2018-06-22 | [r57518](https://vndb.org/r57518) | v2.50 | ⚪ Not tried |  |
 | Kiki Mimi | ききミミ | 2018-07-26 | [v23506](https://vndb.org/v23506) | v2.50 | ⚪ Not tried |  |
@@ -172,6 +174,52 @@ of those versions it does not list.
 | Saimin Paradise! | 催眠ぱらだいす! ～催眠術でツゴウノイイ美少女学園性活～ | 2018-09-28 | [v23063](https://vndb.org/v23063) | v2.50 | ⚪ Not tried |  |
 | Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ⚪ Not tried |  |
 | Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ⚪ Not tried |  |
+
+### No keys yet
+
+The games VNDB lists as ShiinaRio games ([its releases with the engine
+"Shiina Rio"](https://vndb.org/r?f=fwShiina_0Rio-), 350 releases of 166 games on 2026-10-13)
+that are not in the table above: OpenShiina has no keys for their archives yet (`Formats.Json`),
+so they cannot be opened or played until a scheme is found (docs/engine-notes.md, section 1,
+"The schemes"). Votes: the people who rated the game on VNDB that day.
+
+| Game | Japanese title | Release | VNDB | Developer | Votes | Status |
+|---|---|---|---|---|---|---|
+| Hana no Kioku Dai 2 Shou | 花の記憶 第二章 | 1996-12-13 | [v8709](https://vndb.org/v8709) | Foster | 13 | 🔒 No keys |
+| Hana no Kioku Dai 3 Shou | 花の記憶 第3章 | 1997-07-18 | [v8710](https://vndb.org/v8710) | Foster | 10 | 🔒 No keys |
+| Hana no Kioku Dai 4 Shou | 花の記憶 第四章 | 1998-12-25 | [v8711](https://vndb.org/v8711) | Foster | 7 | 🔒 No keys |
+| Hachigatsu no Nostalgia ~The Summer with You~ | 八月のノスタルジア ～the summer with you～ | 2000-07-07 | [v3419](https://vndb.org/v3419) | BeF | 9 | 🔒 No keys |
+| Delicious Way |  | 2000-12-29 | [v63587](https://vndb.org/v63587) | Shinonome | 0 | 🔒 No keys |
+| Kanawanu Koi no Monogatari | 叶わぬ恋の物語 | 2001-03-30 | [v20212](https://vndb.org/v20212) | Foster | 4 | 🔒 No keys |
+| Baby, BE -Bedside Emotion- |  | 2001-04-20 | [v1942](https://vndb.org/v1942) | BeF | 5 | 🔒 No keys |
+| Hana no Kioku Dai 6 Shou | 花の記憶 第6章 | 2001-08-31 | [v8712](https://vndb.org/v8712) | Foster | 11 | 🔒 No keys |
+| Mahou no Shippo na Dai Ichi wa | 魔法のしっぽな 第一話 | 2002-03-22 | [v14674](https://vndb.org/v14674) | Sith | 2 | 🔒 No keys |
+| Itsuka, Dokoka de ~Ano Amaoto no Kioku~ | いつか、どこかで ～あの雨音の記憶～ | 2002-05-24 | [v3214](https://vndb.org/v3214) | BeF | 6 | 🔒 No keys |
+| Mahou no Shippo na Dai Ni wa | 魔法のしっぽな 第二話 | 2002-09-13 | [v14675](https://vndb.org/v14675) | Sith | 2 | 🔒 No keys |
+| Mahou no Shippo na Dai San wa | 魔法のしっぽな 第三話 | 2003-01-24 | [v14673](https://vndb.org/v14673) | Sith | 2 | 🔒 No keys |
+| EDEN V |  | 2003-07-18 | [v4604](https://vndb.org/v4604) | FORST | 14 | 🔒 No keys |
+| Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | propeller | 33 | 🔒 No keys |
+| Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | Amanatto | 22 | 🔒 No keys |
+| Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | propeller | 1137 | 🔒 No keys |
+| Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | LUCHA! | 43 | 🔒 No keys |
+| Nakadashi Hara Maid | なかだし孕メイド | 2007-08-17 | [v2672](https://vndb.org/v2672) | Chain-Reaction | 14 | 🔒 No keys |
+| Sis☆Pon ~Haramase♪ Gochisou-sama!~ | シス☆ぽん～孕ませ♪ご馳走さまっ！～ | 2007-11-30 | [v2858](https://vndb.org/v2858) | Sumomo | 22 | 🔒 No keys |
+| Gakuen Pets ~Houkago no Shiikusha~ | 学園ペッツ ～放課後の飼育舎～ | 2007-12-21 | [v5267](https://vndb.org/v5267) | Goku-Fero | 2 | 🔒 No keys |
+| Stellula Eques ~Shokuzai no Himekishi~ | ステルラエクエス～贖罪の姫騎士～ | 2008-04-25 | [v455](https://vndb.org/v455) | C:drive. | 11 | 🔒 No keys |
+| Nakadashi Hara Maid 2 | なかだし孕メイド2 | 2008-08-16 | [v2673](https://vndb.org/v2673) | Chain-Reaction | 12 | 🔒 No keys |
+| Gakuen Pets 2 ~Pool Side no Shiiku Katsudou~ | 学園ペッツ2 ～プールサイドの飼育活動～ | 2008-10-10 | [v2462](https://vndb.org/v2462) | Goku-Fero | 1 | 🔒 No keys |
+| Cruise☆Cruise ~Shoujo no 10nen to Chiisana Yakusoku~ | くる～ず☆クルーズ～少女の10年とちいさな約束～ | 2009-05-29 | [v1780](https://vndb.org/v1780) | Abelia, Guten Tag | 6 | 🔒 No keys |
+| Gakuen Pets 3 ~Seieki Mamire no Toshokan~ | 学園ペッツ3～精液まみれの図書館～ | 2009-09-11 | [v2564](https://vndb.org/v2564) | Goku-Fero | 2 | 🔒 No keys |
+| Sadistic Little | サディスティックりとる | 2009-11-06 | [v2850](https://vndb.org/v2850) | Tangerine | 14 | 🔒 No keys |
+| Imouto Smile | 妹スマイル | 2009-11-27 | [v2847](https://vndb.org/v2847) | C:drive., Citoron Soft | 32 | 🔒 No keys |
+| 10 nin Yaru! ~Soshite Densetsu e~ | 10人犯る! ～そして伝説へ～ | 2011-08-14 | [v9200](https://vndb.org/v9200) | Circle Lolipop | 7 | 🔒 No keys |
+| Riajuu Saimin ~Real ga Juujitsu Suru Saimin Seikatsu Hajimemashita.~ | リア充催眠～リアルが充実する催眠生活はじめました。～ | 2012-03-30 | [v9750](https://vndb.org/v9750) | C:drive. | 63 | 🔒 No keys |
+| Megane Choukyou ~Megane Shoujo wa Ikan ni Shite Kimoota Kyoushi no Mono ni Natta ka~ | 牝鏡調教 ～メガネ少女は如何にしてキモオタ教師のものになったか～ | 2013-05-24 | [v12626](https://vndb.org/v12626) | Goku-Fero | 7 | 🔒 No keys |
+| Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | Love＆Piss ～少女のガマンが世界を救う～ | 2013-08-30 | [v12613](https://vndb.org/v12613) | Bonbon Company | 36 | 🔒 No keys |
+| S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | Tangerine | 14 | 🔒 No keys |
+| Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld" |  | 2017-07-07 | [v21459](https://vndb.org/v21459) | Onomatope* | 61 | 🔒 No keys |
+| School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | Onomatope*Raspberry | 64 | 🔒 No keys |
+| Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | Onomatope*Raspberry | 43 | 🔒 No keys |
 
 ## Platforms
 
@@ -263,6 +311,15 @@ Revision Error" until `03C2` gave this executable's value. Its 679 opcodes are v
 same operands. In ScnBoot: the title, a new game, the story with its pictures, text and music to
 frame 9,000.
 
+**Chuuni Hime no Teikoku** (engine v2.50, CHU2HIME.EXE, ver 1.01) opcheck: nothing missing.
+Two things were added for it (2026-10-13). Its START copies its music (`m\*.ogv`) into a buffer
+of its own before `06D6` opens it there, as Bitch Nee-chan's does with Ogg: the length of an OGV
+in memory is now read from its header (its third dword + 52), where it stopped at the title.
+Its blur (START 9406E) is Bitch Nee-chan's code with its work buffers 8 bytes further on: it ran
+on the x86 interpreter, 12 s a call, until its signature was given the C# blur32
+(SCNBOOT_VERIFY_NATIVE: the same pictures). Swept: 50 scenarios, every one to its end; its
+messages often take two or three lines of a scenario, shown together (60% of the lines counted).
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -282,6 +339,51 @@ ScnVm.Scale32.cs; 505 random cases the same as its x86 code; SCNBOOT_VERIFY_NATI
 thumbnail's copy into a picture and the rule fade without inversion are the known routines with
 other numbers. opcheck: nothing missing.
 
+## Sweeping
+
+`tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through ScnBoot, each from
+its first line in a process of its own (four at a time): the game starts at once at that
+scenario, as OpenShiina Tools' "Play from here" does (no logos, no title), and runs with Ctrl
+held (the games' skip) while Return and clicks make the choices. A scenario is done when a line
+of another one shows or every line of it has; it is stuck when no new line shows for 9,000
+frames (a movie playing is not counted); it stopped when the scripts stop. The summary gives the
+lines shown of all, the slowest frames with the line then shown, and the peak of the scripts'
+memory. Lines not shown are the branches of choices not taken, or lines shown with the one
+before (Ao no Juuai's messages of two lines). What it does not check: the pictures (a scene that
+draws wrong still runs), the waits and effects the skip leaves out, and what earlier scenarios
+set (each scenario starts a new game). A game whose every scenario is done counts as playing
+through.
+
+The 19 games tried, swept on 2026-10-13: none stopped, none stuck.
+
+| Game | Scenarios | Lines shown |
+|---|---|---|
+| Ero-On! | 27 | 99.7% |
+| Azu Plus | 39 | 99.9% |
+| Oreimo Plus | 33 | 100% |
+| Aneiro | 123 | 99.7% |
+| Homu☆Plus | 37 | 100% |
+| Yuru Plus | 49 | 99.9% |
+| Sena Plus | 31 | 99.9% |
+| Kuroneko Plus | 28 | 100% |
+| Nyaru Plus | 26 | 99.9% |
+| Rikka Plus | 24 | 99.9% |
+| Maki Fes! | 28 | 99.6% |
+| Re:Rem Plus | 25 | 100% |
+| Ao no Juuai | 139 | 60.1% (messages of two lines, the second shown with the first) |
+| Chuuchuu Nurse | 278 | 99.1% |
+| Can Fes! | 379 | 99.4% |
+| Bitch Nee-chan ga Seijun na Hazu ga Nai! | 106 | 99.9% |
+| Bitch Shimai ga Seijun na Hazu ga Nai!! | 66 | 99.9% (TESTX1.TXT, a test file of the game's, shows nothing) |
+| Bitch Gakuen ga Seijun na Hazu ga Nai!!? | 98 | 99.9% |
+| Chuuni Hime no Teikoku | 50 | 59.9% (messages of two or three lines) |
+
+The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
+12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in
+PRO02_02.TXT (a scene with three layers of one large event picture: the 16 MB rule of the 32-bit
+memory had cut it into pieces, engine-notes.md section 10, "Flat memory"), and "Play from here"
+cut a scenario longer than the game's first one short (START asks its length first).
+
 ## Updating
 
 When a game's state changes:
@@ -289,8 +391,8 @@ When a game's state changes:
 1. In the **Games** table, set its **Status** to the row of the legend that fits and **Checked**
    to the date (YYYY-MM-DD); once it was run, its **ShiinaRio** column is the engine version
    START.SCN checks.
-2. Under **Notes**, say what was checked and how (played, skipped with Ctrl, ScnBoot), what was
-   added for it, and what is known not to work.
+2. Under **Notes**, say what was checked and how (played, skipped with Ctrl, ScnBoot, swept),
+   what was added for it, and what is known not to work.
 3. When a platform was tried (a phone, Linux, macOS), add or update its row under **Platforms**
    with the device and what ran.
 4. If it is the headline of a change, the commit message can name the game; README links here

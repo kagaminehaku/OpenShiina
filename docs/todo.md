@@ -20,10 +20,6 @@ should follow what their perf.log shows.
   would save the upload of the whole picture.
 - [ ] **Flat memory: what is left** (engine-notes.md section 10, "Flat memory").
   - Run it on Linux, macOS and Android (the `mmap` path has only been built, not run).
-  - The 32-bit way (16 MB parts, `ScnAddressSpace.Segmented`): ScnBoot as a 32-bit process
-    (scnboot.dll on the x86 .NET runtime, scratch scnboot32.sh / verify32.sh) gives the 64-bit
-    one's pictures, 287 of 287 (Re: Rem Plus's zoom and first route, Oreimo's park route;
-    2026-10-11). Left: an `android-arm` APK on a 32-bit phone or TV box.
 - [ ] **The x86 translation, for games not tried yet.** No routine of the games tried runs
   translated any more (each has a C# version); X86Jit and the interpreter stay for builds no
   signature matches. Only worth it if other ShiinaRio games come: flags computed only where a

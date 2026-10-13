@@ -203,9 +203,8 @@ the story sets it: no logos, no title (a game playing is closed first, when you 
 
 How it gets there, and what that means:
 
-- The game starts a new game at once, as if START were chosen on its title. Two of the games
-  tried ask first: **Yuru Plus** its heroine (choose one, and it goes on to the line), and
-  **Ao no Juuai** shows its title (start a new game).
+- The game starts a new game at once, as if START were chosen on its title. **Yuru Plus**
+  asks for its heroine first: choose one, and it goes on to the line.
 - The first scenario of the new game is the line's scenario instead. What comes before the line
   in it is left out (the lines, speakers, voices, sounds and waits); its other commands still run
   (backgrounds, characters, music), quickly, as when skipping.

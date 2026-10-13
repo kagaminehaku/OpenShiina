@@ -53,18 +53,21 @@ The games tried so far, on Windows, Linux and Android:
 | [Rikka Plus](https://vndb.org/v11902) | 六花プラス | 2012 | 2.49 | ✅ Plays through |
 | [Maki Fes!](https://vndb.org/v16484) | マキフェス！ | 2014 | 2.50 | ✅ Plays through |
 | [Re:Rem Plus](https://vndb.org/v22991) | Re:レムプラス | 2018 | 2.50 | ✅ Plays through |
-| [Ao no Juuai](https://vndb.org/v4048) | 青の獣愛 | 2005 | 2.34 | 🟡 Starts |
-| [Chuuchuu Nurse](https://vndb.org/v1144) | ちゅうちゅうナース | 2008 | 2.45 | 🟡 Starts |
-| [Can Fes!](https://vndb.org/v4143) | きゃん☆フェス！ | 2010 | 2.47 | 🟡 Starts |
-| [Bitch Nee-chan ga Seijun na Hazu ga Nai!](https://vndb.org/v18781) | ビッチ姉ちゃんが清純なはずがないっ！ | 2016 | 2.50 | 🟡 Starts |
-| [Bitch Shimai ga Seijun na Hazu ga Nai!!](https://vndb.org/v20429) | ビッチ姉妹が清純なはずがないっ！！ | 2017 | 2.50 | 🟡 Starts |
-| [Bitch Gakuen ga Seijun na Hazu ga Nai!!?](https://vndb.org/v21429) | ビッチ学園が清純なはずがないっ！！？ | 2017 | 2.50 | 🟡 Starts |
+| [Ao no Juuai](https://vndb.org/v4048) | 青の獣愛 | 2005 | 2.34 | ✅ Plays through |
+| [Chuuchuu Nurse](https://vndb.org/v1144) | ちゅうちゅうナース | 2008 | 2.45 | ✅ Plays through |
+| [Can Fes!](https://vndb.org/v4143) | きゃん☆フェス！ | 2010 | 2.47 | ✅ Plays through |
+| [Bitch Nee-chan ga Seijun na Hazu ga Nai!](https://vndb.org/v18781) | ビッチ姉ちゃんが清純なはずがないっ！ | 2016 | 2.50 | ✅ Plays through |
+| [Bitch Shimai ga Seijun na Hazu ga Nai!!](https://vndb.org/v20429) | ビッチ姉妹が清純なはずがないっ！！ | 2017 | 2.50 | ✅ Plays through |
+| [Bitch Gakuen ga Seijun na Hazu ga Nai!!?](https://vndb.org/v21429) | ビッチ学園が清純なはずがないっ！！？ | 2017 | 2.50 | ✅ Plays through |
+| [Chuuni Hime no Teikoku](https://vndb.org/v17900) | 厨二姫の帝国 | 2018 | 2.50 | ✅ Plays through |
 
-✅ every route was played to its end. 🟡 reaches the title screen; its story was not checked yet.
+✅ every route was played to its end, or every scenario of the game was run through to its end
+by the test runner, nothing stopping ([how](docs/compatibility.md#sweeping)).
 
-OpenShiina has the keys of 118 more ShiinaRio games, not tried yet. Whether one plays depends on
-its engine version: 2.45, 2.47, 2.49 and 2.50 run, 2.34 in part. Every game, with its engine
-version, and each platform's state are in [docs/compatibility.md](docs/compatibility.md).
+OpenShiina has the keys of 117 more ShiinaRio games, not tried yet, and VNDB lists 35 more it
+has no keys for. Whether one plays depends on its engine version: 2.45, 2.47, 2.49 and 2.50 run,
+and 2.34 (one game of it tried). Every game, with its engine version, and each platform's state
+are in [docs/compatibility.md](docs/compatibility.md).
 
 ## Screenshots
 
@@ -115,7 +118,7 @@ dotnet build src/OpenShiina.Android -c Release
 
 The APK is written to `bin/Release/OpenShiina.Android/`. It runs on CoreCLR (experimental in
 .NET 10; arm64 and x64), which played Bitch Nee-chan at 40 frames a second on a phone where Mono
-gave 27. `-p:OpenShiinaMono=true` builds it on Mono instead, for 32-bit Android too, compiled
+gave 27. `-p:OpenShiinaMono=true` builds it on Mono instead, compiled
 ahead of time with LLVM, which takes several minutes (about 9 on a 6-core laptop); that APK goes
 to `bin/Release/OpenShiina.Android.Mono/`. It reads the games from the device's
 storage, so Android 11 and later ask for all files access the first time a game is added. On
@@ -263,6 +266,9 @@ player reads, are in [docs/tools.md](docs/tools.md#translation-translate-a-game)
   `Formats.Json` (keeps ours, adds the others; see docs/engine-notes.md section 1).
 - `tests/OpenShiina.ScnBoot`: runs a game's scripts without a screen, presses keys and clicks
   at given frames, saves screenshots, and reports what the engine ran.
+- `tests/sweep.ps1 -Folder <game folder>`: runs every scenario of a game through ScnBoot and
+  says which stopped or stood still, with the slowest frames
+  ([docs/compatibility.md](docs/compatibility.md#sweeping)).
 
 ## Credits
 

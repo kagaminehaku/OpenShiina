@@ -1382,7 +1382,7 @@ the functions they call from the decompile. First findings:
   pictures, 04C4 4.6 -> 4.4 s.
 - CoreCLR on Android (2026-10-12, OpenShiina.Android.csproj): the app runs on CoreCLR
   (UseMonoRuntime false, arm64 and x64) instead of Mono ahead of time with LLVM
-  (`-p:OpenShiinaMono=true`, which also builds 32-bit ARM). A phone's perf.log on Mono gave its
+  (`-p:OpenShiinaMono=true`, which built 32-bit ARM too until 2026-10-13). A phone's perf.log on Mono gave its
   plain pixel code 2.2 times the PC's time and its vectors hardly anything over plain code
   (AdvSimd not supported there). The same skipping in Bitch Nee-chan on an Adreno 750 phone:
   Mono 26.9 frames a second, CoreCLR 40.2; the compositor 3.33 -> 1.74 ms a call, 00A1 2.01 ->
@@ -1480,14 +1480,11 @@ the functions they call from the decompile. First findings:
   and writes rows in place with `Vector<T>` for the MMX blocks (600 random cases against the
   paged code, sources on the destination and a few rows off among them), copies are one memmove.
   The translated x86 code goes through the same reads and writes (now a pointer and, on Windows,
-  the flag test). No heap block crosses a 16 MB boundary (one over 16 MB starts on one): a
-  32-bit process (32-bit Android, ScnBoot built for win-x86) has no 4 GB to spare, so there the
-  address space is 256 parts of 16 MB (`ScnAddressSpace.Segmented`, chosen by the process; the
-  64-bit code does not see the test), each mapped on its first use next to the part before when
-  that place is free: a script address is part[address >> 24] + (address & 0xFFFFFF), a heap
-  block is one piece of memory for the C# routines (the parts of a block over 16 MB are mapped
-  together when it is made), accesses of 2 and 4 bytes across a boundary go a byte at a time,
-  blocks a part at a time. The games touch a few dozen parts. Checked in ScnBoot: the pictures of
+  the flag test). A 64-bit process only (2026-10-13): until then a 32-bit process mapped the
+  address space as 256 parts of 16 MB, and no heap block crossed a 16 MB boundary (one over 16
+  MB started on one), in 64-bit too; the gaps that left cut the heap into pieces (Bitch
+  Gakuen's PRO02_02.TXT, line 1437: 194 MB free in 31 ranges, none of the 36 MB asked for). That
+  code is on the branch legacy-32bit; blocks now go anywhere, 16 bytes aligned. Checked in ScnBoot: the pictures of
   Re: Rem Plus's zoomed prologue (105, every 25 frames to 2600) and Oreimo's park route (61,
   every 100 frames to 6000) are the same as with the paged memory, and SCNBOOT_VERIFY_NATIVE
   agrees; whole runs (best of 3, Windows, 6 cores): Re: Rem Plus 6.9 -> 6.6 s, Oreimo 7.8 -> 6.7
@@ -1498,7 +1495,7 @@ the functions they call from the decompile. First findings:
   The scripts' memory in RAM is about the same (Re: Rem Plus 237-277 MB paged, 229-259 MB flat);
   the paged memory's pages were on the GC heap, which kept garbage beside them. Commit with 1 MB
   parts: Re: Rem Plus 514 MB at frame 12000 of that route (753 MB with 16 MB parts).
-  Not yet run on Linux, macOS or Android (the `mmap` path), nor in a 32-bit process.
+  Not yet run on Linux, macOS or Android (the `mmap` path).
 - **The hot C# routines on script memory in place** (2026-10-10): scale32 reads its source rows
   and writes its destination rows in place; subpixel32, blend32 and rule alpha too, a source row
   being copied first when it shares bytes with the row written (as the x86 code reads a row

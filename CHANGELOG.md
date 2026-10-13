@@ -4,18 +4,33 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.6.0 (2026-10-13)
 
-- **OpenShiina Tools plays the game it translates, in a window of its own:** ▶ Play no longer
-  starts OpenShiina (nor asks where it is, as it did with the release downloads). Each save of the
-  translation reaches the game playing from its next scenario.
+OpenShiina Tools plays the game it translates, and every game tried plays through.
+
+### Games
+
+- **All 19 games tried play through.** Ao no Juuai, Chuuchuu Nurse, Can Fes! and the three
+  Bitch games too: every scenario of each was run to its end, nothing stopping (a sweep, below).
+- **New: Chuuni Hime no Teikoku (厨二姫の帝国, 2018).** Its title music no longer stops it (OGV
+  music copied into memory), and its blur runs as C# (12 s a frame before).
+- **Bitch Gakuen no longer runs out of memory** in a scene of PRO02_02.TXT (three layers of one
+  large event picture): the scripts' memory was cut into pieces by a rule for 32-bit processes.
+- `docs/compatibility.md` also lists the 35 games VNDB gives the engine ShiinaRio that OpenShiina
+  has no keys for yet.
+
+### OpenShiina Tools
+
+- **The game it translates plays in a window of its own:** ▶ Play no longer starts OpenShiina
+  (nor asks where it is, as it did with the release downloads). Each save of the translation
+  reaches the game playing from its next scenario.
 - **Which line is this?** The game played from the tools shows the id of its line in a corner
   (`MAK00.TXT:64`), and a button in the tools goes to that line in the table.
 - **Play from here (experimental, an extra still being tried):** right-click a line: the game
   opens at that line in a few seconds, without its logos or title, the scene set as the story
-  sets it (what earlier scenarios and choices set is not there). Tried on all 18 games: 16 go
-  straight there, Yuru Plus asks for its heroine first, Ao no Juuai shows its title. Such a game's saves stay in memory; the player's own saves
-  are left alone. `ScnBoot` runs it too (`SCNBOOT_PLAYFROM=MAK00.TXT:64`).
+  sets it (what earlier scenarios and choices set is not there). Tried on the 19 games: 18 go
+  straight there, Yuru Plus asks for its heroine first. Such a game's saves stay in memory; the
+  player's own saves are left alone.
 - **The Translation tab checks by itself:** after each save, the line at the bottom says how far
   the translation is and how many of the 2,820 letter codes it uses (⚠ from nine tenths). The
   Check and Update from the game buttons are gone: a button shows when lines do not fit, or when
@@ -24,6 +39,19 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **A guide to OpenShiina Tools, with pictures** ([docs/tools.md](docs/tools.md)): opening,
   previewing and extracting a game's archives, repacking, and translating a game step by step.
   The README shows the tools and a translation in the game.
+
+### Engine
+
+- **64-bit only:** the players are 64-bit everywhere, and the engine's 32-bit way of mapping the
+  scripts' memory is gone, with the rule that cut it into pieces (the 32-bit Android build of
+  Mono too). The code is kept on the branch `legacy-32bit`.
+
+### Testing games
+
+- **Sweeps:** `tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through
+  ScnBoot (skip held, choices made) and says which stopped or stood still, the slowest frames and
+  the memory's peak ([docs/compatibility.md](docs/compatibility.md#sweeping)). ScnBoot:
+  `SCNBOOT_PLAYFROM` (a game from one line), `SCNBOOT_SWEEP`, `SCNBOOT_HEAP`, `SCNBOOT_LIST`.
 
 ## 0.5.1 (2026-10-13)
 
