@@ -35,7 +35,7 @@ public sealed partial class ScnVm
     {
         if (!m_host.Active)
             return 0;
-        bool Down(params int[] keys) => keys.Any(m_host.KeyDown);
+        bool Down(params int[] keys) => keys.Any(KeyHeld);
         int b = 0;
         if (Down(0x26, 0x68)) b |= 1;                 // up, numpad 8
         if (Down(0x28, 0x62)) b |= 2;                 // down, numpad 2
@@ -141,7 +141,7 @@ public sealed partial class ScnVm
         Register(0x03E8, (vm, c, i) =>
         {
             int vk = vm.Value(c, i.Args[0]);
-            int state = vm.m_host.KeyDown(vk) ? unchecked((short)0x8000) : 0;
+            int state = vm.KeyHeld(vk) ? unchecked((short)0x8000) : 0;
             vm.Store(c, i.Args[1], vm.m_host.Active ? state : 0);
             return 0;
         });

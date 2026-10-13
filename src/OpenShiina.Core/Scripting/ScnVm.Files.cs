@@ -77,12 +77,21 @@ public sealed partial class ScnVm
     /// or a loose file. A .TXT that starts with a UTF-8 byte order mark is a translated scenario,
     /// read as Shift-JIS and gaiji (ScnGaiji). The arrays are only read.
     /// </summary>
-    public byte[]? ReadScriptFile(string path)
+    public byte[]? ReadScriptFile(string path) => ReadScriptFile(path, load: true);
+
+    /// <param name="load">False when only the length is asked for (a scenario read for it is not the one to put in place).</param>
+    private byte[]? ReadScriptFile(string path, bool load)
     {
         if (ResolvePath(path) is not { } p)
             return null;
         if (p.Save)
-            return m_host.ReadSaveFile(p.Name);
+            return ReadSave(p.Name);
+        // "Play from here": the scenario put in place of the one asked for (ScnVm.Warp.cs)
+        if (PlayFromScenario(p.Name, load) is { } play)
+        {
+            LearnScenario(play.Name, play.Data);
+            return play.Data;
+        }
         if (m_fileCache.TryGetValue(p.Name, out var kept))
         {
             m_fileCacheOrder.Remove(kept);
@@ -143,20 +152,33 @@ public sealed partial class ScnVm
     }
 
     /// <summary>
+    /// The translation's files changed while the game plays (OpenShiina Tools saved them): the
+    /// tables and strings are read again when next needed, and the scenarios kept go, so that a
+    /// scenario the scripts read from now on (the next one, or the one a save loads) has the new
+    /// text. The scenario playing keeps the text it was read with. The interpreter's thread.
+    /// </summary>
+    public void ReloadTranslation()
+    {
+        m_translationTablesRead = false;
+        m_translationTables = null;
+        m_strings = null;
+        m_playData = null;
+        foreach (var name in m_fileCache.Keys.Where(n => n.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            var kept = m_fileCache[name];
+            m_fileCacheOrder.Remove(kept);
+            m_fileCache.Remove(name);
+            m_fileCacheSize -= kept.Value.Data.Length;
+        }
+    }
+
+    /// <summary>
     /// A file of the archives read: a scenario translated by text.tsv, a translated scenario
     /// turned into Shift-JIS and gaiji, then kept (the interpreter's thread).
     /// </summary>
     private byte[] Kept(string name, byte[] data)
     {
-        if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && !ScnGaiji.IsUtf8(data)
-            && Tables?.Apply(name[(name.LastIndexOfAny(['\\', '/']) + 1)..], data) is { } translated)
-            data = translated;
-        if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && ScnGaiji.IsUtf8(data))
-        {
-            data = m_gaiji.Scenario(data);
-            if (m_host.Fonts is { } fonts)
-                fonts.Gaiji = m_gaiji.Texts;
-        }
+        data = Translate(name, data);
         if (data.Length <= FileCacheBytes / 2 && !m_fileCache.ContainsKey(name))
         {
             m_fileCache[name] = m_fileCacheOrder.AddFirst((name, data));
@@ -167,6 +189,21 @@ public sealed partial class ScnVm
                 m_fileCache.Remove(oldest.Value.Name);
                 m_fileCacheSize -= oldest.Value.Data.Length;
             }
+        }
+        return data;
+    }
+
+    /// <summary>A file of the archives as the scripts read it: a scenario translated by text.tsv, a translated scenario in Shift-JIS and gaiji.</summary>
+    private byte[] Translate(string name, byte[] data)
+    {
+        if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && !ScnGaiji.IsUtf8(data)
+            && Tables?.Apply(name[(name.LastIndexOfAny(['\\', '/']) + 1)..], data) is { } translated)
+            data = translated;
+        if (name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && ScnGaiji.IsUtf8(data))
+        {
+            data = m_gaiji.Scenario(data);
+            if (m_host.Fonts is { } fonts)
+                fonts.Gaiji = m_gaiji.Texts;
         }
         return data;
     }
@@ -199,9 +236,9 @@ public sealed partial class ScnVm
         if (ResolvePath(path) is not { } p)
             return null;
         if (p.Save)
-            return m_host.ReadSaveFile(p.Name)?.Length;
+            return ReadSave(p.Name)?.Length;
         if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || TranslationFileSize(p.Name) != null)
-            return ReadScriptFile(path)?.Length;
+            return ReadScriptFile(path, load: false)?.Length;
         return m_host.ArchiveFileSize(p.Name) ?? m_host.LooseFileSize(p.Name);
     }
 
@@ -212,7 +249,7 @@ public sealed partial class ScnVm
             return true;    // the engine reports success and writes nothing
         if (ResolvePath(path) is not { Save: true } p)
             return false;
-        m_host.WriteSaveFile(p.Name, data);
+        WriteSave(p.Name, data);
         return true;
     }
 
@@ -285,7 +322,7 @@ public sealed partial class ScnVm
         {
             string path = vm.ReadString(vm.Value(c, i.Args[0])) + vm.ReadString(vm.Value(c, i.Args[1]));
             if (vm.ResolvePath(path) is { Save: true } p && vm.FileWritesEnabled)
-                vm.m_host.DeleteSaveFile(p.Name);
+                vm.DeleteSave(p.Name);
             return 0;
         });
         // 00D2 buffer, n, file: write a file

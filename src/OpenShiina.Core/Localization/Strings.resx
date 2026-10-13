@@ -73,6 +73,7 @@
   <data name="OpeningGame" xml:space="preserve"><value>Opening the game…</value></data>
   <data name="NoWarArchives" xml:space="preserve"><value>The folder has no .WAR archives.</value></data>
   <data name="GameNotRecognised" xml:space="preserve"><value>The game was not recognised: keep the game's own .exe in the folder, or add it again.</value></data>
+  <data name="PlayFromHint" xml:space="preserve"><value>Going to {0}. If the title shows, start a new game. Saves are not kept.</value></data>
   <data name="CouldNotPlay" xml:space="preserve"><value>Could not play the game in {0}:
 {1}</value></data>
   <data name="PlayingAGame" xml:space="preserve"><value>Playing a game</value></data>

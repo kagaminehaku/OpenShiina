@@ -122,6 +122,8 @@ public sealed partial class ScnVm
             if (slot is < 0 or >= Slots || !vm.LoadModule(slot, file, start: true))
                 throw vm.Error(c, $"loadmod {slot}, \"{file}\" failed");
             vm.LeaveScopes(slot, -1);
+            // "Play from here": the title gone past (ScnVm.Warp.cs)
+            vm.PlayFromModule(vm.m_slots[slot], file);
             return 0;
         });
         // 0002 slot, file: load without running

@@ -1,15 +1,15 @@
 // The translation tab: a game chosen, its translation's tables (Core Game/ScenarioText.cs) made in
 // the game folder's translation\ the first time and edited here: the scenarios a file at a time
 // (or every line at once), the speakers' names, and the strings the scripts write themselves. The
-// tables are saved as they change; the player reads them as they are, so "Play" shows the
-// translation at once. The tables stay plain text, to go through a spreadsheet or a translation
-// tool as well.
+// tables are saved as they change; the player reads them as they are, so "Play" (the game in a
+// window of the tools, the player's GameView) shows the translation at once. The tables stay
+// plain text, to go through a spreadsheet or a translation tool as well.
 
-using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -29,8 +29,10 @@ public sealed class TranslationView : UserControl
     private readonly Button m_choose = new() { Content = "Translate a game…" };
     private readonly TextBlock m_game = new() { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Text = "Choose the folder of an installed game (the one with its .exe and .WAR files)." };
     private readonly Button m_play = new() { Content = "▶ Play", IsEnabled = false };
-    private readonly Button m_check = new() { Content = "Check", IsEnabled = false };
-    private readonly Button m_update = new() { Content = "Update from the game", IsEnabled = false };
+    // The line the game playing shows ("MAK00.TXT:28"): a click goes to it
+    private readonly Button m_inGame = new() { IsVisible = false };
+    private string? m_shownLine;
+    private readonly Button m_update = new() { IsVisible = false };
     private readonly ComboBox m_schemes = new() { MinWidth = 260, MaxDropDownHeight = 500 };
     private readonly ListBox m_files = new();
     private readonly TextBox m_search = new() { PlaceholderText = "Search the original or the translation", MinWidth = 280 };
@@ -47,7 +49,14 @@ public sealed class TranslationView : UserControl
     private TranslationTables? m_tables;
     private bool m_dirty;
     private List<string> m_lastProblems = new();
-    private static string? s_player;
+    // The latest check asked for: an older one finishing after it is not shown
+    private int m_checks;
+    // The lines where the game and text.tsv differ, as the latest check found
+    private int m_outdated;
+    // The game "Play" started, in its own window (one at a time), and the folder it plays
+    private Window? m_playWindow;
+    private GameView? m_playView;
+    private string? m_playFolder;
 
     private sealed record FileItem(string Key, string Label);
 
@@ -84,13 +93,15 @@ public sealed class TranslationView : UserControl
             },
         };
         var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
-        var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { m_update, m_check, m_play } };
         DockPanel.SetDock(m_choose, Dock.Left);
-        DockPanel.SetDock(right, Dock.Right);
+        DockPanel.SetDock(m_play, Dock.Right);
+        DockPanel.SetDock(m_inGame, Dock.Right);
         DockPanel.SetDock(advanced, Dock.Right);
         m_game.Margin = new Thickness(12, 0);
+        m_inGame.Margin = new Thickness(0, 0, 8, 0);
         top.Children.Add(m_choose);
-        top.Children.Add(right);
+        top.Children.Add(m_play);
+        top.Children.Add(m_inGame);
         top.Children.Add(advanced);
         top.Children.Add(m_game);
         advanced.Margin = new Thickness(0, 0, 8, 0);
@@ -110,9 +121,12 @@ public sealed class TranslationView : UserControl
         lists.Children.Add(splitter);
         lists.Children.Add(editor);
 
+        // The status line, the translation checked after each save (Check); a button for what
+        // needs a look, only when something does
         var bottom = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
-        DockPanel.SetDock(m_problems, Dock.Right);
-        bottom.Children.Add(m_problems);
+        var needs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { m_problems, m_update } };
+        DockPanel.SetDock(needs, Dock.Right);
+        bottom.Children.Add(needs);
         bottom.Children.Add(m_status);
 
         var root = new DockPanel();
@@ -123,9 +137,9 @@ public sealed class TranslationView : UserControl
         root.Children.Add(lists);
         Content = root;
 
-        ToolTip.SetTip(m_play, "Save, then play the game in OpenShiina with the translation as it is now.");
-        ToolTip.SetTip(m_check, "What the player will make of the translation: the codes its letters take (2,820 in all), and the lines that do not fit the game's.");
-        ToolTip.SetTip(m_update, "Read the game's scenarios again and bring the tables up to date (after an update of the game): translations of lines that did not change are kept.");
+        ToolTip.SetTip(m_play, "Save, then play the game in a window of the tools with the translation as it is now. What you save later reaches it from its next scenario.");
+        ToolTip.SetTip(m_inGame, "The line the game shows: go to it in the table.");
+        ToolTip.SetTip(m_update, "The game's scenarios are not the table's (after an update of the game): bring the table up to date with them. Translations of lines that did not change are kept.");
         ToolTip.SetTip(m_addString, "A text the scripts write themselves (a choice, a menu): exactly as the game shows it, and its translation.");
 
         m_choose.Click += async (_, _) =>
@@ -147,10 +161,16 @@ public sealed class TranslationView : UserControl
         };
         m_saveTimer.Tick += (_, _) => Save();
         m_play.Click += (_, _) => Play();
-        m_check.Click += (_, _) => Check(show: true);
+        m_inGame.Click += (_, _) =>
+        {
+            if (m_shownLine != null)
+                GoTo(m_shownLine);
+        };
         m_update.Click += async (_, _) =>
         {
-            if (m_folder != null)
+            if (m_folder != null && await Ui.Ask(this, $"The game's scenarios and text.tsv differ in {Count(m_outdated, "line")} (after an update of the game?).\n\n"
+                    + "Bring the table up to date with the game? The translations of lines that did not change are kept; lines the game no longer has, "
+                    + "or whose original changed, leave the table with their translations (keep a copy of the translation folder to have them)."))
                 await Open(m_folder, update: true);
         };
         m_problems.Click += async (_, _) =>
@@ -192,7 +212,7 @@ public sealed class TranslationView : UserControl
             {
                 var made = await Task.Run(() => ScenarioText.Export(scenarios, tables));
                 note = update
-                    ? $"Brought up to date: {made.Lines:N0} lines, {made.Kept:N0} translations kept."
+                    ? $"Brought up to date: {Count(made.Lines, "line")}, {Count(made.Kept, "translation")} kept."
                     : $"Made the tables: {made.Lines:N0} lines of {made.Files} scenarios, {made.Names} names.";
             }
             m_folder = folder;
@@ -210,7 +230,7 @@ public sealed class TranslationView : UserControl
                 .Select(Path.GetFileName).Where(n => !n!.Equals("strings.txt", StringComparison.OrdinalIgnoreCase)).ToList();
             if (own.Count > 0)
                 await Ui.Message(this, $"The translation folder also has {own.Count} scenario files of its own ({string.Join(", ", own.Take(5))}{(own.Count > 5 ? ", …" : "")}). The player reads such a file in place of the lines of text.tsv for that scenario: remove it to see the table's translation.");
-            Check(show: false);
+            Check(note);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -227,7 +247,7 @@ public sealed class TranslationView : UserControl
     private void SetEnabled(bool enabled)
     {
         m_choose.IsEnabled = enabled;
-        m_play.IsEnabled = m_check.IsEnabled = m_update.IsEnabled = enabled && m_tables != null;
+        m_play.IsEnabled = m_update.IsEnabled = enabled && m_tables != null;
     }
 
     /// <summary>The game's scheme: by its .exe (or the player's library), else the first its keys fit.</summary>
@@ -269,6 +289,9 @@ public sealed class TranslationView : UserControl
         return $"{done:N0} of {all:N0} lines ({percent}%)";
     }
 
+    /// <summary>"1 line", "2,835 lines".</summary>
+    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n:N0} {noun}s";
+
     private void ShowRows()
     {
         if (m_tables is not { } tables || m_files.SelectedItem is not FileItem file)
@@ -309,7 +332,27 @@ public sealed class TranslationView : UserControl
             }
         };
         translation.KeyDown += (_, e) => MoveOn(row, e);
-        return Columns(new StackPanel { Children = { heading, original } }, translation);
+        // Right-click on the original: play the game from this line (Ctrl+C still copies). The
+        // text and the list's item take the right button for themselves: the menu opens on its
+        // release however they handled it
+        var left = new StackPanel { Background = Brushes.Transparent, Children = { heading, original } };
+        original.ContextFlyout = null;
+        left.AddHandler(PointerReleasedEvent, (_, e) =>
+        {
+            if (e.InitialPressMouseButton == MouseButton.Right)
+            {
+                PlayFromMenu(row).Open(left);
+                e.Handled = true;
+            }
+        }, RoutingStrategies.Bubble, handledEventsToo: true);
+        return Columns(left, translation);
+    }
+
+    private ContextMenu PlayFromMenu(TextRow row)
+    {
+        var play = new MenuItem { Header = "▶ Play from here" };
+        play.Click += (_, _) => Play(row);
+        return new ContextMenu { ItemsSource = new[] { play } };
     }
 
     private Control StringView(StringRow row)
@@ -363,8 +406,13 @@ public sealed class TranslationView : UserControl
             return;
         e.Handled = true;
         int index = rows.IndexOf(row) + ((e.KeyModifiers & KeyModifiers.Shift) != 0 ? -1 : 1);
-        if (index < 0 || index >= rows.Count)
-            return;
+        if (index >= 0 && index < rows.Count)
+            FocusRow(index);
+    }
+
+    /// <summary>A row in view, its translation box (the last one of the row) focused.</summary>
+    private void FocusRow(int index)
+    {
         m_rows.ScrollIntoView(index);
         // Once the row's view is made: its translation box (the last one of the row)
         Dispatcher.UIThread.Post(() =>
@@ -375,6 +423,32 @@ public sealed class TranslationView : UserControl
                 box.CaretIndex = box.Text?.Length ?? 0;
             }
         }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// Goes to a line of text.tsv ("MAK00.TXT:28"): its scenario chosen in the list, the row in
+    /// view and its translation box focused (the search and "Untranslated only" cleared when they
+    /// hide it).
+    /// </summary>
+    private void GoTo(string id)
+    {
+        if (m_tables == null || m_files.ItemsSource is not List<FileItem> items)
+            return;
+        if (m_tables.Lines.FirstOrDefault(l => l.Id.Equals(id, StringComparison.OrdinalIgnoreCase)) is not { } row)
+        {
+            m_status.Text = $"{id} is not a line of the table: is it another version of the game?";
+            return;
+        }
+        if (items.FindIndex(i => i.Key.Equals(row.File, StringComparison.OrdinalIgnoreCase)) is >= 0 and int file && m_files.SelectedIndex != file)
+            m_files.SelectedIndex = file;
+        if (m_rows.ItemsSource is IList<object> shown && !shown.Contains(row))
+        {
+            m_search.Text = "";
+            m_untranslated.IsChecked = false;
+            ShowRows();
+        }
+        if (m_rows.ItemsSource is IList<object> rows && rows.IndexOf(row) is >= 0 and int index)
+            FocusRow(index);
     }
 
     private static Control Columns(Control left, Control right)
@@ -405,9 +479,11 @@ public sealed class TranslationView : UserControl
         {
             m_tables.Write(m_tablesFolder);
             m_dirty = false;
-            int done = m_tables.Lines.Count(l => l.Translation.Trim().Length > 0);
-            m_status.Text = $"Saved. Translated: {Percent(done, m_tables.Lines.Count)}.";
+            // The game playing reads it from its next scenario
+            if (m_playFolder == m_folder)
+                m_playView?.ReloadTranslation();
             Refresh();
+            Check("Saved.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -416,58 +492,115 @@ public sealed class TranslationView : UserControl
         }
     }
 
-    /// <summary>What the player will make of the translation, in the status line (and a message).</summary>
-    private async void Check(bool show)
+    /// <summary>
+    /// What the player will make of the translation, in the status line after <paramref name="note"/>:
+    /// how far it is and the codes its letters take (2,820 in all); and buttons for the lines that
+    /// do not fit the game's and for a game whose scenarios are not the table's.
+    /// </summary>
+    private async void Check(string note = "")
     {
         if (m_tables == null || m_tablesFolder == null)
             return;
-        Save();
+        int check = ++m_checks;
         var scenarios = m_scenarios;
         // A copy to read on another thread while the rows may change here
         var copy = TranslationTables.ReadFolder(m_tablesFolder);
         var summary = await Task.Run(() => copy.Check(scenarios));
+        if (check != m_checks)
+            return;
         m_lastProblems = summary.Problems;
-        m_problems.Content = $"{summary.Problems.Count} lines do not fit";
+        m_problems.Content = summary.Problems.Count == 1 ? "1 line does not fit" : $"{summary.Problems.Count:N0} lines do not fit";
         m_problems.IsVisible = summary.Problems.Count > 0;
+        m_outdated = summary.Outdated;
+        m_update.Content = $"The game differs in {Count(summary.Outdated, "line")}: update…";
+        m_update.IsVisible = summary.Outdated > 0;
+        // The codes: a warning from nine tenths taken, before letters start to show as "?"
         string codes = $"the letters use {summary.CodesUsed:N0} of {ScnGaiji.Capacity:N0} codes"
                        + (summary.Missing > 0 ? $" ({summary.Missing:N0} found none left and show as \"?\")" : "");
-        m_status.Text = $"Translated: {Percent(summary.Translated, summary.Lines)} in {summary.Files} scenarios, {summary.Strings} names and strings; {codes}.";
-        if (show)
-            await Ui.Message(this, m_status.Text + (summary.Problems.Count > 0 ? $"\n\n{summary.Problems.Count} lines of the tables do not fit the game's (see the button below the list)." : ""));
+        bool full = summary.Missing > 0 || summary.CodesUsed >= ScnGaiji.Capacity * 9 / 10;
+        m_status.Text = (note.Length > 0 ? note + " " : "") + (full ? "⚠ " : "")
+                        + $"Translated: {Percent(summary.Translated, summary.Lines)} in {summary.Files} scenarios, {summary.Strings} names and strings; {codes}.";
     }
 
-    /// <summary>Saves, then plays the game in OpenShiina (found next to the tools, else asked for once).</summary>
-    private async void Play()
+    /// <summary>
+    /// Saves, then plays the game in a window of the tools, as the player would: its title, size
+    /// and full screen follow the game, its X asks the game first, and the window goes when the game
+    /// ends. The game playing comes to the front instead of a second one.
+    /// </summary>
+    /// <param name="from">
+    /// "Play from here": a new game starts at this line, the scenario put in place of the first
+    /// one and what comes before the line taken out (ScnVm.Warp.cs); its saves stay in memory.
+    /// </param>
+    private async void Play(TextRow? from = null)
     {
-        if (m_folder == null)
+        if (m_folder == null || m_scheme == null)
             return;
         Save();
-        s_player ??= FindPlayer() ?? await Ui.PickFile(this, "Where is OpenShiina (the player)?", ("OpenShiina", [OperatingSystem.IsWindows() ? "OpenShiina.exe" : "OpenShiina"]));
-        if (s_player == null)
-            return;
-        try
+        if (m_playWindow != null)
         {
-            var start = new ProcessStartInfo(s_player) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(s_player)! };
-            start.ArgumentList.Add(m_folder);
-            Process.Start(start);
+            if (from == null)
+            {
+                if (m_playFolder == m_folder)
+                    m_playWindow.Activate();
+                else
+                    await Ui.Message(this, $"{m_playWindow.Title} is playing: close its window first.");
+                return;
+            }
+            if (!await Ui.Ask(this, $"{m_playWindow.Title} is playing. Close it and play from {from.Id}?"))
+                return;
+            // Closed at once, without asking the game
+            var old = m_playWindow;
+            m_playView?.Close();
+            old.Close();
+            if (m_playWindow == old)
+                return;
         }
-        catch (Exception ex)
+        var view = new GameView(library: false)
         {
-            s_player = null;
-            await Ui.Message(this, $"OpenShiina could not be started: {ex.Message}");
+            ShowsLineIds = true,
+            PlayFrom = from == null || m_tables == null ? null : (from.File, from.Line, m_tables.Lines.Select(l => l.File).Distinct(StringComparer.OrdinalIgnoreCase).ToList()),
+        };
+        view.LineShown += id =>
+        {
+            m_shownLine = id;
+            m_inGame.Content = $"In the game: {id}";
+            m_inGame.IsVisible = true;
+        };
+        var window = new Window
+        {
+            Title = m_scheme.Name,
+            Icon = OpenShiinaApplication.Logo(),
+            Content = view,
+            Width = 800,
+            Height = 600,
+            Background = Brushes.Black,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+        };
+        OpenShiinaApplication.HostGame(window, view);
+        // After the X the game let close, or its own Quit
+        view.GameEnded += () => Dispatcher.UIThread.Post(window.Close);
+        window.Closed += (_, _) =>
+        {
+            if (m_playWindow == window)
+            {
+                m_inGame.IsVisible = false;
+                m_shownLine = null;
+                m_playWindow = null;
+                m_playView = null;
+                m_playFolder = null;
+            }
+        };
+        m_playWindow = window;
+        m_playView = view;
+        m_playFolder = m_folder;
+        window.Show();
+        if (await view.OpenAsync(m_folder, m_scheme) is { } error)
+        {
+            window.Close();
+            await Ui.Message(this, error);
         }
     }
 
-    /// <summary>The player next to the tools: the same folder, a folder beside it (the releases' and the builds' layouts).</summary>
-    private static string? FindPlayer()
-    {
-        string name = OperatingSystem.IsWindows() ? "OpenShiina.exe" : "OpenShiina";
-        string here = AppContext.BaseDirectory;
-        string? parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(here));
-        var candidates = new List<string> { Path.Combine(here, name) };
-        if (parent != null)
-            foreach (var folder in new[] { "OpenShiina", "OpenShiina.Desktop" })
-                candidates.Add(Path.Combine(parent, folder, name));
-        return candidates.FirstOrDefault(File.Exists);
-    }
+    /// <summary>The tools close: the game playing is asked to close too (it may ask first, as on its X).</summary>
+    public void CloseGame() => m_playWindow?.Close();
 }

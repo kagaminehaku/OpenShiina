@@ -190,7 +190,7 @@ public sealed partial class ScnVm
                 vm.Store(c, i.Args[1], 0);
                 return 0;
             }
-            int held = s_dikToVk.TryGetValue(key & 0xFF, out int vk) && vm.m_host.KeyDown(vk) ? 0x80 : 0;
+            int held = s_dikToVk.TryGetValue(key & 0xFF, out int vk) && vm.KeyHeld(vk) ? 0x80 : 0;
             vm.Store(c, i.Args[1], vm.RepeatButtons(key, held));
             return 0;
         });
@@ -201,6 +201,13 @@ public sealed partial class ScnVm
         {
             string file = vm.ReadString(vm.Value(c, i.Args[0]));
             vm.FinishLoading();
+            // "Play from here": the scenario put in place of the one asked for (ScnVm.Warp.cs)
+            if (vm.ResolvePath(file) is { Save: false } asked && vm.PlayFromScenario(asked.Name, load: true) is { } play)
+            {
+                vm.LearnScenario(play.Name, play.Data);
+                vm.Loaded(play.Data);
+                return 0;
+            }
             if (vm.LoadInBackground && vm.ResolvePath(file) is { Save: false } p && !vm.m_fileCache.ContainsKey(p.Name)
                 && vm.m_host.ArchiveFileSize(p.Name) != null)
             {

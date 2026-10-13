@@ -17,6 +17,8 @@
 // mouse wheel one notch away from the user (":-" towards) at those frames. Presses and clicks are
 // also sent as the window messages (WM_KEYDOWN / UP, WM_xBUTTONDOWN / UP) when they start and end.
 // SCNBOOT_CLOSE=frame closes the window then (WM_CLOSE: the scripts' answer is printed).
+// SCNBOOT_PLAYFROM="MAK00.TXT:64" starts the game at that line of a scenario, as OpenShiina
+// Tools' "Play from here" (ScnVm.Warp.cs), and prints the scenario lines shown ("[line]").
 // SCNBOOT_DUMP="frame:address:length:file,..." writes the scripts' memory (hex address) to a file
 // after that frame.
 // SCNBOOT_AREAS=1 checks ScnVm.TakeChangedArea: a copy of the window's picture updated only in the
@@ -99,6 +101,13 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_JIT") is { } jit)
 int profileFrame = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_PROFILE_FRAME"), out var pf) ? pf : -1;
 if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1" || profileFrame >= 0)
     vm.OpTimes = new();
+// SCNBOOT_PLAYFROM="FILE.TXT:line": OpenShiina Tools' "Play from here" (ScnVm.Warp.cs), the game
+// started at that line of a scenario; the scenario lines it shows are printed as they come
+if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && playFrom.LastIndexOf(':') is > 0 and int colon)
+{
+    vm.PlayFrom(playFrom[..colon], int.Parse(playFrom[(colon + 1)..]), ScenarioText.ReadScenarios(folder, scheme).Select(s => s.Name).ToList());
+    vm.LineShown += id => Console.WriteLine($"  [line] {id} at {host.Frame}");
+}
 if (!vm.LoadModule(0, start, start: true))
 {
     Console.WriteLine($"{start} is missing.");

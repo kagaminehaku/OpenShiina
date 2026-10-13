@@ -33,8 +33,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The player's library: its message box and sound output, Avalonia's theme -->
+    <!-- The player's library: its message box and sound output, Avalonia's theme, its game view -->
     <ProjectReference Include="..\OpenShiina.App\OpenShiina.App.csproj" />
+  </ItemGroup>
+
+  <!-- The games the translation tab plays: thread pool workers sleep as soon as they run out of
+       work, as in the player (OpenShiina.Desktop.csproj) -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Threading.ThreadPool.UnfairSemaphoreSpinLimit" Value="0" />
   </ItemGroup>
 
 </Project>

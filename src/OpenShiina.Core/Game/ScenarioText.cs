@@ -155,12 +155,17 @@ public sealed class TranslationTables
         Names.Concat(Strings).Where(s => s.Original.Length > 0 && s.Translation.Trim().Length > 0)
             .Select(s => (Tsv.Clean(s.Original), Tsv.Clean(s.Translation)));
 
-    public sealed record Summary(int Lines, int Translated, int Files, int Strings, int CodesUsed, int Missing, List<string> Problems);
+    /// <param name="Outdated">
+    /// The message lines where the game and text.tsv differ: lines of the game the table does not
+    /// have, rows the game no longer has or whose original is another (after an update of the
+    /// game). <see cref="ScenarioText.Export"/> brings the table up to date.
+    /// </param>
+    public sealed record Summary(int Lines, int Translated, int Files, int Strings, int CodesUsed, int Missing, List<string> Problems, int Outdated);
 
     /// <summary>
     /// How far the translation is and what the player will make of it: the lines translated,
     /// the gaiji codes the translation takes (ScnGaiji.Capacity in all), the rows that do not fit
-    /// the game's scenarios.
+    /// the game's scenarios, and how far text.tsv is behind the game.
     /// </summary>
     public Summary Check(IReadOnlyList<(string Name, byte[] Data)> scenarios)
     {
@@ -168,9 +173,15 @@ public sealed class TranslationTables
         var gaiji = new ScnGaiji();
         int files = 0;
         var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // The game's message lines by their ids in text.tsv ("MAK00.TXT:28"), their originals
+        var game = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, data) in scenarios)
         {
             known.Add(name);
+            var lines = ScenarioText.Lines(data);
+            for (int i = 0; i < lines.Count; i++)
+                if (lines[i].Kind == ScenarioText.LineKind.Message)
+                    game[$"{name}:{i + 1}"] = Tsv.Clean(lines[i].Text);
             if (Apply(name, data, problems) is { } translated)
             {
                 gaiji.Scenario(translated);
@@ -185,7 +196,9 @@ public sealed class TranslationTables
             gaiji.Text(translation);
             strings++;
         }
-        return new Summary(Lines.Count, Lines.Count(l => l.Translation.Trim().Length > 0), files, strings, gaiji.Used, gaiji.Missing, problems);
+        var table = Lines.GroupBy(l => l.Id, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Original, StringComparer.OrdinalIgnoreCase);
+        int outdated = game.Count(g => table.GetValueOrDefault(g.Key) != g.Value) + table.Keys.Count(id => !game.ContainsKey(id));
+        return new Summary(Lines.Count, Lines.Count(l => l.Translation.Trim().Length > 0), files, strings, gaiji.Used, gaiji.Missing, problems, outdated);
     }
 }
 

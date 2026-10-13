@@ -103,6 +103,8 @@ public sealed partial class ScnVm
     /// </summary>
     private void LearnScenario(string name, byte[] text)
     {
+        // Its lines, to tell which one is shown (ScnVm.Lines.cs)
+        NoteScenario(name, text);
         if (!LoadInBackground || !ReadAhead || name.Equals(m_scenarioName, StringComparison.OrdinalIgnoreCase))
             return;
         m_scenarioName = name;

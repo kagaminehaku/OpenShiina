@@ -28,9 +28,13 @@ public sealed class ToolsApplication : Application
 
     public override void Initialize()
     {
-        // The player's theme (its settings), so that both look alike
+        // The player's theme (its settings), so that both look alike; the games played from the
+        // translation tab with its GPU mode and in its language, as in the player
+        OpenShiina.Game.PlayerSettings.AcceleratorFactory = () => (OpenShiina.Gpu.VulkanAccelerator.TryCreate(out string? error), error);
+        var settings = OpenShiina.Game.PlayerSettings.Load();
+        OpenShiina.Localization.Languages.Apply(settings.Language);
         Styles.Add(OpenShiina.App.PlayerTheme.Fluent());
-        OpenShiina.App.PlayerTheme.Apply(this, OpenShiina.Game.PlayerSettings.Load().Theme);
+        OpenShiina.App.PlayerTheme.Apply(this, settings.Theme);
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -69,6 +73,7 @@ public sealed class ToolsApplication : Application
                     return;
                 }
                 translation.Save();
+                translation.CloseGame();
                 archives.Close();
             };
             desktop.MainWindow = window;

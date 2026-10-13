@@ -203,6 +203,7 @@ public sealed partial class ScnVm
     /// <summary>FUN_00431730: the record's text, optionally with a new position.</summary>
     private void SetText(int rec, int x, int y, int text)
     {
+        NoteShownText(text);
         m_lastKind[G(rec, RIndex) % TextRecords] = ScnGaiji.Kind.None;
         m_cellsOnLine[G(rec, RIndex) % TextRecords] = 0;
         if (x != -1)

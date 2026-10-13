@@ -26,6 +26,8 @@ public sealed partial class GameView : UserControl, IGameWindow
 {
     private readonly GamePicture m_image = new() { IsVisible = false };
     private LibraryView m_library;
+    // False: a game alone, without the home screen (OpenShiina Tools plays a game so)
+    private readonly bool m_hasLibrary;
     private readonly Grid m_layers;
     private GameSession? m_session;
     private IPlayerJoystick? m_joystick;
@@ -47,13 +49,16 @@ public sealed partial class GameView : UserControl, IGameWindow
     /// <summary>A game ended and the home screen is back (the window shows the player's title again).</summary>
     public event Action? GameEnded;
 
-    public GameView()
+    /// <param name="library">False for a game alone: the home screen never shows (a game that ends raises <see cref="GameEnded"/>).</param>
+    public GameView(bool library = true)
     {
         StartupLog.Mark("the library made (GameView)");
         Background = Brushes.Black;
         Focusable = true;
+        m_hasLibrary = library;
         m_library = NewLibrary();
-        m_layers = new Grid { Children = { m_image, m_frameRate, TouchBar(), m_library } };
+        m_library.IsVisible = library;
+        m_layers = new Grid { Children = { m_image, m_frameRate, m_lineId, TouchBar(), m_library } };
         Content = m_layers;
 
         m_image.PointerMoved += (_, e) => Pointer(e);
@@ -112,11 +117,12 @@ public sealed partial class GameView : UserControl, IGameWindow
         top.AddHandler(KeyUpEvent, (_, k) => Key(k, false), RoutingStrategies.Tunnel, handledEventsToo: true);
         top.BackRequested += OnBackRequested;
         // Phones: the app going to the background or coming back
-        PlayerPlatform.ActiveChanged += active =>
+        m_activeChanged = active =>
         {
             m_activated = active;
             UpdateFocus(top as Window);
         };
+        PlayerPlatform.ActiveChanged += m_activeChanged;
         if (top is Window window)
         {
             // Minimised counts as not in front (a minimised window can be activated again)
@@ -128,6 +134,16 @@ public sealed partial class GameView : UserControl, IGameWindow
                     UpdateFocus(window);
             };
         }
+    }
+
+    private Action<bool>? m_activeChanged;
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        // A view of a window that closed (each game OpenShiina Tools plays has its own) is not kept
+        PlayerPlatform.ActiveChanged -= m_activeChanged;
+        m_activeChanged = null;
     }
 
     // The last activation event (IsActive may not be up to date while they are raised), and
@@ -335,20 +351,23 @@ public sealed partial class GameView : UserControl, IGameWindow
         return false;
     }
 
-    /// <summary>Recognises the game in a folder, opens its archives and starts it.</summary>
-    public async Task OpenAsync(string folder)
+    /// <summary>
+    /// Recognises the game in a folder (or takes <paramref name="scheme"/>), opens its archives and
+    /// starts it. Null when it started, else why not (the home screen says it too).
+    /// </summary>
+    public async Task<string?> OpenAsync(string folder, EncryptionScheme? scheme = null)
     {
         if (!await FileAccessAsync())
-            return;
+            return m_library.Message;
         m_library.Message = Strings.OpeningGame;
         try
         {
             var data = await Task.Run(() =>
             {
                 _ = GameData.FindArchive(folder) ?? throw new InvalidDataException(Strings.NoWarArchives);
-                var scheme = GameLibrary.SchemeFor(folder)
+                var found = scheme ?? GameLibrary.SchemeFor(folder)
                     ?? throw new InvalidDataException(Strings.GameNotRecognised);
-                return GameData.Open(folder, scheme);
+                return GameData.Open(folder, found);
             });
             GameSession session;
             try
@@ -365,10 +384,12 @@ public sealed partial class GameView : UserControl, IGameWindow
             GameLibrary.Played(folder);
             m_playFolder = folder;
             m_playClock.Restart();
+            return null;
         }
         catch (Exception ex)
         {
             m_library.Message = string.Format(Strings.CouldNotPlay, folder, ex.Message);
+            return m_library.Message;
         }
     }
 
@@ -394,6 +415,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         };
         if (session.Setup.Joypad != false)
             m_joystick = PlayerPlatform.OpenJoystick();
+        WatchLines(session);
         session.Start();
         TouchSession(true);
         Focus();
@@ -418,6 +440,9 @@ public sealed partial class GameView : UserControl, IGameWindow
     }
 
     private DispatcherTimer? m_joystickTimer;
+
+    /// <summary>The game's translation was saved anew (OpenShiina Tools): the scenarios read from now on have it (ScnVm.ReloadTranslation).</summary>
+    public void ReloadTranslation() => m_session?.Schedule((0, vm => vm.ReloadTranslation()));
 
     /// <summary>The game's pace: the interpreter's new picture into the view.</summary>
     private void TakeNewFrame()
@@ -456,6 +481,48 @@ public sealed partial class GameView : UserControl, IGameWindow
         HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
         IsHitTestVisible = false, IsVisible = false,
     };
+
+    // The scenario line shown, over the game's other corner (ShowsLineIds)
+    private readonly TextBlock m_lineId = new()
+    {
+        FontSize = 12, Foreground = Brushes.White, Background = new SolidColorBrush(Color.FromArgb(0x80, 0, 0, 0)),
+        Padding = new Thickness(6, 2), Margin = new Thickness(4),
+        HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false, IsVisible = false,
+    };
+
+    /// <summary>A message line of a scenario was shown ("MAK00.TXT:28", ScnVm.LineShown); OpenShiina Tools goes to it in the translation.</summary>
+    public event Action<string>? LineShown;
+
+    /// <summary>The scenario line shown is written over the game's corner (OpenShiina Tools).</summary>
+    public bool ShowsLineIds { get; init; }
+
+    /// <summary>
+    /// "Play from here" (OpenShiina Tools): a new game starts at this line of a scenario, one of
+    /// the game's scenarios (ScnVm.PlayFrom); the game's saves stay in memory.
+    /// </summary>
+    public (string File, int Line, IReadOnlyCollection<string> Scenarios)? PlayFrom { get; init; }
+
+    /// <summary>The game started: its lines are told when something wants them (they are looked for only then).</summary>
+    private void WatchLines(GameSession session)
+    {
+        if (PlayFrom is { } from)
+        {
+            session.Schedule((0, vm => vm.PlayFrom(from.File, from.Line, from.Scenarios)));
+            m_lineId.Text = string.Format(Strings.PlayFromHint, $"{from.File}:{from.Line}");
+            m_lineId.IsVisible = true;
+        }
+        if (LineShown == null && !ShowsLineIds)
+            return;
+        session.Schedule((0, vm => vm.LineShown += id => Dispatcher.UIThread.Post(() =>
+        {
+            if (m_session != session)
+                return;
+            m_lineId.Text = id;
+            m_lineId.IsVisible = ShowsLineIds;
+            LineShown?.Invoke(id);
+        })));
+    }
 
     public void ShowFrameRate(string text)
     {
@@ -525,9 +592,10 @@ public sealed partial class GameView : UserControl, IGameWindow
         m_image.IsVisible = false;
         m_image.Clear();
         m_frame = null;
-        m_library.IsVisible = true;
+        m_library.IsVisible = m_hasLibrary;
         m_library.Refresh();
         m_frameRate.IsVisible = false;
+        m_lineId.IsVisible = false;
         TouchSession(false);
         FullScreenChanged?.Invoke(false);
         TitleChanged?.Invoke("OpenShiina");

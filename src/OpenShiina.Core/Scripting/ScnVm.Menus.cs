@@ -139,10 +139,10 @@ public sealed partial class ScnVm
             string a = vm.ReadString(vm.Value(c, i.Args[1])), b = vm.ReadString(vm.Value(c, i.Args[2]));
             string Join(string name) => folder.Length > 0 && folder[^1] is not ('\\' or '/') ? folder + "\\" + name : folder + name;
             if (vm.FileWritesEnabled && vm.ResolvePath(Join(a)) is { Save: true } from && vm.ResolvePath(Join(b)) is { Save: true } to
-                && vm.m_host.ReadSaveFile(from.Name) is { } data && vm.m_host.ReadSaveFile(to.Name) == null)
+                && vm.ReadSave(from.Name) is { } data && vm.ReadSave(to.Name) == null)
             {
-                vm.m_host.WriteSaveFile(to.Name, data);
-                vm.m_host.DeleteSaveFile(from.Name);
+                vm.WriteSave(to.Name, data);
+                vm.DeleteSave(from.Name);
             }
             return 0;
         });

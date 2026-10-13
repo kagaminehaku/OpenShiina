@@ -30,6 +30,10 @@ internal static class Ui
     public static Task Message(Control owner, string text, string caption = "OpenShiina Tools") =>
         MessageDialog.ShowAsync(TopLevel.GetTopLevel(owner), text, caption, 0);
 
+    /// <summary>A question with Yes and No: true for Yes.</summary>
+    public static async Task<bool> Ask(Control owner, string text, string caption = "OpenShiina Tools") =>
+        await MessageDialog.ShowAsync(TopLevel.GetTopLevel(owner), text, caption, 4) == 6;
+
     public static async Task<string?> PickFile(Control owner, string title, params (string Name, string[] Patterns)[] types)
     {
         if (TopLevel.GetTopLevel(owner) is not { } top)

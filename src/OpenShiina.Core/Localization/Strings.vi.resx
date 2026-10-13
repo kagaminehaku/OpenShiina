@@ -73,6 +73,7 @@
   <data name="OpeningGame" xml:space="preserve"><value>Đang mở game…</value></data>
   <data name="NoWarArchives" xml:space="preserve"><value>Thư mục không có file .WAR nào.</value></data>
   <data name="GameNotRecognised" xml:space="preserve"><value>Không nhận ra game: hãy giữ file .exe của game trong thư mục, hoặc thêm game lại.</value></data>
+  <data name="PlayFromHint" xml:space="preserve"><value>Đang vào {0}. Nếu màn hình tiêu đề hiện ra, hãy bắt đầu game mới. Save không được giữ lại.</value></data>
   <data name="CouldNotPlay" xml:space="preserve"><value>Không chơi được game trong {0}:
 {1}</value></data>
   <data name="PlayingAGame" xml:space="preserve"><value>Đang chơi game</value></data>
