@@ -21,8 +21,8 @@ and 2.34 in part. OpenShiina has the keys of 136 ShiinaRio games; 18 were tried 
 through (the eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start
 and play their stories. The Android player runs them on phones too (checked on a Galaxy S7). Every game,
 with its engine version and VNDB page, and every platform's state is in
-[docs/compatibility.md](docs/compatibility.md); what is planned next is in
-[docs/todo.md](docs/todo.md).
+[docs/compatibility.md](docs/compatibility.md); what changed in each version is in
+[CHANGELOG.md](CHANGELOG.md), and what is planned next in [docs/todo.md](docs/todo.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
 
