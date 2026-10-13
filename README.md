@@ -30,15 +30,41 @@ ask for their disc. OpenShiina keeps these games playable:
 - **For keeping:** the engine's behaviour is written down in
   [docs/engine-notes.md](docs/engine-notes.md), so these games do not depend on one old executable.
 
-**Status:** early. The interpreter runs ShiinaRio engine versions 2.45, 2.47, 2.49 and 2.50,
-and 2.34 in part. OpenShiina has the keys of 136 ShiinaRio games; 18 were tried and 12 play
-through (the eleven GRAND†CROSS "Plus" games it started with, and Aneiro), the others tried start
-and play their stories. The Android player runs them on phones too (checked on a Galaxy S7). Every game,
-with its engine version and VNDB page, and every platform's state is in
-[docs/compatibility.md](docs/compatibility.md); what changed in each version is in
-[CHANGELOG.md](CHANGELOG.md), and what is planned next in [docs/todo.md](docs/todo.md).
+**Status:** early. What changed in each version is in [CHANGELOG.md](CHANGELOG.md), and what is
+planned next in [docs/todo.md](docs/todo.md).
 
 You need your own installed copy of the game. OpenShiina contains no game data.
+
+## Games
+
+The games tried so far, on Windows, Linux and Android:
+
+| Game | Japanese title | Year | Engine | Status |
+|---|---|---|---|---|
+| [Ero-On!](https://vndb.org/v11473) | えろおん！ | 2010 | 2.49 | ✅ Plays through |
+| [Azu Plus](https://vndb.org/v7579) | アズプラス | 2010 | 2.47 | ✅ Plays through |
+| [Oreimo Plus](https://vndb.org/v6035) | 俺妹プラス | 2010 | 2.47 | ✅ Plays through |
+| [Aneiro](https://vndb.org/v6590) | アネイロ | 2011 | 2.49 | ✅ Plays through |
+| [Homu☆Plus](https://vndb.org/v8019) | ほむ☆プラス | 2011 | 2.49 | ✅ Plays through |
+| [Yuru Plus](https://vndb.org/v10125) | ゆるプラス | 2011 | 2.49 | ✅ Plays through |
+| [Sena Plus](https://vndb.org/v10126) | 星奈プラス | 2011 | 2.49 | ✅ Plays through |
+| [Kuroneko Plus](https://vndb.org/v10586) | 黒猫プラス | 2012 | 2.49 | ✅ Plays through |
+| [Nyaru Plus](https://vndb.org/v10779) | ニャルプラス | 2012 | 2.49 | ✅ Plays through |
+| [Rikka Plus](https://vndb.org/v11902) | 六花プラス | 2012 | 2.49 | ✅ Plays through |
+| [Maki Fes!](https://vndb.org/v16484) | マキフェス！ | 2014 | 2.50 | ✅ Plays through |
+| [Re:Rem Plus](https://vndb.org/v22991) | Re:レムプラス | 2018 | 2.50 | ✅ Plays through |
+| [Ao no Juuai](https://vndb.org/v4048) | 青の獣愛 | 2005 | 2.34 | 🟡 Starts |
+| [Chuuchuu Nurse](https://vndb.org/v1144) | ちゅうちゅうナース | 2008 | 2.45 | 🟡 Starts |
+| [Can Fes!](https://vndb.org/v4143) | きゃん☆フェス！ | 2010 | 2.47 | 🟡 Starts |
+| [Bitch Nee-chan ga Seijun na Hazu ga Nai!](https://vndb.org/v18781) | ビッチ姉ちゃんが清純なはずがないっ！ | 2016 | 2.50 | 🟡 Starts |
+| [Bitch Shimai ga Seijun na Hazu ga Nai!!](https://vndb.org/v20429) | ビッチ姉妹が清純なはずがないっ！！ | 2017 | 2.50 | 🟡 Starts |
+| [Bitch Gakuen ga Seijun na Hazu ga Nai!!?](https://vndb.org/v21429) | ビッチ学園が清純なはずがないっ！！？ | 2017 | 2.50 | 🟡 Starts |
+
+✅ every route was played to its end. 🟡 reaches the title screen; its story was not checked yet.
+
+OpenShiina has the keys of 118 more ShiinaRio games, not tried yet. Whether one plays depends on
+its engine version: 2.45, 2.47, 2.49 and 2.50 run, 2.34 in part. Every game, with its engine
+version, and each platform's state are in [docs/compatibility.md](docs/compatibility.md).
 
 ## Screenshots
 
