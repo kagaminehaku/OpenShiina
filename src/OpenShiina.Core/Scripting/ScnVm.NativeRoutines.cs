@@ -1,14 +1,13 @@
-// C# versions of the rest of the embedded x86 routines of the eleven games (2026-10-09): the
-// small ones (copies, strings, tables, checksums) and the pixel loops that are not zooms or
-// blends (sepia, thumbnails, Ero-On!'s same-size zoom). Each is found by the signature of the
-// whole routine (X86Routine.Signature, one per build) like the kernels of ScnVm.NativeKernels.cs
-// and gives the bytes the x86 code gives; cases it does not take (blocks that overlap in a way
-// the result depends on, counts the x86 code would wrap round to 4 billion) run as x86 code
-// (RunX86). Builds: v2.47 = Oreimo and Azu Plus ("ret 4"), v2.49 = Homu, Yuru, Nyaru, Rikka, Sena,
-// Kuroneko Plus and Ero-On! ("ret"), v2.50 = Maki Fes! and Re: Rem Plus. Offsets are Oreimo's /
-// Sena's / Re: Rem Plus's START unless said otherwise. Left out: the SSE2 build of the zoom
-// (Oreimo 79A20, Sena 79E70, Re: Rem Plus 8BDE0), which never runs: the scripts take their MMX
-// paths, as the CPU the interpreter reports has no SSE.
+// C# versions of the smaller embedded x86 routines: copies, strings, tables, checksums, and the
+// pixel loops that are not zooms or blends (sepia, thumbnails, a same-size zoom). Each is found
+// by the signature of the whole routine (X86Routine.Signature, one per build) like the kernels of
+// ScnVm.NativeKernels.cs and gives the bytes the x86 code gives; cases it does not take (blocks
+// that overlap in a way the result depends on, counts the x86 code would wrap round to 4
+// billion) run as x86 code (RunX86). The builds differ by engine version (v2.47's routines end
+// with "ret 4", v2.49's and v2.50's with "ret"); the offsets named are in the START.SCN of a game
+// of that version (Oreimo Plus, Sena Plus, Re: Rem Plus) unless said otherwise. Left out: the SSE2
+// build of the zoom in those versions, which never runs: their scripts take the MMX paths, as
+// the CPU the interpreter reports has no SSE.
 
 using System.Buffers;
 using System.Buffers.Binary;

@@ -6,11 +6,11 @@
 // KeyRepeatSpeed (50 ms) of RIO.INI. op_03E8 is GetAsyncKeyState of one virtual key.
 // The joystick is winmm's joystick 0 (joyGetPosEx, X / Y / buttons), read only when RIO.INI's
 // Joypad (or Joystick, which wins) is not 0: X below 0x2000 left, above 0xDFFF right, Y below
-// 0x4000 up, above 0xDFFF down, button 1 decide, button 2 cancel. The eleven GRAND†CROSS games
-// ship with Joypad=0; the players turn it on (Joypad).
+// 0x4000 up, above 0xDFFF down, button 1 decide, button 2 cancel. Many games ship with
+// Joypad=0; the players turn it on (Joypad).
 // 0x400 is never in this mask: the window procedure ORs it in with 0x20 on a double click of the
 // left button (WM_LBUTTONDBLCLK) into the masks 0x13B43FC / 0x13B4400, which only the engine's
-// own menus read (FUN_00411770 / FUN_00411B40, opcodes 0B72 / 0B86, used by none of the eleven).
+// own menus read (FUN_00411770 / FUN_00411B40, opcodes 0B72 / 0B86, used by none of the games tried).
 // The wheel (WM_MOUSEWHEEL) sets 0x13B52B4 to 1 (away from the user) or -1; only text with "_s"
 // key 8 reads it (it ends the text's waits) and op_0083 clears it. START sees the wheel itself
 // through its message slot (ScnVm.Events).

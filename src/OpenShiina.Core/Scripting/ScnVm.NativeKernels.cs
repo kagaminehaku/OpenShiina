@@ -3,10 +3,10 @@
 // (X86Routine.Signature) and must give the bytes the x86 code gives; VerifyNatives runs the
 // interpreter as well and compares (for tests).
 //
-// Each comes in two builds with the same instructions: the v2.47 one (Oreimo and Azu Plus) ends
-// with "ret 4", the v2.49 one (Homu, Yuru, Nyaru, Rikka, Sena and Kuroneko Plus, also blend32 of
-// Maki Fes! and Re: Rem Plus) with "ret"; the padding between their blocks differs too, so their
-// signatures do. Maki Fes! and Re: Rem Plus have a third scale32: v2.47's blocks with "ret".
+// Most come in builds with the same instructions: the v2.47 one ends with "ret 4", the v2.49 one
+// (which v2.50 games share for some routines) with "ret"; the padding between their blocks
+// differs too, so their signatures do. Some games carry builds of their own (a v2.50 scale32 of
+// v2.47's blocks with "ret", an SSE2 one, Can Fes!'s): each is registered with its signature.
 
 namespace OpenShiina.Scripting;
 

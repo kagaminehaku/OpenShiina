@@ -1,5 +1,5 @@
-// Opcodes the v2.49 executable has and only the v2.50 games use (Re:Rem Plus, Maki Fes!), read
-// from Sena Plus's executable (the handlers named are its functions).
+// Opcodes the v2.49 executable has and only v2.50 games use, read from a v2.49 executable (the
+// handlers named are its functions).
 //
 // The window menu (0898 / 08AC / 08C0 / 08E8 / 08F2 / 08FC) is Windows' own: the engine makes a
 // menu bar on the window, and a chosen item runs the slot 08AC registered for its id. The players

@@ -1,6 +1,6 @@
 // Calls into Windows DLLs made by the scripts (op_01A4, FUN_0041DB50 -> FUN_0041DA80:
 // LoadLibraryA + GetProcAddress, the arguments up to an FF byte pushed as dwords). The functions
-// the eleven games call are done here: the GDI ones draw into the engine's surfaces through
+// the games call are done here: the GDI ones draw into the engine's surfaces through
 // their device contexts (0x00030000 + surface, op_0529), with brushes and pens kept here and the
 // shapes drawn by the platform (IScnShapes: GDI itself on Windows, else Platform/DibShapes.cs). Also the font list of op_006F.
 

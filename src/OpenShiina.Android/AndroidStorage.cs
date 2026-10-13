@@ -1,8 +1,8 @@
 // The games' folders on Android. The player reads them as files, as on the desktop, which needs
 // all files access from Android 11 (the user turns it on in the settings page the player opens)
 // and the storage permission before. The folder picker gives a document tree, not a path: a tree
-// of the device's storage ("primary:Games/Oreimo"), of a memory card ("1234-ABCD:Games/Oreimo")
-// or of the Downloads ("raw:/storage/emulated/0/Download/Oreimo") is turned into its path.
+// of the device's storage ("primary:Games/MyGame"), of a memory card ("1234-ABCD:Games/MyGame")
+// or of the Downloads ("raw:/storage/emulated/0/Download/MyGame") is turned into its path.
 
 using Android;
 using Android.Content;
