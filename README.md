@@ -231,7 +231,7 @@ folder:
    themselves (choices, menus). Every change is saved as you type.
 3. **▶ Play** plays the game in a window of the tools, as OpenShiina does, with the translation
    as it is. While it plays, what you save reaches it from its next scenario, and a button goes
-   to the line it shows. Right-click a line, **▶ Play from here**: the game opens straight at that line.
+   to the line it shows. Right-click a line, **▶ Play from here** (experimental): the game opens straight at that line.
 
 | | |
 |---|---|

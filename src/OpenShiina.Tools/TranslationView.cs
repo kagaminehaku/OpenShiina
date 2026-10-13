@@ -350,7 +350,8 @@ public sealed class TranslationView : UserControl
 
     private ContextMenu PlayFromMenu(TextRow row)
     {
-        var play = new MenuItem { Header = "▶ Play from here" };
+        var play = new MenuItem { Header = "▶ Play from here (experimental)" };
+        ToolTip.SetTip(play, "An extra, still being tried: the game opens at this line, the scene set as the story sets it. What earlier scenes and choices set is not there, and some games may go wrong.");
         play.Click += (_, _) => Play(row);
         return new ContextMenu { ItemsSource = new[] { play } };
     }

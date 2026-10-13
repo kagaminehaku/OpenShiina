@@ -187,13 +187,19 @@ built or copied; the game reads the tables as it plays.
 Translated lines may use any letters, Vietnamese included. They are drawn with their own widths
 and wrapped at the window's edge by words.
 
-### Play from here
+### Play from here (experimental)
+
+> **An extra, still being tried.** Play from here is a help for checking a line quickly, not a
+> way to play the game. The scene it shows may differ from the real game's, and in some games it
+> may go wrong (stop on the way, show the wrong picture, or not reach the line). When it does,
+> play the game from its start with **▶ Play**, and tell us which game and line on the
+> [issues](https://github.com/kagaminehaku/OpenShiina/issues) page.
 
 To see a line in the game without playing up to it, right-click its original and choose
-**▶ Play from here**. The game opens straight at that line, in a few seconds, the scene set as
+**▶ Play from here (experimental)**. The game opens straight at that line, in a few seconds, the scene set as
 the story sets it: no logos, no title (a game playing is closed first, when you say so).
 
-![Right-clicking line 64 of MAK00.TXT: the menu with ▶ Play from here](images/tools-play-from.png)
+![Right-clicking line 64 of MAK00.TXT: the menu with ▶ Play from here (experimental)](images/tools-play-from.png)
 
 How it gets there, and what that means:
 
@@ -206,7 +212,10 @@ How it gets there, and what that means:
 - What earlier scenarios and choices set is not there: a line that depends on a choice made
   before may show another picture than in the real game. A choice before the line, in the same
   scenario, stops on the way.
-- The story goes on from the line as usual.
+- The story goes on from the line to the end of that scenario. After it, the game goes on as if
+  that scenario had been its first one (to the second scenario of the game, or of the route
+  chosen in Yuru Plus), not to the scenario that follows it in the story: to see more, play
+  from a line of the next scenario.
 - **Saves are not kept**: the game saves and loads as usual while it runs (to see a line again
   after changing its translation, load a quick save made before it), but nothing is written, and
   the player's own saves stay as they were.
