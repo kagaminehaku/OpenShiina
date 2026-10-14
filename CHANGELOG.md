@@ -4,7 +4,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.0 (2026-10-15)
+
+Two more games play through, and OpenShiina is now under the GNU GPL.
 
 - **OpenShiina is now under the GNU GPL, version 3 or later** (MIT before; 0.6.0 and earlier
   stay MIT). The notices of the code ported from GARbro, WPF, FidelityFX FSR and Anime4K are in
