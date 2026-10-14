@@ -18,7 +18,7 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>kagaminehaku</Authors>
     <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
     <!-- Strings.resx is English: English needs no satellite assembly -->
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
@@ -26,6 +26,12 @@
   <!-- Scheme data (keys of each game, their ShiinaImage inside), copied next to the program that uses the engine -->
   <ItemGroup>
     <None Update="Data\Formats.Json" CopyToOutputDirectory="PreserveNewest" TargetPath="Formats.Json" />
+  </ItemGroup>
+
+  <!-- The license and the notices of the code ported from others, next to every program -->
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" TargetPath="LICENSE.txt" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" TargetPath="THIRD-PARTY-NOTICES.md" />
   </ItemGroup>
 
   <!-- SCN opcode operand layouts per engine version (ScnOpcodes) -->

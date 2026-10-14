@@ -48,7 +48,7 @@ E6). The range coder of 1.2-1.6 is Schindler's (32-bit, a byte at a time) over 2
 bytes and an end mark) with a quasistatic model (totals of 4096, counts halved at rescales 36
 symbols apart at first, twice as far each time, up to 2000): Archives/WarcRangeDecoder.cs,
 written for OpenShiina from that description, not from GARbro's port (KogadoCocotte.cs, under
-the GPL v2; OpenShiina is MIT). Checked against GARbro's decoder run as a program (its built
+the GPL v2; OpenShiina was MIT then). Checked against GARbro's decoder run as a program (its built
 ArcFormats.dll through reflection, scratch rangetest): 3,600 random inputs of 2 to 60,000
 bytes, 5.6 MB out, every output the same, also where it does not fit (0). Archives
 of 1.0 and 1.1 need no scheme: a game with no GameMap entry gets one without keys named after

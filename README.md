@@ -290,7 +290,17 @@ player reads, are in [docs/tools.md](docs/tools.md#translation-translate-a-game)
 
 ## License
 
-MIT; see [LICENSE](LICENSE).
+Copyright (C) 2026 kagaminehaku
+
+OpenShiina is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the GNU General Public License.
+
+Versions up to 0.6.0 were released under the MIT License, and stay under it. The code ported
+from GARbro, WPF, FidelityFX FSR and Anime4K keeps its MIT notices in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Disclaimer
 
