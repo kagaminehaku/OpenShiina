@@ -547,12 +547,16 @@ public sealed partial class GameView : UserControl, IGameWindow
             PointerWarp.To(top, point);
     }
 
+    /// <summary>The pointer over the game hidden or shown again (0461 / 0460).</summary>
+    public void ShowPointer(bool shown) => Cursor = shown || m_session == null ? null : new Cursor(StandardCursorType.None);
+
     public Task<int> ShowMessageAsync(string text, string caption, int type) =>
         MessageDialog.ShowAsync(TopLevel.GetTopLevel(this), text, caption, type);
 
     public async void Stopped(Exception? error, string? log)
     {
         m_animating = false;
+        Cursor = null;
         OnFrame();
         if (error != null)
         {

@@ -24,6 +24,7 @@ public interface IGameWindow
 
     /// <summary>Moves the system's pointer to (x, y) of the game's picture, where it can.</summary>
     void MovePointer(int x, int y);
+    void ShowPointer(bool shown);
 
     /// <summary>The game stopped: the scripts ended it (error null), or an error with the crash log's path.</summary>
     void Stopped(Exception? error, string? log);
@@ -127,6 +128,7 @@ public sealed class GameSession : IDisposable
         public byte[]? ReadFile(string name) => m_session.Data.Read(name);
         public long? ArchiveFileSize(string name) => m_session.Data.Size(name);
         public long? ArchiveFileSize(string archive, string name) => m_session.Data.Size(archive, name);
+        public bool MountArchive(string archive, bool mounted) => m_session.Data.Mount(archive, mounted);
 
         public byte[]? ReadLooseFile(string name) => m_session.Data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
         public long? LooseFileSize(string name) => m_session.Data.LooseFile(name) is { } path ? new FileInfo(path).Length : null;
@@ -173,6 +175,8 @@ public sealed class GameSession : IDisposable
             m_session.Input.Position = (x, y);
             Dispatcher.UIThread.Post(() => m_session.m_window.MovePointer(x, y));
         }
+
+        public void ShowPointer(bool shown) => Dispatcher.UIThread.Post(() => m_session.m_window.ShowPointer(shown));
 
         public ScnJoystick? Joystick => m_session.Input.Joystick;
 

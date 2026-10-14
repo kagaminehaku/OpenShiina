@@ -163,13 +163,31 @@ public sealed partial class ScnVm
         m_translationTables = null;
         m_strings = null;
         m_playData = null;
-        foreach (var name in m_fileCache.Keys.Where(n => n.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).ToList())
+        ForgetKept(n => n.EndsWith(".txt", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>The files kept whose names match go (read again when next asked for).</summary>
+    private void ForgetKept(Func<string, bool> match)
+    {
+        foreach (var name in m_fileCache.Keys.Where(match).ToList())
         {
             var kept = m_fileCache[name];
             m_fileCacheOrder.Remove(kept);
             m_fileCache.Remove(name);
             m_fileCacheSize -= kept.Value.Data.Length;
         }
+    }
+
+    /// <summary>
+    /// 00DD / 00DF: an archive mounted or unmounted. A file in several archives comes from a
+    /// mounted one (GameData.Mount), so what was kept or read ahead may now be another archive's.
+    /// </summary>
+    private void MountArchive(string archive, bool mounted)
+    {
+        if (!m_host.MountArchive(archive, mounted))
+            return;
+        ForgetKept(_ => true);
+        m_ahead.Clear();
     }
 
     /// <summary>

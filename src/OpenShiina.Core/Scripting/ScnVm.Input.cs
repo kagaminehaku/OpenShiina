@@ -183,6 +183,11 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[0], mouse & 7);
             return 0;
         });
+        // 0460 / 0461: the mouse pointer shown again / hidden (REMPLUS.EXE 423130: a flag the
+        // window's WM_SETCURSOR reads set; 423150: the flag cleared and SetCursor(NULL)).
+        // Chiccha na Hanayome's START hides it after 3 s without a move (gHCAdoing)
+        Register(0x0460, (vm, c, i) => { vm.m_host.ShowPointer(true); return 0; });
+        Register(0x0461, (vm, c, i) => { vm.m_host.ShowPointer(false); return 0; });
         // 0492 x, y: window point -> picture point (x - offset) / scale, both in and out; the
         // host already gives picture points, so they stay as they are
         Register(0x0492, (vm, c, i) =>

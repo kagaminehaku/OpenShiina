@@ -10,6 +10,20 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   stay MIT). The notices of the code ported from GARbro, WPF, FidelityFX FSR and Anime4K are in
   `THIRD-PARTY-NOTICES.md`, which the downloads carry with `LICENSE.txt`.
 
+### Games
+
+- **New: Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ (ちっちゃな花嫁, 2017)** plays through.
+  Its archives' key had the wrong date (one picture came out spoiled, and loading it took the
+  game down), its story read the scene replay's scenarios, its blur ran on the x86 interpreter
+  (16 s a frame), and it hides the mouse pointer after 3 s without a move.
+- **Updates of a game are read as the game reads them:** a file in several archives comes from
+  the first the scripts mount. Aneiro's update (ANEIRO_U1.WAR) replaces two pictures it did not
+  replace before.
+
+### Testing games
+
+- `tests/sweep.ps1` no longer fails on a scenario that left no summary.
+
 ## 0.6.0 (2026-10-13)
 
 OpenShiina Tools plays the game it translates, and every game tried plays through.

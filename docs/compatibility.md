@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 19 games tried). Then ScnBoot
+scripts the player does not run yet (none in the 20 games tried). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -162,7 +162,7 @@ of those versions it does not list.
 | Signalist Stars!! | しぐなリストスタ～ズ!! | 2016-10-28 | [v19590](https://vndb.org/v19590) | v2.50 | ⚪ Not tried |  |
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | 2017-01-27 | [v20429](https://vndb.org/v20429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Libra of the Vampire Princess | 吸血姫のリブラ (English) | 2017-05-03 | [r44159](https://vndb.org/r44159) | v2.50 | ⚪ Not tried |  |
-| Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ⚪ Not tried |  |
+| Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ✅ Plays through | 2026-10-14 |
 | Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ⚪ Not tried |  |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Sorcery Jokers [English] | ソーサリージョーカーズ (English) | 2018-01-12 | [r47518](https://vndb.org/r47518) | v2.50 | ⚪ Not tried |  |
@@ -336,6 +336,18 @@ on the x86 interpreter, 12 s a call, until its signature was given the C# blur32
 (SCNBOOT_VERIFY_NATIVE: the same pictures). Swept: 50 scenarios, every one to its end; its
 messages often take two or three lines of a scenario, shown together (60% of the lines counted).
 
+**Chiccha na Hanayome ~Mada Mada Tsubomi da mon~** (engine v2.50, CHIPPANA.EXE) opcheck:
+`0460` / `0461`, the pointer shown again / hidden (its START hides it after 3 s without a move).
+The first sweep (2026-10-14) found three more faults, fixed. Its scheme's DecodeBin had GARbro's
+date (engine-notes.md, "DecodeBin's date"): one dword of st\lis_1Z.s25 came out wrong, and
+loading it wrote over the scripts' stack (a process of 4.3 GB, frames of 30 s); its date is
+0x20161012, and all 1,669 S25, 225 TXT and 6,360 OGV of its archives now come out whole. Its
+story read the scene replay's scenarios of CHIPPANA_E3.WAR, which name voices the game does not
+have (`0158` stopped on v\HAR0140.ogv): files are now taken from the archives the scripts
+mounted, in their order. Its blur (START 9764A) is Chuuni Hime's code with other offsets: on the
+interpreter until its signature was given the C# blur32 (SCNBOOT_VERIFY_NATIVE: the same bytes).
+Swept again: 111 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -370,7 +382,8 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 19 games tried, swept on 2026-10-13: none stopped, none stuck.
+The 20 games tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on 2026-10-14):
+none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -393,6 +406,7 @@ The 19 games tried, swept on 2026-10-13: none stopped, none stuck.
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | 66 | 99.9% (TESTX1.TXT, a test file of the game's, shows nothing) |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | 98 | 99.9% |
 | Chuuni Hime no Teikoku | 50 | 59.9% (messages of two or three lines) |
+| Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | 111 | 93.7% (the branches of choices not taken) |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

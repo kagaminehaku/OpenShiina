@@ -508,6 +508,7 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     }
     public long? ArchiveFileSize(string name) => Swap(name) is { } swap ? new FileInfo(swap).Length : data.Size(name.Replace('/', '\\'));
     public long? ArchiveFileSize(string archive, string name) => data.Size(archive, name.Replace('/', '\\'));
+    public bool MountArchive(string archive, bool mounted) => data.Mount(archive, mounted);
 
     public long? LooseFileSize(string name) =>
         name.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? ReadLooseFile(name)?.Length

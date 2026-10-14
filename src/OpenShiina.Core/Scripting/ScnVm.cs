@@ -33,6 +33,12 @@ public interface IScnHost
     /// </summary>
     long? ArchiveFileSize(string archive, string name) => LooseFileSize(archive) != null ? ArchiveFileSize(name) : null;
 
+    /// <summary>
+    /// The scripts mount (00DD) or unmount (00DF) an archive ("CHIPPANA_T.WAR"): a file in
+    /// several archives then comes from a mounted one. True when that changed anything.
+    /// </summary>
+    bool MountArchive(string archive, bool mounted) => false;
+
     /// <summary>A file of the game folder itself (RIO.INI, movies), or null.</summary>
     byte[]? ReadLooseFile(string name);
 
@@ -92,6 +98,9 @@ public interface IScnHost
 
     /// <summary>Moves the mouse to a point of the game's picture (SetCursorPos).</summary>
     void SetMousePosition(int x, int y) { }
+
+    /// <summary>The mouse pointer shown over the game, or hidden (SetCursor(NULL)).</summary>
+    void ShowPointer(bool shown) { }
 
     /// <summary>Joystick 0 as joyGetPosEx gives it, or null when there is none.</summary>
     ScnJoystick? Joystick => null;

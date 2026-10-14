@@ -61,6 +61,9 @@ public sealed class GameData : IDisposable
             data.Dispose();
             throw;
         }
+        foreach (var list in data.m_byStem.Values.Where(l => l.Count > 1))
+            foreach (var (warc, _) in list)
+                data.m_shared.Add(warc);
         if (data.m_archives.Count == 0)
             throw new InvalidDataException($"No archive in {folder} could be opened with the {scheme.Name} scheme.");
         return data;
@@ -107,19 +110,60 @@ public sealed class GameData : IDisposable
 
     private static string Stem(string path) => Path.GetFileNameWithoutExtension(path.Replace('\\', '/').Trim());
 
-    /// <summary>Finds an entry by a script path; an entry with one of <paramref name="extensions"/> wins.</summary>
+    // The archives the scripts mounted (00DD) and have not unmounted since (00DF), in the order
+    // mounted. The engine reads only from those, searching them in that order: a file in several
+    // archives comes from the first mounted (Aneiro's START mounts its update ANEIRO_U1.WAR before
+    // _G and _V, whose pictures and voices it replaces; Chiccha na Hanayome's scene replay mounts
+    // CHIPPANA_E3.WAR, its own copies of the scenarios, in place of CHIPPANA_T.WAR). Replaced
+    // whole, as other threads read it
+    private volatile WarcArchive[] m_mounted = [];
+
+    /// <summary>
+    /// The scripts mount (00DD) or unmount (00DF) an archive, named by its file ("CHIPPANA_T.WAR").
+    /// True when a file that is in more than one archive may now come from another.
+    /// </summary>
+    public bool Mount(string archive, bool mounted)
+    {
+        var warc = m_archives.FirstOrDefault(a => Path.GetFileName(a.File.Name).Equals(Path.GetFileName(archive.Trim()), StringComparison.OrdinalIgnoreCase));
+        if (warc == null || m_mounted.Contains(warc) == mounted)
+            return false;
+        m_mounted = mounted ? [.. m_mounted, warc] : m_mounted.Where(a => a != warc).ToArray();
+        return m_shared.Contains(warc);
+    }
+
+    // The archives with a file that another archive has too (by its stem)
+    private readonly HashSet<WarcArchive> m_shared = [];
+
+    /// <summary>
+    /// Finds an entry by a script path: one with the path's extension, else one of
+    /// <paramref name="extensions"/>, else any; of those, the one of the first mounted archive.
+    /// </summary>
     private (WarcArchive Archive, Entry Entry)? Find(string path, params string[] extensions)
     {
         if (string.IsNullOrWhiteSpace(path) || !m_byStem.TryGetValue(Stem(path), out var list))
             return null;
+        if (list.Count == 1)
+            return list[0];
         string ext = Path.GetExtension(path.Trim());
+        return Pick(list, c => Path.GetExtension(c.Entry.Name).Equals(ext, StringComparison.OrdinalIgnoreCase))
+            ?? Pick(list, c => extensions.Any(e => Path.GetExtension(c.Entry.Name).Equals(e, StringComparison.OrdinalIgnoreCase)))
+            ?? Pick(list, _ => true);
+    }
+
+    private (WarcArchive Archive, Entry Entry)? Pick(List<(WarcArchive Archive, Entry Entry)> list, Func<(WarcArchive Archive, Entry Entry), bool> match)
+    {
+        var mounted = m_mounted;
+        (WarcArchive, Entry)? best = null;
+        int bestOrder = int.MaxValue;
         foreach (var candidate in list)
-            if (Path.GetExtension(candidate.Entry.Name).Equals(ext, StringComparison.OrdinalIgnoreCase))
-                return candidate;
-        foreach (var candidate in list)
-            if (extensions.Any(e => Path.GetExtension(candidate.Entry.Name).Equals(e, StringComparison.OrdinalIgnoreCase)))
-                return candidate;
-        return list[0];
+            if (match(candidate))
+            {
+                int order = Array.IndexOf(mounted, candidate.Archive);
+                order = order < 0 ? int.MaxValue - 1 : order;
+                if (order < bestOrder)
+                    (best, bestOrder) = (candidate, order);
+            }
+        return best;
     }
 
     /// <summary>A file of the archives by a script path, or null.</summary>

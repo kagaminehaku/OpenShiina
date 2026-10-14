@@ -69,7 +69,7 @@ $heap = ($rows | ForEach-Object { if ($_.Heap -match '(\d+) MB') { [int]$Matches
 "{0} scenarios in {1:N0} s, lines {2}/{3} ({4:P1}), heap peak {5} MB" -f $rows.Count, $clock.Elapsed.TotalSeconds, $shown, $all, ($shown / [Math]::Max(1, $all)), $heap
 $rows | Group-Object Result | ForEach-Object { "  {0}: {1}" -f $_.Name, $_.Count }
 '  stopped, stuck, or under 90% of the lines:'
-$rows | Where-Object { $_.Result -notlike 'done*' -or (All $_) -gt 0 -and (Shown $_) / (All $_) -lt 0.9 } | ForEach-Object {
+$rows | Where-Object { $_.Result -notlike 'done*' -or ((All $_) -gt 0 -and (Shown $_) / (All $_) -lt 0.9) } | ForEach-Object {
     "    {0,-18} {1,-22} {2,-10} last {3} {4}" -f $_.Scenario, $_.Result, $_.Lines, $_.Last, $_.Error
 }
 '  slowest frames:'

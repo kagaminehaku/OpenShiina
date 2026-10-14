@@ -39,6 +39,18 @@ By engine version: 30 below 2.39, 26 from 2.39 to 2.46, 35 2.47-2.48, 18 2.49, 2
 later. The interpreter knows the opcodes of 2.47, 2.49 and 2.50 (ScnOpcodes picks 2.47's for
 2.36 too): the others need more (todo.md).
 
+**DecodeBin's date.** The DecodeBins of all schemes are the same but for one dword at 0x1020, a
+date of the engine's build (0x20161012 for Chiccha na Hanayome and Signalist Stars!!, 0x20171006
+for Chuuni Hime). Decrypt2 (entries flagged 0x40000000) XORs the 64 dwords at 0x200-0x2FF of a
+file with DecodeBin's dword at (the dword 0x100 bytes before) & 0x1FFC, so a wrong date spoils 4
+bytes of the few files whose selector there is 0x1020 (3% of them), and nothing shows until the
+game uses one: Nyaru Plus's RULE213.S25, start.scn of Bitch Nee-chan, Chiccha na Hanayome's
+st\lis_1Z.s25 (an unused frame slot of its index read as 0x1E1206, a frame whose relocation then
+wrote over the scripts' stack). GARbro's schemes take the shared DecodeBin with Nyaru Plus's old
+0x20080214 (54 of them) unless one was worked out: the right date makes such a file come out
+whole (a slot of an S25's index that should be 0, Ogg page CRCs, strict Shift-JIS), and the value
+there is the right date XOR the wrong one.
+
 **WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
 eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a
 range coder), 1.1 (the index as it is, 16-byte names, no keys: EncryptionScheme.Warc110) and 1.0
@@ -976,7 +988,14 @@ the functions they call from the decompile. First findings:
   the size the scripts compare them with: the next instructions after `0158` are looked through
   (up to 8, to a jump) for an `if` (01F4 / 01FE) between the size and a number, and the size is
   that number (one more for >, one less for <; 1 without a comparison: ScnVm.VirtualDiscSize);
-  `00DF archive` unmounts one (the engine's list of mounted archives).
+  `00DF archive` unmounts one (the engine's list of mounted archives). The engine looks a file
+  up in the archives mounted, in the order mounted: Aneiro's START mounts its update
+  ANEIRO_U1.WAR after _T and before _G / _V, whose pictures and voices it replaces; Chiccha na
+  Hanayome's menus swap CHIPPANA_T.WAR for _E3.WAR (the scene replay's own copies of the
+  scenarios, which name voices the game does not have) and back. The player opens every archive
+  and takes a file in several of them from the first mounted (GameData.Mount); it took the
+  first by the archives' names before (2026-10-14), so Aneiro showed two pictures of before its
+  update, and Chiccha's story read the replay's scenarios.
 - **32-bit pictures** (text and button layers): `0562 picture, frame, x, y, slot, frame` draws a
   frame over one (FUN_004436F0 / 004437C0, one entry): source alpha 0 skips, 255 or a transparent
   destination copies, else a = (0xFE01 - (255-sa)(255-da)) * 0x10203 >> 24 (32 bits) and each
