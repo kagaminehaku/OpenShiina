@@ -200,7 +200,9 @@ public sealed partial class ScnVm : IDisposable
     // Memory regions
     private const int GRegion = 0x01000000, BRegion = 0x02000000, ARegion = 0x03000000, SRegion = 0x04000000;
     private const int FRegion = 0x05000000, StackRegion = 0x06000000, NamedRegion = 0x07000000;
-    private const int HeapRegion = 0x10000000, CodeRegion = 0x40000000;
+    // The heap has 1.5 GB (Kyuuketsuki no Libra's scripts take over 800 MB), everything stays
+    // below 2 GB as in the engine's own process (not large address aware: no address seen as < 0)
+    private const int HeapRegion = 0x10000000, CodeRegion = 0x70000000;
 
     // The 32-bit address space (ScnAddressSpace: one block of virtual memory, an address being
     // Base + (uint)address), physical memory only for the pages written

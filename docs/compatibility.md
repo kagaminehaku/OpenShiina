@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 20 games tried). Then ScnBoot
+scripts the player does not run yet (none in the 21 games tried). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -156,7 +156,7 @@ of those versions it does not list.
 | Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ⚪ Not tried |  |
 | Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | ⚪ Not tried |  |
 | Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | 2015-09-18 | [v17971](https://vndb.org/v17971) | v2.50 | ⚪ Not tried |  |
-| Kyuuketsuki no Libra | 吸血姫のリブラ | 2015-10-30 | [v17825](https://vndb.org/v17825) | v2.50 | ⚪ Not tried |  |
+| Kyuuketsuki no Libra | 吸血姫のリブラ | 2015-10-30 | [v17825](https://vndb.org/v17825) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | 2016-04-28 | [v18781](https://vndb.org/v18781) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Lovecha ~Tsumasakidachi de, Hitomi o Tojite~ | らぶちゃ ～つま先立ちで、瞳をとじて～ | 2016-04-28 | [v18590](https://vndb.org/v18590) | v2.50 | ⚪ Not tried |  |
 | Signalist Stars!! | しぐなリストスタ～ズ!! | 2016-10-28 | [v19590](https://vndb.org/v19590) | v2.50 | ⚪ Not tried |  |
@@ -348,6 +348,15 @@ mounted, in their order. Its blur (START 9764A) is Chuuni Hime's code with other
 interpreter until its signature was given the C# blur32 (SCNBOOT_VERIFY_NATIVE: the same bytes).
 Swept again: 111 scenarios, every one to its end.
 
+**Kyuuketsuki no Libra** (engine v2.50, LIBRA.EXE, with its patch of the first edition
+LIBRA_HP.WAR and its update LIBRA_U1.WAR) opcheck: nothing missing. Its scheme has no DecodeBin,
+and none of the 16,033 files of its archives needs one (no entry has the flags of Decrypt2); its
+1,241 S25, 106 TXT and 2 OGV all come out whole. Every embedded routine it runs has its C#
+version. The first sweep (2026-10-15) stopped in 9 scenarios with "Out of script memory": its
+scenes of large event pictures keep up to 964 MB of the scripts' heap (a block of 126 MB among
+them), which had 768 MB; it has 1.5 GB now (engine-notes.md section 10). Swept again: 105
+scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -382,8 +391,8 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 20 games tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on 2026-10-14):
-none stopped, none stuck.
+The 21 games tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on 2026-10-14,
+Kyuuketsuki no Libra on 2026-10-15): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -407,6 +416,7 @@ none stopped, none stuck.
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | 98 | 99.9% |
 | Chuuni Hime no Teikoku | 50 | 59.9% (messages of two or three lines) |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | 111 | 93.7% (the branches of choices not taken) |
+| Kyuuketsuki no Libra | 105 | 99.6% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

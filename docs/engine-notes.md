@@ -957,7 +957,10 @@ the functions they call from the decompile. First findings:
   merged and used again (best fit) and kept zero (whole pages given back to the system). Before, the heap
   only grew: after a long play it reached the modules' code at 0x40000000 and pictures were
   written over START.SCN (unknown opcodes in START). Running into the code now stops with "Out
-  of script memory".
+  of script memory". The heap is 0x10000000-0x70000000 (1.5 GB; 768 MB until 2026-10-15, when
+  Kyuuketsuki no Libra's scenes of large event pictures asked for more: 688 MB in use and a
+  block of 126 MB), the code 0x70000000 on: every address below 0x80000000, as in the engine's
+  process (not large address aware), so that none reads as a negative number.
 - Named variables (`03CF local`) live in per-slot scopes; their memory is used again when the
   scope is left (the start-up fade alone declares thousands in a few seconds).
 - Status: START, TOPMENU's logo, white and caution screens run and are pixel-identical to the

@@ -16,6 +16,10 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   Its archives' key had the wrong date (one picture came out spoiled, and loading it took the
   game down), its story read the scene replay's scenarios, its blur ran on the x86 interpreter
   (16 s a frame), and it hides the mouse pointer after 3 s without a move.
+- **New: Kyuuketsuki no Libra (吸血姫のリブラ, 2015)** plays through.
+- **The games' scripts have 1.5 GB of memory** (768 MB before): Kyuuketsuki no Libra's scenes
+  of large event pictures stopped with "Out of script memory". Memory is still taken only as it
+  is used.
 - **Updates of a game are read as the game reads them:** a file in several archives comes from
   the first the scripts mount. Aneiro's update (ANEIRO_U1.WAR) replaces two pictures it did not
   replace before.
