@@ -4,6 +4,14 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.7.1 (2026-10-15)
+
+- **Add games… takes a folder of games too.** Choose the folder your games are in (say
+  `Games`, with `Games\Maker\Game` in it): every game up to four levels under it is added at once (a folder with
+  `.WAR` files is a game; its own subfolders are not looked into), and the player says how many
+  it found, added and already had, and which it could not recognise. A game's own folder is
+  added as before.
+
 ## 0.7.0 (2026-10-15)
 
 Two more games play through, and OpenShiina is now under the GNU GPL.

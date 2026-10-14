@@ -135,12 +135,14 @@ signed with the keystore in the repository's secrets (`ANDROID_KEYSTORE_BASE64`,
 
 ## Usage
 
-Run `OpenShiina`: its home screen has a rail on the left (the library, **Add a game…** and
+Run `OpenShiina`: its home screen has a rail on the left (the library, **Add games…** and
 the settings), your games as tiles, the one played last first, each with its `.exe`'s icon on that
 icon's own colour, and the chosen game's card on the right: when it was played last, for how
 long (counted while the game is in front), the size of its folder and saves, and **Play** in the
 corner. A tile chooses a game (a double click or tap plays it); the card plays it wherever it is
-clicked. **Add a game…** takes the game's folder (the one with its `.exe` and `.WAR` files). The
+clicked. **Add games…** takes a game's folder (the one with its `.exe` and `.WAR` files), or a
+folder with games in it: the games up to four levels under it (`Games\Maker\Game`) are added
+at once, and the player says which it could not recognise. The
 card's **…** opens the save folder (and, on a desktop, the game's folder) or removes the game:
 from the list only (its files and saves stay, with Undo for a few seconds), or its folder deleted
 too, and its saves if asked; the player deletes only a folder with the game's `.WAR` archives in

@@ -299,8 +299,7 @@ public sealed partial class GameView : UserControl, IGameWindow
     }
 
     /// <summary>
-    /// "Add a game…": a folder into the library, when the game in it is recognised: by its .exe,
-    /// else by the keys that open its archives (SchemeDetector; the user picks when several fit).
+    /// "Add games…": the game of a game's folder, or the games in a folder of games (GameLibrary.FindGames).
     /// </summary>
     private async Task AddGameAsync()
     {
@@ -308,30 +307,85 @@ public sealed partial class GameView : UserControl, IGameWindow
             return;
         if (await ChooseFolderAsync() is not { } folder)
             return;
-        var game = await Task.Run(() => GameLibrary.Add(folder));
-        if (game == null && GameData.FindArchive(folder) != null)
+        if (GameData.FindArchive(folder) == null)
         {
-            m_library.Message = Strings.UnknownExeLooking;
-            var found = await Task.Run(() => SchemeDetector.Detect(folder));
-            string? chosen = found.Count switch
-            {
-                0 => null,
-                1 => found[0].Name,
-                _ => await m_library.ChooseAsync(
-                    string.Format(Strings.WhichGame, found.Count, folder),
-                    found.Select(c => c.Name).ToList()),
-            };
-            if (chosen != null)
-                game = await Task.Run(() => GameLibrary.Add(folder, chosen));
-            else if (found.Count > 0)
-            {
-                m_library.Message = "";
-                return;
-            }
+            await AddGamesAsync(folder);
+            return;
         }
-        m_library.Message = game == null
+        var (game, picked) = await AddFolderAsync(folder);
+        m_library.Message = game == null && picked
             ? string.Format(Strings.NoGameRecognised, folder)
             : "";
+        m_library.Refresh();
+    }
+
+    /// <summary>
+    /// A game's folder into the library, when the game in it is recognised: by its .exe, else by
+    /// the keys that open its archives (SchemeDetector; the user picks when several fit). The game,
+    /// or null; Picked is false when the user gave no answer (Cancel).
+    /// </summary>
+    private async Task<(LibraryGame? Game, bool Picked)> AddFolderAsync(string folder)
+    {
+        if (await Task.Run(() => GameLibrary.Add(folder)) is { } game)
+            return (game, true);
+        m_library.Message = Strings.UnknownExeLooking;
+        var found = await Task.Run(() => SchemeDetector.Detect(folder));
+        string? chosen = found.Count switch
+        {
+            0 => null,
+            1 => found[0].Name,
+            _ => await m_library.ChooseAsync(
+                string.Format(Strings.WhichGame, found.Count, folder),
+                found.Select(c => c.Name).ToList()),
+        };
+        if (chosen == null)
+            return (null, found.Count == 0);
+        return (await Task.Run(() => GameLibrary.Add(folder, chosen)), true);
+    }
+
+    /// <summary>
+    /// The games under a folder of games into the library, one after the other; then what came of
+    /// it: how many were added, were there already, and the folders whose game was not recognised.
+    /// </summary>
+    private async Task AddGamesAsync(string folder)
+    {
+        bool looking = true;
+        var progress = new Progress<int>(seen =>
+        {
+            if (looking)
+                m_library.Message = string.Format(Strings.LookingForGames, folder, seen);
+        });
+        m_library.Message = string.Format(Strings.LookingForGames, folder, 0);
+        var folders = await Task.Run(() => GameLibrary.FindGames(folder, progress));
+        looking = false;
+        if (folders.Count == 0)
+        {
+            m_library.Message = string.Format(Strings.NoGamesFound, folder, GameLibrary.SearchDepth);
+            return;
+        }
+        int added = 0, had = 0;
+        var left = new List<string>();
+        for (int i = 0; i < folders.Count; i++)
+        {
+            if (GameLibrary.Contains(folders[i]))
+            {
+                had++;
+                continue;
+            }
+            m_library.Message = string.Format(Strings.AddingGames, i + 1, folders.Count);
+            if ((await AddFolderAsync(folders[i])).Game != null)
+            {
+                added++;
+                m_library.Refresh();
+            }
+            else
+                left.Add(Path.GetRelativePath(folder, folders[i]));
+        }
+        string message = string.Format(Strings.GamesAdded, folders.Count, added, had);
+        if (left.Count > 0)
+            message += " " + string.Format(Strings.GamesLeftOut,
+                string.Join(", ", left.Take(5)) + (left.Count > 5 ? $" (+{left.Count - 5})" : ""));
+        m_library.Message = message;
         m_library.Refresh();
     }
 

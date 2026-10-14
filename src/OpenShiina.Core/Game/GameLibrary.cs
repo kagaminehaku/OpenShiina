@@ -6,7 +6,7 @@
 // the library existed (last-game.txt) is taken in the first time the library is read. Each game
 // keeps the time it was played (in front, counted by the player) and the size its folder had
 // when last measured. Delete takes a game's folder off the disk, after checks that it is the
-// game's own.
+// game's own. FindGames looks for the games in a folder of games (Add games… on such a folder).
 
 using System.IO;
 using System.Text.Json;
@@ -122,6 +122,57 @@ public static class GameLibrary
             return null;
         }
     }
+
+    /// <summary>How many levels under the folder chosen <see cref="FindGames"/> looks (games\maker\game is 2).</summary>
+    public const int SearchDepth = 4;
+
+    /// <summary>The folders <see cref="FindGames"/> looks at, at most (a whole drive chosen).</summary>
+    public const int SearchFolders = 20_000;
+
+    /// <summary>
+    /// The game folders (with .WAR archives) in <paramref name="folder"/>: itself when it is one,
+    /// else those under it, up to <see cref="SearchDepth"/> levels down, the nearest first. A
+    /// game's folder is not looked into; hidden and system folders and links are left out, and
+    /// the search ends after <see cref="SearchFolders"/> folders. <paramref name="progress"/> gets
+    /// the number of folders looked at now and then.
+    /// </summary>
+    public static List<string> FindGames(string folder, IProgress<int>? progress = null)
+    {
+        var games = new List<string>();
+        var options = new EnumerationOptions
+        {
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+        };
+        var queue = new Queue<(string Path, int Depth)>();
+        queue.Enqueue((Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)), 0));
+        int seen = 0;
+        while (queue.Count > 0 && seen < SearchFolders)
+        {
+            var (path, depth) = queue.Dequeue();
+            if (++seen % 100 == 0)
+                progress?.Report(seen);
+            try
+            {
+                if (GameData.FindArchive(path) != null)
+                {
+                    games.Add(path);
+                    continue;
+                }
+                if (depth < SearchDepth)
+                    foreach (var sub in Directory.EnumerateDirectories(path, "*", options).Order(StringComparer.CurrentCultureIgnoreCase))
+                        queue.Enqueue((sub, depth + 1));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // A folder that cannot be read is passed over
+            }
+        }
+        return games;
+    }
+
+    /// <summary>The game in <paramref name="folder"/> is in the list.</summary>
+    public static bool Contains(string folder) => (Read() ?? []).Any(g => SameFolder(g.Folder, folder));
 
     /// <summary>
     /// Adds the game in <paramref name="folder"/> (or finds it again); null when it is not

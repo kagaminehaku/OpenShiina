@@ -58,6 +58,12 @@ is mostly for slow phones, and should follow what their perf.log shows.
 - [ ] Opcode tables for 2.35-2.46 and 2.48 (opscan on the game's executable).
 - [ ] The ExtraCrypts (PostAdler, PreAdler, Binbo, Count, AltCount, Ushimitsu, Nukitashi2,
   Saimin) checked against their archives.
+- [ ] **Known builds**: a game's build told by the SHA-256 (and size) of its .exe, for the
+  scheme and keys (Re:Rem Plus's re-release has another DecodeBin date under the same .exe name),
+  `03C2`'s value, and in the library whether that build was played through; and START.SCN's
+  hash (or the archives' indexes) as the mark of the scripts a sweep ran (an update can leave the
+  .exe as it is). An unknown hash only says so: the .exe name and SchemeDetector as now, never
+  refused (patched, disc-free or translated .exes all differ).
 - [ ] A real WARC 1.0-1.6 game (1.0 / 1.1 tried only on archives made for the test, 1.2-1.6
   only against GARbro's on random input).
 

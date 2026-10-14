@@ -64,11 +64,16 @@
   <data name="DeletePlayerData" xml:space="preserve"><value>Thư mục này chứa dữ liệu của OpenShiina (save, cài đặt): đã được giữ nguyên.</value></data>
   <data name="DeleteOtherGame" xml:space="preserve"><value>Thư mục này chứa một game khác trong danh sách: đã được giữ nguyên.</value></data>
   <data name="DeletePartly" xml:space="preserve"><value>Không xóa được hết: {0}</value></data>
-  <data name="ChooseFolderTitle" xml:space="preserve"><value>Chọn thư mục của một game đã cài</value></data>
+  <data name="ChooseFolderTitle" xml:space="preserve"><value>Chọn thư mục của một game, hoặc thư mục chứa nhiều game</value></data>
   <data name="CannotReadFolder" xml:space="preserve"><value>Không đọc được thư mục đó: hãy chọn một thư mục trong bộ nhớ máy hoặc trên thẻ nhớ.</value></data>
   <data name="UnknownExeLooking" xml:space="preserve"><value>Không nhận ra file .exe của game: đang tìm khóa mở các file archive của nó…</value></data>
   <data name="WhichGame" xml:space="preserve"><value>Khóa của {0} game sau đều mở được các archive trong {1}. Đây là game nào?</value></data>
   <data name="NoGameRecognised" xml:space="preserve"><value>Không nhận ra game nào trong {0}: hãy chọn thư mục có các file .WAR của game (không có khóa nào đã biết mở được chúng).</value></data>
+  <data name="LookingForGames" xml:space="preserve"><value>Đang tìm game trong {0}… ({1} thư mục)</value></data>
+  <data name="NoGamesFound" xml:space="preserve"><value>Không tìm thấy game nào trong {0}: không có thư mục nào chứa file .WAR, kể cả {1} cấp thư mục con bên dưới.</value></data>
+  <data name="AddingGames" xml:space="preserve"><value>Đang thêm các game tìm thấy: {0}/{1}…</value></data>
+  <data name="GamesAdded" xml:space="preserve"><value>Tìm thấy {0} game: thêm {1}, có sẵn trong thư viện {2}.</value></data>
+  <data name="GamesLeftOut" xml:space="preserve"><value>Chưa thêm (không có khóa nào đã biết mở được, hoặc chưa chọn game): {0}.</value></data>
   <data name="NeedFileAccess" xml:space="preserve"><value>OpenShiina cần quyền truy cập file để đọc game: hãy cho phép rồi thử lại.</value></data>
   <data name="OpeningGame" xml:space="preserve"><value>Đang mở game…</value></data>
   <data name="NoWarArchives" xml:space="preserve"><value>Thư mục không có file .WAR nào.</value></data>

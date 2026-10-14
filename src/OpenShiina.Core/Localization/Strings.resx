@@ -6,7 +6,7 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="Library" xml:space="preserve"><value>Library</value></data>
-  <data name="AddGame" xml:space="preserve"><value>Add a game…</value></data>
+  <data name="AddGame" xml:space="preserve"><value>Add games…</value></data>
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="NoGamesYet" xml:space="preserve"><value>No games yet. Add the folder of an installed game: the one with its .exe and .WAR files.</value></data>
   <data name="WelcomeText" xml:space="preserve"><value>Add the folder of an installed game (the one with its .exe and .WAR files), on this device or a memory card.</value></data>
@@ -64,11 +64,16 @@
   <data name="DeletePlayerData" xml:space="preserve"><value>The folder holds OpenShiina's own (saves, settings): it was left alone.</value></data>
   <data name="DeleteOtherGame" xml:space="preserve"><value>The folder holds another game of the list: it was left alone.</value></data>
   <data name="DeletePartly" xml:space="preserve"><value>Not everything could be deleted: {0}</value></data>
-  <data name="ChooseFolderTitle" xml:space="preserve"><value>Choose the folder of an installed game</value></data>
+  <data name="ChooseFolderTitle" xml:space="preserve"><value>Choose a game's folder, or a folder with games in it</value></data>
   <data name="CannotReadFolder" xml:space="preserve"><value>The player cannot read that folder: choose a folder on the device's storage or a memory card.</value></data>
   <data name="UnknownExeLooking" xml:space="preserve"><value>The game's .exe is not one the player knows: looking for the keys that open its archives…</value></data>
   <data name="WhichGame" xml:space="preserve"><value>These {0} games' keys all open the archives in {1}. Which game is it?</value></data>
   <data name="NoGameRecognised" xml:space="preserve"><value>No game was recognised in {0}: choose the folder with the game's .WAR files (no keys the player knows open them).</value></data>
+  <data name="LookingForGames" xml:space="preserve"><value>Looking for games in {0}… ({1} folders)</value></data>
+  <data name="NoGamesFound" xml:space="preserve"><value>No game was found in {0}: no folder with .WAR files in it or up to {1} levels under it.</value></data>
+  <data name="AddingGames" xml:space="preserve"><value>Adding the games found: {0} of {1}…</value></data>
+  <data name="GamesAdded" xml:space="preserve"><value>{0} games found: {1} added, {2} already in the library.</value></data>
+  <data name="GamesLeftOut" xml:space="preserve"><value>Not added (no keys the player knows open them, or no game was picked): {0}.</value></data>
   <data name="NeedFileAccess" xml:space="preserve"><value>OpenShiina needs access to the files to read the games: allow it, then try again.</value></data>
   <data name="OpeningGame" xml:space="preserve"><value>Opening the game…</value></data>
   <data name="NoWarArchives" xml:space="preserve"><value>The folder has no .WAR archives.</value></data>

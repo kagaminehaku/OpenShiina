@@ -1,5 +1,5 @@
-// The home screen. On the left a rail: the logo, the library, "Add a game…" (the host asks for a
-// folder) and the settings (SettingsView.cs, in the page's place). Then the games of the library
+// The home screen. On the left a rail: the logo, the library, "Add games…" (the host asks for a
+// game's folder or a folder of games) and the settings (SettingsView.cs, in the page's place). Then the games of the library
 // (Game/GameLibrary.cs) as tiles to choose from, the one played last first, each with its .exe's
 // icon on its own colour (GameIcons.cs); and, on the right, the chosen game's card: its icon and
 // name, when it was played last, for how long, the size of its folder and saves, and Play in the
@@ -55,7 +55,7 @@ public sealed class LibraryView : UserControl
     /// <summary>A game was chosen: its folder.</summary>
     public event Action<string>? Play;
 
-    /// <summary>"Add a game…": the host asks for a folder and opens it.</summary>
+    /// <summary>"Add games…": the host asks for a folder and adds the games in it.</summary>
     public event Action? AddRequested;
 
     /// <summary>The language was changed in the settings: the host makes the screens again in it.</summary>

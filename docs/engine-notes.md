@@ -1460,7 +1460,7 @@ the functions they call from the decompile. First findings:
   wrong. An archive opening proves little (its index does not use the ShiinaImage). On the 16
   games here (GameMap left out) every keyed one gave its own scheme alone, in 0.2-0.4 s; Ao no
   Juuai (WARC 1.5, files without the per-game key) gave 24 that all decode it. The Avalonia
-  player's "Add a game…" adds a game its .exe does not tell this way (one scheme: at once;
+  player's "Add games…" adds a game its .exe does not tell this way (one scheme: at once;
   several: the user picks under the cards); library.json keeps it (LibraryGame.Scheme) and
   both players open the game with it (GameLibrary.SchemeFor). Checked on hard links of Bitch
   Shimai's archives renamed ZZ_*.WAR with no .exe (scratch detecttest --library).
