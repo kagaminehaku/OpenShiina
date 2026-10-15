@@ -36,6 +36,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Code ported into OpenShiina (GNU LGPL 2.1 or later)
+
+| Work | Copyright | Used in |
+|---|---|---|
+| [FFmpeg](https://ffmpeg.org) libavcodec (vc1*.c, vc1dsp.c, msmpeg4_vc1_data.c, wmv2data.c, wma.c, wmadec.c, wmaprodec.c, their tables, mdct_template.c) and libavformat (asfdec_f.c) | Copyright (c) the FFmpeg developers (among them Konstantin Shishkov, Mashiat Sarker Shakkhar, Michael Niedermayer, Fabrice Bellard, Sascha Sommer) | The Windows Media movies: ASF (`Formats/AsfFile.cs`), VC-1 / WMV3 video (`Formats/Vc1Video*.cs`, `Formats/Vc1Tables.cs`), WMA and WMA Pro sound (`Formats/WmaAudio.cs`, `Formats/WmaProAudio.cs`, `Formats/WmaTables.cs`, `Formats/Mdct.cs`) |
+
+FFmpeg is free software under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. Section 3 of that license lets a copy be put under the GNU General
+Public License instead, which these ported parts are, as part of OpenShiina (GPL version 3 or
+later). The original sources are at https://git.ffmpeg.org/ffmpeg.git (release n7.1).
+
 ## Libraries the programs ship with
 
 Each under its own license, all of which allow it to be used by GPLv3 software:

@@ -63,7 +63,7 @@ The games tried so far, on Windows, Linux and Android:
 | [Chiccha na Hanayome ~Mada Mada Tsubomi da mon~](https://vndb.org/v20284) | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017 | 2.50 | ✅ Plays through |
 | [Kyuuketsuki no Libra](https://vndb.org/v17825) | 吸血姫のリブラ | 2015 | 2.50 | ✅ Plays through |
 | [Libra of the Vampire Princess](https://vndb.org/r44159) (English, Steam) | 吸血姫のリブラ | 2017 | 2.50 | ✅ Plays through |
-| [Sorcery Jokers](https://vndb.org/r47518) (English, MangaGamer) | ソーサリージョーカーズ | 2018 | 2.50 | ✅ Plays through (its movies not shown: they are WMV) |
+| [Sorcery Jokers](https://vndb.org/r47518) (English, MangaGamer) | ソーサリージョーカーズ | 2018 | 2.50 | ✅ Plays through |
 | [Puchipuchi Idol Kouhosei](https://vndb.org/v9973) | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012 | 2.49 | ✅ Plays through |
 | [Gyaku Katei Kyoushi](https://vndb.org/v16306) | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014 | 2.50 | ✅ Plays through |
 
@@ -284,6 +284,8 @@ player reads, are in [docs/tools.md](docs/tools.md#translation-translate-a-game)
   the schemes of the other ShiinaRio games come from GARbro-Mod's scheme database.
 - Started from [GrandCrossExtractor](https://github.com/kagaminehaku/GrandCrossExtractor), which OpenShiina Tools carries on.
 - The sound of movies is decoded with [NLayer](https://github.com/naudio/NLayer) (MIT).
+- Windows Media movies (ASF, WMV3 / VC-1 video, WMA and WMA Pro sound) are decoded by C# ports of
+  [FFmpeg](https://ffmpeg.org)'s decoders (LGPL 2.1 or later).
 - The player uses [Avalonia](https://avaloniaui.net) (MIT), [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT)
   and [SDL3](https://libsdl.org) through [SDL3-CS](https://github.com/ppy/SDL3-CS) (zlib, MIT).
 - Ellipses without Windows flatten their curves with GDI's Bézier flattener as kept in
@@ -307,8 +309,8 @@ useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTA
 FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the GNU General Public License.
 
 Versions up to 0.6.0 were released under the MIT License, and stay under it. The code ported
-from GARbro, WPF, FidelityFX FSR and Anime4K keeps its MIT notices in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+from GARbro, WPF, FidelityFX FSR and Anime4K keeps its MIT notices, and that ported from FFmpeg
+its LGPL one, in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Disclaimer
 

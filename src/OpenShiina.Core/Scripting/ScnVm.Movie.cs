@@ -6,10 +6,11 @@
 // START uses this path when RIO.INI MovieMode is 0 or 1 (b[9] = 1); MovieMode 2 selects the
 // other player (05C9-05D8, ScnVm.GraphMovie.cs).
 //
-// Here the movie is decoded by Formats/Mpeg1Video and frame n is due n / rate seconds after the
-// start; 05C0 draws the latest frame that is due. The sound (MPEG-1 Layer II, only in a few
-// movies; Formats/MpegAudio) plays through the music streams (IScnMusic), started, paused and
-// stopped with the picture, at the volume of the music streams' table.
+// Here the movie is decoded by Formats/Mpeg1Video (MPEG-1) or Formats/Vc1Video (Windows Media:
+// WMV3 / VC-1 in an ASF file) and frame n is due n / rate seconds after the start; 05C0 draws
+// the latest frame that is due. The sound (MPEG-1 Layer II, Formats/MpegAudio; WMA,
+// Formats/AsfAudio) plays through the music streams (IScnMusic), started, paused and stopped
+// with the picture, at the volume of the music streams' table.
 
 namespace OpenShiina.Scripting;
 
@@ -28,7 +29,7 @@ public sealed partial class ScnVm
         public int Width, Height;
         /// <summary>+0x34: volume 0-100.</summary>
         public int Volume = 100;
-        public Mpeg1Video? Video;
+        public IMovieVideo? Video;
         /// <summary>Frames decoded since the start, and the time frame 0 was due.</summary>
         public int Decoded;
         public uint Start;
@@ -40,7 +41,7 @@ public sealed partial class ScnVm
         public byte[]? LastRows;
         /// <summary>The movie's sound as a WAVE (null when it has none) and its music stream while it plays.</summary>
         public byte[]? Wave;
-        /// <summary>The decoding of the rest of the sound (MpegAudio.StartWave).</summary>
+        /// <summary>The decoding of the rest of the sound (MpegAudio / AsfAudio.StartWave).</summary>
         public Task WaveRest = Task.CompletedTask;
         public int Sound;
     }
@@ -54,16 +55,17 @@ public sealed partial class ScnVm
     public bool MoviePlaying => m_movies.Any(m => m.State == 3) || m_graphMovies.Any(m => m.State == 3);
 
     /// <summary>
-    /// Opens the movie file of a record (FUN_0040B450); false when it cannot be played. Windows
-    /// Media files (v2.50's ending, mv\ed.wmv) play as the MPEG-1 movie of the same name the games
-    /// ship beside them: DirectShow plays either, the decoder here MPEG-1 only.
+    /// Opens the movie file of a record (FUN_0040B450); false when it cannot be played. A
+    /// Windows Media file (mv\*.wmv) the games also ship as MPEG-1 beside it (Maki Fes!, Libra,
+    /// the Bitch games) plays as that MPEG-1 movie, as it has since before Windows Media could be
+    /// decoded here (both are the same pictures); Sorcery Jokers' alone play as they are.
     /// </summary>
     private bool OpenMovie(Movie movie)
     {
-        if (OpenMovieFile(movie, movie.Name))
+        if (movie.Name.EndsWith(".wmv", StringComparison.OrdinalIgnoreCase)
+            && OpenMovieFile(movie, Path.ChangeExtension(movie.Name, ".mpg")))
             return true;
-        return movie.Name.EndsWith(".wmv", StringComparison.OrdinalIgnoreCase)
-            && OpenMovieFile(movie, Path.ChangeExtension(movie.Name, ".mpg"));
+        return OpenMovieFile(movie, movie.Name);
     }
 
     private bool OpenMovieFile(Movie movie, string name)
@@ -74,13 +76,24 @@ public sealed partial class ScnVm
         MovieSoundStop(movie);
         try
         {
-            var stream = new MpegSystemStream(data);
-            movie.Video = new Mpeg1Video(stream);
+            Func<(byte[]? Wave, Task Remaining)> sound;
+            if (AsfFile.IsAsf(data))
+            {
+                var asf = new AsfFile(data);
+                movie.Video = new Vc1Video(asf.Video ?? throw new InvalidDataException("No video stream"));
+                sound = () => (AsfAudio.StartWave(asf, 3, out var rest), rest);
+            }
+            else
+            {
+                var stream = new MpegSystemStream(data);
+                movie.Video = new Mpeg1Video(stream);
+                sound = () => (MpegAudio.StartWave(stream.Audio, 3, out var rest), rest);
+            }
             if (!m_movieWaves.TryGetValue(name, out movie.Wave))
             {
                 // the first seconds now, the rest while it plays (the whole sound took 0.6 s)
-                var rest = Task.CompletedTask;
-                m_movieWaves[name] = movie.Wave = Music != null ? MpegAudio.StartWave(stream.Audio, 3, out rest) : null;
+                var (wave, rest) = Music != null ? sound() : (null, Task.CompletedTask);
+                m_movieWaves[name] = movie.Wave = wave;
                 m_movieWaveRest[name] = rest;
             }
             movie.WaveRest = m_movieWaveRest.GetValueOrDefault(name) ?? Task.CompletedTask;
@@ -263,15 +276,15 @@ public sealed partial class ScnVm
             movie.State = 0;
             if (!vm.OpenMovie(movie))
             {
-                // A movie that is there but only as Windows Media (Sorcery Jokers ships mv\*.wmv
-                // alone, no MPEG-1 beside them), which the decoder here cannot play: it is as if
-                // it had played to its end, the surface left as it was
+                // A movie that is there but cannot be decoded here (a format or a Windows Media
+                // feature not supported): it is as if it had played to its end, the surface left
+                // as it was
                 if (vm.m_host.LooseFileSize(name) == null && vm.ScriptFileSize(name) == null)
                     return 2;
                 movie.Width = vm.ScreenWidth;
                 movie.Height = vm.ScreenHeight;
                 movie.State = 1;
-                vm.Trace?.Add($"f{vm.m_frameNumber} 05B5 {name}: not MPEG-1, skipped");
+                vm.Trace?.Add($"f{vm.m_frameNumber} 05B5 {name}: not decodable, skipped");
                 return 0;
             }
             return vm.RunMovie(movie) ? 0 : 2;

@@ -385,7 +385,9 @@ against their x86 code. Its first sweep (2026-10-15) found two faults of the pla
 `02C6` (memmove) copied at most 64 MB, so the last 18 MB of its 82 MB EVE21_01D.S25 never
 reached its pool and relocating that picture wrote all over the memory (a process of 5 GB, its
 scripts overwritten); and its movies are Windows Media only (mv\*.wmv, no MPEG-1 beside them),
-which the decoder here cannot play: such a movie is now taken as played to its end (not shown).
+which nothing here could play then: such a movie was taken as played to its end (not shown).
+They play since (2026-10-15): four WMV3 with WMA 2 sound and the ending in VC-1 Advanced profile
+with WMA Pro, decoded here (engine-notes.md, "Windows Media movies").
 Swept again: 101 scenarios, every one to its end.
 
 **Puchipuchi Idol Kouhosei** (桃色劇場, PETITxPETIT.EXE, engine v2.49, 800 x 600; its package's

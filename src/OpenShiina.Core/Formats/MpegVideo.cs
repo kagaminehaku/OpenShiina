@@ -222,7 +222,7 @@ public sealed class MpegFrame
 }
 
 /// <summary>An MPEG-1 video stream decoder (ISO/IEC 11172-2); frames come out in display order.</summary>
-public sealed class Mpeg1Video
+public sealed class Mpeg1Video : IMovieVideo
 {
     private readonly byte[] m_data;
     private int m_bit;              // read position in bits

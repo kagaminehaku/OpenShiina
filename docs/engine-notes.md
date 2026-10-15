@@ -1114,8 +1114,9 @@ the functions they call from the decompile. First findings:
   runs of such a row for its length (ReadRow). It loads its large pictures into a pool of its
   own (one heap block of 472 MB) and copies them there with `02C6`, 82 MB at once for
   EVE21_01D.S25: memmove and memset (`02C7`) take any size (a cap of 64 MB here had spoiled the
-  rest). Its movies are mv\*.wmv alone; `05B5` takes one that is there but cannot be decoded as
-  played to its end (state 1, the screen's size), where it stopped the scripts.
+  rest). Its movies are mv\*.wmv alone (no MPEG-1 beside them), now decoded here; `05B5` still
+  takes a movie that is there but cannot be decoded as played to its end (state 1, the screen's
+  size), where it stopped the scripts.
 - `006F -, v` lists the fixed-pitch TrueType SHIFTJIS_CHARSET faces (no "@" faces) in 32-byte
   entries (IScnFonts.FixedPitchJapaneseFaces). `04E8 mode, a, b, c, v` picks the renderer (0
   GDI, 2 Direct3D, 3 OpenGL): only GDI is offered (v = 1; 0 for the others, the scripts then
@@ -1172,6 +1173,34 @@ the functions they call from the decompile. First findings:
   streams (IScnMusic), started, paused, stopped, looped and moved with the picture; the volume
   0-100 goes through the music streams' table. Only Maki Fes! and Re: Rem Plus have sound in
   their movies (ed.mpg, 104 s and 155 s); Oreimo's and Azu's sepa.mpg carry 0.5 s of silence.
+
+### Windows Media movies (2026-10-15)
+
+- v2.50 games name Windows Media movies (`mv\*.wmv`: ASF files) and DirectShow plays them with
+  Windows' own decoders. Maki Fes!, both Libras and the three Bitch games ship each one also as
+  MPEG-1 (`.mpg` of the same name), which OpenShiina has played all along and still prefers;
+  Sorcery Jokers ships them alone. OpenShiina decodes them itself (C# ports of FFmpeg):
+  Formats/AsfFile (the objects of the first video and audio stream), Formats/Vc1Video (WMV3:
+  VC-1 Simple / Main profile; WVC1: Advanced profile, progressive pictures only),
+  Formats/WmaAudio (WMA 1 / 2) and Formats/WmaProAudio (WMA Pro), the sound made a WAVE as for
+  MPEG-1 (Formats/AsfAudio).
+- What the games use: Sorcery Jokers' four WMV3 movies (1280 x 720, 30 frames a second, I and P
+  pictures, loop filter, extended vectors, variable-size transforms; WMA 2, 44.1 kHz stereo) and
+  its ending SJS_GrandED.wmv (WVC1: B pictures, skipped pictures, overlap smoothing, loop filter;
+  WMA Pro, 24 bits). Libra_OP.wmv is WMV3, the Bitch games' WVC1; all of them with WMA Pro.
+- Checked against Media Foundation (a test tool decoding the same files with Windows'
+  decoders): every frame of seven of the movies the same to the byte (Sorcery Jokers' 1st OP,
+  both insert endings and the 10286 frames of the ending; Libra_OP; the Bitch games' op.wmv and
+  eye_ai.wmv), the WMA 2 sound to 16-bit rounding, the WMA Pro sound to 124 dB. Sorcery
+  Jokers' 2nd OP differs from frame 140 on by 1 or 2 in a few hundred pixels (worst PSNR
+  57.7 dB): Windows' WMV9 decoder chooses some P-picture loop filter edges otherwise than SMPTE
+  421M (and FFmpeg). In most of its pictures the middle edge of a macroblock's bottom half is
+  filtered by the coded parts of the top right block instead of the bottom left one, in a few
+  every edge is; the rule that decides it was not found, and the decoder keeps the standard's.
+- The decoder filters over the whole picture once it is decoded, where FFmpeg trails the
+  decoding by a row and a column; the order is the same (overlap: vertical edges, then
+  horizontal; loop filter: horizontal, then vertical; macroblocks in raster order). A 1280 x 720
+  frame takes 8-13 ms on one core.
 
 ### Hot embedded x86 in C# (ScnVm, 2026-10-06)
 

@@ -7,8 +7,8 @@
 // v2.47 and v2.49 differ from op_05D1 on: in v2.49 the grabber itself draws each new frame into
 // the place op_05D4 / op_05D5 set (05D4 waits for the frame that is due, 05D5 does not, 05D6 only
 // waits), and op_05C9's flags can send the frames into a surface (bit 31; the surface in bits
-// 16-23). Here the frames are decoded by Formats/Mpeg1Video and the sound played as for the
-// other player.
+// 16-23). Here the frames are decoded as for the other player (Formats/Mpeg1Video or
+// Formats/Vc1Video) and the sound played as there.
 
 namespace OpenShiina.Scripting;
 

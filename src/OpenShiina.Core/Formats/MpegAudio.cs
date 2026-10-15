@@ -136,7 +136,7 @@ public static class MpegAudio
     }
 
     /// <summary>The 44-byte header of a 16-bit PCM WAVE into <paramref name="wave"/> (its data the rest of the array).</summary>
-    private static byte[] Header(byte[] wave, int channels, int rate)
+    internal static byte[] Header(byte[] wave, int channels, int rate)
     {
         int pcmLength = wave.Length - 44;
         void Text(int at, string s) { for (int i = 0; i < 4; i++) wave[at + i] = (byte)s[i]; }

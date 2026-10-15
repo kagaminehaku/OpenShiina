@@ -13,9 +13,12 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   first script among them); its newer engine build takes memory, fonts, its saves folder and a
   Steam DLL in hand itself, and the player now answers all of that (the game runs without
   Steam).
-- **New: Sorcery Jokers (the English release by MangaGamer, 1920 x 1080)** plays through, but
-  without its movies: they are Windows Media only, which OpenShiina cannot play yet (they are
-  passed over).
+- **New: Sorcery Jokers (the English release by MangaGamer, 1920 x 1080)** plays through, its
+  movies too.
+- **Windows Media movies play.** OpenShiina now decodes `.wmv` movies itself (WMV3 / VC-1
+  pictures, WMA and WMA Pro sound), on every platform, as Windows shows them: Sorcery Jokers'
+  five play, and the `.wmv` of Libra and the Bitch games decode the same as Windows' own decoder
+  (where a game also ships the movie as MPEG-1, that one still plays, as before).
 - **New: Puchipuchi Idol Kouhosei (ぷちぷちアイドル候補生, 2012)** plays through.
 - **New: Gyaku Katei Kyoushi (逆家庭教師, 2014)** plays through.
 - **Large files copied whole:** the scripts' memory copy stopped at 64 MB, which spoiled the
