@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 26 games, 27 releases, tried; all of them
+scripts the player does not run yet (none in the 27 games, 28 releases, tried; all of them
 play through, as the README's table lists them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
@@ -176,6 +176,7 @@ of those versions it does not list.
 | Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ⚪ Not tried |  |
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ⚪ Not tried |  |
+| Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
 
 ### No keys yet
 
@@ -220,7 +221,6 @@ so they cannot be opened or played until a scheme is found (docs/engine-notes.md
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | Love＆Piss ～少女のガマンが世界を救う～ | 2013-08-30 | [v12613](https://vndb.org/v12613) | Bonbon Company | 36 | 🔒 No keys |
 | S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | Tangerine | 14 | 🔒 No keys |
 | Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld" |  | 2017-07-07 | [v21459](https://vndb.org/v21459) | Onomatope* | 61 | 🔒 No keys |
-| Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | Onomatope*Raspberry | 43 | 🔒 No keys |
 
 ## Platforms
 
@@ -415,6 +415,18 @@ SUKUPARA.EXE, engine v2.50, 1280 x 720) had no keys: its scheme came out of its 
 opcheck found nothing missing, and every routine it runs has its C# version. Swept: 46
 scenarios, every one to its end.
 
+**Sis△Camp** (Onomatope*Raspberry, its DL edition, SISCAMP_DDL.exe, engine v2.50, 1280 x 720)
+had no keys, and its executable is packed: the scheme came out of a memory dump of the running
+game (engine-notes.md, section 1, "A scheme from the executable"), with DecodeBin's date
+0x20201020. opcheck: kernel32 `FreeLibrary`. Its START loads `plugin.dll`, which is no file
+(the executable makes it as it runs: the DL edition's DRM.dll), stops when it does not load,
+calls its `executeAPI` once without looking at what it gives, and frees it: the player has it
+load. Two embedded routines had no C# version: its subpixel32 (START C1E08) is a build of its
+own, whose partly covered right pixel weighs the next source pixel by D4 in every lane and, on
+the rows from two source rows, is the average of its 2 x 2 source pixels (609 calls and 392
+random cases the same as its x86 code), and its enlarge32 (C375C) is Re: Rem Plus's with other
+padding (188 calls the same). Swept: 66 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -449,9 +461,9 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 26 games (27 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
-2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love! and
-School Saimin Paradise! on 2026-10-15): none stopped, none stuck.
+The 27 games (28 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love!,
+School Saimin Paradise! and Sis△Camp on 2026-10-15): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -482,6 +494,7 @@ School Saimin Paradise! on 2026-10-15): none stopped, none stuck.
 | Gyaku Katei Kyoushi | 51 | 98.0% |
 | Pure Love! | 172 | 98.1% |
 | School Saimin Paradise! | 46 | 99.9% |
+| Sis△Camp | 66 | 99.7% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

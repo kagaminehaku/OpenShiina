@@ -62,7 +62,15 @@ its ExtraCrypt is a plug-in packed in a `YPK` + 01h zlib block (0xD4934), with a
 before it ("cdaudio", flags, the unpacked size, the seed 0x671CF724): a MakiFesCrypt whose
 DecodeTable is the raw bytes of the PNG in the plug-in (its header's dwords at 0x10 and 0x14 give
 where the PNG starts and ends). CryptKey and Region are the ones all schemes share. Its 561
-S25, 47 TXT and 2 OGV come out whole.
+S25, 47 TXT and 2 OGV come out whole. Sis△Camp's SISCAMP_DDL.exe (2020) is packed, but
+running it unpacks it in memory, laid out as Sukupara's file is (the same offsets): a memory
+dump of the game at its title (Task Manager, "Create dump file") gave the same parts, the seed
+0x166BD4C2 (the dword 12 bytes before the YPK block, as in Sukupara; the one before it is
+another field here) and a 4,162-byte PNG; its plug-in's code is Sukupara's. Its DecodeBin's
+date 0x20201020 came from the six files that read that slot, all S25 whose slot falls in a
+frame's table of rows: each row is a 16-bit length and that many bytes, the next row right
+after, so the right offset is known and XORing it with the decoded one gives the date (all six
+agree). Its 674 S25, 67 TXT and 26 OGV come out whole.
 
 **WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
 eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a

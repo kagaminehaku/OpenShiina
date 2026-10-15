@@ -291,8 +291,16 @@ public sealed partial class ScnVm
                 // with the game; START says the DLL is missing when it does not load)
                 string name = ReadString(Arg(0));
                 Trace?.Add($"f{m_frameNumber} LoadLibraryA \"{name}\"");
-                return m_host.LooseFileSize(name) != null ? 0x10000000 : 0;
+                // Sis△Camp's plugin.dll is no file: its executable makes it as it runs (the DL
+                // edition's DRM.dll); START stops without it, calls its executeAPI once and frees it
+                return m_host.LooseFileSize(name) != null || name.Equals("plugin.dll", StringComparison.OrdinalIgnoreCase) ? 0x10000000 : 0;
             }
+            case (_, "executeAPI"):
+                // (what it gives is not looked at)
+                return 0;
+            case ("kernel32", "FreeLibrary"):
+                // The library LoadLibraryA seemed to load: freed
+                return 1;
             // HID_ONAHOLE.dll as it is without its device: version 1.0, onahoInit finds none (Libra
             // of the Vampire Princess has the DLL as LIBRAeS_D2.WAR; its START ends at a version
             // below 1.0)

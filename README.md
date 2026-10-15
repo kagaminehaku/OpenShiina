@@ -68,11 +68,12 @@ The games tried so far, on Windows, Linux and Android:
 | [Gyaku Katei Kyoushi](https://vndb.org/v16306) | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014 | 2.50 | ✅ Plays through |
 | [Pure Love!](https://vndb.org/v2930) | ぴゅあらっ！ | 2010 | 2.47 | ✅ Plays through |
 | [School Saimin Paradise!](https://vndb.org/v25534) | スク～ル催眠ぱらだいす！ | 2019 | 2.50 | ✅ Plays through |
+| [Sis△Camp](https://vndb.org/v28635) | シス△キャン | 2020 | 2.50 | ✅ Plays through |
 
 ✅ every route was played to its end, or every scenario of the game was run through to its end
 by the test runner, nothing stopping ([how](docs/compatibility.md#sweeping)).
 
-That is 26 games, 27 releases (Libra's English one as well). OpenShiina has the keys of 110 more ShiinaRio games, not tried yet, and VNDB lists 34 more it
+That is 27 games, 28 releases (Libra's English one as well). OpenShiina has the keys of 110 more ShiinaRio games, not tried yet, and VNDB lists 33 more it
 has no keys for. Whether one plays depends on its engine version: 2.45, 2.47, 2.49 and 2.50 run,
 and 2.34 (one game of it tried). Every game, with its engine version, and each platform's state
 are in [docs/compatibility.md](docs/compatibility.md).

@@ -27,8 +27,13 @@ public sealed partial class ScnVm
     /// <paramref name="v250"/>: the build of Maki Fes! and Re: Rem Plus (START 850F8 / ...), whose
     /// loop over the whole rows from two source rows counts down by two and up by one (it draws
     /// one row fewer, at least one) and whose partly covered bottom row is not drawn at all.
+    /// <paramref name="averageEdge"/>: Sis△Camp's build (START C1E08; its rows as v2.47's): its partly
+    /// covered right pixel takes the source pixel right of it with the weight D4 in every lane
+    /// (not the covered fraction in the alpha lane), and on the whole rows from two source rows is
+    /// the average of its 2 x 2 source pixels, byte by byte ((a + b + c + d) >> 2).
     /// </summary>
-    public bool Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, int src, int srcPitch, int stx, int sty, bool v250 = false)
+    public bool Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, int src, int srcPitch, int stx, int sty, bool v250 = false,
+                           bool averageEdge = false)
     {
         if (dtx < 0 || dty < 0 || stx < 0 || sty < 0 || w < 0 || h < 0)
             return true;
@@ -42,9 +47,9 @@ public sealed partial class ScnVm
 
         var k = new SubpixelWeights
         {
-            AX = ax, BX = bx, TailX = tailX, SrcTailX = srcTailX, Copy = d0 == 0,
+            AX = ax, BX = bx, TailX = tailX, SrcTailX = srcTailX, Copy = d0 == 0, AverageEdge = averageEdge,
             L70 = Lanes4(16, ax), L78 = Lanes4(16, ay), L80 = Lanes4(16, tailX), L88 = Lanes4(16, tailY),
-            L50 = Lanes4(d0, bx), L58 = Lanes4(d8, by), L60 = Lanes4(d4, srcTailX), L68 = Lanes4(dc, srcTailY),
+            L50 = Lanes4(d0, bx), L58 = Lanes4(d8, by), L60 = averageEdge ? Lanes4(d4, d4) : Lanes4(d4, srcTailX), L68 = Lanes4(dc, srcTailY),
             B0 = Lanes4(d0, d0), B8 = Lanes4(d4, d4), C0 = Lanes4(d8, d8), C8 = Lanes4(dc, dc),
             D0 = (ushort)d0, D4 = (ushort)d4, D8 = (ushort)d8, DC = (ushort)dc,
         };
@@ -81,8 +86,9 @@ public sealed partial class ScnVm
 
         int outPixels = (ax != 0 ? 1 : 0) + (int)middle + (tailX != 0 ? 1 : 0);
         int inBytes = ((int)middle + 3) * 4;
+        // (the GPU's kernel is the other builds')
         var timing = ChooseGpu("subpixel32", (long)rows.Count * outPixels);
-        if (timing.Gpu)
+        if (timing.Gpu && !averageEdge)
         {
             if (SubpixelOnGpu(Accelerator!, rows, srcPitch, (int)middle + 3, outPixels, new SubpixelParameters
                 {
@@ -121,7 +127,7 @@ public sealed partial class ScnVm
     private sealed class SubpixelWeights
     {
         public uint AX, BX, TailX, SrcTailX;
-        public bool Copy;
+        public bool Copy, AverageEdge;
         public ulong L70, L78, L80, L88, L50, L58, L60, L68, B0, B8, C0, C8;
         public ushort D0, D4, D8, DC;
     }
@@ -205,6 +211,11 @@ public sealed partial class ScnVm
                     ? Mul(Add(Mul(Px(p, s), wyP), Mul(Px(q, s), wyQ)), k.L80)
                     : kind == SubpixelRow.MiddleOne ? Mul(Px(p, s), k.L80) : Mul(Mul(Px(p, s), k.L80), v);
                 StorePacked(output, o, X86Ops.Psrlw(x, two || kind != SubpixelRow.MiddleOne ? 8ul : 4ul));
+            }
+            else if (k.AverageEdge && kind == SubpixelRow.MiddleTwo)
+            {
+                for (int j = 0; j < 4; j++)
+                    output[o + j] = (byte)((p[s + j] + q[s + j] + p[s + 4 + j] + q[s + 4 + j]) >> 2);
             }
             else if (two)
             {

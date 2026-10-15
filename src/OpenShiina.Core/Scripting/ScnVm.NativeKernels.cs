@@ -172,13 +172,28 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
+        // Sis△Camp START C1E08 (Kyuuketsuki no Libra's C0668 but for the partly covered right
+        // pixel): every row drawn, as v2.47's build draws them (ScnVm.Subpixel32, averageEdge; 609
+        // calls and 392 random cases the same as its x86 code). Arguments as above
+        RegisterNative("5E66FE0CE791241C0CD6FE7991B5368C3CC00308", "subpixel32 (Sis△Camp)", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
+            int length = x < 0 || y < 0 || w < 0 || h < 0 ? 0 : pitch * ((y + h) >> 4) + (((x + w) >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Subpixel32(dst, pitch, x, y, w, h, vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9),
+                               averageEdge: true))
+                throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
+        });
+
         // Oreimo START 77108 (Azu 6BBB8; Sena 77556 and the other v2.49 games; Re: Rem Plus 866A8,
-        // Maki Fes! 85B38; MMX): the enlarging case of the same copy, written out in
+        // Maki Fes! 85B38; Sis△Camp C375C, Re: Rem Plus's with other padding; MMX): the
+        // enlarging case of the same copy, written out in
         // ScnVm.Enlarge32.cs (each build: 150 or more random cases the same as its x86 code; Re:
         // Rem Plus's 130 % zoom took 50 ms a frame translated, 4 ms as C#). Arguments as scale32's;
         // rectangles the C# version does not take run as x86 code (RunX86)
         RegisterNative(["67FD294324E188D2D3891314AB51537274147A92", "5F055480EAF613D53B5AAF6EE2475EA9FF247A76",
-                        "E17C33CA39A48D249E621A1EB13D0FBE757B99D8"], "enlarge32", (vm, c, a) =>
+                        "E17C33CA39A48D249E621A1EB13D0FBE757B99D8", "F420A46FA68357CAF25DF581DD343F81250B5636"], "enlarge32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);

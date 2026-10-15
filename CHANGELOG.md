@@ -25,6 +25,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   (`0563`) is new.
 - **New: School Saimin Paradise! (スク～ル催眠ぱらだいす！, 2019)** plays through. No keys
   for its archives were known: they were taken from its executable.
+- **New: Sis△Camp (シス△キャン, 2020, its DL edition)** plays through. Its executable is
+  packed: its keys were taken from the running game's memory.
 - **Large files copied whole:** the scripts' memory copy stopped at 64 MB, which spoiled the
   rest of a larger picture and could take the game down with gigabytes of memory.
 - **A game's archive of scripts is the one its RIO.INI names** (`Arc=`), where a game has two.
