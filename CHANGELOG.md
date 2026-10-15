@@ -16,6 +16,7 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **New: Sorcery Jokers (the English release by MangaGamer, 1920 x 1080)** plays through, but
   without its movies: they are Windows Media only, which OpenShiina cannot play yet (they are
   passed over).
+- **New: Puchipuchi Idol Kouhosei (ぷちぷちアイドル候補生, 2012)** plays through.
 - **Large files copied whole:** the scripts' memory copy stopped at 64 MB, which spoiled the
   rest of a larger picture and could take the game down with gigabytes of memory.
 - **A game's archive of scripts is the one its RIO.INI names** (`Arc=`), where a game has two.

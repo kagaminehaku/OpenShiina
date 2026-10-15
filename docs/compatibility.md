@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 22 games, 23 releases, tried; all of them
+scripts the player does not run yet (none in the 23 games, 24 releases, tried; all of them
 play through, as the README's table lists them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
@@ -134,7 +134,7 @@ of those versions it does not list.
 | Shojo Mama | 処女ママ | 2011-11-04 | [v8077](https://vndb.org/v8077) | v2.49 | ⚪ Not tried |  |
 | Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-13 |
-| Puchipuchi Idol Kouhosei | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012-02-24 | [v9973](https://vndb.org/v9973) | v2.49 | ⚪ Not tried |  |
+| Puchipuchi Idol Kouhosei | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012-02-24 | [v9973](https://vndb.org/v9973) | v2.49 | ✅ Plays through | 2026-10-15 |
 | Shinigami no Testament | 死神のテスタメント ～menuet of epistula～ | 2012-02-24 | [v7650](https://vndb.org/v7650) | v2.49 | ⚪ Not tried |  |
 | Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Intruder | イントルーダー ～侵入者～ | 2012-06-22 | [v10533](https://vndb.org/v10533) | v2.49 | ⚪ Not tried |  |
@@ -388,6 +388,13 @@ scripts overwritten); and its movies are Windows Media only (mv\*.wmv, no MPEG-1
 which the decoder here cannot play: such a movie is now taken as played to its end (not shown).
 Swept again: 101 scenarios, every one to its end.
 
+**Puchipuchi Idol Kouhosei** (桃色劇場, PETITxPETIT.EXE, engine v2.49, 800 x 600; its package's
+CloneCD image, MODE2/2352 sectors, all of Form 1) needs no DecodeBin (no entry has the flags of
+Decrypt2); its 464 S25, 68 TXT and 1,499 OGV come out whole. opcheck: user32 GetWindowLongA /
+SetWindowLongA (its START takes the maximize box off the window's style while a menu of its own
+is open, and puts it back), kept here and given back. Every routine it runs has its C# version.
+Swept: 66 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -422,8 +429,9 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 22 games (23 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
-2026-10-14, both Libras and Sorcery Jokers on 2026-10-15): none stopped, none stuck.
+The 23 games (24 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+2026-10-14, both Libras, Sorcery Jokers and Puchipuchi Idol Kouhosei on 2026-10-15): none
+stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -450,6 +458,7 @@ The 22 games (23 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and A
 | Kyuuketsuki no Libra | 105 | 99.6% |
 | Libra of the Vampire Princess (English) | 131 | 96.2% (short lines of its H scenes, "\*Kiss\*.", passed in the skip; and the stand-in scenarios of the cut scenes, `_N`) |
 | Sorcery Jokers (English) | 101 | 96.5% |
+| Puchipuchi Idol Kouhosei | 66 | 99.0% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

@@ -30,6 +30,8 @@ public sealed partial class ScnVm
     private int m_nextGdiObject = 0x00060001;
     // The font files added (AddFontMemResourceEx), for their handles
     private int m_memoryFonts;
+    // SetWindowLongA's values, by window and index
+    private readonly Dictionary<(int Window, int Index), int> m_windowLongs = new();
     // Without the platform's GDI: GDI's shapes as Wine's DIB driver draws them
     private static readonly Platform.DibShapes s_dibShapes = new();
     private const int WhiteBrush = 0x00050000, BlackPen = 0x00050001, NullBrush = 0x00050002, NullPen = 0x00050003;
@@ -222,6 +224,19 @@ public sealed partial class ScnVm
                 return 1;
             case ("user32", "SetForegroundWindow"):
                 return 1;
+            case ("user32", "GetWindowLongA"):
+                // window, index: a value SetWindowLongA kept, else the game window's style
+                // (visible, a caption, system menu, minimize and maximize boxes) for GWL_STYLE
+                return m_windowLongs.TryGetValue((Arg(0), Arg(1)), out int kept) ? kept : Arg(1) == -16 ? 0x14CB0000 : 0;
+            case ("user32", "SetWindowLongA"):
+            {
+                // window, index, value: kept and the old one given back (Puchipuchi Idol Kouhosei
+                // takes the maximize box off its style while a menu of its own is open); the host's
+                // window is as the player's settings make it
+                int old = m_windowLongs.TryGetValue((Arg(0), Arg(1)), out int was) ? was : Arg(1) == -16 ? 0x14CB0000 : 0;
+                m_windowLongs[(Arg(0), Arg(1))] = Arg(2);
+                return old;
+            }
             case ("user32", "GetClientRect"):
             {
                 // The window's inside: the picture (Sorcery Jokers' hook for a window being sized)
