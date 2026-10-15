@@ -4,7 +4,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.2 (2026-10-15)
+
+Six more games play through (seven releases), and Windows Media movies play.
 
 ### Games
 
