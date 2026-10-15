@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 21 games tried). Then ScnBoot
+scripts the player does not run yet (none in the 21 games, 22 releases, tried). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -161,7 +161,7 @@ of those versions it does not list.
 | Lovecha ~Tsumasakidachi de, Hitomi o Tojite~ | らぶちゃ ～つま先立ちで、瞳をとじて～ | 2016-04-28 | [v18590](https://vndb.org/v18590) | v2.50 | ⚪ Not tried |  |
 | Signalist Stars!! | しぐなリストスタ～ズ!! | 2016-10-28 | [v19590](https://vndb.org/v19590) | v2.50 | ⚪ Not tried |  |
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | 2017-01-27 | [v20429](https://vndb.org/v20429) | v2.50 | ✅ Plays through | 2026-10-13 |
-| Libra of the Vampire Princess | 吸血姫のリブラ (English) | 2017-05-03 | [r44159](https://vndb.org/r44159) | v2.50 | ⚪ Not tried |  |
+| Libra of the Vampire Princess | 吸血姫のリブラ (English) | 2017-05-03 | [r44159](https://vndb.org/r44159) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ✅ Plays through | 2026-10-14 |
 | Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ⚪ Not tried |  |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
@@ -357,6 +357,22 @@ scenes of large event pictures keep up to 964 MB of the scripts' heap (a block o
 them), which had 768 MB; it has 1.5 GB now (engine-notes.md section 10). Swept again: 105
 scenarios, every one to its end.
 
+**Libra of the Vampire Princess** (the English Kyuuketsuki no Libra on Steam, LIBRAeS.exe of
+2023, engine v2.50, with its X-rated patch: LIBRAES_P1-P4.WAR, LIBRAES_D2.WAR) is a release of
+its own: another scheme, another build of the engine and other scripts (LIBRAES_S-B.WAR, which
+RIO.INI's Arc names; LIBRAES_S.WAR is an older set). Its scheme had no DecodeBin, but 65 of its
+files use one (START.SCN among them): the date, 0x20170505, was worked out from its English text
+(engine-notes.md, "DecodeBin's date"). opcheck found five opcodes and twelve DLL functions
+missing; with them its START takes and gives back most of the address space with VirtualAlloc,
+adds its own fonts from its archives (Arbutus Slab, Noto Serif, Redressed, Roboto) and sets them
+with the text code `_C`, calls a Steam DLL and the device DLL kept as .WAR files, and saves into
+data_libraes\ in the game's folder (all in engine-notes.md, "The 2023 build of v2.50"; the saves
+go to the player's own folder). Five embedded routines were new: four small ones given C# of
+their own (a copy that doubles some characters, a mark found in a text, a text's width by
+tables, a glyph mask of any size; the x86 interpreter learnt `repne scasb` to check them) and
+its blur, Chiccha na Hanayome's code with other offsets, given the C# blur32 (30 s a frame on
+the interpreter before). Swept: 131 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -391,8 +407,8 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 21 games tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on 2026-10-14,
-Kyuuketsuki no Libra on 2026-10-15): none stopped, none stuck.
+The 21 games (22 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+2026-10-14, both Libras on 2026-10-15): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -417,6 +433,7 @@ Kyuuketsuki no Libra on 2026-10-15): none stopped, none stuck.
 | Chuuni Hime no Teikoku | 50 | 59.9% (messages of two or three lines) |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | 111 | 93.7% (the branches of choices not taken) |
 | Kyuuketsuki no Libra | 105 | 99.6% |
+| Libra of the Vampire Princess (English) | 131 | 96.2% (short lines of its H scenes, "\*Kiss\*.", passed in the skip; and the stand-in scenarios of the cut scenes, `_N`) |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

@@ -3,6 +3,7 @@
 // the matching "W" calls after decoding the Shift-JIS text, as GDI does for a SHIFTJIS_CHARSET font.
 // The gaiji of translated scenarios (ScnGaiji) are measured and drawn with a Latin face of the
 // font's height (Segoe UI), which has every Vietnamese letter; text without them is as before.
+// Fonts a game adds from its archives go to GDI as the game gives them (AddFontMemResourceEx).
 
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -48,6 +49,13 @@ public sealed class GdiFonts : IScnFonts, IDisposable
         m_fonts[id] = font;
         m_requests[id] = r;
         return id;
+    }
+
+    public int AddMemoryFonts(ReadOnlySpan<byte> file)
+    {
+        // Private to this process, gone with it
+        uint count = 0;
+        return AddFontMemResourceEx(file.ToArray(), (uint)file.Length, IntPtr.Zero, ref count) != IntPtr.Zero ? (int)count : 0;
     }
 
     public void DeleteFont(int font)
@@ -204,6 +212,7 @@ public sealed class GdiFonts : IScnFonts, IDisposable
     [DllImport("gdi32.dll")] private static extern IntPtr GetStockObject(int index);
     [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
+    [DllImport("gdi32.dll")] private static extern IntPtr AddFontMemResourceEx(byte[] font, uint size, IntPtr reserved, ref uint count);
 
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateFontW(int height, int width, int escapement, int orientation, int weight,

@@ -506,6 +506,8 @@ public sealed partial class X86Cpu
             case Mnemonic.Stosd:
             case Mnemonic.Cmpsb:
             case Mnemonic.Cmpsd when ins.GetOpKind(0) is OpKind.MemorySegESI or OpKind.MemorySegSI:
+            case Mnemonic.Scasb:
+            case Mnemonic.Scasd:
                 StringOp(ins);
                 break;
 
@@ -663,13 +665,13 @@ public sealed partial class X86Cpu
     {
         int size = ins.Mnemonic switch
         {
-            Mnemonic.Movsb or Mnemonic.Stosb or Mnemonic.Cmpsb => 1,
+            Mnemonic.Movsb or Mnemonic.Stosb or Mnemonic.Cmpsb or Mnemonic.Scasb => 1,
             Mnemonic.Movsw or Mnemonic.Stosw => 2,
             _ => 4,
         };
         int step = m_df ? -size : size;
         bool rep = ins.HasRepPrefix || ins.HasRepePrefix || ins.HasRepnePrefix;
-        bool compare = ins.Mnemonic is Mnemonic.Cmpsb or Mnemonic.Cmpsd;
+        bool compare = ins.Mnemonic is Mnemonic.Cmpsb or Mnemonic.Cmpsd or Mnemonic.Scasb or Mnemonic.Scasd;
         while (!rep || R[1] != 0)
         {
             switch (ins.Mnemonic)
@@ -685,6 +687,13 @@ public sealed partial class X86Cpu
                 case Mnemonic.Stosw:
                 case Mnemonic.Stosd:
                     Store(R[7], size, R[0]);
+                    R[7] += (uint)step;
+                    break;
+                case Mnemonic.Scasb:
+                case Mnemonic.Scasd:
+                    // al / eax compared with the byte / dword at edi (Libra of the Vampire Princess's
+                    // "repne scasb", a byte looked for in a few)
+                    Sub(size == 1 ? R[0] & 0xFF : R[0], Load(R[7], size), 0, size);
                     R[7] += (uint)step;
                     break;
                 default:

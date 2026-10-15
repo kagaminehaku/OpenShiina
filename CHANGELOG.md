@@ -4,6 +4,17 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+### Games
+
+- **New: Libra of the Vampire Princess (the English Kyuuketsuki no Libra, Steam)** plays
+  through, in its own fonts. Its archives' key had no date (65 files came out spoiled, its
+  first script among them); its newer engine build takes memory, fonts, its saves folder and a
+  Steam DLL in hand itself, and the player now answers all of that (the game runs without
+  Steam).
+- **A game's archive of scripts is the one its RIO.INI names** (`Arc=`), where a game has two.
+
 ## 0.7.1 (2026-10-15)
 
 - **Add games… takes a folder of games too.** Choose the folder your games are in (say

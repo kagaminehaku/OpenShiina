@@ -1071,6 +1071,35 @@ the functions they call from the decompile. First findings:
   CreateEllipticRgn(l, t, r, b) (symmetric, a pixel smaller), approximated; pens wider than a
   pixel, approximated. `dotnet run -c Release --project tools/GdiEllipseCheck` on Windows
   compares the two (gdi-ellipse-check.txt).
+- **The 2023 build of v2.50** (Libra of the Vampire Princess on Steam, LIBRAeS.exe; its opcode
+  table and its interpreter are Re: Rem Plus's) has its scripts do more themselves:
+  - Memory: START reads RIO.INI's SGMemSize (default 480 MB) and takes all the address space
+    GlobalMemoryStatusEx says is free but that much with kernel32 VirtualAlloc, in up to 32
+    blocks (each the largest that will go, found by halving from 1 GB with VirtualAlloc and
+    VirtualFree, steps of GetSystemInfo's page size), loads its tables into what is left, then
+    frees them all: its tables lie low, out of the way of large pictures. Here VirtualAlloc is a
+    block of the heap (0 when there is no room) and GlobalMemoryStatusEx's free address space is
+    the heap's (ScnVm.HeapFree); VirtualQuery serves its map of the memory for RIO.INI's
+    TestMMOut, which also opens files with the C library: `0BB8 name, mode, v` fopen,
+    `0BB9` fclose, `0BC0 text, file` fputs and `0BC4 buffer, size, count, file, v` fwrite
+    (0x428B70, 0x428ED0, 0x429120, 0x429210). They are only for that debug output, which is not
+    written (fopen gives 0). `0108 section, key, buffer, size` is GetPrivateProfileStringA of
+    the settings file (0x4080B0; RIO.INI's UserFont, a list of faces).
+  - Fonts: START loads .ttf files from its archives and adds them with gdi32
+    AddFontMemResourceEx (IScnFonts.AddMemoryFonts: GDI itself in ScnBoot, SkiaSharp typefaces
+    found by family name in the players), and keeps only those in its list of faces unless
+    RIO.INI's UserFont names others. Its text sets them with `_C0,6_F<face>/`: the control code
+    `_Ccharset[,pitch]` (0x4390D0, in Re: Rem Plus's table too, unused there) gives CreateFontA
+    its character set and pitch and family (else SHIFTJIS_CHARSET and 1). Without it GDI gave a
+    Japanese face for "Noto Serif".
+  - DLLs: its Steam wrapper and the HID_ONAHOLE.dll of the first edition are in the game's
+    folder as LIBRAeS_S2.WAR and LIBRAES_D2.WAR (the archives skip them: they start with MZ);
+    LoadLibraryA of a loose file works and their functions answer as without Steam and the
+    device (steamInit 1, onahoDLLVer 1.0).
+  - Saves go to data_libraes\ in the game's folder (CreateDirectoryA of a relative path): a
+    folder the scripts make there is a save folder from then on, its files the host's.
+  - RIO.INI's `Arc=` names the archive of scripts, mounted before the first script (GameData):
+    this game has two, LIBRAES_S.WAR and the LIBRAES_S-B.WAR it names.
 - `006F -, v` lists the fixed-pitch TrueType SHIFTJIS_CHARSET faces (no "@" faces) in 32-byte
   entries (IScnFonts.FixedPitchJapaneseFaces). `04E8 mode, a, b, c, v` picks the renderer (0
   GDI, 2 Direct3D, 3 OpenGL): only GDI is offered (v = 1; 0 for the others, the scripts then

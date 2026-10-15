@@ -66,6 +66,13 @@ public sealed class GameData : IDisposable
                 data.m_shared.Add(warc);
         if (data.m_archives.Count == 0)
             throw new InvalidDataException($"No archive in {folder} could be opened with the {scheme.Name} scheme.");
+        // The engine mounts the archive RIO.INI names (Arc=) before the first script runs, so its
+        // files come first: Libra of the Vampire Princess has two archives of scripts, _S and the
+        // _S-B its RIO.INI names
+        if (EngineIni(folder) is { } ini
+            && System.Text.RegularExpressions.Regex.Match(Encodings.cp932.GetString(File.ReadAllBytes(ini)), @"(?im)^Arc=(.+)$")
+                is { Success: true } arc)
+            data.Mount(arc.Groups[1].Value.Trim(), true);
         return data;
     }
 
@@ -111,7 +118,7 @@ public sealed class GameData : IDisposable
     private static string Stem(string path) => Path.GetFileNameWithoutExtension(path.Replace('\\', '/').Trim());
 
     // The archives the scripts mounted (00DD) and have not unmounted since (00DF), in the order
-    // mounted. The engine reads only from those, searching them in that order: a file in several
+    // mounted, after RIO.INI's Arc. The engine reads only from those, searching them in that order: a file in several
     // archives comes from the first mounted (Aneiro's START mounts its update ANEIRO_U1.WAR before
     // _G and _V, whose pictures and voices it replaces; Chiccha na Hanayome's scene replay mounts
     // CHIPPANA_E3.WAR, its own copies of the scenarios, in place of CHIPPANA_T.WAR). Replaced

@@ -460,9 +460,42 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>Bytes of heap in use (for reports).</summary>
     public long HeapInUse { get; private set; }
 
+    /// <summary>Bytes of heap not in use: below the code, less the blocks in use.</summary>
+    public long HeapFree => CodeRegion - HeapRegion - HeapInUse;
+
     /// <summary>Zeroed memory (GlobalAlloc / VirtualAlloc); <see cref="Free"/> gives it back.</summary>
-    public int Allocate(int bytes)
+    public int Allocate(int bytes) =>
+        TryAllocate(bytes) is var at and not 0
+            ? at
+            : throw new ScnException($"Out of script memory: {HeapInUse >> 20} MB in use, {bytes} bytes asked for", -1, 0, 0);
+
+    /// <summary>
+    /// The block (with its size) that <paramref name="address"/> is in, or null (a linear search:
+    /// for VirtualQuery and such).
+    /// </summary>
+    public (int Start, int Size)? BlockAt(int address)
     {
+        foreach (var (start, size) in m_blocks)
+            if ((uint)(address - start) < (uint)size)
+                return (start, size);
+        return null;
+    }
+
+    /// <summary>The lowest block in use at or above <paramref name="address"/> (a linear search), or null.</summary>
+    public int? NextBlock(int address)
+    {
+        int? next = null;
+        foreach (int start in m_blocks.Keys)
+            if (start >= address && (next == null || start < next))
+                next = start;
+        return next;
+    }
+
+    /// <summary>As <see cref="Allocate"/>, but 0 when the heap has no room (VirtualAlloc failing).</summary>
+    public int TryAllocate(int bytes)
+    {
+        if (bytes < 0 || bytes > CodeRegion - HeapRegion)
+            return 0;
         int size = (Math.Max(bytes, 4) + 15) & ~15;
         // The smallest free range it fits in
         int best = -1, bestSize = int.MaxValue;
@@ -489,7 +522,7 @@ public sealed partial class ScnVm : IDisposable
         {
             // The heap must not grow into the code of the modules
             if ((long)m_heapTop + size > CodeRegion)
-                throw new ScnException($"Out of script memory: {HeapInUse >> 20} MB in use, {size} bytes asked for", -1, 0, 0);
+                return 0;
             at = m_heapTop;
             m_heapTop = at + size;
         }

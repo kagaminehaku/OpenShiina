@@ -56,15 +56,40 @@ public sealed partial class ScnVm
     private readonly Dictionary<int, (byte[] Data, int Position)> m_files = new();
     private int m_nextHandle = 0x100;
 
+    // Folders of the game's folder the scripts made (CreateDirectoryA with a relative path): their
+    // save folders. Libra of the Vampire Princess (Steam) keeps its saves in data_libraes\ there,
+    // not under the registry's DataPath
+    private readonly HashSet<string> m_madeFolders = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The scripts made a folder (CreateDirectoryA): one in the game's folder is a save folder.</summary>
+    private void FolderMade(string path)
+    {
+        string folder = path.Replace('/', '\\').TrimEnd('\\');
+        if (folder.Length > 0 && !folder.Contains(':') && !folder.StartsWith('\\') && !folder.Split('\\').Contains(".."))
+            m_madeFolders.Add(folder);
+    }
+
+    /// <summary>The path is in a save folder the scripts made in the game's folder (or is one).</summary>
+    private bool InMadeFolder(string path, bool folderItself)
+    {
+        string p = path.Replace('/', '\\');
+        foreach (var folder in m_madeFolders)
+            if (folderItself ? p.TrimEnd('\\').Equals(folder, StringComparison.OrdinalIgnoreCase)
+                             : p.StartsWith(folder + "\\", StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
     /// <summary>
     /// A path of the scripts: under DataPath it is a save file (the host's save folder; one in a
-    /// folder of it, as Ao no Juuai's save\, goes there too), any other absolute path is
-    /// refused, and a relative name is a file of the game.
+    /// folder of it, as Ao no Juuai's save\, goes there too), as in a folder the scripts made in
+    /// the game's folder; any other absolute path is refused, and a relative name is a file of
+    /// the game.
     /// </summary>
     private (bool Save, string Name)? ResolvePath(string path)
     {
         string data = DataPath;
-        if (path.StartsWith(data, StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(data, StringComparison.OrdinalIgnoreCase) || InMadeFolder(path, folderItself: false))
             return (true, path[(path.LastIndexOfAny(['\\', '/']) + 1)..]);
         if (path.Contains(':'))
             return null;
@@ -278,6 +303,8 @@ public sealed partial class ScnVm
     /// </summary>
     private bool IsSaveFolder(string path)
     {
+        if (InMadeFolder(path, folderItself: true))
+            return true;
         string folder = DataPath.TrimEnd('\\', '/');
         if (!path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -360,6 +387,47 @@ public sealed partial class ScnVm
             string key = vm.ReadString(vm.Value(c, i.Args[1]));
             int fallback = vm.Value(c, i.Args[2]);
             vm.Store(c, i.Args[2], vm.IniInt(vm.m_iniFile, section, key, fallback));
+            return 0;
+        });
+        // 0108 section, key, buffer, size: the text in the settings file, up to size - 1 bytes and a
+        // 0, empty when missing (GetPrivateProfileStringA, FUN_004080B0)
+        Register(0x0108, (vm, c, i) =>
+        {
+            string section = vm.ReadString(vm.Value(c, i.Args[0]));
+            string key = vm.ReadString(vm.Value(c, i.Args[1]));
+            int buffer = vm.Value(c, i.Args[2]), size = vm.Value(c, i.Args[3]);
+            if (buffer == 0 || size <= 0)
+                return 0;
+            byte[] text = Encodings.cp932.GetBytes(vm.IniString(vm.m_iniFile, section, key) ?? "");
+            int n = Math.Min(text.Length, size - 1);
+            vm.WriteBytes(buffer, text.AsSpan(0, n));
+            vm.WriteByte(buffer + n, 0);
+            return 0;
+        });
+
+        // 0BB8 name, mode, v: fopen (FUN_00428B70, the game's folder and others searched), only for
+        // the engine's debug output (Libra of the Vampire Princess: RIO.INI's TestMMOut, a map and
+        // dump of the memory). Nothing is written into the game's folder: v = 0, as a file that
+        // does not open; 0BB9 fclose, 0BC0 fputs and 0BC4 fwrite (v = 0 items) do nothing with it
+        Register(0x0BB8, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            vm.Value(c, i.Args[1]);
+            vm.Store(c, i.Args[2], 0);
+            return 0;
+        });
+        Register(0x0BB9, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
+        Register(0x0BC0, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            vm.Value(c, i.Args[1]);
+            return 0;
+        });
+        Register(0x0BC4, (vm, c, i) =>
+        {
+            for (int k = 0; k < 4; k++)
+                vm.Value(c, i.Args[k]);
+            vm.Store(c, i.Args[4], 0);
             return 0;
         });
     }

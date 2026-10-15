@@ -4,7 +4,9 @@
 // pixel. A face the system lacks (the games ask for ＭＳ ゴシック) is replaced by a Japanese font
 // that is there - a fixed-pitch one for a gothic, a serif one for a mincho - sized and measured as
 // MS Gothic is (its cell is its em, ascent 0.859 em, average width half an em), since the games
-// lay their text out for it; a character a face lacks comes from a font that has it.
+// lay their text out for it; a character a face lacks comes from a font that has it. Fonts the
+// scripts add from their archives (AddFontMemResourceEx: Libra of the Vampire Princess's Noto
+// Serif, Roboto...) are found by their family name before the system's.
 //
 // GDI's terms, as the engine uses them: a font's height > 0 is the cell height (ascent + descent),
 // < 0 the em height; a width other than 0 stretches the font to that average character width. A
@@ -46,6 +48,8 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
     private readonly Dictionary<int, Font> m_fonts = new();
     private readonly Dictionary<string, (SKTypeface, bool)> m_faces = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, SKTypeface?> m_fallbacks = new();
+    // The faces of font files the scripts added (AddFontMemResourceEx), found before the system's
+    private readonly List<SKTypeface> m_memoryFaces = new();
     private readonly Font m_system;
     private int m_next = 1;
 
@@ -95,6 +99,23 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
         return id;
     }
 
+    public int AddMemoryFonts(ReadOnlySpan<byte> file)
+    {
+        // Each face of the file (a collection has several)
+        using var data = SKData.CreateCopy(file);
+        int added = 0;
+        for (int index = 0; index < 64; index++)
+        {
+            if (SKTypeface.FromData(data, index) is not { } face)
+                break;
+            m_memoryFaces.Add(face);
+            added++;
+        }
+        if (added > 0)
+            m_faces.Clear();
+        return added;
+    }
+
     public void DeleteFont(int font)
     {
         if (m_fonts.Remove(font, out var f))
@@ -138,6 +159,11 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
         string key = $"{name}/{style.Weight}/{style.Slant}";
         if (m_faces.TryGetValue(key, out var known))
             return known;
+        // A face the scripts added, the closest to the weight and slant asked for
+        if (m_memoryFaces.Where(f => f.FamilyName.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => Math.Abs(f.FontStyle.Weight - style.Weight) + (f.FontStyle.Slant == style.Slant ? 0 : 1000))
+                .FirstOrDefault() is { } added)
+            return m_faces[key] = (added, false);
         var manager = SKFontManager.Default;
         // MS Gothic and MS Mincho themselves are measured by their own metrics, which are these
         if (Matching(manager, name, style) is { } own && !IsMsFace(name))
@@ -306,5 +332,8 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
             f.Latin?.Dispose();
         }
         m_fonts.Clear();
+        foreach (var face in m_memoryFaces)
+            face.Dispose();
+        m_memoryFaces.Clear();
     }
 }

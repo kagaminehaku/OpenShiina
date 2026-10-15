@@ -93,4 +93,10 @@ public interface IScnFonts
     /// fixed pitch, not the vertical "@" faces; names in Shift-JIS, at most 31 bytes.
     /// </summary>
     IReadOnlyList<byte[]> FixedPitchJapaneseFaces() => [];
+
+    /// <summary>
+    /// AddFontMemResourceEx: the fonts of a TrueType / OpenType file in memory, for this font engine
+    /// alone (CreateFont finds them by their family name); how many were added, 0 when none.
+    /// </summary>
+    int AddMemoryFonts(ReadOnlySpan<byte> file) => 0;
 }

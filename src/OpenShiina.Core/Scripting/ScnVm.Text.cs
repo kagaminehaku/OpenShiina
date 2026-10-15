@@ -99,11 +99,17 @@ public sealed partial class ScnVm
     private int G(int rec, int field) => Read32(rec + 4 * field);
     private void S(int rec, int field, int value) => Write32(rec + 4 * field, value);
 
+    // Each record's character set and pitch and family for CreateFontA ("_C"), by its address;
+    // none: SHIFTJIS_CHARSET and 1, as before v2.50 (kept beside the record, whose layout here is
+    // v2.47's, which has no room for them)
+    private readonly Dictionary<int, (int CharSet, int Pitch)> m_fontCharSets = new();
+
     /// <summary>FUN_004343D0: a record's defaults.</summary>
     private void ResetRecord(int index)
     {
         int rec = RecordAddress(index);
         FillMemory(rec, RecordSize, 0);
+        m_fontCharSets.Remove(rec);
         S(rec, RIndex, index);
         S(rec, RHeight, 0x10);
         S(rec, RWeight, 400);
@@ -262,8 +268,9 @@ public sealed partial class ScnVm
         while (length < 31 && ReadByte(rec + OFace + length) != 0)
             length++;
         string face = Encoding.GetEncoding(932).GetString(ReadBytes(rec + OFace, length));
+        var (charSet, pitch) = m_fontCharSets.GetValueOrDefault(rec, (0x80, 1));
         var request = new ScnFontRequest(G(rec, RHeight), G(rec, RWidth), G(rec, 5), G(rec, 6), G(rec, RWeight),
-            G(rec, RItalic), G(rec, 9), G(rec, RStrikeOut), 0x80, G(rec, RQuality), 1, face);
+            G(rec, RItalic), G(rec, 9), G(rec, RStrikeOut), charSet, G(rec, RQuality), pitch, face);
         int font = m_host.Fonts?.CreateFont(request) ?? 0;
         if (font == 0)
             font = 0x7F000000 + m_liveFonts.Count;   // no font engine: a stand-in handle
@@ -494,6 +501,26 @@ public sealed partial class ScnVm
             case (byte)'B':
                 S(rec, RBackSurface, ParseNumber(rec));
                 return;
+            case (byte)'C':
+            {
+                // _Ccharset[,pitch] (v2.50, 0x4390D0): CreateFontA's character set and pitch and
+                // family for the record's fonts ("_C,": 0; no pitch: 1). Libra of the Vampire
+                // Princess sets "_C0,6" (ANSI, a variable-pitch serif) before its fonts' names, so
+                // that its own Noto Serif and others are taken, not a Japanese face
+                int charSet;
+                if (ReadByte(G(rec, RPtr)) == ',')
+                {
+                    S(rec, RPtr, G(rec, RPtr) + 1);
+                    charSet = 0;
+                }
+                else
+                    charSet = ParseNumber(rec);
+                int pitch = ReadByte(G(rec, RPtr) - 1) == ',' ? ParseNumber(rec) : 1;
+                m_fontCharSets[rec] = (charSet, pitch);
+                S(rec, RFontDirty, 1);
+                S(rec, RGlyphsDirty, 1);
+                return;
+            }
             case (byte)'E':
                 WriteByte(rec + OEdgeColor, (byte)ParseNumber(rec));
                 WriteByte(rec + OEdgeColor + 1, (byte)ParseNumber(rec));

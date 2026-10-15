@@ -28,6 +28,8 @@ public sealed partial class ScnVm
     // What each device context has selected (a new one: the white brush and the black pen)
     private readonly Dictionary<int, (int Brush, int Pen)> m_gdiSelected = new();
     private int m_nextGdiObject = 0x00060001;
+    // The font files added (AddFontMemResourceEx), for their handles
+    private int m_memoryFonts;
     // Without the platform's GDI: GDI's shapes as Wine's DIB driver draws them
     private static readonly Platform.DibShapes s_dibShapes = new();
     private const int WhiteBrush = 0x00050000, BlackPen = 0x00050001, NullBrush = 0x00050002, NullPen = 0x00050003;
@@ -112,12 +114,17 @@ public sealed partial class ScnVm
                 return 1;
             case ("kernel32", "CreateDirectoryA"):
                 // Ao no Juuai's save folder ("save" in the game's folder): the host keeps its
-                // saves in a folder of its own and never writes into the game's
+                // saves in a folder of its own and never writes into the game's; a folder made in
+                // the game's folder is a save folder from then on (Libra of the Vampire Princess's
+                // data_libraes\)
                 Trace?.Add($"f{m_frameNumber} CreateDirectoryA \"{ReadString(Arg(0))}\"");
+                FolderMade(ReadString(Arg(0)));
                 return 1;
             case ("kernel32", "GlobalMemoryStatusEx"):
             {
-                // MEMORYSTATUSEX of a PC with 8 GB, as a 32-bit program sees it
+                // MEMORYSTATUSEX of a PC with 8 GB, as a 32-bit program sees it; the address space
+                // free is the heap's (Libra of the Vampire Princess's START takes all of it but
+                // SGMemSize with VirtualAlloc while it loads its tables, then gives it back)
                 int p = Arg(0);
                 Write32(p + 4, 25);
                 Write64(p + 8, 8L << 30);
@@ -125,10 +132,94 @@ public sealed partial class ScnVm
                 Write64(p + 24, 16L << 30);
                 Write64(p + 32, 12L << 30);
                 Write64(p + 40, 0x7FFE0000);
-                Write64(p + 48, 0x60000000);
+                Write64(p + 48, HeapFree);
                 Write64(p + 56, 0);
                 return 1;
             }
+            case ("kernel32", "GetSystemInfo"):
+            {
+                // SYSTEM_INFO of an x86 PC with 4 cores: pages of 4 KB, addresses from 64 KB to
+                // 2 GB, allocations at 64 KB (Libra of the Vampire Princess's START steps its
+                // search for the largest VirtualAlloc down to the page size)
+                int p = Arg(0);
+                Write32(p, 0);
+                Write32(p + 4, 4096);
+                Write32(p + 8, 0x10000);
+                Write32(p + 12, 0x7FFEFFFF);
+                Write32(p + 16, 15);
+                Write32(p + 20, 4);
+                Write32(p + 24, 586);
+                Write32(p + 28, 0x10000);
+                Write16(p + 32, 6);
+                Write16(p + 34, 0);
+                return 0;
+            }
+            case ("kernel32", "VirtualAlloc"):
+            {
+                // address, size, type, protection: a block of the heap (zeroed), 0 when there is
+                // no room for it; an address given is one already allocated (a commit in it)
+                if (Arg(0) != 0)
+                    return BlockAt(Arg(0)) is { } block && (long)Arg(0) + (uint)Arg(1) <= (long)block.Start + block.Size ? Arg(0) : 0;
+                return TryAllocate((Arg(1) + 0xFFF) & ~0xFFF);
+            }
+            case ("kernel32", "VirtualFree"):
+            {
+                // address, size, type: MEM_RELEASE (0x8000) gives the block back; MEM_DECOMMIT
+                // leaves it (the memory is only taken as it is written)
+                if ((Arg(2) & 0x8000) != 0)
+                {
+                    if (!IsBlock(Arg(0)))
+                        return 0;
+                    Free(Arg(0));
+                }
+                return 1;
+            }
+            case ("kernel32", "VirtualQuery"):
+            {
+                // address, MEMORY_BASIC_INFORMATION, its size: the heap block the address is in
+                // (committed, read and write, private), else the free room up to the next one
+                // (only Libra of the Vampire Princess's map of the memory for RIO.INI's TestMMOut)
+                int address = Arg(0), info = Arg(1);
+                if (Arg(2) < 28 || (uint)address >= 0x7FFF0000u)
+                    return 0;
+                if (BlockAt(address) is { } block)
+                {
+                    Write32(info, address & ~0xFFF);
+                    Write32(info + 4, block.Start);
+                    Write32(info + 8, 4);
+                    Write32(info + 12, block.Start + block.Size - (address & ~0xFFF));
+                    Write32(info + 16, 0x1000);
+                    Write32(info + 20, 4);
+                    Write32(info + 24, 0x20000);
+                }
+                else
+                {
+                    int start = address & ~0xFFF, end = NextBlock(address) ?? 0x7FFF0000;
+                    Write32(info, start);
+                    Write32(info + 4, 0);
+                    Write32(info + 8, 0);
+                    Write32(info + 12, Math.Max(end - start, 0x1000));
+                    Write32(info + 16, 0x10000);
+                    Write32(info + 20, 1);
+                    Write32(info + 24, 0);
+                }
+                return 28;
+            }
+            case ("gdi32", "AddFontMemResourceEx"):
+            {
+                // font file, size, -, count: the fonts of a file the scripts loaded (Libra of the
+                // Vampire Princess's .ttf in its archives) for this game's text alone; a handle,
+                // 0 when none was added
+                if (Arg(0) == 0 || Arg(1) <= 0 || m_host.Fonts is not { } fonts)
+                    return 0;
+                int count = fonts.AddMemoryFonts(ReadBytes(Arg(0), Arg(1)));
+                if (Arg(3) != 0)
+                    Write32(Arg(3), count);
+                return count > 0 ? 0x00070000 + ++m_memoryFonts : 0;
+            }
+            case ("user32", "ShowWindow"):
+                // The host shows the window; it was visible
+                return 1;
             case ("kernel32", "GetDiskFreeSpaceExA"):
             {
                 // A disk of 256 GB with 64 GB free, where each pointer is not null (Chuuchuu Nurse
@@ -172,11 +263,19 @@ public sealed partial class ScnVm
                 Trace?.Add($"f{m_frameNumber} LoadLibraryA \"{name}\"");
                 return m_host.LooseFileSize(name) != null ? 0x10000000 : 0;
             }
-            // HID_ONAHOLE.dll as it is without its device: version 1.0, onahoInit finds none
-            case ("hid_onahole", "onahoDLLVer"):
+            // HID_ONAHOLE.dll as it is without its device: version 1.0, onahoInit finds none (Libra
+            // of the Vampire Princess has the DLL as LIBRAeS_D2.WAR; its START ends at a version
+            // below 1.0)
+            case (_, "onahoDLLVer"):
                 return 0x10000;
-            case ("hid_onahole", "onahoInit" or "onahoEnd" or "onahoSetLevel" or "onahoSetPattern"):
+            case (_, "onahoInit" or "onahoEnd" or "onahoSetLevel" or "onahoSetPattern"):
                 return 0;
+            // Libra of the Vampire Princess's Steam DLL (LIBRAeS_S2.WAR, over steam_api.dll): the
+            // game is played without Steam, so Steam starts, runs its callbacks and takes the
+            // achievements without being there
+            case (_, "steamInit" or "steamDebugMode" or "steamRunCallbacks" or "steamSetAchievement"
+                     or "steamResetAchievement" or "steamEnd"):
+                return 1;
             case ("kernel32", "GetVersionExA"):
             {
                 // OSVERSIONINFOA as Windows 8 and later give a program without a manifest: 6.2,

@@ -558,6 +558,105 @@ public sealed partial class ScnVm
         // to -1); a record without its match, and every table record left, gets 1 at +5Ch of
         // the record its first dword points to
         RegisterNative("97B65886703D8A12CE27C061A3EEFBD607A1C556", "match records", (vm, c, a) => vm.MatchRecords(c, a));
+
+        // Libra of the Vampire Princess START E1B0C: mask28 of any size, n x n with n the low byte
+        // of l[2] (0: 256)
+        RegisterNative("0A844E6B45D4675A2CDE5BA1EA49CCAA0A3AB48B", "mask", (vm, c, a) =>
+        {
+            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1), n = (byte)vm.NativeArg(a, 2);
+            if (n == 0)
+                n = 256;
+            using var verify = vm.VerifyRegion(c, a, dst, n * n);
+            for (int y = 0; y < n; y++, src += 3840)
+                for (int x = 0; x < n; x++)
+                    vm.WriteByte(dst++, (byte)((vm.ReadByte(src + 3 * x) << 6) / 255));
+        });
+
+        // Libra of the Vampire Princess START F777: the Shift-JIS string at l[0] copied to l[1],
+        // each single byte among the first five of l[2] written twice (the sixth is looked at
+        // too, but "repne scasb" leaves ecx 0 when it is found there, as when it is not); a lead
+        // byte (81-9F, E0-FC) takes the byte after it whatever it is, its 0 too
+        RegisterNative("49414E55EAE3AB94EC8890F0BBE7D67BB8039798", "escape copy", (vm, c, a) =>
+        {
+            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1), set = vm.NativeArg(a, 2);
+            Span<byte> doubled = stackalloc byte[5];
+            vm.ReadBytes(set, doubled);
+            var output = new List<byte>();
+            for (int p = src; ; )
+            {
+                byte b = vm.ReadByte(p);
+                if (b == 0)
+                    break;
+                if (b is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
+                {
+                    output.Add(b);
+                    output.Add(vm.ReadByte(p + 1));
+                    p += 2;
+                    continue;
+                }
+                if (doubled.Contains(b))
+                    output.Add(b);
+                output.Add(b);
+                p++;
+            }
+            output.Add(0);
+            using var verify = vm.VerifyRegion(c, a, dst, output.Count);
+            vm.WriteBytes(dst, output.ToArray());
+        });
+
+        // Libra of the Vampire Princess START F7C8: the first "[" (l[0] = 1), "{" (2) or lead byte
+        // of a double-byte character (81-9F, E0-FC: 3) in the text at l[0], l[1] = its address;
+        // l[0] = 0 when there is none before the 0 (l[1] left as it was)
+        RegisterNative("B9C872F614C7912A386590D67B7FFBA75C4AF240", "find mark", (vm, c, a) =>
+        {
+            int p = vm.NativeArg(a, 0), kind = 0;
+            using var verify = vm.VerifyRegion(c, a, a.Stack, 8);
+            for (byte b; (b = vm.ReadByte(p)) != 0; p++)
+            {
+                kind = b switch
+                {
+                    (byte)'[' => 1,
+                    (byte)'{' => 2,
+                    >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC => 3,
+                    _ => 0,
+                };
+                if (kind != 0)
+                    break;
+            }
+            // l[0] is cleared first, then its low byte set
+            vm.SetL(a, 0, kind);
+            if (kind != 0)
+                vm.SetL(a, 1, p);
+        });
+
+        // Libra of the Vampire Princess START A27E4: the width of the text at l[0], its letters'
+        // widths from the byte table in use (l[2] at first; "[" switches to l[1], "{" to l[3], "]"
+        // and "}" back to l[2]), 36 for a double-byte character: l[0] = the width, l[1] = the
+        // table in use at the end
+        RegisterNative("5B6AFC75F46CBDFF8B9C53955F1445FBF6C4B8B1", "text width", (vm, c, a) =>
+        {
+            int p = vm.NativeArg(a, 0), table = vm.NativeArg(a, 2), width = 0;
+            using var verify = vm.VerifyRegion(c, a, a.Stack, 8);
+            for (byte b; (b = vm.ReadByte(p)) != 0; )
+            {
+                switch (b)
+                {
+                    case (byte)'[': table = vm.NativeArg(a, 1); p++; continue;
+                    case (byte)']' or (byte)'}': table = vm.NativeArg(a, 2); p++; continue;
+                    case (byte)'{': table = vm.NativeArg(a, 3); p++; continue;
+                }
+                if (b is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
+                {
+                    width += 0x24;
+                    p += 2;
+                    continue;
+                }
+                width += vm.ReadByte(table + b);
+                p++;
+            }
+            vm.SetL(a, 0, width);
+            vm.SetL(a, 1, table);
+        });
     }
 
     /// <summary>a-z to A-Z (the x86 code compares signed bytes: 80-FF stay).</summary>
