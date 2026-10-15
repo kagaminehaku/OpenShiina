@@ -21,6 +21,10 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   (where a game also ships the movie as MPEG-1, that one still plays, as before).
 - **New: Puchipuchi Idol Kouhosei (ぷちぷちアイドル候補生, 2012)** plays through.
 - **New: Gyaku Katei Kyoushi (逆家庭教師, 2014)** plays through.
+- **New: Pure Love! (ぴゅあらっ！, 2010)** plays through: its cross-fade of two pictures
+  (`0563`) is new.
+- **New: School Saimin Paradise! (スク～ル催眠ぱらだいす！, 2019)** plays through. No keys
+  for its archives were known: they were taken from its executable.
 - **Large files copied whole:** the scripts' memory copy stopped at 64 MB, which spoiled the
   rest of a larger picture and could take the game down with gigabytes of memory.
 - **A game's archive of scripts is the one its RIO.INI names** (`Arc=`), where a game has two.

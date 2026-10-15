@@ -223,6 +223,78 @@ public sealed partial class ScnVm
             vm.DrawOnPicture(vm.Picture(v[0]), v[1], entry);
             return 0;
         });
+        // 0563 dst, frame, x, y, A, frame, ax, ay, B, frame, bx, by, w, h, a, b (FUN_0041F410 ->
+        // FUN_004111A0, v2.47): each byte of the 32-bit pixels (alpha too) A * a / 256 plus
+        // B * b / 256, at most 255, into dst's frame. The rectangle is clipped to dst's frame
+        // (FUN_00417790), A's and B's places moving with its left and top edges. Pure Love!'s
+        // cross-fade of two pictures
+        Register(0x0563, (vm, c, i) =>
+        {
+            var v = new int[16];
+            for (int k = 0; k < 16; k++)
+                v[k] = vm.Value(c, i.Args[k]);
+            vm.BlendPictures(v);
+            return 0;
+        });
+    }
+
+    /// <summary>A frame of a picture slot (its header address), or 0.</summary>
+    private int PictureFrame(int slot, int frame)
+    {
+        int picture = Picture(slot);
+        if (picture == 0 || (uint)frame > (uint)Read32(picture + 4))
+            return 0;
+        return Read32(picture + 8 + 4 * frame);
+    }
+
+    /// <summary>FUN_004111A0 for op 0563 (its arguments in <paramref name="v"/>).</summary>
+    private void BlendPictures(int[] v)
+    {
+        int dst = PictureFrame(v[0], v[1]), a = PictureFrame(v[4], v[5]), b = PictureFrame(v[8], v[9]);
+        if (dst == 0 || a == 0 || b == 0)
+            return;
+        int l = v[2], t = v[3], r = v[2] + v[12], btm = v[3] + v[13];
+        int ax = v[6], ay = v[7], bx = v[10], by = v[11];
+        int dw = Read32(dst), dh = Read32(dst + 4);
+        if (l > dw || t > dh)
+            return;
+        if (l < 0)
+        {
+            if (r <= 0)
+                return;
+            ax -= l;
+            bx -= l;
+            l = 0;
+        }
+        if (t < 0)
+        {
+            if (btm <= 0)
+                return;
+            ay -= t;
+            by -= t;
+            t = 0;
+        }
+        r = Math.Min(r, dw);
+        btm = Math.Min(btm, dh);
+        int width = r - l, rows = btm - t;
+        if (width <= 0 || rows <= 0)
+            return;
+        uint fa = (uint)v[14], fb = (uint)v[15];
+        var lineA = new byte[width * 4];
+        var lineB = new byte[width * 4];
+        var line = new byte[width * 4];
+        // the rows follow each other in a frame (each with an 8-byte head)
+        int pa = Read32(a + 0x14 + 4 * ay) + 8 + 4 * ax, strideA = Read32(a) * 4 + 8;
+        int pb = Read32(b + 0x14 + 4 * by) + 8 + 4 * bx, strideB = Read32(b) * 4 + 8;
+        int pd = Read32(dst + 0x14 + 4 * t) + 8 + 4 * l, strideD = dw * 4 + 8;
+        for (int y = 0; y < rows; y++, pa += strideA, pb += strideB, pd += strideD)
+        {
+            ReadBytes(pa, lineA);
+            ReadBytes(pb, lineB);
+            for (int k = 0; k < line.Length; k++)
+                line[k] = (byte)Math.Min(255u, ((lineA[k] * fa) >> 8 & 0xFF) + ((lineB[k] * fb) >> 8 & 0xFF));
+            WriteBytes(pd, line);
+        }
     }
 
     // A scratch sprite entry for the layer opcodes

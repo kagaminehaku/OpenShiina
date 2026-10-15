@@ -112,6 +112,36 @@ public sealed partial class ScnVm
             }
         });
 
+        // Pure Love! (v2.47, MMX, the routine after xorstream): a rectangle of 32-bit pixels moved
+        // by a fraction of a pixel, each byte the 2 x 2 source pixels from the one at the same
+        // place with the weights (16 - fx)(16 - fy), fx(16 - fy), (16 - fx)fy, fx fy, >> 8 (16-bit
+        // lanes: pmullw, paddw). l[0] dst, l[1] src, l[2] / l[3] their row strides, l[4] width,
+        // l[5] height, l[6] fx, l[7] fy (sixteenths). Counts of 0 or less run as x86 code
+        RegisterNative("5763B8B12978519D193DA1B8FA85C2C96E97DB7D", "shift32", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1), sd = vm.NativeArg(a, 2), ss = vm.NativeArg(a, 3);
+            int width = vm.NativeArg(a, 4), height = vm.NativeArg(a, 5), fx = vm.NativeArg(a, 6), fy = vm.NativeArg(a, 7);
+            if (width <= 0 || height <= 0 || width > 0x1000000)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            uint w00 = (ushort)((16 - fx) * (16 - fy)), w01 = (ushort)(fx * (16 - fy));
+            uint w10 = (ushort)((16 - fx) * fy), w11 = (ushort)(fx * fy);
+            using var verify = vm.VerifyRegion(c, a, dst, sd * (height - 1) + width * 4);
+            int bytes = width * 4;
+            byte[]? spareA = null, spareB = null;
+            for (int y = 0; y < height; y++, dst += sd, src += ss)
+            {
+                // the two source rows in place (copied when they share bytes with the row written)
+                var top = vm.ReadView(src, bytes + 4, ref spareA, dst, bytes);
+                var bottom = vm.ReadView(src + ss, bytes + 4, ref spareB, dst, bytes);
+                var output = vm.Bytes(dst, bytes);
+                for (int k = 0; k < bytes; k++)
+                    output[k] = (byte)((ushort)(top[k] * w00 + top[k + 4] * w01 + bottom[k] * w10 + bottom[k + 4] * w11) >> 8);
+            }
+        });
+
         // Oreimo START 76388 (Sena 767D4; MMX, 0x16157): copies a rectangle of a 32-bit picture to another
         // with positions in 1/16 pixels (bilinear weights at the fractions, partial coverage in
         // the alpha of the edge pixels). Written out in ScnVm.Subpixel32.cs.

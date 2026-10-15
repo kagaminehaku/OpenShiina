@@ -43,7 +43,8 @@ later. The interpreter knows the opcodes of 2.47, 2.49 and 2.50 (ScnOpcodes pick
 date of the engine's build (0x20161012 for Chiccha na Hanayome and Signalist Stars!!, 0x20171006
 for Chuuni Hime, 0x20170505 for Libra of the Vampire Princess, the English Kyuuketsuki no Libra:
 worked out from its English text, "The moon looks e[....]more beautiful tonight."; 0x20160725
-for the English Sorcery Jokers, from "Re:D E[....]ant", Elephant). Decrypt2 (entries flagged 0x40000000) XORs the 64 dwords at 0x200-0x2FF of a
+for the English Sorcery Jokers, from "Re:D E[....]ant", Elephant; 0x20190512 for School Saimin
+Paradise!, found by trying the dates of 2010-2022 on its TXT files). Decrypt2 (entries flagged 0x40000000) XORs the 64 dwords at 0x200-0x2FF of a
 file with DecodeBin's dword at (the dword 0x100 bytes before) & 0x1FFC, so a wrong date spoils 4
 bytes of the few files whose selector there is 0x1020 (3% of them), and nothing shows until the
 game uses one: Nyaru Plus's RULE213.S25, start.scn of Bitch Nee-chan, Chiccha na Hanayome's
@@ -52,6 +53,16 @@ wrote over the scripts' stack). GARbro's schemes take the shared DecodeBin with 
 0x20080214 (54 of them) unless one was worked out: the right date makes such a file come out
 whole (a slot of an S25's index that should be 0, Ogg page CRCs, strict Shift-JIS), and the value
 there is the right date XOR the wrong one.
+
+**A scheme from the executable** (School Saimin Paradise!, 2026-10-15; GARbro has none). Its
+v2.50 SUKUPARA.EXE carries all of it in the clear: the HelperKey is the 20 bytes 12 after the IEND
+of its first PNG (0xE712C); the ShiinaImage is the common 33,438-byte JPEG and the bytes after it
+up to the length a small routine gives (`mov eax, imm / and eax, 0FFFFh / ret`, 63,938 bytes);
+its ExtraCrypt is a plug-in packed in a `YPK` + 01h zlib block (0xD4934), with a config block
+before it ("cdaudio", flags, the unpacked size, the seed 0x671CF724): a MakiFesCrypt whose
+DecodeTable is the raw bytes of the PNG in the plug-in (its header's dwords at 0x10 and 0x14 give
+where the PNG starts and ends). CryptKey and Region are the ones all schemes share. Its 561
+S25, 47 TXT and 2 OGV come out whole.
 
 **WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
 eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a
@@ -1007,6 +1018,10 @@ the functions they call from the decompile. First findings:
   channel (s sa 255 + (255-sa) da d) * (2^24 / a) >> 32. Text drawn into a layer ("_g n,i" /
   `00B4`) uses tables made at start-up (FUN_00408EB0): share[da | sa << 8] = trunc(255 * (A/B) /
   (1 - A + A/B)) with A = sa/255, B = da/255 (255 when da = 0), alpha = 255 - (255-da)(255-sa)/255.
+- `0563 dst, frame, x, y, A, frame, ax, ay, B, frame, bx, by, w, h, a, b` (v2.47, FUN_0041F410 ->
+  FUN_004111A0; Pure Love!'s cross-fade of two pictures) mixes two 32-bit pictures into a third:
+  each byte, alpha too, (A a >> 8 & 0xFF) + (B b >> 8 & 0xFF), at most 255. The rectangle is
+  clipped to dst's frame (FUN_00417790), A's and B's places moving with its left and top edges.
 - Compositor mode 0x40000000 (alpha a): tables T1 = a/256 and T2 = (256-a)/256 stepped as in
   FUN_004396B4; BGR runs blend two sources ((s a + d (256-a)) >> 8 in MMX blocks, T1[s] + T2[d] at
   the edges), one-colour runs add (c a >> 8) to T2[d] (MMX (d (256-a) >> 8) in 8-pixel groups
