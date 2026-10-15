@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 23 games, 24 releases, tried; all of them
+scripts the player does not run yet (none in the 24 games, 25 releases, tried; all of them
 play through, as the README's table lists them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
@@ -151,7 +151,7 @@ of those versions it does not list.
 | Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ⚪ Not tried |  |
 | Kanojo ga Ore ni Kureta Mono | 彼女が俺にくれたもの。俺が彼女にあげるもの。 | 2014-09-26 | [v14321](https://vndb.org/v14321) | v2.50 | ⚪ Not tried |  |
 | Kinpatsu Tarou Monogatari | 金髪太郎物語 | 2014-10-03 | [v16102](https://vndb.org/v16102) | v2.50 | ⚪ Not tried |  |
-| Gyaku Katei Kyoushi | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014-12-12 | [v16306](https://vndb.org/v16306) | v2.50 | ⚪ Not tried |  |
+| Gyaku Katei Kyoushi | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014-12-12 | [v16306](https://vndb.org/v16306) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Shuukatsu Katei Kyoushi | シュウカツ家庭教師 | 2015-03-13 | [v16904](https://vndb.org/v16904) | v2.50 | ⚪ Not tried |  |
 | Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ⚪ Not tried |  |
@@ -395,6 +395,11 @@ SetWindowLongA (its START takes the maximize box off the window's style while a 
 is open, and puts it back), kept here and given back. Every routine it runs has its C# version.
 Swept: 66 scenarios, every one to its end.
 
+**Gyaku Katei Kyoushi** (シリカゲル, its download edition, GYAKUKATE.EXE, engine v2.50) needed
+nothing new: no DecodeBin (no entry has the flags of Decrypt2; its 161 S25, 53 TXT and 1,182
+OGV come out whole), opcheck found nothing missing, and every routine it runs has its C#
+version. Swept: 51 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -429,9 +434,9 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 23 games (24 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
-2026-10-14, both Libras, Sorcery Jokers and Puchipuchi Idol Kouhosei on 2026-10-15): none
-stopped, none stuck.
+The 24 games (25 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei and Gyaku Katei Kyoushi on
+2026-10-15): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -459,6 +464,7 @@ stopped, none stuck.
 | Libra of the Vampire Princess (English) | 131 | 96.2% (short lines of its H scenes, "\*Kiss\*.", passed in the skip; and the stand-in scenarios of the cut scenes, `_N`) |
 | Sorcery Jokers (English) | 101 | 96.5% |
 | Puchipuchi Idol Kouhosei | 66 | 99.0% |
+| Gyaku Katei Kyoushi | 51 | 98.0% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in
