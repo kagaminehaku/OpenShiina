@@ -17,6 +17,8 @@ public sealed partial class ScnVm
     private const int SpriteLists = 256, SpriteSize = 0x20;
     private readonly int[] m_spriteCounts = new int[SpriteLists];
     private int m_spriteList;
+    // The list 04B8 was given, for 04B7 (m_spriteList is it in range)
+    private int m_spriteListSet;
 
     private int SpriteEntry(int list, int index) => TableAddress(list) + index * SpriteSize;
 
@@ -332,11 +334,27 @@ public sealed partial class ScnVm
     /// <summary>
     /// The row of a frame from its row pointer (its 16-bit length and the runs after it), read
     /// in place; copied first when it shares bytes with the destination row [dst, dst + bytes)
-    /// (or runs past the top of the 4 GB with the 16 bytes read past its runs).
+    /// (or runs past the top of the 4 GB with the 16 bytes read past its runs). A length of 0 is
+    /// a row the scripts made themselves without one (Sorcery Jokers' x86 routine at START
+    /// 2159B8, a 3844-pixel row of one ABGR run): its runs are walked over for its pixels, as
+    /// the engine reads only the runs.
     /// </summary>
-    private ReadOnlySpan<byte> ReadRow(int p, int dst, int bytes)
+    private ReadOnlySpan<byte> ReadRow(int p, int dst, int bytes, int pixels)
     {
         int n = Read16(p) + 16;
+        if (n == 16)
+        {
+            int at = p + 2;
+            for (int seen = 0; seen < pixels; )
+            {
+                var (method, count, data) = ReadRun(at);
+                if (count <= 0)
+                    break;
+                at = RunEnd(method, count, data);
+                seen += count;
+            }
+            n = at - p + 16;
+        }
         if (((long)p + n <= dst || (long)dst + bytes <= p) && IsContiguous(p, n))
             return Bytes(p, n);
         if (t_rowSource == null || t_rowSource.Length < n)
@@ -370,7 +388,7 @@ public sealed partial class ScnVm
         if (visible <= 0)
             return;
         int rowBytes = visible * 3;
-        var src = ReadRow(p, dst, rowBytes);
+        var src = ReadRow(p, dst, rowBytes, skip + visible);
         // drawn straight into script memory
         Span<byte> row = Bytes(dst, rowBytes);
         int o = 2, d = 0;
@@ -904,7 +922,14 @@ public sealed partial class ScnVm
     private void RegisterSprites()
     {
         // 04B8 n: the list the sprite opcodes use; 04B9 n, v: v = list n's table
-        Register(0x04B8, (vm, c, i) => { vm.m_spriteList = vm.Value(c, i.Args[0]) & (SpriteLists - 1); return 0; });
+        Register(0x04B8, (vm, c, i) =>
+        {
+            vm.m_spriteListSet = vm.Value(c, i.Args[0]);
+            vm.m_spriteList = vm.m_spriteListSet & (SpriteLists - 1);
+            return 0;
+        });
+        // 04B7 v: v = the sprite list 04B8 chose, as it was given (0x0D0AC14)
+        Register(0x04B7, (vm, c, i) => { vm.Store(c, i.Args[0], vm.m_spriteListSet); return 0; });
         Register(0x04B9, (vm, c, i) =>
         {
             vm.Store(c, i.Args[1], vm.TableAddress(vm.Value(c, i.Args[0])));

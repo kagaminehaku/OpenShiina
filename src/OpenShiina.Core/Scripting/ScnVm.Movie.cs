@@ -262,7 +262,18 @@ public sealed partial class ScnVm
             movie.Video = null;
             movie.State = 0;
             if (!vm.OpenMovie(movie))
-                return 2;
+            {
+                // A movie that is there but only as Windows Media (Sorcery Jokers ships mv\*.wmv
+                // alone, no MPEG-1 beside them), which the decoder here cannot play: it is as if
+                // it had played to its end, the surface left as it was
+                if (vm.m_host.LooseFileSize(name) == null && vm.ScriptFileSize(name) == null)
+                    return 2;
+                movie.Width = vm.ScreenWidth;
+                movie.Height = vm.ScreenHeight;
+                movie.State = 1;
+                vm.Trace?.Add($"f{vm.m_frameNumber} 05B5 {name}: not MPEG-1, skipped");
+                return 0;
+            }
             return vm.RunMovie(movie) ? 0 : 2;
         });
         // 05B6 n: stop (FUN_0040B780); the loop count becomes -1

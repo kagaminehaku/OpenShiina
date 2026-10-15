@@ -108,6 +108,36 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[2], vm.Read16(a + b));
             return 0;
         });
+        // 030D a, b, v: the 16-bit word at a + b = v (FUN_00422240)
+        Register(0x030D, (vm, c, i) =>
+        {
+            int a = vm.Value(c, i.Args[0]), b = vm.Value(c, i.Args[1]);
+            vm.Write16(a + b, (ushort)vm.Value(c, i.Args[2]));
+            return 0;
+        });
+        // 0390 x, y: x and y swapped (FUN_004222B0)
+        Register(0x0390, (vm, c, i) =>
+        {
+            int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
+            vm.Store(c, i.Args[0], y);
+            vm.Store(c, i.Args[1], x);
+            return 0;
+        });
+        // 09EC window, l, t, r, b: GetWindowRect of the window (0: the game's; FUN_00426A60). The
+        // host makes the window around the picture: the screen's size at (0, 0) (Sorcery Jokers'
+        // hook for a window being sized reads it)
+        Register(0x09EC, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            vm.Store(c, i.Args[1], 0);
+            vm.Store(c, i.Args[2], 0);
+            vm.Store(c, i.Args[3], vm.ScreenWidth);
+            vm.Store(c, i.Args[4], vm.ScreenHeight);
+            return 0;
+        });
+        // 0A06 on: whether the window can be sized by its frame (WS_THICKFRAME, RIO.INI's
+        // FreeWindow; FUN_00426F40): the host's window is sized as the player's settings say
+        Register(0x0A06, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
         // 0395 v: v = ~v (FUN_004219B0)
         Register(0x0395, (vm, c, i) => { vm.Store(c, i.Args[0], ~vm.Value(c, i.Args[0])); return 0; });
         // 0BCC s, ch, v: v = strchr(s, ch) (FUN_004286C0 -> FUN_0044E340): the address of the

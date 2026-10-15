@@ -42,7 +42,8 @@ later. The interpreter knows the opcodes of 2.47, 2.49 and 2.50 (ScnOpcodes pick
 **DecodeBin's date.** The DecodeBins of all schemes are the same but for one dword at 0x1020, a
 date of the engine's build (0x20161012 for Chiccha na Hanayome and Signalist Stars!!, 0x20171006
 for Chuuni Hime, 0x20170505 for Libra of the Vampire Princess, the English Kyuuketsuki no Libra:
-worked out from its English text, "The moon looks e[....]more beautiful tonight."). Decrypt2 (entries flagged 0x40000000) XORs the 64 dwords at 0x200-0x2FF of a
+worked out from its English text, "The moon looks e[....]more beautiful tonight."; 0x20160725
+for the English Sorcery Jokers, from "Re:D E[....]ant", Elephant). Decrypt2 (entries flagged 0x40000000) XORs the 64 dwords at 0x200-0x2FF of a
 file with DecodeBin's dword at (the dword 0x100 bytes before) & 0x1FFC, so a wrong date spoils 4
 bytes of the few files whose selector there is 0x1020 (3% of them), and nothing shows until the
 game uses one: Nyaru Plus's RULE213.S25, start.scn of Bitch Nee-chan, Chiccha na Hanayome's
@@ -1100,6 +1101,21 @@ the functions they call from the decompile. First findings:
     folder the scripts make there is a save folder from then on, its files the host's.
   - RIO.INI's `Arc=` names the archive of scripts, mounted before the first script (GameData):
     this game has two, LIBRAES_S.WAR and the LIBRAES_S-B.WAR it names.
+- **Sorcery Jokers (English, MangaGamer; v2.50, SJSe.EXE)** is the first game here at 1920 x
+  1080. Its scripts use `030D a, b, v` (the 16-bit word at a + b = v, FUN_00422240), `0390 x, y`
+  (x and y swapped, FUN_004222B0), `04B7 v` (v = the sprite list 04B8 was given, 0xD0AC14),
+  `09EC window, l, t, r, b` (GetWindowRect, FUN_00426A60) and `0A06 on` (the window sized by its
+  frame, RIO.INI's FreeWindow, FUN_00426F40), with user32 GetClientRect, ClientToScreen (its hook
+  for a window being sized) and SetForegroundWindow: the host's window is the picture at (0, 0).
+  Its START wants SSE2 ("CPU does not supported to SSE2"), so the cpuid routine tells it SSE2 and
+  it takes the SSE2 build of scale32. Its x86 routine at START 2159B8 makes blank S25 pictures
+  whose rows have no 16-bit length before their runs (0: one ABGR run of the whole width, its
+  count in the dword after): the engine draws from the runs alone, so the compositor walks the
+  runs of such a row for its length (ReadRow). It loads its large pictures into a pool of its
+  own (one heap block of 472 MB) and copies them there with `02C6`, 82 MB at once for
+  EVE21_01D.S25: memmove and memset (`02C7`) take any size (a cap of 64 MB here had spoiled the
+  rest). Its movies are mv\*.wmv alone; `05B5` takes one that is there but cannot be decoded as
+  played to its end (state 1, the screen's size), where it stopped the scripts.
 - `006F -, v` lists the fixed-pitch TrueType SHIFTJIS_CHARSET faces (no "@" faces) in 32-byte
   entries (IScnFonts.FixedPitchJapaneseFaces). `04E8 mode, a, b, c, v` picks the renderer (0
   GDI, 2 Direct3D, 3 OpenGL): only GDI is offered (v = 1; 0 for the others, the scripts then

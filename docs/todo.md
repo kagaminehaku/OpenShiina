@@ -58,6 +58,9 @@ is mostly for slow phones, and should follow what their perf.log shows.
 - [ ] Opcode tables for 2.35-2.46 and 2.48 (opscan on the game's executable).
 - [ ] The ExtraCrypts (PostAdler, PreAdler, Binbo, Count, AltCount, Ushimitsu, Nukitashi2,
   Saimin) checked against their archives.
+- [ ] **Windows Media movies**: Sorcery Jokers' mv\*.wmv have no MPEG-1 beside them and are
+  passed over (ScnVm.Movie.cs). A WMV / VC-1 + WMA decoder, or the system's (Media Foundation on
+  Windows, MediaCodec on Android) - a choice to make first.
 - [ ] **Known builds**: a game's build told by the SHA-256 (and size) of its .exe, for the
   scheme and keys (Re:Rem Plus's re-release has another DecodeBin date under the same .exe name),
   `03C2`'s value, and in the library whether that build was played through; and START.SCN's

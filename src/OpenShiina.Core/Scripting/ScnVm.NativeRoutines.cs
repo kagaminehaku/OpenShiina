@@ -42,11 +42,13 @@ public sealed partial class ScnVm
         // 40h SSE2, 80h SSE3...) into l[0] and into the dword before the routine (gCPUID). The
         // CPU the interpreter reports (X86Cpu.Cpuid: an Intel with MMX, no SSE) gives 0x11, so
         // START takes its routines without SSE2 (Re: Rem Plus's own SSE2 zoom too). A START that
-        // will not run without SSE2 (Bitch Nee-chan's "SSE2 をサポートしていません") is told
-        // SSE and SSE2 as well (0x71)
+        // will not run without SSE2 (Bitch Nee-chan's "SSE2 をサポートしていません", Sorcery
+        // Jokers' "CPU does not supported to SSE2") is told SSE and SSE2 as well (0x71)
         RegisterNative(["B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F"], "cpuid", (vm, c, a) =>
         {
-            int features = vm.ReadBytes(c.CodeBase, c.CodeSize).AsSpan().IndexOf(Encodings.cp932.GetBytes("SSE2 をサポートしていません")) >= 0 ? 0x71 : 0x11;
+            var code = vm.ReadBytes(c.CodeBase, c.CodeSize).AsSpan();
+            int features = code.IndexOf(Encodings.cp932.GetBytes("SSE2 をサポートしていません")) >= 0
+                           || code.IndexOf("does not supported to SSE2"u8) >= 0 ? 0x71 : 0x11;
             // The interpreter's CPUID has no SSE: nothing to verify the SSE2 answer with
             using var verify = features == 0x11 ? vm.VerifyRegions(c, a, (a.Stack, 4), (vm.m_nativeTarget - 4, 4)) : null;
             vm.SetL(a, 0, features);
@@ -199,7 +201,7 @@ public sealed partial class ScnVm
         // (l[3] = 0: the count rounded down to 8) or by 4
         RegisterNative(["8EE6D4D8C30D61F6379F0F7FA42BAB648AE0483E", "0CF868D5FF21E737808C7235BF0D164BFDE48B4F",
                         "516F6F4090493362A1590006FF9F3031DFFC9346", "039192F71200D43AF29A5F5AE0682CCAC4317F2C",
-                        "7B2B7B77BACDED981FFB2FEBE08F68CBFB09DB09"], "not", (vm, c, a) =>
+                        "7B2B7B77BACDED981FFB2FEBE08F68CBFB09DB09", "CD4D7E16634D0824BA915D35DFE8555BC0971D1B"], "not", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
             uint count = (uint)vm.NativeArg(a, 2);
@@ -560,16 +562,46 @@ public sealed partial class ScnVm
         RegisterNative("97B65886703D8A12CE27C061A3EEFBD607A1C556", "match records", (vm, c, a) => vm.MatchRecords(c, a));
 
         // Libra of the Vampire Princess START E1B0C: mask28 of any size, n x n with n the low byte
-        // of l[2] (0: 256)
-        RegisterNative("0A844E6B45D4675A2CDE5BA1EA49CCAA0A3AB48B", "mask", (vm, c, a) =>
+        // of l[2] (0: 256). Sorcery Jokers 2184D0: the same from a picture 1920 wide
+        RegisterNative("0A844E6B45D4675A2CDE5BA1EA49CCAA0A3AB48B", "mask", (vm, c, a) => vm.Mask(c, a, 3840));
+        RegisterNative("CDBE0CBE1850ACA2AC91138D33EEED4284359AE3", "mask 1920", (vm, c, a) => vm.Mask(c, a, 5760));
+
+        // Sorcery Jokers START 2159B8: a blank S25 picture at l[0]: l[1] bytes cleared, then
+        // "S25", l[5] frames of l[4] bytes each (their offsets after the header), each l[6] x
+        // l[7] at (0, 0) with rows l[3] bytes apart, every row one run of l[6] ABGR pixels (the
+        // code dword l[2] << 16: no length before the run, method 4 from l[2] 0x8000) left
+        // clear; l[8] counts the frames down to 0
+        RegisterNative("DE3A498EFE2D198ACE0A0AA10C6CD571E986461A", "blank s25", (vm, c, a) =>
         {
-            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1), n = (byte)vm.NativeArg(a, 2);
-            if (n == 0)
-                n = 256;
-            using var verify = vm.VerifyRegion(c, a, dst, n * n);
-            for (int y = 0; y < n; y++, src += 3840)
-                for (int x = 0; x < n; x++)
-                    vm.WriteByte(dst++, (byte)((vm.ReadByte(src + 3 * x) << 6) / 255));
+            int dst = vm.NativeArg(a, 0), bytes = vm.NativeArg(a, 1), code = vm.NativeArg(a, 2), stride = vm.NativeArg(a, 3);
+            int frameBytes = vm.NativeArg(a, 4), frames = vm.NativeArg(a, 5), w = vm.NativeArg(a, 6), h = vm.NativeArg(a, 7);
+            // Counts the x86 code would take round 4 billion times, or that write past the bytes cleared
+            if (bytes < 0 || frames <= 0 || h <= 0 || 8L + 4L * frames + (long)frameBytes * (frames - 1) + 0x14 + 4L * h + (long)stride * (h - 1) + 8 > bytes)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegions(c, a, (dst, bytes), (a.Stack + 32, 4));
+            vm.FillMemory(dst, bytes, 0);
+            vm.Write32(dst, 0x353253);
+            vm.Write32(dst + 4, frames);
+            int frame = dst + 8 + 4 * frames;
+            for (int f = 0; f < frames; f++)
+                vm.Write32(dst + 8 + 4 * f, 4 * frames + 8 + f * frameBytes);
+            for (int f = 0; f < frames; f++, frame += frameBytes)
+            {
+                vm.Write32(frame, w);
+                vm.Write32(frame + 4, h);
+                int rows = frame + 0x14, row = rows + 4 * h;
+                for (int y = 0; y < h; y++)
+                    vm.Write32(rows + 4 * y, row + y * stride - dst);
+                for (int y = 0; y < h; y++, row += stride)
+                {
+                    vm.Write32(row, code << 16);
+                    vm.Write32(row + 4, w);
+                }
+            }
+            vm.SetL(a, 8, 0);
         });
 
         // Libra of the Vampire Princess START F777: the Shift-JIS string at l[0] copied to l[1],
@@ -633,30 +665,181 @@ public sealed partial class ScnVm
         // widths from the byte table in use (l[2] at first; "[" switches to l[1], "{" to l[3], "]"
         // and "}" back to l[2]), 36 for a double-byte character: l[0] = the width, l[1] = the
         // table in use at the end
-        RegisterNative("5B6AFC75F46CBDFF8B9C53955F1445FBF6C4B8B1", "text width", (vm, c, a) =>
+        RegisterNative("5B6AFC75F46CBDFF8B9C53955F1445FBF6C4B8B1", "text width", (vm, c, a) => vm.TextWidth(c, a, 0x24));
+        // Sorcery Jokers START 1DBB08: the same, 34 for a double-byte character
+        RegisterNative("1F28134971F3C9966E2AA8BCC5D672B3034AAE0D", "text width 34", (vm, c, a) => vm.TextWidth(c, a, 0x22));
+
+        // Sorcery Jokers START 215980: the picture at l[0] made relocatable again (what 04B2 did,
+        // undone): each frame's pointer and its rows' pointers less the picture's address
+        RegisterNative("FC46690390954614B7823E737C55531ED3C6017B", "unrelocate s25", (vm, c, a) =>
         {
-            int p = vm.NativeArg(a, 0), table = vm.NativeArg(a, 2), width = 0;
-            using var verify = vm.VerifyRegion(c, a, a.Stack, 8);
-            for (byte b; (b = vm.ReadByte(p)) != 0; )
+            int picture = vm.NativeArg(a, 0), frames = vm.Read32(picture + 4);
+            if (frames == 0)
+                return;
+            if (frames < 0 || frames > 0x100000)
             {
-                switch (b)
-                {
-                    case (byte)'[': table = vm.NativeArg(a, 1); p++; continue;
-                    case (byte)']' or (byte)'}': table = vm.NativeArg(a, 2); p++; continue;
-                    case (byte)'{': table = vm.NativeArg(a, 3); p++; continue;
-                }
-                if (b is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
-                {
-                    width += 0x24;
-                    p += 2;
-                    continue;
-                }
-                width += vm.ReadByte(table + b);
-                p++;
+                vm.RunX86(c, a);
+                return;
             }
-            vm.SetL(a, 0, width);
-            vm.SetL(a, 1, table);
+            var regions = new List<(int Start, int Length)> { (picture + 8, 4 * frames) };
+            for (int i = 0; i < frames; i++)
+                if (vm.Read32(picture + 8 + 4 * i) is var frame and not 0 && vm.Read32(frame + 4) is > 0 and var height)
+                    regions.Add((frame + 0x14, 4 * height));
+            using var verify = vm.VerifyRegions(c, a, regions.ToArray());
+            for (int i = 0; i < frames; i++)
+            {
+                int at = picture + 8 + 4 * i, frame = vm.Read32(at);
+                if (frame == 0)
+                    continue;
+                vm.Write32(at, frame - picture);
+                int height = vm.Read32(frame + 4);
+                for (int y = 0; y < height; y++)
+                    vm.Write32(frame + 0x14 + 4 * y, vm.Read32(frame + 0x14 + 4 * y) - picture);
+            }
         });
+
+        // Sorcery Jokers START 215A56: l[2] BGR pixels from l[1] to l[0], their colour scaled by
+        // l[3] towards their brightest channel, which stays: of the two others the least moves by
+        // (max - min) * l[3] / 256, the middle one by a dword table after the routine (+0xA7A,
+        // four of 512 by which channel is largest; the index ((mid - x) << 8) / (max - min) may
+        // be below 0 and reach into the table before) times that / 65536. Divisions as idiv,
+        // shifts as sar after the x86 code's rounding towards 0
+        RegisterNative("3897C1B201D06481C10CFBDD3B60B45DFCF84934", "saturation", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
+            uint count = (uint)vm.NativeArg(a, 2);
+            int k = vm.NativeArg(a, 3), table = vm.m_nativeTarget + 0xA7A;
+            if (count == 0)
+                return;
+            long bytes = 3L * count;
+            if (bytes > 0x10000000 || dst != src && !Apart(dst, bytes, src, bytes))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, (int)bytes);
+            static int Sar16(int x) => (x + ((x >> 31) & 0xFFFF)) >> 16;
+            static int Sar8(int x) => (x + ((x >> 31) & 0xFF)) >> 8;
+            for (int n = 0; n < (int)count; n++, src += 3, dst += 3)
+            {
+                int b = vm.ReadByte(src), g = vm.ReadByte(src + 1), r = vm.ReadByte(src + 2);
+                int T(int at, int index) => vm.Read32(table + at + 4 * index);
+                byte nb, ng, nr;
+                if (b > g)
+                {
+                    if (r > b)
+                    {
+                        int e = unchecked((r - g) * k), q = ((b - g) << 8) / (r - g);
+                        (nb, ng, nr) = ((byte)(r - Sar16(unchecked(T(0x1000, q) * e))), (byte)(r - Sar8(e)), (byte)r);
+                    }
+                    else if (g > r)
+                    {
+                        int e = unchecked((b - r) * k), q = ((g - r) << 8) / (b - r);
+                        (nb, ng, nr) = ((byte)b, (byte)(b - Sar16(unchecked(T(0, q) * e))), (byte)(b - Sar8(e)));
+                    }
+                    else
+                    {
+                        int e = unchecked((b - g) * k), q = ((g - r) << 8) / (b - g);
+                        (nb, ng, nr) = ((byte)b, (byte)(b - Sar8(e)), (byte)(b - Sar16(unchecked(T(0x1800, q) * e))));
+                    }
+                }
+                else if (r > g)
+                {
+                    int e = unchecked((r - b) * k), q = ((b - g) << 8) / (r - b);
+                    (nb, ng, nr) = ((byte)(r - Sar8(e)), (byte)(r - Sar16(unchecked(T(0x1000, q) * e))), (byte)r);
+                }
+                else if (b > r)
+                {
+                    int e = unchecked((g - r) * k), q = ((r - b) << 8) / (g - r);
+                    (nb, ng, nr) = ((byte)(g - Sar16(unchecked(T(0x800, q) * e))), (byte)g, (byte)(g - Sar8(e)));
+                }
+                else if (g == b)
+                    (nb, ng, nr) = ((byte)g, (byte)g, (byte)g);
+                else
+                {
+                    int e = unchecked((g - b) * k), q = ((r - b) << 8) / (g - b);
+                    (nb, ng, nr) = ((byte)(g - Sar8(e)), (byte)g, (byte)(g - Sar16(unchecked(T(0x800, q) * e))));
+                }
+                vm.WriteByte(dst, nb);
+                vm.WriteByte(dst + 1, ng);
+                vm.WriteByte(dst + 2, nr);
+            }
+        });
+
+        // Sorcery Jokers START 1249E: l[1] = the first byte of the text at l[5] that is not a
+        // double-byte character (lead bytes 81-9F, E0-FC take the byte after them, whatever it
+        // is), 0 when the text ends first
+        RegisterNative("76C5891E51AA8562C14754D009A15228C3B0964E", "skip double bytes", (vm, c, a) =>
+        {
+            int p = vm.NativeArg(a, 5);
+            using var verify = vm.VerifyRegion(c, a, a.Stack + 4, 4);
+            byte b;
+            while ((b = vm.ReadByte(p)) is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
+                p += 2;
+            vm.SetL(a, 1, b == 0 ? 0 : p);
+        });
+
+        // Sorcery Jokers START 211A07: 482 rows of 856 BGR pixels from l[4] (a picture 1920
+        // wide) to l[0], one after the other (a byte at a time: blocks that share bytes run as x86)
+        RegisterNative("8E6C33413435C5ACB0FE26A1264354E76D077DA0", "copy 856x482", (vm, c, a) =>
+        {
+            const int Rows = 482, RowBytes = 856 * 3, Stride = 5760;
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
+            if (!Apart((dst, (long)Rows * RowBytes), RowsSpan(src, Stride, Rows, RowBytes)))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, Rows * RowBytes);
+            for (int y = 0; y < Rows; y++)
+                vm.WriteBytes(dst + y * RowBytes, vm.ReadBytes(src + y * Stride, RowBytes));
+        });
+    }
+
+    /// <summary>
+    /// Libra of the Vampire Princess START A27E4 (Sorcery Jokers 1DBB08): the width of the text
+    /// at l[0], its letters' widths from the byte table in use (l[2] at first; "[" switches to
+    /// l[1], "{" to l[3], "]" and "}" back to l[2]), <paramref name="wide"/> for a double-byte
+    /// character: l[0] = the width, l[1] = the table in use at the end.
+    /// </summary>
+    private void TextWidth(ScnContext c, ScnNativeArgs a, int wide)
+    {
+        int p = NativeArg(a, 0), table = NativeArg(a, 2), width = 0;
+        using var verify = VerifyRegion(c, a, a.Stack, 8);
+        for (byte b; (b = ReadByte(p)) != 0; )
+        {
+            switch (b)
+            {
+                case (byte)'[': table = NativeArg(a, 1); p++; continue;
+                case (byte)']' or (byte)'}': table = NativeArg(a, 2); p++; continue;
+                case (byte)'{': table = NativeArg(a, 3); p++; continue;
+            }
+            if (b is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
+            {
+                width += wide;
+                p += 2;
+                continue;
+            }
+            width += ReadByte(table + b);
+            p++;
+        }
+        SetL(a, 0, width);
+        SetL(a, 1, table);
+    }
+
+    /// <summary>
+    /// An n x n mask (n the low byte of l[2], 0: 256) at l[1] from the first byte of each pixel of
+    /// a BGR picture at l[0] with rows <paramref name="stride"/> bytes apart: (v &lt;&lt; 6) / 255.
+    /// </summary>
+    private void Mask(ScnContext c, ScnNativeArgs a, int stride)
+    {
+        int src = NativeArg(a, 0), dst = NativeArg(a, 1), n = (byte)NativeArg(a, 2);
+        if (n == 0)
+            n = 256;
+        using var verify = VerifyRegion(c, a, dst, n * n);
+        for (int y = 0; y < n; y++, src += stride)
+            for (int x = 0; x < n; x++)
+                WriteByte(dst++, (byte)((ReadByte(src + 3 * x) << 6) / 255));
     }
 
     /// <summary>a-z to A-Z (the x86 code compares signed bytes: 80-FF stay).</summary>

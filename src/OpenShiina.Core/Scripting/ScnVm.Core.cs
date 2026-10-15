@@ -533,20 +533,20 @@ public sealed partial class ScnVm
             vm.WriteByte(a, (byte)vm.Value(c, i.Args[2]));
             return 0;
         });
-        // 02C6 dst, src, n: memmove
+        // 02C6 dst, src, n: memmove, of any size (Sorcery Jokers copies its 82 MB EVE21_01D.S25 into
+        // its own pool; a cap of 64 MB here once left the rest of it as it was, and relocating
+        // its frames wrote all over the memory)
         Register(0x02C6, (vm, c, i) =>
         {
             int dst = vm.Value(c, i.Args[0]), src = vm.Value(c, i.Args[1]), n = vm.Value(c, i.Args[2]);
-            vm.MoveMemory(dst, src, Math.Clamp(n, 0, 0x4000000));
+            vm.MoveMemory(dst, src, Math.Max(n, 0));
             return 0;
         });
-        // 02C7 dst, n, byte: memset
+        // 02C7 dst, n, byte: memset, of any size
         Register(0x02C7, (vm, c, i) =>
         {
             int dst = vm.Value(c, i.Args[0]), n = vm.Value(c, i.Args[1]);
-            byte b = (byte)vm.Value(c, i.Args[2]);
-            for (int k = 0; k < n && k < 0x4000000; k++)
-                vm.WriteByte(dst + k, b);
+            vm.FillMemory(dst, Math.Max(n, 0), (byte)vm.Value(c, i.Args[2]));
             return 0;
         });
         // 02CB a, b, n, v (aoj.EXE 0x416180 -> FUN_00416130): v = 0 when the n bytes at a and b

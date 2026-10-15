@@ -86,7 +86,12 @@ var vm = new ScnVm(ScnOpcodes.ForVersion(version), host)
 foreach (var (key, set) in new (string, Action<int>)[] { ("WindowWidth", v => vm.ScreenWidth = v), ("WindowHeight", v => vm.ScreenHeight = v) })
     if (System.Text.RegularExpressions.Regex.Match(ini, $@"(?im)^{key}=(\d+)") is { Success: true } m)
         set(int.Parse(m.Groups[1].Value));
-vm.VerifyNatives = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE") == "1";
+// SCNBOOT_VERIFY_NATIVE=1 checks every C# routine against its x86 code; =sig,sig... only those
+// whose signatures start so (the large zooms take long on the interpreter)
+string? verifyNative = Environment.GetEnvironmentVariable("SCNBOOT_VERIFY_NATIVE");
+vm.VerifyNatives = verifyNative is { Length: > 0 } && verifyNative != "0";
+if (vm.VerifyNatives && verifyNative != "1")
+    vm.VerifyOnly = verifyNative!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 // SCNBOOT_BGLOAD=1: the background loader (00CE) reads on another thread, as in the players
 // (and the files a scenario names are read ahead: ScnVm.ReadAhead.cs; SCNBOOT_AHEAD=0 turns that off)
 // (the frames then depend on the machine's timing: off by default)

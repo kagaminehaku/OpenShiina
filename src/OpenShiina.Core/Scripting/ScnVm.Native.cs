@@ -179,6 +179,8 @@ public sealed partial class ScnVm
     {
         if (!VerifyNatives)
             return null;
+        if (VerifyOnly is { Count: > 0 } only && !only.Any(NativeSignature(m_nativeTarget).StartsWith))
+            return null;
         regions = regions.Where(r => r.Length > 0).ToArray();
         if (regions.Length == 0)
             return null;

@@ -63,11 +63,12 @@ The games tried so far, on Windows, Linux and Android:
 | [Chiccha na Hanayome ~Mada Mada Tsubomi da mon~](https://vndb.org/v20284) | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017 | 2.50 | ✅ Plays through |
 | [Kyuuketsuki no Libra](https://vndb.org/v17825) | 吸血姫のリブラ | 2015 | 2.50 | ✅ Plays through |
 | [Libra of the Vampire Princess](https://vndb.org/r44159) (English, Steam) | 吸血姫のリブラ | 2017 | 2.50 | ✅ Plays through |
+| [Sorcery Jokers](https://vndb.org/r47518) (English, MangaGamer) | ソーサリージョーカーズ | 2018 | 2.50 | ✅ Plays through (its movies not shown: they are WMV) |
 
 ✅ every route was played to its end, or every scenario of the game was run through to its end
 by the test runner, nothing stopping ([how](docs/compatibility.md#sweeping)).
 
-That is 21 games, 22 releases (Libra's English one as well). OpenShiina has the keys of 114 more ShiinaRio games, not tried yet, and VNDB lists 35 more it
+That is 22 games, 23 releases (Libra's English one as well). OpenShiina has the keys of 113 more ShiinaRio games, not tried yet, and VNDB lists 35 more it
 has no keys for. Whether one plays depends on its engine version: 2.45, 2.47, 2.49 and 2.50 run,
 and 2.34 (one game of it tried). Every game, with its engine version, and each platform's state
 are in [docs/compatibility.md](docs/compatibility.md).

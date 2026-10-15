@@ -20,7 +20,8 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 21 games, 22 releases, tried). Then ScnBoot
+scripts the player does not run yet (none in the 22 games, 23 releases, tried; all of them
+play through, as the README's table lists them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -165,7 +166,7 @@ of those versions it does not list.
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ✅ Plays through | 2026-10-14 |
 | Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ⚪ Not tried |  |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
-| Sorcery Jokers [English] | ソーサリージョーカーズ (English) | 2018-01-12 | [r47518](https://vndb.org/r47518) | v2.50 | ⚪ Not tried |  |
+| Sorcery Jokers [English] | ソーサリージョーカーズ (English) | 2018-01-12 | [r47518](https://vndb.org/r47518) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Chuuni Hime no Teikoku | 厨二姫の帝国 | 2018-02-23 | [v17900](https://vndb.org/v17900) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Nukige Mitai na Shima ni Sunderu [Trial] | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 体験版 | 2018-06-22 | [r57518](https://vndb.org/r57518) | v2.50 | ⚪ Not tried |  |
@@ -225,7 +226,7 @@ so they cannot be opened or played until a scheme is found (docs/engine-notes.md
 
 | Platform | Player | Status | Checked |
 |---|---|---|---|
-| Windows 10 / 11 | Avalonia (`OpenShiina.Desktop`; the WPF player of 0.2.0 and before is on the branch `legacy-wpf`) | ✅ The games above | 2026-10-08 |
+| Windows 10 / 11 | Avalonia (`OpenShiina.Desktop`; the WPF player of 0.2.0 and before is on the branch `legacy-wpf`) | ✅ The games above | 2026-10-15 |
 | Android | Avalonia (`OpenShiina.Android`), Release built with LLVM | 🟢 Plays | 2026-10-08 |
 | Linux, macOS | Avalonia (`OpenShiina.Desktop`) | ⚪ Builds; no game run recorded here | |
 | iOS | not written yet | ⚪ Planned | |
@@ -373,6 +374,20 @@ tables, a glyph mask of any size; the x86 interpreter learnt `repne scasb` to ch
 its blur, Chiccha na Hanayome's code with other offsets, given the C# blur32 (30 s a frame on
 the interpreter before). Swept: 131 scenarios, every one to its end.
 
+**Sorcery Jokers** (the English release by MangaGamer, SJSe.EXE, engine v2.50, 1920 x 1080) has
+its own scheme; its DecodeBin had GARbro's shared date, which spoiled 8 of its pictures: its own,
+0x20160725, was worked out from its English text. opcheck found five opcodes and three user32
+functions missing (engine-notes.md, "Sorcery Jokers"); its START wants SSE2. Eight embedded
+routines were new, all given C# (a blank S25 maker whose rows have no length, a mask and a copy
+of a 1920-wide picture, a text width, a scan past double-byte characters, a picture's pointers
+made offsets again, a colour saturation through tables after it, and the C# not), checked
+against their x86 code. Its first sweep (2026-10-15) found two faults of the player, fixed:
+`02C6` (memmove) copied at most 64 MB, so the last 18 MB of its 82 MB EVE21_01D.S25 never
+reached its pool and relocating that picture wrote all over the memory (a process of 5 GB, its
+scripts overwritten); and its movies are Windows Media only (mv\*.wmv, no MPEG-1 beside them),
+which the decoder here cannot play: such a movie is now taken as played to its end (not shown).
+Swept again: 101 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -407,8 +422,8 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 21 games (22 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
-2026-10-14, both Libras on 2026-10-15): none stopped, none stuck.
+The 22 games (23 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+2026-10-14, both Libras and Sorcery Jokers on 2026-10-15): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -434,6 +449,7 @@ The 21 games (22 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and A
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | 111 | 93.7% (the branches of choices not taken) |
 | Kyuuketsuki no Libra | 105 | 99.6% |
 | Libra of the Vampire Princess (English) | 131 | 96.2% (short lines of its H scenes, "\*Kiss\*.", passed in the skip; and the stand-in scenarios of the cut scenes, `_N`) |
+| Sorcery Jokers (English) | 101 | 96.5% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in
@@ -452,8 +468,9 @@ When a game's state changes:
    what was added for it, and what is known not to work.
 3. When a platform was tried (a phone, Linux, macOS), add or update its row under **Platforms**
    with the device and what ran.
-4. If it is the headline of a change, the commit message can name the game; README links here
-   and does not list the games itself.
+4. When it now plays through, add it to the README's table of the games tried (with the count
+   under it: games, and releases where a game has more than one, as Libra's English one) and
+   to the table under **Sweeping**; the commit message can name the game.
 
 To see which opcodes a game's scripts use that OpenShiina does not run yet, boot it in ScnBoot
 (`tests/OpenShiina.ScnBoot`): it stops at the first one and prints it.

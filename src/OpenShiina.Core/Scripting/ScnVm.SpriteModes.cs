@@ -137,7 +137,7 @@ public sealed partial class ScnVm
         if (visible <= 0)
             return;
         int rowBytes = visible * 3;
-        var src = ReadRow(p, dst, rowBytes);
+        var src = ReadRow(p, dst, rowBytes, skip + visible);
         // drawn straight into script memory
         Span<byte> row = Bytes(dst, rowBytes);
         int o = 2, d = 0, remaining = visible, pending = 0;

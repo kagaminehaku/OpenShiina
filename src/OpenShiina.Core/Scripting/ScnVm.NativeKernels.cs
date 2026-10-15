@@ -15,6 +15,9 @@ public sealed partial class ScnVm
     /// <summary>Run each replaced routine on the interpreter too and compare the results.</summary>
     public bool VerifyNatives { get; set; }
 
+    /// <summary>With VerifyNatives: only the routines whose signatures start with one of these (none: all).</summary>
+    public IReadOnlyList<string>? VerifyOnly { get; set; }
+
     // START 75C3D of Oreimo (6A6ED Azu, 5D88B Ero-On!, 75ED7 Homu, 76167 Yuru, 76687 Nyaru, 76647
     // Rikka, 76097 Sena, 760B7 Kuroneko): xors count dwords at l[1] with a key stream from l[0]
     // (xor [ebx],eax / inc eax / rol eax,3 / bswap eax), count a constant of each game (Oreimo

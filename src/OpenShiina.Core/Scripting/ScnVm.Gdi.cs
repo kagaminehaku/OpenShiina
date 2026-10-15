@@ -220,6 +220,21 @@ public sealed partial class ScnVm
             case ("user32", "ShowWindow"):
                 // The host shows the window; it was visible
                 return 1;
+            case ("user32", "SetForegroundWindow"):
+                return 1;
+            case ("user32", "GetClientRect"):
+            {
+                // The window's inside: the picture (Sorcery Jokers' hook for a window being sized)
+                int r = Arg(1);
+                Write32(r, 0);
+                Write32(r + 4, 0);
+                Write32(r + 8, ScreenWidth);
+                Write32(r + 12, ScreenHeight);
+                return 1;
+            }
+            case ("user32", "ClientToScreen"):
+                // The window's inside is at (0, 0) of the screen (09EC): the point stays
+                return 1;
             case ("kernel32", "GetDiskFreeSpaceExA"):
             {
                 // A disk of 256 GB with 64 GB free, where each pointer is not null (Chuuchuu Nurse
