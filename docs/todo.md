@@ -11,8 +11,6 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 - [ ] **Re:Rem Plus's held kiss zoom** is still two to three times the original (3.1-3.3% of the
   machine against 1.0%; engine-notes.md section 7): half the frame (2.4 ms), half showing it.
-- [ ] **The Avalonia player's picture**: a GPU texture that takes only the changed part
-  (GameSession.TakeFrame gives it) instead of the whole picture each frame.
 - [ ] **blur32 on arm64**: 87-93 ms a call on a phone against 5.5 on a PC, whatever the JIT does.
   Time its pieces there.
 - [ ] **`00C9` on phones**: the first read of a large picture takes 7 ms a MB (2.4 on a PC);

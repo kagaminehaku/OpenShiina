@@ -33,8 +33,8 @@ public sealed partial class GameView : UserControl, IGameWindow
     private IPlayerJoystick? m_joystick;
     // Closing: asked the scripts and waiting for their answer / they let the window close
     private bool m_closeAsked, m_closeAllowed;
-    // The game's latest picture (BGRA), handed to the GamePicture when it changes
-    private byte[]? m_frame;
+    // The game's pictures, as the GamePicture takes them (GameSession.TakeFrame)
+    private GamePicture.FrameSource? m_frames;
     private bool m_animating;
 
     /// <summary>The window title the game asks for (the desktop window shows it).</summary>
@@ -223,7 +223,7 @@ public sealed partial class GameView : UserControl, IGameWindow
 
     private void Pointer(PointerEventArgs e)
     {
-        if (m_session == null || m_frame == null)
+        if (m_session == null)
             return;
         // Fingers are a mouse of their own (GameView.Touch.cs); a pen is a mouse
         if (e.Pointer.Type == PointerType.Touch)
@@ -450,10 +450,10 @@ public sealed partial class GameView : UserControl, IGameWindow
     private void Start(GameSession session)
     {
         m_session = session;
-        m_frame = new byte[session.Width * session.Height * 4];
+        m_frames = session.TakeFrame;
         m_image.Scaling = session.Setup.Settings.Scaling;
         m_image.FsrSharpness = session.Setup.Settings.FsrSharpness;
-        m_image.SetFrame(m_frame, session.Width, session.Height, session.Width * 4);
+        m_image.Start(session.Width, session.Height);
         m_image.IsVisible = true;
         m_library.IsVisible = false;
         TitleChanged?.Invoke(session.Data.SchemeName);
@@ -501,10 +501,8 @@ public sealed partial class GameView : UserControl, IGameWindow
     /// <summary>The game's pace: the interpreter's new picture into the view.</summary>
     private void TakeNewFrame()
     {
-        if (m_session == null || m_frame == null)
-            return;
-        if (m_session.TakeFrame(m_frame, m_session.Width * 4, out var area) && !area.IsEmpty)
-            m_image.SetFrame(m_frame, m_session.Width, m_session.Height, m_session.Width * 4);
+        if (m_frames != null)
+            m_image.TakeFrame(m_frames);
     }
 
     private void RequestFrame()
@@ -516,7 +514,7 @@ public sealed partial class GameView : UserControl, IGameWindow
     /// <summary>A frame of the window: the game's latest picture, and the interpreter's next frame.</summary>
     private void OnFrame()
     {
-        if (m_session == null || m_frame == null)
+        if (m_session == null)
             return;
         if (m_joystick != null)
             m_session.Input.Joystick = m_joystick.Poll();
@@ -649,7 +647,7 @@ public sealed partial class GameView : UserControl, IGameWindow
         m_closeAsked = m_closeAllowed = false;
         m_image.IsVisible = false;
         m_image.Clear();
-        m_frame = null;
+        m_frames = null;
         m_library.IsVisible = m_hasLibrary;
         m_library.Refresh();
         m_frameRate.IsVisible = false;

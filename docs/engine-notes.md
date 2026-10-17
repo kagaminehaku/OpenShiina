@@ -526,8 +526,13 @@ Finding problems:
     converts to BGRA only that part and what its back buffer lacks (the area of the frame
     before), and keeps what changed since the window took a picture; TakeFrame copies that
     into the window's buffer and gives it; the WPF player writes and marks only that part of
-    its bitmap (and of the multiplied one), the Avalonia player skips frames that changed
-    nothing. SCNBOOT_AREAS=1 checks it: a copy updated only in the areas given is the picture
+    its bitmap (and of the multiplied one), the Avalonia player writes it into its picture's
+    pixels and draws only that part into its texture (GamePicture.FrameTexture: a GPU surface,
+    or a raster one without a GPU) on the render thread. Its texture read back after every
+    change was the picture (Pure Love!'s title and first scene, Re: Rem Plus's first scene:
+    3,976 changes, 1,687 of them a part). Re: Rem Plus's first scene waiting for a click (the
+    cursor turns, a 44 x 48 part): 14.7% of one core -> 12.0% (four runs of 30 s each, 13.0-16.9
+    against 10.7-14.2). SCNBOOT_AREAS=1 checks it: a copy updated only in the areas given is the picture
     after every frame (Re: Rem Plus's first route and zoom, Oreimo's park route: no frame
     missed). In Re: Rem Plus's first route a third of the frames change under a tenth of the
     screen (the text), two thirds all of it (the scenes move).
