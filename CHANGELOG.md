@@ -4,7 +4,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.4 (2026-10-17)
+
+One more game plays through: 28 games, 29 releases.
 
 - **New: Tsugou no Ii Idol (ツゴウノイイアイドル, 2015)** plays through.
 
