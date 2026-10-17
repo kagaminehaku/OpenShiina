@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 27 games, 28 releases, tried; all of them
+scripts the player does not run yet (none in the 28 games, 29 releases, tried; all of them
 play through, as the README's table lists them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
@@ -154,7 +154,7 @@ of those versions it does not list.
 | Gyaku Katei Kyoushi | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014-12-12 | [v16306](https://vndb.org/v16306) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Shuukatsu Katei Kyoushi | シュウカツ家庭教師 | 2015-03-13 | [v16904](https://vndb.org/v16904) | v2.50 | ⚪ Not tried |  |
-| Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ⚪ Not tried |  |
+| Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ✅ Plays through | 2026-10-17 |
 | Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | ⚪ Not tried |  |
 | Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | 2015-09-18 | [v17971](https://vndb.org/v17971) | v2.50 | ⚪ Not tried |  |
 | Kyuuketsuki no Libra | 吸血姫のリブラ | 2015-10-30 | [v17825](https://vndb.org/v17825) | v2.50 | ✅ Plays through | 2026-10-15 |
@@ -432,6 +432,12 @@ the rows from two source rows, is the average of its 2 x 2 source pixels (609 ca
 random cases the same as its x86 code), and its enlarge32 (C375C) is Re: Rem Plus's with other
 padding (188 calls the same). Swept: 66 scenarios, every one to its end.
 
+**Tsugou no Ii Idol** (D：drive., TSUGOI.EXE, engine v2.50, 1280 x 720) had its scheme but not
+its executable's name, so it was not recognised: `TSUGOI.EXE` is mapped to it now. No entry
+needs DecodeBin (none has the flags of Decrypt2); its 289 S25, 81 TXT and 2 OGV come out whole.
+opcheck found nothing missing, and every routine it runs has its C# version. Swept: 80
+scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -466,9 +472,10 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 27 games (28 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+The 28 games (29 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
 2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love!,
-School Saimin Paradise! and Sis△Camp on 2026-10-15): none stopped, none stuck.
+School Saimin Paradise! and Sis△Camp on 2026-10-15; Tsugou no Ii Idol on 2026-10-17): none
+stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -500,6 +507,7 @@ School Saimin Paradise! and Sis△Camp on 2026-10-15): none stopped, none stuck.
 | Pure Love! | 172 | 98.1% |
 | School Saimin Paradise! | 46 | 99.9% |
 | Sis△Camp | 66 | 99.7% |
+| Tsugou no Ii Idol | 80 | 99.7% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in
