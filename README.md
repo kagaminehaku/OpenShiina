@@ -199,7 +199,8 @@ The environment variables of the settings still win over them, for tests: `OPENS
 `=0`, `OPENSHIINA_JOYPAD=0` / `=ini` (below), `OPENSHIINA_PERF=0` (no frame rate) / `=log` (also
 `perf.log`), `OPENSHIINA_X86JIT=0`, `OPENSHIINA_TRACE=draw`. Only as variables:
 `OPENSHIINA_PAINT=surface` (shows the display surface every frame), `OPENSHIINA_THREADS=<n>` (the
-most pieces a pixel routine is cut into; 1 runs them all on the interpreter's thread),
+most pieces a pixel routine is cut into, and the most threads for a movie picture's slices; 1 runs
+them all on the interpreter's thread),
 `OPENSHIINA_DATA=<folder>`
 (the player's data instead of %AppData%\OpenShiina), `OPENSHIINA_WAYLAND=1` (Avalonia's own
 Wayland backend on Linux), `OPENSHIINA_TOUCH=1` (the desktop player laid out as on a phone or

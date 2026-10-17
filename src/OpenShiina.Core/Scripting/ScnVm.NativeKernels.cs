@@ -56,6 +56,15 @@ public sealed partial class ScnVm
 
     private void RegisterNativeKernels()
     {
+        // Sorcery Jokers START 429E0 (MMX): a 1280 x 720 movie frame (BGR, rows of 1920 pixels)
+        // enlarged to 1920 x 1080 in rows as long, each 2 x 2 pixels a b / c d becoming 3 x 3 (per
+        // byte, rounded down): a, (a + b) >> 1, b / (a + c) >> 1, (a + b + c + d) >> 2, (b + d) >> 1
+        // / c, (c + d) >> 1, d. l[0] dst, l[1] src. It keeps a mask (0xFFFFFF, 0) and its count of
+        // row pairs (360, down to 0) in the 12 bytes 0x30 before itself, and finds them with a call
+        // to the next instruction: a routine that calls stays on the interpreter, 540 ms a frame
+        // of its movies (the retrom-project fork found it too)
+        RegisterNative("5CACF83E36A7430DE10BFB2C07321C6A72C6CC87", "movie 3:2", (vm, c, a) => vm.EnlargeMovie(c, a));
+
         // Re:Rem Plus / Maki Fes! START 8BBD0: f[0] = the 16 bytes at l[0] against those at l[1]
         // (repe cmpsb, signed bytes: -1, 0, 1); the compare 0294 sorts the montage table with
         // (81,301 entries in Re:Rem Plus, so about 1.5 million calls at start)
@@ -364,5 +373,48 @@ public sealed partial class ScnVm
                 output[p] = (byte)(v | (belowMax ? 0u : (uint)s));
             }
         }
+    }
+
+    /// <summary>The 3:2 movie enlargement of Sorcery Jokers (RegisterNativeKernels): rows of pairs on all cores.</summary>
+    private void EnlargeMovie(ScnContext c, ScnNativeArgs a)
+    {
+        const int Pitch = 1920 * 3, PairRows = 360, Pairs = 640;
+        int dst = NativeArg(a, 0), src = NativeArg(a, 1), scratch = m_nativeTarget - 0x30;
+        const int SrcBytes = Pitch * (2 * PairRows - 1) + Pairs * 6, DstBytes = Pitch * 3 * PairRows;
+        if (!IsContiguous(src, SrcBytes) || !IsContiguous(dst, DstBytes) || !Apart((uint)src, SrcBytes, (uint)dst, DstBytes)
+            || !Apart((uint)scratch, 12, (uint)src, SrcBytes) || !Apart((uint)scratch, 12, (uint)dst, DstBytes))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegions(c, a, (dst, DstBytes), (scratch, 12));
+        ParallelRows.For(PairRows, (long)1920 * 1080, (first, last) =>
+        {
+            for (int y = first; y < last; y++)
+            {
+                ReadOnlySpan<byte> top = Bytes(src + 2 * y * Pitch, Pairs * 6);
+                ReadOnlySpan<byte> bottom = Bytes(src + (2 * y + 1) * Pitch, Pairs * 6);
+                var r0 = Bytes(dst + 3 * y * Pitch, Pitch);
+                var r1 = Bytes(dst + (3 * y + 1) * Pitch, Pitch);
+                var r2 = Bytes(dst + (3 * y + 2) * Pitch, Pitch);
+                for (int i = 0, o = 0; i < Pairs * 6; i += 6, o += 9)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        int pa = top[i + k], pb = top[i + 3 + k], pc = bottom[i + k], pd = bottom[i + 3 + k];
+                        r0[o + k] = (byte)pa;
+                        r0[o + 3 + k] = (byte)((pa + pb) >> 1);
+                        r0[o + 6 + k] = (byte)pb;
+                        r1[o + k] = (byte)((pa + pc) >> 1);
+                        r1[o + 3 + k] = (byte)((pa + pb + pc + pd) >> 2);
+                        r1[o + 6 + k] = (byte)((pb + pd) >> 1);
+                        r2[o + k] = (byte)pc;
+                        r2[o + 3 + k] = (byte)((pc + pd) >> 1);
+                        r2[o + 6 + k] = (byte)pd;
+                    }
+            }
+        });
+        Write32(scratch, 0xFFFFFF);
+        Write32(scratch + 4, 0);
+        Write32(scratch + 8, 0);
     }
 }

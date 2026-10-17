@@ -6,6 +6,7 @@
 //   Mpeg1Video       - decodes the video stream into YCbCr frames in display order
 
 using System.Runtime.Intrinsics;
+using OpenShiina.Scripting;
 
 namespace OpenShiina.Formats;
 
@@ -457,7 +458,8 @@ public sealed class Mpeg1Video : IMovieVideo
         }
 
         // Slices up to the next picture, GOP or sequence start code: found first, then decoded
-        // on all cores (each writes macroblocks of its own)
+        // on as many cores as the pixel routines take (ParallelRows.MaxParts, OPENSHIINA_THREADS;
+        // each writes macroblocks of its own)
         m_slices.Clear();
         while (true)
         {
@@ -485,8 +487,9 @@ public sealed class Mpeg1Video : IMovieVideo
                 Interlocked.Increment(ref m_errors);
             }
         }
-        if (m_slices.Count >= 2)
-            Parallel.For(0, m_slices.Count, () => new SliceDecoder(this), (index, _, decoder) =>
+        if (m_slices.Count >= 2 && ParallelRows.MaxParts > 1)
+            Parallel.For(0, m_slices.Count, new ParallelOptions { MaxDegreeOfParallelism = ParallelRows.MaxParts },
+                () => new SliceDecoder(this), (index, _, decoder) =>
             {
                 DecodeOne(decoder, index);
                 return decoder;

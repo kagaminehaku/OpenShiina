@@ -326,7 +326,9 @@ picture's variant).
 stub decrypts it at start), and the game checks its checksum: START stopped with "Program
 Revision Error" until `03C2` gave this executable's value. Its 679 opcodes are v2.47's with the
 same operands. In ScnBoot: the title, a new game, the story with its pictures, text and music to
-frame 9,000.
+frame 9,000. Its save thumbnails (START 70036AF3: 160 x 120 from blocks of 5 x 5 of the 800 x 600
+picture; 70036B67 the same code for 400 x 300 from blocks of 2 x 2) ran as translated x86 code
+until 2026-10-17: they now take the C# thumbnail (SCNBOOT_VERIFY_NATIVE: the same bytes).
 
 **Chuuni Hime no Teikoku** (engine v2.50, CHU2HIME.EXE, ver 1.01) opcheck: nothing missing.
 Two things were added for it (2026-10-13). Its START copies its music (`m\*.ogv`) into a buffer
@@ -387,7 +389,10 @@ reached its pool and relocating that picture wrote all over the memory (a proces
 scripts overwritten); and its movies are Windows Media only (mv\*.wmv, no MPEG-1 beside them),
 which nothing here could play then: such a movie was taken as played to its end (not shown).
 They play since (2026-10-15): four WMV3 with WMA 2 sound and the ending in VC-1 Advanced profile
-with WMA Pro, decoded here (engine-notes.md, "Windows Media movies").
+with WMA Pro, decoded here (engine-notes.md, "Windows Media movies"). Each movie frame (1280 x
+720) is enlarged to the screen by START 429E0 (3 x 3 pixels from each 2 x 2, MMX): a routine that
+calls, so it stayed on the x86 interpreter, 540 ms a frame, until it was given C# (2026-10-17,
+2.8 ms; SCNBOOT_VERIFY_NATIVE: 268 frames of the first opening, the same bytes).
 Swept again: 101 scenarios, every one to its end.
 
 **Puchipuchi Idol Kouhosei** (桃色劇場, PETITxPETIT.EXE, engine v2.49, 800 x 600; its package's

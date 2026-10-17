@@ -16,8 +16,20 @@ is mostly for slow phones, and should follow what their perf.log shows.
 - [ ] **`00C9` on phones**: the first read of a large picture takes 7 ms a MB (2.4 on a PC);
   see whether decrypting or unpacking takes it.
 - [ ] **The compositor: compose only what changed.** In a scene of text 04C4 redraws the whole
-  1280 x 720 list every frame where only the message window changes. Needs to know when a
-  picture's pixels change.
+  list every frame where often only the message window changes. Tried (2026-10-17), right but no
+  faster, so not kept: every write marked the 4 KB pages it wrote; for each surface 04C4 kept the
+  rows before and after its last composition and the entries drawn, and drew again only the
+  rows of entries that changed (their 32 bytes, or a write into their picture's heap block) and
+  of the surface that changed (whole rows: a run cut at the sides can take another MMX path).
+  Checked against whole compositions on all 28 releases. But the surfaces drawn into are
+  written over before nearly every 04C4 (Bitch Nee-chan copies surface 3 into surface 0 with
+  04E2, then composes over it): comparing their rows and copying the kept ones back cost as much
+  as drawing them (04C4 in the first scenario swept: Re: Rem Plus 640-700 -> 840-870 ms, Sorcery
+  Jokers 9.6-10.0 -> 14.1-14.8 s, Libra 4.2-4.3 -> 5.6-5.8 s; Oreimo Plus 180-226 -> 166-204);
+  keeping rows only of surfaces nothing wrote since made it as fast as before, with 0-8% of the
+  rows kept. What would pay: putting off a copy such as 04E2's for the rows the next composition
+  draws over anyway, which needs to know when anything reads the surface. Bitch Nee-chan's
+  prologue changes most of its rows anyway (a layer of its background is drawn every frame).
 - [ ] **Load in the background**: the system pictures and sounds START loads at the start (no
   scenario names them), and pictures' decoding, still on the interpreter's thread.
 - [ ] **`00A1`**: every shown character is drawn again at each call.

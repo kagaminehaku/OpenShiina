@@ -43,11 +43,14 @@ public sealed partial class ScnVm
         // CPU the interpreter reports (X86Cpu.Cpuid: an Intel with MMX, no SSE) gives 0x11, so
         // START takes its routines without SSE2 (Re: Rem Plus's own SSE2 zoom too). A START that
         // will not run without SSE2 (Bitch Nee-chan's "SSE2 をサポートしていません", Sorcery
-        // Jokers' "CPU does not supported to SSE2") is told SSE and SSE2 as well (0x71)
+        // Jokers' "CPU does not supported to SSE2"; "ＣＰＵが《ＳＳＥ２》に対応していません" is a
+        // game's that none of the games here has, found by the retrom-project fork) is told SSE
+        // and SSE2 as well (0x71)
         RegisterNative(["B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F"], "cpuid", (vm, c, a) =>
         {
             var code = vm.ReadBytes(c.CodeBase, c.CodeSize).AsSpan();
             int features = code.IndexOf(Encodings.cp932.GetBytes("SSE2 をサポートしていません")) >= 0
+                           || code.IndexOf(Encodings.cp932.GetBytes("ＣＰＵが《ＳＳＥ２》に対応していません")) >= 0
                            || code.IndexOf("does not supported to SSE2"u8) >= 0 ? 0x71 : 0x11;
             // The interpreter's CPUID has no SSE: nothing to verify the SSE2 answer with
             using var verify = features == 0x11 ? vm.VerifyRegions(c, a, (a.Stack, 4), (vm.m_nativeTarget - 4, 4)) : null;
@@ -63,6 +66,10 @@ public sealed partial class ScnVm
         RegisterNative("1174F52A9A080EAEF9B086E491846FF3D5B35EB8", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 50, 16, 12));
         // Can Fes! START 71211: 68 x 51 from blocks of 11 x 11 (the rest of the 800 x 600 picture left out)
         RegisterNative("4D0B738FCFB0B45B214E4DFE0C8F5F46129F0B09", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 11, 68, 51));
+        // Chuuchuu Nurse START 70036AF3 / 70036B67 (v2.45): 160 x 120 from blocks of 5 x 5, and the
+        // same code with blocks of 2 x 2 for 400 x 300
+        RegisterNative("42515BD6BA1FCC24A41CA6A734692CC90E6577DB", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 160, 120));
+        RegisterNative("2853439284672B39391C2DEA48F204032D81382A", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 2, 400, 300));
         // Ao no Juuai 188BE (START2 18950; v2.34): the same 100 x 75 thumbnail, f[0] src, f[1] dst
         RegisterNative("FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F)));

@@ -455,7 +455,9 @@ Finding problems:
   850F8 / 85C68: its loop over the rows from two source rows draws one row fewer and the
   partly covered bottom row is not drawn; `Subpixel32(v250)`, 387 random cases the same as the
   x86 code; translated it took 93 ms a call there); the MPEG-1 decoder decodes a picture's slices
-  on all cores (ed.mpg has about 3 a picture) and ToBgr24 shares its rows out (7.1 -> 2.8 ms a
+  on as many cores as the pixel routines take (ParallelRows.MaxParts, OPENSHIINA_THREADS: until
+  2026-10-17 on all of them; ed.mpg 0.80 ms a picture on 4, 0.71 on 12, 2.11 on 1, the same bytes;
+  it has about 3 slices a picture) and ToBgr24 shares its rows out (7.1 -> 2.8 ms a
   1280 x 720 frame, the same bytes on all 3,115 frames); Ogg sounds are decoded as they play
   (ScnMusic.Source) instead of all at 06B1 (100 ms a voice there; only the headers are read
   first); 051E's stretches copied a pixel through a 3-byte array (CopyPixel24 now); 0568
