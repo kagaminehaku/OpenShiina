@@ -4,6 +4,21 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.7.3 (2026-10-17)
+
+Sorcery Jokers' movies play at full speed, and the player shows its picture with less work.
+
+- **Sorcery Jokers' movies play at full speed.** Each movie frame is enlarged to the 1920 x 1080
+  screen by a routine of the game that ran on the x86 interpreter: 540 ms a frame, so its
+  movies crawled. It has a C# version now, 2.8 ms a frame, the same pictures.
+- **Chuuchuu Nurse's save thumbnails** are made by C# code instead of translated x86 code (the
+  same pictures).
+- **The player's picture takes only what changed.** The window's picture is a texture on the
+  GPU that gets only the part of each frame that changed, instead of the whole picture every
+  frame (in a scene of text, often the text alone).
+- **`OPENSHIINA_THREADS` counts movie decoding too:** an MPEG-1 picture is decoded on as many
+  threads as the pixel routines take (4 at most by default; all the processor's before).
+
 ## 0.7.2 (2026-10-15)
 
 Six more games play through (seven releases), and Windows Media movies play.
