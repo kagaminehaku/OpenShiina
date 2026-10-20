@@ -4,7 +4,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.6 (2026-10-21)
+
+Five new games: 33 games (34 releases) now play through.
 
 - **New: Hin wa Bokura no Fuku no Kami (貧は僕らの福の神, 2012)** plays through.
 - **New: Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld"
