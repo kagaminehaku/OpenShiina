@@ -70,7 +70,11 @@ another field here) and a 4,162-byte PNG; its plug-in's code is Sukupara's. Its 
 date 0x20201020 came from the six files that read that slot, all S25 whose slot falls in a
 frame's table of rows: each row is a 16-bit length and that many bytes, the next row right
 after, so the right offset is known and XORing it with the decoded one gives the date (all six
-agree). Its 674 S25, 67 TXT and 26 OGV come out whole.
+agree). Its 674 S25, 67 TXT and 26 OGV come out whole. Libra of the Vampire Princess's English
+fan disc (LIBRAeSe.exe, 2017) is laid out as its main game's LIBRAeS.exe, which is as Sukupara's:
+the HelperKey 12 bytes after the first IEND, the image's length from the routine at 0x75A10
+(46,962), the seed 12 bytes before the YPK block at 0xD4934; its plug-in holds the shared
+DecodeTable's PNG and after it a MakiFesCrypt's code (the main game's: a YuruPlusCrypt's).
 
 **WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
 eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a

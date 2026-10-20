@@ -4,6 +4,20 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **New: Hin wa Bokura no Fuku no Kami (貧は僕らの福の神, 2012)** plays through.
+- **New: Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld"
+  (the English fan disc, Steam)** plays through. No keys for its archives were known: they were
+  taken from its executable. Its blur ran on the x86 interpreter (10-25 s a frame).
+- **New: Iyashinbo The Motion (癒しん母 The Motion, 2010)** plays through, its animations too
+  (MPEG-1 video streams without sound, which would not open). Its save comments are an edit box
+  the player does not show yet: the comment stays empty.
+- **New: Damatte Watashi no Muko ni Nare! (黙って私のムコになれ！, 2011)** plays through.
+- **New: Gensou no Idea ~Oratorio Phantasm Historia~ (幻創のイデア, 2013)** plays through.
+- **The README is shorter**: the list of games is in docs/compatibility.md, and the player's
+  settings, controls and environment variables are in the new docs/player.md.
+
 ## 0.7.5 (2026-10-20)
 
 A fix for devices with 16 KB memory pages.

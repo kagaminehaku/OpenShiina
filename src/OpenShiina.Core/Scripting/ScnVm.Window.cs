@@ -57,11 +57,56 @@ public sealed partial class ScnVm
                 vm.Value(c, a);
             return 0;
         });
-        // 07A8 hwnd, text: the window title
+        // 07A8 hwnd, text: SetWindowTextA (FUN_0041F5D0 in v2.47; 0 is the game window): the title,
+        // or a control's text
         Register(0x07A8, (vm, c, i) =>
         {
-            vm.Value(c, i.Args[0]);
-            vm.m_host.SetTitle(vm.ReadString(vm.Value(c, i.Args[1])));
+            int hwnd = vm.Value(c, i.Args[0]);
+            string text = vm.ReadString(vm.Value(c, i.Args[1]));
+            if (vm.m_controls.ContainsKey(hwnd))
+                vm.m_controls[hwnd] = text;
+            else if (hwnd is 0 or WindowHandle)
+            {
+                vm.m_windowTitle = text;
+                vm.m_host.SetTitle(text);
+            }
+            return 0;
+        });
+        // 07A9 hwnd, buffer, size: GetWindowTextA (FUN_0041F600): at most size - 1 bytes and a 0
+        Register(0x07A9, (vm, c, i) =>
+        {
+            int hwnd = vm.Value(c, i.Args[0]), buffer = vm.Value(c, i.Args[1]), size = vm.Value(c, i.Args[2]);
+            string text = vm.m_controls.TryGetValue(hwnd, out var t) ? t : hwnd is 0 or WindowHandle ? vm.m_windowTitle : "";
+            if (size > 0)
+            {
+                byte[] bytes = OpenShiina.IO.Encodings.cp932.GetBytes(text);
+                int n = Math.Min(bytes.Length, size - 1);
+                vm.WriteBytes(buffer, bytes.AsSpan(0, n));
+                vm.WriteByte(buffer + n, 0);
+            }
+            return 0;
+        });
+        // 0960 text, x, y, w, h, v: an edit box on the window (FUN_00416F20: CreateWindowExA "EDIT",
+        // child, visible, bordered, at most 256 controls), v its handle; 097E hwnd: it goes
+        // (FUN_00417160: DestroyWindow). Iyashinbo The Motion asks for its saves' comments so. The
+        // players show no box yet: its text is what the scripts set (07A8), the box stays empty.
+        Register(0x0960, (vm, c, i) =>
+        {
+            string text = vm.ReadString(vm.Value(c, i.Args[0]));
+            for (int k = 1; k <= 4; k++)
+                vm.Value(c, i.Args[k]);
+            if (vm.m_controls.Count >= MaxControls)
+                return 2;
+            int hwnd = ControlHandle;
+            while (vm.m_controls.ContainsKey(hwnd))
+                hwnd++;
+            vm.m_controls[hwnd] = text;
+            vm.Store(c, i.Args[5], hwnd);
+            return 0;
+        });
+        Register(0x097E, (vm, c, i) =>
+        {
+            vm.m_controls.Remove(vm.Value(c, i.Args[0]));
             return 0;
         });
         // 0778 on: full screen on / off; 0776: full screen off
@@ -88,6 +133,12 @@ public sealed partial class ScnVm
     }
 
     private readonly Dictionary<int, int> m_classLongs = new();
+
+    // The controls 0960 made (stand-in handles from ControlHandle on) and their text; the title
+    // the scripts gave the window
+    private readonly Dictionary<int, string> m_controls = new();
+    private const int MaxControls = 0x100, ControlHandle = 0x00090001;
+    private string m_windowTitle = "";
 
     private int SetGlobal(int address, ScnContext c, ScnInstruction i)
     {

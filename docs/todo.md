@@ -42,6 +42,9 @@ is mostly for slow phones, and should follow what their perf.log shows.
 ## Translations
 
 - [ ] A translated scene on a phone (tried on Windows only).
+- [ ] **Edit boxes** (`0960`, Iyashinbo The Motion's save comments): the players show none yet,
+  so the text cannot be typed; a box over the picture taking the keyboard (and on phones the
+  on-screen keyboard), its text read back by `07A9`.
 - [ ] Name plates that are pictures found by name (Oreimo Plus's `NWINTBL.BIN`): the original
   names have to stay for the lookup, and the plates are pictures (below).
 - [ ] Texts the scripts build from parts or draw another way (Oreimo Plus's menus):
@@ -56,17 +59,17 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 138 games; 19 play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 139 games; 34 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
-- [ ] **Keys for the 35 games without them** (compatibility.md, "No keys yet"), once their files
+- [ ] **Keys for the 32 games without them** (compatibility.md, "No keys yet"), once their files
   are found. From Niflheim's WARC_unpack.c: the DecodeBin (0x2000 bytes) is read by the code
   near the constant 0x40000000; v2.50's Extra picture is unpacked at run time (follow
   `push 202` through GetProcAddress).
 - [ ] Other v2.34 games: the 11 opcodes with other operands than v2.47's (0686-068B, 055A, 055B,
   04EC, 0B7D), the 9 new ones (007D-0080, 060E-0610, 0614, 077B) and 03BF. Ao no Juuai uses none.
 - [ ] Opcode tables for 2.35-2.46 and 2.48 (opscan on the game's executable).
-- [ ] The ExtraCrypts (PostAdler, PreAdler, Binbo, Count, AltCount, Ushimitsu, Nukitashi2,
+- [ ] The ExtraCrypts (PostAdler, PreAdler, Count, AltCount, Ushimitsu, Nukitashi2,
   Saimin) checked against their archives.
 - [ ] **WMV9 P-picture loop filter**: Windows' decoder chooses some loop filter edges of WMV3
   P pictures otherwise than the standard (Sorcery Jokers' 2nd OP differs by 1-2 from frame 140;

@@ -54,6 +54,9 @@ public sealed partial class ScnVm
     // of a translated line (the record's own right edge can be the screen's)
     private readonly ScnGaiji.Kind[] m_lastKind = new ScnGaiji.Kind[TextRecords];
     private readonly int[] m_cellsOnLine = new int[TextRecords], m_lineCells = new int[TextRecords];
+    // 008C's copy of a record (one for all of them, as the engine's), with what is kept of it here
+    private readonly byte[] m_savedRecord = new byte[RecordSize];
+    private (ScnGaiji.Kind LastKind, int CellsOnLine, int LineCells) m_savedRecordState;
     private static readonly byte[] s_fullWidthSpace = [0x81, 0x40];
 
     /// <summary>
@@ -1781,6 +1784,32 @@ public sealed partial class ScnVm
             int rec = vm.CurrentRecord(c);
             vm.S(rec, ROffsetX, vm.Value(c, i.Args[0]));
             vm.S(rec, ROffsetY, vm.Value(c, i.Args[1]));
+            return 0;
+        });
+        // 008C / 008D (v2.49; Damatte's v2.48 runs v2.49's opcodes): the current record copied
+        // aside and back (Sena Plus 0x43AC20 / 0x43AC40: rep movsd of the whole record to and from
+        // one place for all records). Gensou no Idea's TOPMENU draws a label with the record
+        // between them. In v2.47 both are other opcodes (an operand and a result: FUN_00422A40 /
+        // FUN_00422A70 of Oreimo Plus), not done
+        Register(0x008C, (vm, c, i) =>
+        {
+            if (vm.EngineVersion < 248)
+                throw vm.Error(c, "op_008C of v2.47 is not done");
+            int rec = vm.CurrentRecord(c), index = vm.G(rec, RIndex) % TextRecords;
+            vm.ReadBytes(rec, vm.m_savedRecord);
+            vm.m_savedRecordState = (vm.m_lastKind[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]);
+            return 0;
+        });
+        Register(0x008D, (vm, c, i) =>
+        {
+            if (vm.EngineVersion < 248)
+                throw vm.Error(c, "op_008D of v2.47 is not done");
+            int rec = vm.CurrentRecord(c);
+            vm.WriteBytes(rec, vm.m_savedRecord);
+            int index = vm.G(rec, RIndex) % TextRecords;
+            (vm.m_lastKind[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]) = vm.m_savedRecordState;
+            // the record's font is back without going through its setting: no glyph of the other one stays
+            vm.ClearGlyphs(rec);
             return 0;
         });
         // 00A0 text: set the text and keep a snapshot of the record to redraw from

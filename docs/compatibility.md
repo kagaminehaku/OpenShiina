@@ -20,8 +20,8 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 28 games, 29 releases, tried; all of them
-play through, as the README's table lists them). Then ScnBoot
+scripts the player does not run yet (none in the 33 games, 34 releases, tried; all of them
+play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -104,7 +104,7 @@ of those versions it does not list.
 | Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ⚪ Not tried |  |
 | Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ⚪ Not tried |  |
 | Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ⚪ Not tried |  |
-| Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ⚪ Not tried |  |
+| Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ✅ Plays through | 2026-10-20 |
 | Pure Love! | ぴゅあらっ！ | 2010-02-19 | [v2930](https://vndb.org/v2930) | v2.47 | ✅ Plays through | 2026-10-15 |
 | Saimin Seikatsu | 催眠生活 ～校則だから仕方ない！？～ | 2010-02-26 | [v3370](https://vndb.org/v3370) | v2.47 | ⚪ Not tried |  |
 | Najimi no Oba-chan | 馴染みのオバちゃん | 2010-03-19 | [v3815](https://vndb.org/v3815) | v2.47 | ⚪ Not tried |  |
@@ -123,7 +123,7 @@ of those versions it does not list.
 | Saint ~Aa Shu yo | セイント ～あぁ主よ、教え子達に堕とされた私をお許し下さい～ | 2010-12-10 | [v5773](https://vndb.org/v5773) | v2.47 | ⚪ Not tried |  |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ⚪ Not tried |  |
-| Damatte Watashi no Muko ni Nare! | 黙って私のムコになれ！ | 2011-01-28 | [v5289](https://vndb.org/v5289) | v2.47 | ⚪ Not tried |  |
+| Damatte Watashi no Muko ni Nare! | 黙って私のムコになれ！ | 2011-01-28 | [v5289](https://vndb.org/v5289) | v2.48 | ✅ Plays through | 2026-10-20 |
 | Gakushoku no Oba-san The Motion | 学食のおばさん The Motion ～母さんの汁の味～ | 2011-02-25 | [r12508](https://vndb.org/r12508) | v2.48 | ⚪ Not tried |  |
 | Tanetsuke Mura | 種憑け村 ～白濁神、念仏講ノ儀～ | 2011-02-25 | [v6353](https://vndb.org/v6353) | v2.48 | ⚪ Not tried |  |
 | Sensei! Shite Ageru | 先生っ！ シてあげる | 2011-03-04 | [v6444](https://vndb.org/v6444) | v2.48 | ⚪ Not tried |  |
@@ -139,13 +139,13 @@ of those versions it does not list.
 | Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Intruder | イントルーダー ～侵入者～ | 2012-06-22 | [v10533](https://vndb.org/v10533) | v2.49 | ⚪ Not tried |  |
 | Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-13 |
-| Hin wa Bokura no Fuku no Kami | 貧は僕らの福の神 | 2012-08-24 | [v10042](https://vndb.org/v10042) | v2.49 | ⚪ Not tried |  |
+| Hin wa Bokura no Fuku no Kami | 貧は僕らの福の神 | 2012-08-24 | [v10042](https://vndb.org/v10042) | v2.49 | ✅ Plays through | 2026-10-20 |
 | Boku Igai no Otoko o Shiranai Kanojo | 僕以外の男を知らない彼女が他の男に抱かれていた | 2012-08-31 | [v10816](https://vndb.org/v10816) | v2.49 | ⚪ Not tried |  |
 | Son of a ☆ Bitch | サノバ☆ビッチ ～早乙女野薔薇ちゃん、マジ天使!～ | 2012-09-07 | [v11089](https://vndb.org/v11089) | v2.49 | ⚪ Not tried |  |
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | 2012-09-28 | [v10217](https://vndb.org/v10217) | v2.49 | ⚪ Not tried |  |
 | Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | 2012-12-14 | [v11603](https://vndb.org/v11603) | v2.49 | ⚪ Not tried |  |
 | Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-13 |
-| Gensou no Idea ~Oratorio Phantasm Historia~ | 幻創のイデア～Oratorio Phantasm Historia～ | 2013-06-28 | [v11881](https://vndb.org/v11881) | v2.49 | ⚪ Not tried |  |
+| Gensou no Idea ~Oratorio Phantasm Historia~ | 幻創のイデア～Oratorio Phantasm Historia～ | 2013-06-28 | [v11881](https://vndb.org/v11881) | v2.49 | ✅ Plays through | 2026-10-21 |
 | Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ⚪ Not tried |  |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | 2014-05-30 | [v14614](https://vndb.org/v14614) | v2.49 | ⚪ Not tried |  |
 | Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ⚪ Not tried |  |
@@ -163,6 +163,7 @@ of those versions it does not list.
 | Signalist Stars!! | しぐなリストスタ～ズ!! | 2016-10-28 | [v19590](https://vndb.org/v19590) | v2.50 | ⚪ Not tried |  |
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | 2017-01-27 | [v20429](https://vndb.org/v20429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Libra of the Vampire Princess | 吸血姫のリブラ (English) | 2017-05-03 | [r44159](https://vndb.org/r44159) | v2.50 | ✅ Plays through | 2026-10-15 |
+| Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld" | 吸血姫のリブラ (English, fan disc) | 2017-07-07 | [v21459](https://vndb.org/v21459) | v2.50 | ✅ Plays through | 2026-10-20 |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ✅ Plays through | 2026-10-14 |
 | Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ⚪ Not tried |  |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
@@ -220,7 +221,6 @@ so they cannot be opened or played until a scheme is found (docs/engine-notes.md
 | Megane Choukyou ~Megane Shoujo wa Ikan ni Shite Kimoota Kyoushi no Mono ni Natta ka~ | 牝鏡調教 ～メガネ少女は如何にしてキモオタ教師のものになったか～ | 2013-05-24 | [v12626](https://vndb.org/v12626) | Goku-Fero | 7 | 🔒 No keys |
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | Love＆Piss ～少女のガマンが世界を救う～ | 2013-08-30 | [v12613](https://vndb.org/v12613) | Bonbon Company | 36 | 🔒 No keys |
 | S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | Tangerine | 14 | 🔒 No keys |
-| Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld" |  | 2017-07-07 | [v21459](https://vndb.org/v21459) | Onomatope* | 61 | 🔒 No keys |
 
 ## Platforms
 
@@ -238,7 +238,7 @@ exe (Re:Rem Plus's: about 3% of the machine for both). The GPU mode needs a Vulk
 **Android** Checked on a Galaxy S7 (Exynos 8890, Mali-T880, Vulkan 1.0) with Maki Fes!: it
 plays, 18.4 frames a second over a session from its perf.log (6.2 before the Release build used
 LLVM and the changes of 2026-10-08). Zooms and transitions still drop frames on a phone that old.
-Touch controls are described in the README.
+Touch controls are described in [player.md](player.md#controls).
 
 ## Notes
 
@@ -438,6 +438,54 @@ needs DecodeBin (none has the flags of Decrypt2); its 289 S25, 81 TXT and 2 OGV 
 opcheck found nothing missing, and every routine it runs has its C# version. Swept: 80
 scenarios, every one to its end.
 
+**Hin wa Bokura no Fuku no Kami** (Bonbon Company, BINBO.EXE, engine v2.49, 800 x 600) is the
+first game tried with its archives' ExtraCrypt, BinboCrypt (from GARbro): its 1,400 S25, 119 TXT
+and 12,499 OGV come out whole. No entry needs DecodeBin (none has the flags of Decrypt2).
+opcheck found nothing missing, and every routine it runs has its C# version. Swept: 117
+scenarios, every one to its end.
+
+**Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld"** (Onomatope*, the English fan disc on Steam, LIBRAeSe.exe, engine v2.50, 1280 x 720)
+had no keys. Its executable is laid out as the main game's (and School Saimin Paradise!'s), so
+its scheme was read from it (engine-notes.md, section 1, "A scheme from the executable"): the
+HelperKey, a ShiinaImage of 46,962 bytes, and as ExtraCrypt a MakiFesCrypt (the code its plug-in
+carries after the shared DecodeTable; the main game's is a YuruPlusCrypt) with the seed
+0x042034D4. No entry needs DecodeBin (none has the flags of Decrypt2); its 295 S25, 6 TXT and 2
+OGV come out whole (LIBRAeSe_S2.WAR is a DLL, as the main game's _S2). opcheck's one opcode,
+`000A` at START 9B5DE, is two bytes after a return (`0285`), not code. Its blur (START B90AF) is
+the main game's with its work buffers 4 bytes further on: it ran on the x86 interpreter, 10-25 s
+a frame, until its signature was given the C# blur32 (16 calls the same as the x86 code). Swept:
+5 scenarios, every one to its end.
+
+**Iyashinbo The Motion** (GuiltyPLUS, IYASHIm.EXE, engine v2.47, 800 x 600): its 664 S25, 82 TXT
+and 2,284 OGV come out whole; no entry needs DecodeBin. Its save screen asks for a comment in an
+edit box, with opcodes no other game here had: `0960` text, x, y, w, h, v makes the box (v its
+handle; CreateWindowExA "EDIT" in FUN_00416F20 of v2.47), `097E` takes it away (DestroyWindow),
+`07A9` reads its text (GetWindowTextA), `07A8` writes it (SetWindowTextA, which was taken for
+the title alone), and user32 `UpdateWindow`. The player has them as controls of its own, but
+shows no box yet: the comment stays what the scripts put there. Its "Motion" animations
+(a\*.a, 800 x 600) are MPEG-1 video streams alone, no system stream around them and no sound:
+they stopped the scenarios that play them (`05C9` failed) until the player took such a stream as
+it is. The game is found by its archives' names too, so its executable is not needed. Swept: 82
+scenarios, every one to its end.
+
+**Damatte Watashi no Muko ni Nare!** (ensemble, DAMAMUKO.EXE, engine v2.48, 800 x 600) had its
+scheme but not its executable's name: `DAMAMUKO.EXE` is mapped to it now. Its RIO.INI says v2.48,
+the scheme v2.47; it runs with v2.49's opcodes, opcheck finding nothing missing. Its 1,913 S25,
+173 TXT and 11,769 OGV come out whole; no entry needs DecodeBin (the shared one its scheme names
+is never used). Every routine it runs has its C# version. Swept: 163 scenarios, every one to its
+end.
+
+**Gensou no Idea ~Oratorio Phantasm Historia~** (3rdEye, IDEA.EXE, engine v2.49, 1280 x 720, with
+its update IDEA_U1.WAR) had its scheme but not its executable's name: `IDEA.EXE` is mapped to it
+now. Its 1,986 S25, 75 TXT and 14,246 OGV come out whole; no entry needs DecodeBin. Its TOPMENU
+uses `008C` and `008D`, which v2.49 has otherwise than v2.47: they copy the current text record
+aside and back (Sena Plus 0x43AC20 / 0x43AC40, one place for every record), around a label drawn
+with the record; that part of the menus is not reached by the sweep. Three embedded routines ran
+as translated x86 code until they were given C#: its subpixel32 (START A4724) is Re: Rem Plus's
+v2.50 build with other padding (393 calls the same as its x86 code), a thumbnail (A3F6F, 192 x 108
+from blocks of 6 x 6 of the 1280 x 720 picture) and a copy of dwords XORed with a byte (F5440;
+its one call the same). Swept: 70 scenarios, every one to its end.
+
 **Can Fes! ~Itazura Majo to Naisho no Gakuensai~** (engine v2.47, CANFES.EXE) START checks
 itself three ways before its title. `03C2` gives this executable's checksum (it wants
 v ^ 306723180 = -1948973168). kernel32 `GetModuleFileNameA` names the executable, which START
@@ -474,8 +522,9 @@ through.
 
 The 28 games (29 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
 2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love!,
-School Saimin Paradise! and Sis△Camp on 2026-10-15; Tsugou no Ii Idol on 2026-10-17): none
-stopped, none stuck.
+School Saimin Paradise! and Sis△Camp on 2026-10-15; Tsugou no Ii Idol on 2026-10-17; Hin wa
+Bokura no Fuku no Kami, Libra's fan disc, Iyashinbo The Motion and Damatte Watashi no Muko ni
+Nare! on 2026-10-20; Gensou no Idea on 2026-10-21): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -508,6 +557,11 @@ stopped, none stuck.
 | School Saimin Paradise! | 46 | 99.9% |
 | Sis△Camp | 66 | 99.7% |
 | Tsugou no Ii Idol | 80 | 99.7% |
+| Hin wa Bokura no Fuku no Kami | 117 | 99.7% |
+| Libra of the Vampire Princess: The Promise PLUS Homeworld (English) | 5 | 97.1% |
+| Iyashinbo The Motion | 82 | 53.5% (messages of two lines, the second shown with the first) |
+| Damatte Watashi no Muko ni Nare! | 163 | 61.0% (messages of two or three lines) |
+| Gensou no Idea ~Oratorio Phantasm Historia~ | 70 | 77.7% (messages of two or three lines, and the branches of choices not taken) |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in
@@ -526,9 +580,9 @@ When a game's state changes:
    what was added for it, and what is known not to work.
 3. When a platform was tried (a phone, Linux, macOS), add or update its row under **Platforms**
    with the device and what ran.
-4. When it now plays through, add it to the README's table of the games tried (with the count
-   under it: games, and releases where a game has more than one, as Libra's English one) and
-   to the table under **Sweeping**; the commit message can name the game.
+4. When it now plays through, update the README's count of the games that play (games, and
+   releases where a game has more than one, as Libra's English one) and add it to the table
+   under **Sweeping**; the commit message can name the game.
 
 To see which opcodes a game's scripts use that OpenShiina does not run yet, boot it in ScnBoot
 (`tests/OpenShiina.ScnBoot`): it stops at the first one and prints it.

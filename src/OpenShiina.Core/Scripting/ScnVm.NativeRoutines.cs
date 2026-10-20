@@ -70,6 +70,35 @@ public sealed partial class ScnVm
         // same code with blocks of 2 x 2 for 400 x 300
         RegisterNative("42515BD6BA1FCC24A41CA6A734692CC90E6577DB", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 160, 120));
         RegisterNative("2853439284672B39391C2DEA48F204032D81382A", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 2, 400, 300));
+        // Gensou no Idea START A3F6F (v2.49, 1280 x 720): 192 x 108 from blocks of 6 x 6, rows of 3,840 bytes
+        RegisterNative("A358C4BDF44489F7DFB8A57F3BF7D3B7E63A31FF", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 6, 192, 108, 3840));
+        // Gensou no Idea F5440: l[3] dwords from l[4] to l[0], each XORed with the byte l[5] in all
+        // four bytes (b | b << 8, then | << 16, as the x86 code builds it); a count under 1 runs as x86 code
+        RegisterNative("304020D68894542344EA2C8F8D67586EF480BE6F", "xor dwords", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), count = vm.NativeArg(a, 3), src = vm.NativeArg(a, 4);
+            uint key = (uint)vm.NativeArg(a, 5);
+            key |= key << 8;
+            key |= key << 16;
+            if (count <= 0 || count > 0x4000000)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, count * 4);
+            if (dst == src || Apart(dst, count * 4L, src, count * 4L))
+            {
+                // a dword is read before it is written: in place too
+                byte[] bytes = vm.ReadBytes(src, count * 4);
+                var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytes.AsSpan());
+                for (int i = 0; i < words.Length; i++)
+                    words[i] ^= key;
+                vm.WriteBytes(dst, bytes);
+            }
+            else
+                for (int i = 0; i < count; i++)
+                    vm.Write32(dst + 4 * i, vm.Read32(src + 4 * i) ^ (int)key);
+        });
         // Ao no Juuai 188BE (START2 18950; v2.34): the same 100 x 75 thumbnail, f[0] src, f[1] dst
         RegisterNative("FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F)));
@@ -875,20 +904,20 @@ public sealed partial class ScnVm
         ArrayPool<byte>.Shared.Return(buffer);
     }
 
-    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows) =>
-        Thumbnail(c, a, block, columns, rows, NativeArg(a, 0), NativeArg(a, 4));
+    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int stride = 2400) =>
+        Thumbnail(c, a, block, columns, rows, NativeArg(a, 0), NativeArg(a, 4), stride);
 
-    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int dst, int src)
+    /// <summary>Each byte the average of a block of block x block pixels of a BGR picture (rows of <paramref name="stride"/> bytes; 800 x 600 unless said).</summary>
+    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int dst, int src, int stride = 2400)
     {
-        const int Stride = 2400;
         int outBytes = columns * rows * 3, inRows = rows * block;
-        if (!Apart(dst, outBytes, src, (long)Stride * inRows))
+        if (!Apart(dst, outBytes, src, (long)stride * inRows))
         {
             RunX86(c, a);
             return;
         }
         using var verify = VerifyRegion(c, a, dst, outBytes);
-        byte[] picture = ReadBytes(src, Stride * (inRows - 1) + columns * block * 3);
+        byte[] picture = ReadBytes(src, stride * (inRows - 1) + columns * block * 3);
         var output = new byte[outBytes];
         int o = 0;
         for (int by = 0; by < rows; by++)
@@ -898,7 +927,7 @@ public sealed partial class ScnVm
                     int sum = 0;
                     for (int y = 0; y < block; y++)
                     {
-                        int p = (by * block + y) * Stride + bx * block * 3 + k;
+                        int p = (by * block + y) * stride + bx * block * 3 + k;
                         for (int x = 0; x < block; x++, p += 3)
                             sum += picture[p];
                     }

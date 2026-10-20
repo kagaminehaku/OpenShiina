@@ -219,6 +219,12 @@ public sealed partial class ScnVm
                     Write32(Arg(3), count);
                 return count > 0 ? 0x00070000 + ++m_memoryFonts : 0;
             }
+            case ("user32", "UpdateWindow"):
+                // the game window: WM_PAINT now where part of it is invalid (as 07D1); a control
+                // has nothing drawn
+                if (Arg(0) is 0 or WindowHandle)
+                    Paint();
+                return 1;
             case ("user32", "ShowWindow"):
                 // The host shows the window; it was visible
                 return 1;

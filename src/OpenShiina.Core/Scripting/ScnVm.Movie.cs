@@ -83,6 +83,13 @@ public sealed partial class ScnVm
                 movie.Video = new Vc1Video(asf.Video ?? throw new InvalidDataException("No video stream"));
                 sound = () => (AsfAudio.StartWave(asf, 3, out var rest), rest);
             }
+            else if (data.Length >= 4 && data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0xB3)
+            {
+                // An MPEG-1 video stream alone, from its sequence header: the animations of
+                // Iyashinbo The Motion (a\*.a, 800 x 600), which have no sound
+                movie.Video = new Mpeg1Video(data);
+                sound = () => (null, Task.CompletedTask);
+            }
             else
             {
                 var stream = new MpegSystemStream(data);

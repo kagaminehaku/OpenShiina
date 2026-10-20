@@ -37,47 +37,12 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 
 ## Games
 
-The games tried so far, on Windows, Linux and Android:
+33 games (34 releases) play through on Windows, Linux and Android, among them the GRAND†CROSS
+"Plus" games and Maki Fes!, the Bitch games, Kyuuketsuki no Libra, and the English releases of
+Libra of the Vampire Princess and Sorcery Jokers. Engine versions 2.45 and 2.47 to 2.50 run, and
+2.34 (one game tried). OpenShiina has the keys of 105 more ShiinaRio games, not tried yet.
 
-| Game | Japanese title | Year | Engine | Status |
-|---|---|---|---|---|
-| [Ero-On!](https://vndb.org/v11473) | えろおん！ | 2010 | 2.49 | ✅ Plays through |
-| [Azu Plus](https://vndb.org/v7579) | アズプラス | 2010 | 2.47 | ✅ Plays through |
-| [Oreimo Plus](https://vndb.org/v6035) | 俺妹プラス | 2010 | 2.47 | ✅ Plays through |
-| [Aneiro](https://vndb.org/v6590) | アネイロ | 2011 | 2.49 | ✅ Plays through |
-| [Homu☆Plus](https://vndb.org/v8019) | ほむ☆プラス | 2011 | 2.49 | ✅ Plays through |
-| [Yuru Plus](https://vndb.org/v10125) | ゆるプラス | 2011 | 2.49 | ✅ Plays through |
-| [Sena Plus](https://vndb.org/v10126) | 星奈プラス | 2011 | 2.49 | ✅ Plays through |
-| [Kuroneko Plus](https://vndb.org/v10586) | 黒猫プラス | 2012 | 2.49 | ✅ Plays through |
-| [Nyaru Plus](https://vndb.org/v10779) | ニャルプラス | 2012 | 2.49 | ✅ Plays through |
-| [Rikka Plus](https://vndb.org/v11902) | 六花プラス | 2012 | 2.49 | ✅ Plays through |
-| [Maki Fes!](https://vndb.org/v16484) | マキフェス！ | 2014 | 2.50 | ✅ Plays through |
-| [Re:Rem Plus](https://vndb.org/v22991) | Re:レムプラス | 2018 | 2.50 | ✅ Plays through |
-| [Ao no Juuai](https://vndb.org/v4048) | 青の獣愛 | 2005 | 2.34 | ✅ Plays through |
-| [Chuuchuu Nurse](https://vndb.org/v1144) | ちゅうちゅうナース | 2008 | 2.45 | ✅ Plays through |
-| [Can Fes!](https://vndb.org/v4143) | きゃん☆フェス！ | 2010 | 2.47 | ✅ Plays through |
-| [Bitch Nee-chan ga Seijun na Hazu ga Nai!](https://vndb.org/v18781) | ビッチ姉ちゃんが清純なはずがないっ！ | 2016 | 2.50 | ✅ Plays through |
-| [Bitch Shimai ga Seijun na Hazu ga Nai!!](https://vndb.org/v20429) | ビッチ姉妹が清純なはずがないっ！！ | 2017 | 2.50 | ✅ Plays through |
-| [Bitch Gakuen ga Seijun na Hazu ga Nai!!?](https://vndb.org/v21429) | ビッチ学園が清純なはずがないっ！！？ | 2017 | 2.50 | ✅ Plays through |
-| [Chuuni Hime no Teikoku](https://vndb.org/v17900) | 厨二姫の帝国 | 2018 | 2.50 | ✅ Plays through |
-| [Chiccha na Hanayome ~Mada Mada Tsubomi da mon~](https://vndb.org/v20284) | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017 | 2.50 | ✅ Plays through |
-| [Kyuuketsuki no Libra](https://vndb.org/v17825) | 吸血姫のリブラ | 2015 | 2.50 | ✅ Plays through |
-| [Libra of the Vampire Princess](https://vndb.org/r44159) (English, Steam) | 吸血姫のリブラ | 2017 | 2.50 | ✅ Plays through |
-| [Sorcery Jokers](https://vndb.org/r47518) (English, MangaGamer) | ソーサリージョーカーズ | 2018 | 2.50 | ✅ Plays through |
-| [Puchipuchi Idol Kouhosei](https://vndb.org/v9973) | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012 | 2.49 | ✅ Plays through |
-| [Gyaku Katei Kyoushi](https://vndb.org/v16306) | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014 | 2.50 | ✅ Plays through |
-| [Pure Love!](https://vndb.org/v2930) | ぴゅあらっ！ | 2010 | 2.47 | ✅ Plays through |
-| [School Saimin Paradise!](https://vndb.org/v25534) | スク～ル催眠ぱらだいす！ | 2019 | 2.50 | ✅ Plays through |
-| [Sis△Camp](https://vndb.org/v28635) | シス△キャン | 2020 | 2.50 | ✅ Plays through |
-| [Tsugou no Ii Idol](https://vndb.org/v16469) | ツゴウノイイアイドル | 2015 | 2.50 | ✅ Plays through |
-
-✅ every route was played to its end, or every scenario of the game was run through to its end
-by the test runner, nothing stopping ([how](docs/compatibility.md#sweeping)).
-
-That is 28 games, 29 releases (Libra's English one as well). OpenShiina has the keys of 109 more ShiinaRio games, not tried yet, and VNDB lists 33 more it
-has no keys for. Whether one plays depends on its engine version: 2.45, 2.47, 2.49 and 2.50 run,
-and 2.34 (one game of it tried). Every game, with its engine version, and each platform's state
-are in [docs/compatibility.md](docs/compatibility.md).
+**Every game, with its engine version and how far it was checked: [docs/compatibility.md](docs/compatibility.md).**
 
 ## Screenshots
 
@@ -93,17 +58,6 @@ are in [docs/compatibility.md](docs/compatibility.md).
 | ![The home screen in the Shiina theme](docs/images/home.png) | ![The home screen in the Parchment theme](docs/images/theme-parchment.png) | ![The home screen in the Graphite theme](docs/images/theme-graphite.png) |
 | Shiina, the default | Parchment | Graphite |
 
-## Platforms
-
-| Project | Platform |
-|---|---|
-| `src/OpenShiina.Core` | The engine, no user interface (`net10.0`): archives and decryption, image and sound decoders, the SCN interpreter and its x86 translator |
-| `src/OpenShiina.App` | The player on [Avalonia](https://avaloniaui.net), shared by every platform: the game view, the interpreter on a thread of its own, sound through SDL3, text through SkiaSharp |
-| `src/OpenShiina.Desktop` | The player for Windows, Linux and macOS (Avalonia) |
-| `src/OpenShiina.Tools` | OpenShiina Tools for Windows, Linux and macOS (Avalonia): browse, preview, extract and repack a game's archives; translate a game |
-| `src/OpenShiina.Android` | The player for Android phones and tablets (Avalonia), with touch controls; plays on a Galaxy S7 (Exynos 8890), heavy scenes are slow on phones that old |
-| iOS | Planned, on `OpenShiina.App` |
-
 ## Building
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
@@ -112,112 +66,38 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 dotnet build -c Release
 ```
 
-The player is written to `bin/Release/OpenShiina.Desktop/` (run `OpenShiina` or
-`dotnet OpenShiina.dll`), OpenShiina Tools to `bin/Release/OpenShiina.Tools/` (`OpenShiinaTools`),
-each with the scheme data (`Formats.Json`) next to it. The Windows player
-on WPF (text drawn by Windows GDI) was retired after 0.2.0; its code is kept on the branch
-`legacy-wpf`.
+- The player goes to `bin/Release/OpenShiina.Desktop/` (`OpenShiina`), OpenShiina Tools to
+  `bin/Release/OpenShiina.Tools/` (`OpenShiinaTools`).
+- The Android player is built on its own (it needs the .NET Android workload):
+  `dotnet workload install android`, then `dotnet build src/OpenShiina.Android -c Release`; the
+  APK goes to `bin/Release/OpenShiina.Android/`.
+- Pushing a tag `v*` has GitHub Actions build the player for Windows and Linux and the APK, and
+  publish them as a release.
 
-The Android player is not in the solution (it needs the .NET Android workload and the Android
-SDK); build it on its own:
-
-```
-dotnet workload install android
-dotnet build src/OpenShiina.Android -c Release
-```
-
-The APK is written to `bin/Release/OpenShiina.Android/`. It runs on CoreCLR (experimental in
-.NET 10; arm64 and x64), which played Bitch Nee-chan at 40 frames a second on a phone where Mono
-gave 27. `-p:OpenShiinaMono=true` builds it on Mono instead, compiled
-ahead of time with LLVM, which takes several minutes (about 9 on a 6-core laptop); that APK goes
-to `bin/Release/OpenShiina.Android.Mono/`. It reads the games from the device's
-storage, so Android 11 and later ask for all files access the first time a game is added. On
-the screen: a tap clicks, dragging holds the left button, two fingers moved up or down turn
-the wheel (down opens the backlog); the bar on the right has Menu (a right click, as is Back),
-Auto, Skip, Log and Exit.
-
-Releases: pushing a tag `v*` (for instance `v0.2.0`) has GitHub Actions
-(`.github/workflows/release.yml`) build the player for Windows and Linux and the APK, with the tag's version, and publish them as a release. The APK is
-signed with the keystore in the repository's secrets (`ANDROID_KEYSTORE_BASE64`,
-`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), or with a debug key when there is none.
+The projects: `src/OpenShiina.Core` (the engine: archives, decoders, the SCN interpreter and its
+x86 translator), `src/OpenShiina.App` (the player on [Avalonia](https://avaloniaui.net), shared by
+every platform), `src/OpenShiina.Desktop` (Windows, Linux, macOS), `src/OpenShiina.Android`,
+`src/OpenShiina.Tools`. iOS is planned.
 
 ## Usage
 
-Run `OpenShiina`: its home screen has a rail on the left (the library, **Add games…** and
-the settings), your games as tiles, the one played last first, each with its `.exe`'s icon on that
-icon's own colour, and the chosen game's card on the right: when it was played last, for how
-long (counted while the game is in front), the size of its folder and saves, and **Play** in the
-corner. A tile chooses a game (a double click or tap plays it); the card plays it wherever it is
-clicked. **Add games…** takes a game's folder (the one with its `.exe` and `.WAR` files), or a
-folder with games in it: the games up to four levels under it (`Games\Maker\Game`) are added
-at once, and the player says which it could not recognise. The
-card's **…** opens the save folder (and, on a desktop, the game's folder) or removes the game:
-from the list only (its files and saves stay, with Undo for a few seconds), or its folder deleted
-too, and its saves if asked; the player deletes only a folder with the game's `.WAR` archives in
-it, never a drive, a system folder, its own data or a folder holding another game of the list.
-Passing a folder on the command line plays that game at once and adds it to the list. Quitting a
-game brings the list back; closing the list ends the player. The game is recognised by its
-`.exe`. The list is kept in `library.json` next to the saves. The player runs the
-game's own SCN scripts, so the game looks and behaves as it does in its own engine.
+1. Run `OpenShiina` and click **Add games…**: choose a game's folder (the one with its `.exe` and
+   `.WAR` files), or a folder with several games in it.
+2. Click a game's tile, then **Play**. The game runs its own scripts: its menus, saves and
+   settings are the original ones.
+3. Quit the game to come back to the list.
 
-Text: the games ask for MS Gothic. The player draws text with the system's fonts, with MS Gothic's measures: on
-Windows MS Gothic itself, elsewhere a Japanese font that is installed (on Linux, for instance,
-`fonts-noto-cjk` or `fonts-ipafont`), so text is close to the game's but not pixel for pixel.
+- **Controls:** keyboard, mouse and game controllers as in the game. On Android a tap clicks, two
+  fingers moved up or down turn the wheel (down opens the backlog), and the bar on the right has
+  Menu, Auto, Skip, Log and Exit.
+- **Settings:** the theme and language, the graphics (sharp scaling, FSR 1 or Anime4K upscaling,
+  the frame rate), the game controller, the file cache.
+- **Saves** are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`). On Android they
+  are backed up with the phone.
+- **Fonts:** on Linux, install a Japanese font (`fonts-noto-cjk` or `fonts-ipafont`).
 
-A game whose .exe the player does not know (renamed, or a version it does not list) is found by
-the keys that open its archives when it is added; when several games' keys fit, the player asks
-which game it is.
-
-Settings (the home screen's Settings button opens their page, saved in `settings.json` beside
-`library.json`; each counts from the next game started), page by page:
-
-- **Appearance**: the theme, shown at once (OpenShiina Tools too): Shiina, the logo's wine red and
-  gold, by default; Parchment, light; Graphite, plain greys. And the language of the player's own
-  screens: the device's by default, English or Vietnamese (the words are in
-  `src/OpenShiina.Core/Localization`: `Strings.resx` in English, a `Strings.<language>.resx` for
-  each translation, which shows in the list by itself).
-- **Graphics**: on phones and tablets first two profiles, Battery saver (sharp scaling at the
-  game's own pace) and Pretty (FSR 1 sharpened, a frame every refresh of the screen); then the graphics level (Potato: nearest pixels; Low: sharp; Medium: FSR 1; High: FSR 1
-  sharpened; Max: Anime4K; Custom when the details match none of them), and its details: the
-  scaling of the picture to the window (sharp: whole game pixels as far as they fit and the rest
-  smooth, so text and lines stay even at any size; whole numbers only, with black around; smooth;
-  nearest; or, on the GPU that draws the window, the upscalers FSR 1, with its sharpening from
-  none to 10, and Anime4K, the heaviest), drawing on the GPU (the default) or on the CPU (the GPU mode runs
-  heavy picture work as Vulkan compute shaders, `src/OpenShiina.Gpu`: the scaling, enlarging and
-  rotating of zoomed scenes and subpixel moves, each on whichever of the CPU and the GPU was
-  faster on its first large calls, with the same pictures; without a Vulkan driver the games run
-  on the CPU), the frame rate (the game's own pace, up to 60 frames a second with the window
-  drawing only new pictures, as the original keeps it; or every refresh of the screen, smoother
-  on a fast screen but the scripts run as often: four times as much processor on a 240 Hz one),
-  and showing the frame rate (in the title; on phones over the game).
-- **Game**: the game controller, and pausing the game while another window is in front (on by
-  default; off, the game does as its RIO.INI says: most go on, sound included).
-- **Storage**: the file cache, and on Android the backup of the saves (below).
-- **Debug**, for bug reports: writing `perf.log` and `draw-trace.log` (both into the game's save
-  folder), and translating the games' x86 code (off: the interpreter only).
-
-The environment variables of the settings still win over them, for tests: `OPENSHIINA_GPU=1` /
-`=0`, `OPENSHIINA_JOYPAD=0` / `=ini` (below), `OPENSHIINA_PERF=0` (no frame rate) / `=log` (also
-`perf.log`), `OPENSHIINA_X86JIT=0`, `OPENSHIINA_TRACE=draw`. Only as variables:
-`OPENSHIINA_PAINT=surface` (shows the display surface every frame), `OPENSHIINA_THREADS=<n>` (the
-most pieces a pixel routine is cut into, and the most threads for a movie picture's slices; 1 runs
-them all on the interpreter's thread),
-`OPENSHIINA_DATA=<folder>`
-(the player's data instead of %AppData%\OpenShiina), `OPENSHIINA_WAYLAND=1` (Avalonia's own
-Wayland backend on Linux), `OPENSHIINA_TOUCH=1` (the desktop player laid out as on a phone or
-tablet).
-
-Game controllers: the first joystick or gamepad works as the engine reads it: the stick (or
-the first two axes) moves, button 1 decides, button 2 cancels. The games turn it off in their
-RIO.INI (Joypad=0) but the players read it anyway; the setting "Game controller" (or
-`OPENSHIINA_JOYPAD=0`) turns it off, `OPENSHIINA_JOYPAD=ini` follows RIO.INI.
-
-Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`; Android:
-`Android/data/com.kagaminehaku.openshiina/files`); both players share them. On Android they go
-into Android's backup (Google's cloud, a new phone) and come back when the app is installed
-again; the game library and the logs do not. Android keeps 25 MB of an app (a GRAND†CROSS game's
-saves are about 3.5 MB): the settings go first, then the save folders of the games played last,
-as many as fit. Settings > Back up saves turns that off.
+Every setting, the controls, where the logs go and the environment variables for tests are in
+[docs/player.md](docs/player.md).
 
 ## OpenShiina Tools
 
@@ -263,6 +143,8 @@ player reads, are in [docs/tools.md](docs/tools.md#translation-translate-a-game)
 
 - [`docs/compatibility.md`](docs/compatibility.md): which games play, and how far each was checked,
   on which platforms.
+- [`docs/player.md`](docs/player.md): the player in full: the home screen, controls, settings,
+  saves, environment variables.
 - [`docs/tools.md`](docs/tools.md): how to use OpenShiina Tools, with pictures: archives,
   extracting, repacking, translating a game.
 - [`docs/todo.md`](docs/todo.md): what is planned and not done yet.
