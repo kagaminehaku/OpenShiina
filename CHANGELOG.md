@@ -4,6 +4,12 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **Devices with 16 KB memory pages** (some newer Android phones, Apple's ARM Macs): a game
+  stopped with "Could not map script memory" when it freed a large picture or file, or
+  spoiled the memory just after it, as the player took memory pages to be 4 KB.
+
 ## 0.7.4 (2026-10-17)
 
 One more game plays through: 28 games, 29 releases.

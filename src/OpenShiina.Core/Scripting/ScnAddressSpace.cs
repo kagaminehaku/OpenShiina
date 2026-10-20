@@ -25,7 +25,10 @@ public sealed unsafe partial class ScnAddressSpace : IDisposable
 
     private const long CommitSize = 1L << CommitBits;
 
-    private const int OsPage = 4096;
+    // The system's page: 4 KB on Windows and most of the others, 16 KB on Apple's ARM Macs and on
+    // Android devices built for 16 KB pages; Discard gives back only whole ones (mmap MAP_FIXED
+    // refuses an address that is not on one)
+    private static readonly int OsPage = Environment.SystemPageSize;
 
     /// <summary>Windows: parts are committed on first use (elsewhere everything is there at once).</summary>
     private static readonly bool LazyCommit = OperatingSystem.IsWindows();

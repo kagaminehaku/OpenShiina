@@ -1602,7 +1602,11 @@ the functions they call from the decompile. First findings:
   against RAM + page file, so not all 4 GB at once; 16 MB parts committed about twice the RAM
   used): every access tests a table of 4096 flags, and a part is committed with the first page
   of the next, so an access of up to 8 bytes needs only its first byte's test. Memory freed reads as zero again: whole pages go back to the system
-  (`mmap` over them / decommit and commit again), the rest is cleared. `ScnVm.Bytes` gives a block
+  (`mmap` over them / decommit and commit again), the rest is cleared. The pages are the system's
+  (`Environment.SystemPageSize`): until 2026-10-18 they were taken as 4 KB, and where they are 16 KB
+  (Apple's ARM Macs, Android devices built for 16 KB pages) `mmap` refused a freed block's pages
+  that did not start on one ("Could not map script memory"), and of one that did, it cleared the
+  whole last page, up to 12 KB of the block after it. `ScnVm.Bytes` gives a block
   as a span to work on in place: the compositor draws its rows into it and reads the sprites'
   runs from it (a frame row drawn over itself is copied first), BlendRows (`04F6` / `0500`) reads
   and writes rows in place with `Vector<T>` for the MMX blocks (600 random cases against the
