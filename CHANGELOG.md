@@ -4,6 +4,11 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **New: Ayakashibito (あやかしびと, 2005)** starts and its story plays (not every scenario was
+  checked yet). No keys were known for it: its archives open with Ao no Juuai's.
+
 ## 0.7.6 (2026-10-21)
 
 Five new games: 33 games (34 releases) now play through.

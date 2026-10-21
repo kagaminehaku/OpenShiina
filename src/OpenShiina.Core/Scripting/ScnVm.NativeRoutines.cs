@@ -102,6 +102,9 @@ public sealed partial class ScnVm
         // Ao no Juuai 188BE (START2 18950; v2.34): the same 100 x 75 thumbnail, f[0] src, f[1] dst
         RegisterNative("FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F)));
+        // Ayakashibito START2 12B77 (v2.34): 80 x 60 from blocks of 10 x 10, the same arguments
+        RegisterNative("D9036751E14B2CD371970392C16FD29EB60CF5A8", "thumbnail",
+                       (vm, c, a) => vm.Thumbnail(c, a, 10, 80, 60, vm.Read32(a.F + 4), vm.Read32(a.F)));
 
         // Ao no Juuai 7F562 (START2 7F7B2; v2.34): l[0] = the index of the first word l[1] in the
         // string of words at l[0] (before its 0), else -1

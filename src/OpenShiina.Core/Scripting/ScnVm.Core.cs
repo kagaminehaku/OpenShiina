@@ -626,6 +626,20 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[3], result);
             return 0;
         });
+        // 0BD0 dst, src, n: strncpy (up to n bytes, stopping at the end of src; the rest of the n
+        // filled with zeros, no end added when src is longer)
+        Register(0x0BD0, (vm, c, i) =>
+        {
+            int dst = vm.Value(c, i.Args[0]), src = vm.Value(c, i.Args[1]), n = vm.Value(c, i.Args[2]);
+            if (n <= 0)
+                return 0;
+            var bytes = new byte[n];
+            for (int k = 0; k < n; k++)
+                if ((bytes[k] = vm.ReadByte(src + k)) == 0)
+                    break;
+            vm.WriteBytes(dst, bytes);
+            return 0;
+        });
         // 0BD4 text, part, result: strstr (the address of the first match, or 0)
         Register(0x0BD4, (vm, c, i) =>
         {

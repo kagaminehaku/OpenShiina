@@ -51,6 +51,7 @@ of those versions it does not list.
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.39 | ⚪ Not tried |  |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ⚪ Not tried |  |
 | Ao no Juuai | 青の獣愛 | 2005-06-24 | [v4048](https://vndb.org/v4048) | v2.34 | ✅ Plays through | 2026-10-13 |
+| Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | v2.34 | 🟢 Plays | 2026-10-21 |
 | ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | ⚪ Not tried |  |
 | Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | ⚪ Not tried |  |
 | Gibo to Oba ~Soshite Yuujin no Haha~ | 義母と叔母 ～そして友人の母～ | 2005-12-22 | [v2498](https://vndb.org/v2498) | v2.36 | ⚪ Not tried |  |
@@ -204,7 +205,6 @@ so they cannot be opened or played until a scheme is found (docs/engine-notes.md
 | EDEN V |  | 2003-07-18 | [v4604](https://vndb.org/v4604) | FORST | 14 | 🔒 No keys |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | propeller | 33 | 🔒 No keys |
 | Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | Amanatto | 22 | 🔒 No keys |
-| Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | propeller | 1137 | 🔒 No keys |
 | Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | LUCHA! | 43 | 🔒 No keys |
 | Nakadashi Hara Maid | なかだし孕メイド | 2007-08-17 | [v2672](https://vndb.org/v2672) | Chain-Reaction | 14 | 🔒 No keys |
 | Sis☆Pon ~Haramase♪ Gochisou-sama!~ | シス☆ぽん～孕ませ♪ご馳走さまっ！～ | 2007-11-30 | [v2858](https://vndb.org/v2858) | Sumomo | 22 | 🔒 No keys |
@@ -295,6 +295,15 @@ task waits, not at the first picture; music has one stream (`06E3` volume, `06EC
 operand is named up to its first `}`; its first music file is a RIFF WAVE. It also needed `0A28`,
 `0A5C`, `0502`, `0028`, `03A2`-`03A5`, `03AD`, `03BB`-`03BE` and `02EE` / `02EF` fixed for every
 version. What is left for other 2.34 games is in docs/todo.md ("Other ShiinaRio games").
+
+**Ayakashibito** (propeller, ayakasi.EXE, engine v2.34, patch 1.03) is the same build of the
+engine as Ao no Juuai (aoj.EXE: the same sections and handlers), and its archives (WARC 1.5) open
+with the same keys, which no scheme had under its name: it has its own now. Its 2,756 S25 and
+22,803 OGV come out whole (SE_1158.OGV is a WAVE of no samples in the archive itself); its
+scenarios are 179 SCN. AYA_F.WAR to AYA_L.WAR are MPEG-1 movies under the archives' extension.
+opcheck found `0BD0`, strncpy (the speaker's name cut from a message line); its save thumbnail
+(START2 12B77, 80 x 60 from blocks of 10 x 10) has its C# version, the same as its x86 code. The
+title screen and the start of the story play in ScnBoot; the scenarios were not swept yet.
 
 **Aneiro** (engine v2.49, ver 1.03a) Skipped to the end by the user (2026-10-10). Every embedded
 x86 routine has a C# version. It needed `010E` finding the save folder itself, `06E6` (a music

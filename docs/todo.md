@@ -59,10 +59,10 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 139 games; 34 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 140 games; 34 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
-- [ ] **Keys for the 32 games without them** (compatibility.md, "No keys yet"), once their files
+- [ ] **Keys for the 31 games without them** (compatibility.md, "No keys yet"), once their files
   are found. From Niflheim's WARC_unpack.c: the DecodeBin (0x2000 bytes) is read by the code
   near the constant 0x40000000; v2.50's Extra picture is unpacked at run time (follow
   `push 202` through GetProcAddress).
