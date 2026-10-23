@@ -72,9 +72,10 @@ public sealed partial class ScnVm
         RegisterNative("2853439284672B39391C2DEA48F204032D81382A", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 2, 400, 300));
         // Gensou no Idea START A3F6F (v2.49, 1280 x 720): 192 x 108 from blocks of 6 x 6, rows of 3,840 bytes
         RegisterNative("A358C4BDF44489F7DFB8A57F3BF7D3B7E63A31FF", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 6, 192, 108, 3840));
-        // Gensou no Idea F5440: l[3] dwords from l[4] to l[0], each XORed with the byte l[5] in all
-        // four bytes (b | b << 8, then | << 16, as the x86 code builds it); a count under 1 runs as x86 code
-        RegisterNative("304020D68894542344EA2C8F8D67586EF480BE6F", "xor dwords", (vm, c, a) =>
+        // Gensou no Idea F5440 (The Pillagers of Raillore EFCLIB 3568, other padding): l[3] dwords
+        // from l[4] to l[0], each XORed with the byte l[5] in all four bytes (b | b << 8, then
+        // | << 16, as the x86 code builds it); a count under 1 runs as x86 code
+        RegisterNative(["304020D68894542344EA2C8F8D67586EF480BE6F", "EC6DD9EC7E160D8BA47F26DB38B9A688C63951ED"], "xor dwords", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), count = vm.NativeArg(a, 3), src = vm.NativeArg(a, 4);
             uint key = (uint)vm.NativeArg(a, 5);
@@ -105,6 +106,185 @@ public sealed partial class ScnVm
         // Ayakashibito START2 12B77 (v2.34): 80 x 60 from blocks of 10 x 10, the same arguments
         RegisterNative("D9036751E14B2CD371970392C16FD29EB60CF5A8", "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 10, 80, 60, vm.Read32(a.F + 4), vm.Read32(a.F)));
+
+        // The Pillagers of Raillore START 3DAE54 / 3DAEA7 (SSE2): a 960 x 540 / 640 x 360 32-bit
+        // picture enlarged two / three times into 1920 x 1080, each pixel repeated across and down.
+        // l[0] dst, l[1] its stride, l[2] src, l[3] its stride
+        RegisterNative("1A0CA904E74263F80CC1A2BBAC2E6AF86C1C838C", "enlarge x2", (vm, c, a) => vm.EnlargeWhole(c, a, 2, 960, 540));
+        RegisterNative("F96B154D20F92ABAA59589044921B28E7DADBAE9", "enlarge x3", (vm, c, a) => vm.EnlargeWhole(c, a, 3, 640, 360));
+        // Raillore 3DAFE3: 480 x 270 four times; 3D9DFC (MMX): 1280 x 720 into 1920 x 1080, each 2 x 2
+        // pixels into 3 x 3 - the corners as they are, the edges' middles the averages of their
+        // two, the middle the average of all four (Sorcery Jokers' movie 3:2 in 32 bits)
+        RegisterNative("5D890BED7B136019B7D8848E93992501D2519721", "enlarge x4", (vm, c, a) => vm.EnlargeWhole(c, a, 4, 480, 270));
+        RegisterNative("11726E4688DF316677B49171683930D9ED17D545", "enlarge 3:2", (vm, c, a) => vm.EnlargeThreeHalves(c, a));
+        // Raillore 3D243F: the 750 x 420 thumbnail of a 1920-pixel wide 24-bit picture, each byte the
+        // average of 2 x 2; 3D24B7: 420 rows of 2,250 bytes from l[4] (rows 5,760 bytes apart) to
+        // l[0] one after the other; 3D2765: the other way, from l[0] to l[1], rows l[2] bytes apart
+        RegisterNative("A15FAA3A37D529AE5C73C12F7D5647E0F9DBF7ED", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 2, 750, 420, 5760));
+        RegisterNative("EDC2AAF8FECE0B007FE9E8E6A84DB7491C835855", "rows 750 x 420", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 0), 2250, vm.NativeArg(a, 4), 5760, 420, 2250));
+        RegisterNative("9AAFA46F7AE7F2DC37E76C780EDEC870012BB309", "rows 750 x 420", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 2250, 420, 2250));
+        // Raillore 3D27BC: 750 x 420 pixels of 24 bits at l[0] (one after the other) into 32 bits at
+        // l[1] (rows l[2] bytes apart): FF, then the pixel's three bytes
+        RegisterNative("4E7AFE31B6653D60E34B305DB2A5E68023317F69", "24 to 32 bits", (vm, c, a) =>
+        {
+            const int Width = 750, Height = 420;
+            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1), stride = vm.NativeArg(a, 2);
+            var target = RowsSpan(dst, stride, Height, Width * 4);
+            if (Math.Abs((long)stride) < Width * 4 || !Apart(target, (src, (long)Width * 3 * Height)))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, (int)target.Start, (int)target.Length);
+            var input = new byte[Width * 3];
+            for (int y = 0; y < Height; y++, src += Width * 3, dst += stride)
+            {
+                vm.ReadBytes(src, input);
+                var row = vm.Bytes(dst, Width * 4);
+                for (int x = 0; x < Width; x++)
+                {
+                    row[4 * x] = 0xFF;
+                    row[4 * x + 1] = input[3 * x];
+                    row[4 * x + 2] = input[3 * x + 1];
+                    row[4 * x + 3] = input[3 * x + 2];
+                }
+            }
+        });
+        // The save thumbnails of the 1280 x 720 games (24-bit pictures, rows of 3,840 bytes):
+        // Shinigami no Testament START 8255F, 116 x 65 from blocks of 11 x 11; Tojita Sekai no Tori
+        // Colony START 8824F, 240 x 135 from blocks of 5 x 5. Arguments as Gensou no Idea's
+        RegisterNative("F9C7EC158AD7FFF292E04686FA8D4254D94CEFF1", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 11, 116, 65, 3840));
+        RegisterNative("75728C1CF427254DADD9B1E12944A9352FA74A7B", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 240, 135, 3840));
+        // Rows of a thumbnail from l[0] (one after the other) to l[1]: Testament 82648, 65 rows of 348
+        // bytes, 3,840 apart; Tori Colony 884E3, 135 of 720, 3,840 apart, and 8852E, l[2] apart;
+        // Kanojo ga Ore ni Kureta Mono 909A4, 84 rows of 450 bytes, 3,072 apart
+        RegisterNative("703F2D11977DBC27CBAF7A16F1EC6D9A2212CB62", "rows", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 3840, vm.NativeArg(a, 0), 348, 65, 348));
+        RegisterNative("21DFA52521953EAFA0CFA2FED49D420C0D21CF52", "rows", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 3840, vm.NativeArg(a, 0), 720, 135, 720));
+        RegisterNative("E0E81F9785A0F274BCC8FD6AB2B644AF349B9ADC", "rows", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 720, 135, 720));
+        RegisterNative("1B4BCE0BEC3B4D1CD9E7C9606521224E6C26C6B4", "rows", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 3072, vm.NativeArg(a, 0), 450, 84, 450));
+        // Testament 827CD: l[2] bytes from l[1] to l[0], each dword inverted - eight bytes a step when
+        // l[3] is 0 (the bytes past the last eight left), else four. A count of 0 runs as x86 code
+        RegisterNative("2E87AFFFFF1105B79D31E2277BFF3CB1DA38B2E8", "copy inverted", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
+            uint bytes = (uint)vm.NativeArg(a, 2);
+            long words = vm.NativeArg(a, 3) == 0 ? (bytes >> 3) * 2L : bytes >> 2;
+            if (words == 0 || words > 0x4000000 || dst != src && !Apart(dst, words * 4, src, words * 4))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, (int)words * 4);
+            var data = vm.ReadBytes(src, (int)words * 4);
+            for (int i = 0; i < data.Length; i++)
+                data[i] = (byte)~data[i];
+            vm.WriteBytes(dst, data);
+        });
+        // Kanojo ga Ore ni Kureta Mono 970DC: 22 x 22 bytes to l[1], each the first byte of a pixel
+        // of the 24-bit picture at l[0] (rows of 3,072 bytes) * 64 / 255
+        RegisterNative("697ECC2DF28991A03AF2B0849DD0BB1CFEC99854", "mask 22 x 22", (vm, c, a) =>
+        {
+            const int Side = 22, Stride = 3072;
+            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1);
+            if (!Apart(dst, Side * Side, src, Stride * (Side - 1) + Side * 3))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, Side * Side);
+            var output = new byte[Side * Side];
+            var row = new byte[Side * 3];
+            for (int y = 0; y < Side; y++)
+            {
+                vm.ReadBytes(src + y * Stride, row);
+                for (int x = 0; x < Side; x++)
+                    output[y * Side + x] = (byte)((row[3 * x] << 6) / 255);
+            }
+            vm.WriteBytes(dst, output);
+        });
+        // Hana to Otome ni Shukufuku o Royal Bouquet 4CAEC: 892,740 dwords at l[1] XORed with a key
+        // from l[0], after each the key + 1, rotated left by 3, its bytes reversed
+        RegisterNative("B4937B7F8A71BA951426F3E44AC8D0ED313E669A", "xor stream", (vm, c, a) =>
+        {
+            const int Count = 0xD9F44;
+            uint key = (uint)vm.NativeArg(a, 0);
+            int at = vm.NativeArg(a, 1);
+            using var verify = vm.VerifyRegion(c, a, at, Count * 4);
+            var bytes = vm.ReadBytes(at, Count * 4);
+            var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytes.AsSpan());
+            for (int i = 0; i < words.Length; i++)
+            {
+                words[i] ^= key;
+                key = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Numerics.BitOperations.RotateLeft(key + 1, 3));
+            }
+            vm.WriteBytes(at, bytes);
+        });
+        // Raillore EFCLIB 92F0 (Tojita Sekai no Tori Colony EFCLIB 666C, other padding): l[1] dwords at
+        // l[0] inverted (XOR FFFFFFFF); a count under 1 runs as x86 code
+        RegisterNative(["F79705977D2B17A02E3A733E04EF5BA87A031A92", "C4E79AD74DF00F25B64339C72CF808E9E7627276"], "invert dwords", (vm, c, a) =>
+        {
+            int at = vm.NativeArg(a, 0), count = vm.NativeArg(a, 1);
+            if (count <= 0 || count > 0x4000000)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, at, count * 4);
+            var bytes = vm.Bytes(at, count * 4);
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] ^= 0xFF;
+        });
+        // Raillore 3D9CA7: the first byte of each pixel of 1920 x 1080 at l[0] times (the second
+        // byte of l[1]'s pixel + 1), >> 8 (imul, then ah); both rows l[2] bytes apart
+        RegisterNative("B830BE90B783CA51533E8B9E1E52F05F6CBCB9C5", "mask byte 0", (vm, c, a) =>
+        {
+            const int Width = 1920, Height = 1080, RowBytes = Width * 4;
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1), stride = vm.NativeArg(a, 2);
+            var span = RowsSpan(dst, stride, Height, RowBytes);
+            if (Math.Abs((long)stride) < RowBytes || dst != src && !Apart(span, RowsSpan(src, stride, Height, RowBytes)))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, (int)span.Start, (int)span.Length);
+            var mask = new byte[RowBytes];
+            for (int y = 0; y < Height; y++, dst += stride, src += stride)
+            {
+                // (the second bytes are read before the first ones are written: in place too)
+                vm.ReadBytes(src, mask);
+                var row = vm.Bytes(dst, RowBytes);
+                for (int x = 0; x < RowBytes; x += 4)
+                    row[x] = (byte)(row[x] * (mask[x + 1] + 1) >> 8);
+            }
+        });
+        // Raillore 39A40C: the width of the string at l[0] - each byte's width from a table of 256,
+        // "[" / "{" choosing l[1]'s / l[3]'s table, "]" / "}" l[2]'s again (the first one), a
+        // Shift-JIS lead byte (81-9F, E0-FC) l[4] for its two bytes (the second one is not looked
+        // at, a 0 there too); l[0] = the width, l[1] = the table in use at the end
+        RegisterNative("6257404FB455FA61F6AEEC6B7E158251BF6C0B06", "text width", (vm, c, a) =>
+        {
+            int p = vm.NativeArg(a, 0), table = vm.NativeArg(a, 2), wide = vm.NativeArg(a, 4), width = 0;
+            using var verify = vm.VerifyRegion(c, a, a.Stack, 8);
+            for (int b; (b = vm.ReadByte(p)) != 0;)
+            {
+                switch (b)
+                {
+                    case 0x5B: table = vm.NativeArg(a, 1); p++; break;
+                    case 0x5D or 0x7D: table = vm.NativeArg(a, 2); p++; break;
+                    case 0x7B: table = vm.NativeArg(a, 3); p++; break;
+                    case >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC: width += wide; p += 2; break;
+                    default: width += vm.ReadByte(table + b); p++; break;
+                }
+            }
+            vm.SetL(a, 0, width);
+            vm.SetL(a, 1, table);
+        });
 
         // Ao no Juuai 7F562 (START2 7F7B2; v2.34): l[0] = the index of the first word l[1] in the
         // string of words at l[0] (before its 0), else -1
@@ -905,6 +1085,92 @@ public sealed partial class ScnVm
             WriteBytes(dst + done, span);
         }
         ArrayPool<byte>.Shared.Return(buffer);
+    }
+
+    /// <summary>
+    /// A width x height 32-bit picture (l[2], rows l[3] bytes apart) each pixel repeated n times
+    /// across and down into l[0] (rows l[1] bytes apart); pictures that share bytes run as x86 code.
+    /// </summary>
+    private void EnlargeWhole(ScnContext c, ScnNativeArgs a, int n, int width, int height)
+    {
+        int dst = NativeArg(a, 0), dstStride = NativeArg(a, 1), src = NativeArg(a, 2), srcStride = NativeArg(a, 3);
+        int inBytes = width * 4, outBytes = inBytes * n;
+        var target = RowsSpan(dst, dstStride, height * n, outBytes);
+        // (rows written over each other: the order the x86 code writes them in tells)
+        if (Math.Abs((long)dstStride) < outBytes || !Apart(target, RowsSpan(src, srcStride, height, inBytes)))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegion(c, a, (int)target.Start, (int)target.Length);
+        var input = new byte[inBytes];
+        var output = new byte[outBytes];
+        var pixels = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(input.AsSpan());
+        var repeated = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(output.AsSpan());
+        for (int y = 0; y < height; y++, src += srcStride)
+        {
+            ReadBytes(src, input);
+            for (int x = 0; x < width; x++)
+                repeated.Slice(x * n, n).Fill(pixels[x]);
+            for (int k = 0; k < n; k++, dst += dstStride)
+                WriteBytes(dst, output);
+        }
+    }
+
+    /// <summary>1280 x 720 32-bit pixels (l[2], rows l[3] bytes apart) into 1920 x 1080 (l[0], rows l[1] apart), 2 x 2 into 3 x 3.</summary>
+    private void EnlargeThreeHalves(ScnContext c, ScnNativeArgs a)
+    {
+        const int Pairs = 640, PairRows = 360, InBytes = Pairs * 8, OutBytes = Pairs * 12;
+        int dst = NativeArg(a, 0), dstStride = NativeArg(a, 1), src = NativeArg(a, 2), srcStride = NativeArg(a, 3);
+        var target = RowsSpan(dst, dstStride, PairRows * 3, OutBytes);
+        if (Math.Abs((long)dstStride) < OutBytes || !Apart(target, RowsSpan(src, srcStride, PairRows * 2, InBytes)))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegion(c, a, (int)target.Start, (int)target.Length);
+        var top = new byte[InBytes];
+        var bottom = new byte[InBytes];
+        for (int y = 0; y < PairRows; y++)
+        {
+            ReadBytes(src + 2 * y * srcStride, top);
+            ReadBytes(src + (2 * y + 1) * srcStride, bottom);
+            var r0 = Bytes(dst + 3 * y * dstStride, OutBytes);
+            var r1 = Bytes(dst + (3 * y + 1) * dstStride, OutBytes);
+            var r2 = Bytes(dst + (3 * y + 2) * dstStride, OutBytes);
+            for (int i = 0, o = 0; i < InBytes; i += 8, o += 12)
+                for (int k = 0; k < 4; k++)
+                {
+                    int pa = top[i + k], pb = top[i + 4 + k], pc = bottom[i + k], pd = bottom[i + 4 + k];
+                    r0[o + k] = (byte)pa;
+                    r0[o + 4 + k] = (byte)((pa + pb) >> 1);
+                    r0[o + 8 + k] = (byte)pb;
+                    r1[o + k] = (byte)((pa + pc) >> 1);
+                    r1[o + 4 + k] = (byte)((pa + pb + pc + pd) >> 2);
+                    r1[o + 8 + k] = (byte)((pb + pd) >> 1);
+                    r2[o + k] = (byte)pc;
+                    r2[o + 4 + k] = (byte)((pc + pd) >> 1);
+                    r2[o + 8 + k] = (byte)pd;
+                }
+        }
+    }
+
+    /// <summary>Rows of rowBytes from src (rows srcStride apart) to dst (dstStride apart); blocks that share bytes run as x86 code.</summary>
+    private void CopyRows(ScnContext c, ScnNativeArgs a, int dst, int dstStride, int src, int srcStride, int rows, int rowBytes)
+    {
+        var target = RowsSpan(dst, dstStride, rows, rowBytes);
+        if (Math.Abs((long)dstStride) < rowBytes || !Apart(target, RowsSpan(src, srcStride, rows, rowBytes)))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegion(c, a, (int)target.Start, (int)target.Length);
+        var row = new byte[rowBytes];
+        for (int y = 0; y < rows; y++)
+        {
+            ReadBytes(src + y * srcStride, row);
+            WriteBytes(dst + y * dstStride, row);
+        }
     }
 
     private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int stride = 2400) =>

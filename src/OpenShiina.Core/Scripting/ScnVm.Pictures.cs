@@ -9,11 +9,16 @@ namespace OpenShiina.Scripting;
 
 public sealed partial class ScnVm
 {
-    /// <summary>Room for the picture slots of every version: 0-0x100 up to v2.49, 0-0x400 in v2.50.</summary>
+    /// <summary>Room for the picture slots of every version: 0-0x100 up to v2.48, 0-0x400 in v2.49 and v2.50.</summary>
     public const int PictureSlots = 0x401;
 
-    /// <summary>The last picture slot the engine takes (0x100, v2.50's 0x400: REMPLUS 0x42B29A).</summary>
-    private int MaxPictureSlot => EngineVersion >= 250 ? 0x400 : 0x100;
+    /// <summary>
+    /// The last picture slot the engine takes (0x100, v2.50's 0x400: REMPLUS 0x42B29A). The later
+    /// v2.49 builds take 0x400 too: Tojita Sekai no Tori Colony's START frees slots 160 above its
+    /// effect slots (over 0x100), and Gensou no Idea's IDEA.EXE compares with 400h far more often
+    /// than the 2011 ones; no v2.49 game here uses a slot over 0x100 otherwise.
+    /// </summary>
+    private int MaxPictureSlot => EngineVersion >= 249 ? 0x400 : 0x100;
     private const int PictureRegion = 0x09300000;
     // 0xFB3BBC: the slot owns its memory (loaded by 04B0 / made by 055A), so it is freed when replaced
     private readonly bool[] m_pictureOwned = new bool[PictureSlots];
@@ -355,8 +360,10 @@ public sealed partial class ScnVm
             int picture = vm.Value(c, i.Args[1]);
             vm.Write32(vm.PictureAddress(slot), picture);
             vm.RelocatePicture(picture);
-            // A heap block becomes the slot's: 04B1 frees it
-            vm.m_pictureOwned[slot] = vm.IsBlock(picture);
+            // A heap block becomes the slot's: 04B1 frees it. Not one of VirtualAlloc, which the
+            // scripts free themselves (The Pillagers of Raillore's pool of full-screen pictures, cut
+            // from one VirtualAlloc: its first one was freed when its slot got another picture)
+            vm.m_pictureOwned[slot] = vm.IsBlock(picture) && !vm.m_virtualBlocks.Contains(picture);
             return 0;
         });
         // 055A slot, width, height, bytes per pixel, frames: a blank picture

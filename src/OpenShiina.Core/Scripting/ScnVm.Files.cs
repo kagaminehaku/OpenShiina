@@ -299,7 +299,9 @@ public sealed partial class ScnVm
     /// <summary>
     /// The save folder (DataPath) or a folder in it: there, as the engine's GetFileAttributes
     /// finds it (Aneiro's START checks DataPath with 010E, Ao no Juuai's its save\, and they have
-    /// kernel32 CreateDirectoryA make it when it is not). A name with a '.' is a file.
+    /// kernel32 CreateDirectoryA make it when it is not). A name with a '.' is a file (Hitozuma
+    /// Gui's START asks for DataPath + "\hit_sys.bin", whose rest Path.GetFileName takes for a
+    /// UNC root and gives no name).
     /// </summary>
     private bool IsSaveFolder(string path)
     {
@@ -309,7 +311,7 @@ public sealed partial class ScnVm
         if (!path.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
             return false;
         string rest = path[folder.Length..].TrimEnd('\\', '/');
-        return rest.Length == 0 || path[folder.Length] is '\\' or '/' && !Path.GetFileName(rest).Contains('.');
+        return rest.Length == 0 || path[folder.Length] is '\\' or '/' && !rest[(rest.LastIndexOfAny(['\\', '/']) + 1)..].Contains('.');
     }
 
     private void RegisterFiles()

@@ -162,7 +162,10 @@ public sealed partial class ScnVm
                 // no room for it; an address given is one already allocated (a commit in it)
                 if (Arg(0) != 0)
                     return BlockAt(Arg(0)) is { } block && (long)Arg(0) + (uint)Arg(1) <= (long)block.Start + block.Size ? Arg(0) : 0;
-                return TryAllocate((Arg(1) + 0xFFF) & ~0xFFF);
+                int allocated = TryAllocate((Arg(1) + 0xFFF) & ~0xFFF);
+                if (allocated != 0)
+                    m_virtualBlocks.Add(allocated);
+                return allocated;
             }
             case ("kernel32", "VirtualFree"):
             {
@@ -172,6 +175,7 @@ public sealed partial class ScnVm
                 {
                     if (!IsBlock(Arg(0)))
                         return 0;
+                    m_virtualBlocks.Remove(Arg(0));
                     Free(Arg(0));
                 }
                 return 1;
@@ -334,6 +338,40 @@ public sealed partial class ScnVm
                 Write32(p + 16, 2);
                 return 1;
             }
+            // The Pillagers of Raillore's START asks whether it runs on a 64-bit Windows (and goes
+            // on the same way either way): kernel32 is there, IsWow64Process too, and says yes
+            case ("kernel32", "GetModuleHandleA"):
+                return ReadString(Arg(0)).Equals("kernel32.dll", StringComparison.OrdinalIgnoreCase) ? Kernel32Module : 0;
+            case ("kernel32", "GetProcAddress"):
+                // (the scripts call the function through 01A4, never at this address)
+                return Arg(0) == Kernel32Module && ReadString(Arg(1)) == "IsWow64Process" ? Kernel32Module + 0x1000 : 0;
+            case ("kernel32", "GetCurrentProcess"):
+                return -1;
+            case ("kernel32", "IsWow64Process"):
+                if (Arg(1) != 0)
+                    Write32(Arg(1), 1);
+                return 1;
+            // RIOSUB.DLL's DXGI presentation (The Pillagers of Raillore, asked for when the window
+            // leaves full screen): it does not start, and the scripts draw as without it
+            // (rsDXGIEnd is called only when it started)
+            case ("riosub", "rsDXGIStart"):
+                return 0;
+            case ("riosub", "rsDXGIEnd"):
+                return 0;
+            case ("riosub", "rsDXGIWaitForVBlank"):
+                // (no DXGI output: it returns at once)
+                return 0;
+            // RIOSUB.DLL's colour changes of a picture's pixels (ScnVm.RioSub.cs); what they give is
+            // not looked at
+            case ("riosub", "rsS25ChangeHSL"):
+                RioChangeHsl(Arg(0), Arg(1), Arg(2), Arg(3), Arg(5), Arg(6));
+                return 0;
+            case ("riosub", "rsS25ChangeColorBalance"):
+                RioChangeColorBalance(Arg(0), Arg(1), Arg(2), Arg(3), Arg(4), Arg(5), Arg(6), Arg(7));
+                return 0;
+            case ("riosub", "rsS25ChangeCBHSL"):
+                RioChangeCbHsl(Arg(0), Arg(1), Arg(2), Arg(3), Arg(4), Arg(5), Arg(6), Arg(7), Arg(9), Arg(10));
+                return 0;
             case ("kernel32", "MultiByteToWideChar"):
             {
                 // Aneiro's START turns its UTF-8 .wav.sli files into Shift-JIS through UTF-16:

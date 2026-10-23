@@ -861,7 +861,7 @@ public sealed partial class ScnVm : IDisposable
                     p += 2;
                     raw.Add(count);
                     for (int i = 0; i < count; i++)
-                        args.Add(ReadOperand(ref p));
+                        args.Add(ReadOperand(ref p, declaration: op is 0x03CE or 0x03CF));
                     break;
                 }
                 case "SW":
@@ -924,7 +924,8 @@ public sealed partial class ScnVm : IDisposable
         return ins;
     }
 
-    private ScnOperand ReadOperand(ref int p)
+    /// <param name="declaration">A name of 03CE / 03CF's, read to its 0.</param>
+    private ScnOperand ReadOperand(ref int p, bool declaration = false)
     {
         int at = p;
         byte type = ReadByte(p++);
@@ -969,12 +970,16 @@ public sealed partial class ScnVm : IDisposable
             }
             case 0x12 or 0x13:
             {
+                // A name up to its 0 or a '}' (Oreimo 0x401610, which GetVar reads names with);
+                // 03CE / 03CF read their names to the 0 (Oreimo FUN_0041D0D0, the same in Hitozuma
+                // Gui's v2.45, whose START declares the local "{ret_flag}"). 2.34 (aoj.EXE
+                // 0x40D635) goes on to the 0 for every name and names it up to the first '}'
+                // ("{ret_flag}" is "{ret_flag")
+                bool whole = declaration && EngineVersion >= 240;
                 int start = p;
-                while (ReadByte(p) != 0 && ReadByte(p) != (byte)'}')
+                while (ReadByte(p) != 0 && (whole || ReadByte(p) != (byte)'}'))
                     p++;
                 string name = Encodings.cp932.GetString(ReadBytes(start, p - start));
-                // 2.34 (aoj.EXE 0x40D635) goes on to the 0 and names it up to the first '}' (the
-                // local "{ret_flag}" is "{ret_flag")
                 if (EngineVersion < 240)
                     while (ReadByte(p) != 0)
                         p++;

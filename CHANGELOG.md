@@ -4,10 +4,25 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.7 (2026-10-24)
 
+Seven new games: 40 games (41 releases) now play through.
+
+- **New: The Pillagers of Raillore (レイルロアの略奪者, the English release)** plays through. No keys
+  for its archives were known: they were taken from its executable. Its colour changes of
+  pictures (RIOSUB.DLL) are in the player now, and its title no longer waits forever.
+- **New: Shinigami no Testament (死神のテスタメント, 2012)** plays through.
+- **New: Tojita Sekai no Tori Colony (閉じたセカイのトリコロニー, 2013)** plays through.
+- **New: Kanojo ga Ore ni Kureta Mono (彼女が俺にくれたもの。俺が彼女にあげるもの。, 2014)** plays
+  through.
+- **New: Hana to Otome ni Shukufuku o Royal Bouquet (花と乙女に祝福を ロイヤルブーケ, 2010)** plays
+  through.
+- **New: Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ (人妻喰い, 2008)** plays through.
+- **New: Gakushoku no Oba-san The Motion (学食のおばさん The Motion, 2011)** plays through.
 - **New: Ayakashibito (あやかしびと, 2005)** starts and its story plays (not every scenario was
   checked yet). No keys were known for it: its archives open with Ao no Juuai's.
+- Every embedded x86 routine these games run has its C# version: none of them runs on the x86
+  interpreter.
 
 ## 0.7.6 (2026-10-21)
 

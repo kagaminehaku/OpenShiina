@@ -118,6 +118,7 @@ public sealed partial class ScnVm
         }
         m_invalid.Clear();
         ScreenInvalidated = true;
+        m_paints++;
         RunPaintSlot(0x4880B4);
     }
 

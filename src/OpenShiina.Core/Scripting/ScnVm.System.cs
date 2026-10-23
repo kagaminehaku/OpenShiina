@@ -80,6 +80,7 @@ public sealed partial class ScnVm
         ["Azu Plus"] = 306723180 ^ 1804523910,
         ["Chuuchuu Nurse"] = unchecked((int)0xF63C9C2D),
         ["Can Fes! ~Itazura Majo to Naisho no Gakuensai~"] = 306723180 ^ -1948973168,
+        ["Hana to Otome ni Shukufuku o Royal Bouquet"] = 306723180 ^ 1872894084,
     };
 
     private void RegisterSystem()

@@ -75,6 +75,11 @@ fan disc (LIBRAeSe.exe, 2017) is laid out as its main game's LIBRAeS.exe, which 
 the HelperKey 12 bytes after the first IEND, the image's length from the routine at 0x75A10
 (46,962), the seed 12 bytes before the YPK block at 0xD4934; its plug-in holds the shared
 DecodeTable's PNG and after it a MakiFesCrypt's code (the main game's: a YuruPlusCrypt's).
+The Pillagers of Raillore (RAILLOREe.exe, the English Raillore no Ryakudatsusha, 2025) is laid out
+the same: the HelperKey 12 bytes after the first IEND, the image's length (45,492) from the
+routine at 0x75A10, its plug-in at 0xD4934. The plug-in is a small bytecode machine whose
+program is the Japanese release's AltCountCrypt; its DecodeBin's date is 0x20210815, which the
+executable holds too.
 
 **WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
 eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a
@@ -189,7 +194,7 @@ The engine interprets **TXT at run time**; the SCN files are the engine's own sc
 | 0x04 (0x05 = deref) | i32 | immediate |
 | 0x10 | NUL-terminated string | string literal |
 | 0x11 | optional '.', NUL-terminated string | expression text, e.g. `_D780|(1<<_D990)` |
-| 0x12 (0x13 = deref) | name up to NUL or `}` | named variable |
+| 0x12 (0x13 = deref) | name up to NUL or `}` (03CE / 03CF's declarations: up to NUL, `}` and all) | named variable |
 | flag 0x80 | | address relative to the script base (jump targets are `0x84 <i32>`) |
 | flag 0x40 | | take the address (GetVarAdr) |
 

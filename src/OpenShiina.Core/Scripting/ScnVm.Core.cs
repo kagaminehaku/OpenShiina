@@ -228,6 +228,10 @@ public sealed partial class ScnVm
         // 001E / 001F: set / clear task flag 4
         Register(0x001E, (vm, c, i) => { c.Flags |= 4; return 0; });
         Register(0x001F, (vm, c, i) => { c.Flags &= ~4; return 0; });
+        // 000A n (Oreimo FUN_0041FD70): the most tasks the engine runs (up to 1,000; 0: the highest
+        // in use is kept), which the scripts do not read back; tasks are made as they come here.
+        // Hitozuma Gui's START (v2.45) starts with 000A 256
+        Register(0x000A, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
         // D382 / AA82: switches set to their own opcode number; AA82 lets the scripts write files
         Register(0xD382, (vm, c, i) => { vm.SwitchD382 = 0xD382; return 0; });
         Register(0xAA82, (vm, c, i) => { vm.FileWritesEnabled = true; return 0; });
@@ -479,8 +483,59 @@ public sealed partial class ScnVm
         });
         // 03A5 v: v = v - the task's module base (an address as an offset, 0x417380)
         Register(0x03A5, (vm, c, i) => { vm.Store(c, i.Args[0], vm.Value(c, i.Args[0]) - c.Base); return 0; });
-        // 03BD v: the time in ms
-        Register(0x03BD, (vm, c, i) => { vm.Store(c, i.Args[0], (int)vm.Clock); return 0; });
+        // 03BD v: the time in ms. The engine's clock runs on while it paints the window; here it
+        // moves between frames, so a task that has painted (07D1) since it last read the clock in
+        // this frame waits for the next one (The Pillagers of Raillore's title fades in a loop
+        // that draws, paints and reads the clock until 500 ms have passed, with no other wait)
+        Register(0x03BD, (vm, c, i) =>
+        {
+            int paints = vm.m_taskPaints.GetValueOrDefault(c.Slot);
+            if (vm.m_clockReads.TryGetValue(c.Slot, out var read) && read.Frame == vm.m_frameNumber && read.Paints != paints)
+            {
+                c.Pc = c.Current;
+                vm.FrameShown = true;
+                return 3;
+            }
+            vm.m_clockReads[c.Slot] = (vm.m_frameNumber, paints);
+            vm.Store(c, i.Args[0], (int)vm.Clock);
+            return 0;
+        });
+        // 03B6 v: timeGetTime (Oreimo FUN_0041CE30), the clock 03BD reads (Hitozuma Gui's movies)
+        Register(0x03B6, (vm, c, i) => { vm.Store(c, i.Args[0], (int)vm.Clock); return 0; });
+        // 0320 n, ms / 0321 n, v (Oreimo FUN_0041CD20 / FUN_0041CD50): timer n's period (0: 1) /
+        // its start, at v and the time now; 0322-0325 would read them (Hitozuma Gui sets one up
+        // before a movie and reads it with none of them)
+        Register(0x0320, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]), ms = vm.Value(c, i.Args[1]);
+            var t = vm.m_engineTimers.GetValueOrDefault(n);
+            vm.m_engineTimers[n] = t with { Period = ms == 0 ? 1 : ms };
+            return 0;
+        });
+        Register(0x0321, (vm, c, i) =>
+        {
+            int n = vm.Value(c, i.Args[0]), v = vm.Value(c, i.Args[1]);
+            var t = vm.m_engineTimers.GetValueOrDefault(n);
+            vm.m_engineTimers[n] = t with { Value = v, Count = 0, Start = vm.Clock };
+            return 0;
+        });
+        // 07BF ms (Oreimo FUN_0041FE90): MsgWaitForMultipleObjects on an event never set - the task
+        // waits ms, or less when input comes; here a frame at a time as 0028 (Hitozuma Gui paces
+        // its frames to 20 ms so)
+        Register(0x07BF, (vm, c, i) =>
+        {
+            int ms = vm.Value(c, i.Args[0]);
+            if (!vm.m_inputWaits.TryGetValue(c.Slot, out uint start))
+                vm.m_inputWaits[c.Slot] = start = vm.Clock;
+            if (ms > 0 && vm.Clock - start < (uint)ms)
+            {
+                c.Pc = c.Current;
+                vm.FrameShown = true;
+                return 3;
+            }
+            vm.m_inputWaits.Remove(c.Slot);
+            return 0;
+        });
         // 03B7 year, month, day, day of week / 03B8 hour, minute, second, ms (local time)
         Register(0x03B7, (vm, c, i) =>
         {

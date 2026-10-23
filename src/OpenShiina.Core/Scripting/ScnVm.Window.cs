@@ -18,6 +18,23 @@ public sealed partial class ScnVm
     /// <summary>A stand-in for the game window's handle: never 0.</summary>
     public const int WindowHandle = 0x00010001;
 
+    /// <summary>A stand-in for kernel32.dll's module handle (GetModuleHandleA): a value only, never read.</summary>
+    private const int Kernel32Module = 0x7C800000;
+
+    // 0320 / 0321's timers by number; 07BF's waits by task (when they started)
+    private readonly record struct ScnTimer(int Period, int Value, int Count, uint Start);
+    private readonly Dictionary<int, ScnTimer> m_engineTimers = new();
+    private readonly Dictionary<int, uint> m_inputWaits = new();
+
+    // The blocks kernel32 VirtualAlloc gave (VirtualFree frees them, never a picture slot)
+    private readonly HashSet<int> m_virtualBlocks = new();
+
+    // WM_PAINTs that showed the window (Paint), those of each task's 07D1, and the frame and count
+    // of the latter each task last read the clock (03BD) at
+    private int m_paints;
+    private readonly Dictionary<int, int> m_taskPaints = new();
+    private readonly Dictionary<int, (int Frame, int Paints)> m_clockReads = new();
+
     private void RegisterWindow()
     {
         // 07EE hwnd, index, v: GetClassLong (0 = the game window); 07EF hwnd, index, value: SetClassLong
@@ -49,8 +66,15 @@ public sealed partial class ScnVm
         Register(0x07BC, (vm, c, i) => vm.WindowMessage(c, i));
         Register(0x07BD, (vm, c, i) => vm.WindowMessage(c, i));
         // 07D1 UpdateWindow, 07D2 l, t, r, b: ValidateRect - nothing to do
-        // 07D1: UpdateWindow - WM_PAINT now if part of the window is invalid
-        Register(0x07D1, (vm, c, i) => { vm.Paint(); return 0; });
+        // 07D1: UpdateWindow - WM_PAINT now if part of the window is invalid (counted by task for 03BD)
+        Register(0x07D1, (vm, c, i) =>
+        {
+            int before = vm.m_paints;
+            vm.Paint();
+            if (vm.m_paints != before)
+                vm.m_taskPaints[c.Slot] = vm.m_taskPaints.GetValueOrDefault(c.Slot) + 1;
+            return 0;
+        });
         Register(0x07D2, (vm, c, i) =>
         {
             foreach (var a in i.Args)

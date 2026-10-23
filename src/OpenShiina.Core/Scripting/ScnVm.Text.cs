@@ -470,6 +470,37 @@ public sealed partial class ScnVm
 
     #region Control codes (FUN_00431960)
 
+    /// <summary>
+    /// "_n" (FUN_004315C0 of v2.47, called with record n and the record whose text it is): the
+    /// two records swap their glyphs (by their indices, before) and then all their bytes; the
+    /// record of the text keeps its place in it (pointer, position, waits, counts, line state)
+    /// and draws its font again. Tojita Sekai no Tori Colony and Royal Bouquet use it (record 0).
+    /// </summary>
+    private void SwapRecords(int other, int rec)
+    {
+        if (other == rec)
+            return;
+        int a = G(other, RIndex) % TextRecords, b = G(rec, RIndex) % TextRecords;
+        (m_glyphs[a], m_glyphs[b]) = (m_glyphs[b], m_glyphs[a]);
+        (m_lastKind[a], m_lastKind[b]) = (m_lastKind[b], m_lastKind[a]);
+        (m_cellsOnLine[a], m_cellsOnLine[b]) = (m_cellsOnLine[b], m_cellsOnLine[a]);
+        (m_lineCells[a], m_lineCells[b]) = (m_lineCells[b], m_lineCells[a]);
+        var bytesOther = ReadBytes(other, RecordSize);
+        var bytesRec = ReadBytes(rec, RecordSize);
+        WriteBytes(other, bytesRec);
+        WriteBytes(rec, bytesOther);
+        // (the font's character set goes with the bytes)
+        bool hasOther = m_fontCharSets.Remove(other, out var setOther), hasRec = m_fontCharSets.Remove(rec, out var setRec);
+        if (hasRec)
+            m_fontCharSets[other] = setRec;
+        if (hasOther)
+            m_fontCharSets[rec] = setOther;
+        foreach (int field in (ReadOnlySpan<int>)[RLeft, RX, RY, RPtr, RWait, RState, RPrevX, RPrevY, RWaits, RMeasured, RCount, RKinsoku, RAligned])
+            S(rec, field, G(other, field));
+        S(rec, RFontDirty, 1);
+        S(rec, RGlyphsDirty, 0);
+    }
+
     private void ControlCode(int rec, int surface)
     {
         int code = G(rec, RPtr);
@@ -708,7 +739,8 @@ public sealed partial class ScnVm
                 S(rec, RRight, ParseNumber(rec));
                 return;
             case (byte)'n':
-                throw new NotSupportedException("Text code _n (swap text records) is not supported yet");
+                SwapRecords(RecordAddress(ParseNumber(rec) % TextRecords), rec);
+                return;
             case (byte)'o':
                 S(rec, RStrikeOut, ParseNumber(rec));
                 FontChanged(rec);

@@ -23,8 +23,11 @@ public sealed partial class ScnVm
     /// Ero-On! START 5DFA5: the rectangle (sl, st)-(sr, sb) of a 32-bit picture into (dl, dt)-(dr, db)
     /// of another, enlarging (1/16 pixels), with the weight table at <paramref name="table"/>.
     /// False when the rectangles are not ones it enlarges (the scripts then use the x86 code).
+    /// <paramref name="scale"/>: the weight table's i * scale / sW (Royal Bouquet's build: 256);
+    /// <paramref name="opaque"/>: that build's first byte FF in every pixel it mixes.
     /// </summary>
-    public bool Enlarge16(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb, int table)
+    public bool Enlarge16(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb, int table,
+                          int scale = 257, bool opaque = false)
     {
         int dW = dr - dl, dH = db - dt, sW = sr - sl, sH = sb - st;
         if (dW == 0 || dH == 0 || sW == 0 || sH == 0)
@@ -37,7 +40,7 @@ public sealed partial class ScnVm
         var entries = new byte[(sW + 1) * 8];
         for (int i = 0; i < sW; i++)
         {
-            ushort w = (ushort)(i * 257 / sW);
+            ushort w = (ushort)(i * scale / sW);
             for (int k = 0; k < 4; k++)
                 BitConverter.TryWriteBytes(entries.AsSpan(i * 8 + k * 2), w);
         }
@@ -112,8 +115,9 @@ public sealed partial class ScnVm
 
         int srcBase = src + (int)((uint)st >> 4) * srcPitch + (int)((uint)sl >> 4) * 4;
         int dstBase = dst + (int)((uint)dt >> 4) * dstPitch + (int)((uint)dl >> 4) * 4;
+        // (the GPU's kernel is the other build's)
         var timing = ChooseGpu("enlarge16", (long)rows.Length * columns);
-        if (timing.Gpu)
+        if (timing.Gpu && !opaque)
         {
             if (Enlarge16OnGpu(Accelerator!, rows, from, mixLeft, left, right, width, srcBase, srcPitch, dstBase, dstPitch))
             {
@@ -146,6 +150,8 @@ public sealed partial class ScnVm
                     for (int i = 0; i < mixed.Length; i++)
                         mixed[i] = ((upper[i] * wa & 0xFFFF) + (lower[i] * wb & 0xFFFF) & 0xFFFF) >> 8;
                 }
+                // The opaque build sets the first byte of what it mixes (a row from two, or two pixels)
+                bool rowMixed = opaque && row.Mixed;
                 for (int c = 0, o = 0; c < columns; c++, o += 4)
                 {
                     int p = from[c] * 4;
@@ -153,6 +159,8 @@ public sealed partial class ScnVm
                     {
                         for (int k = 0; k < 4; k++)
                             output[o + k] = (byte)mixed[p + k];
+                        if (rowMixed)
+                            output[o] = 0xFF;
                         continue;
                     }
                     for (int k = 0; k < 4; k++)
@@ -160,6 +168,8 @@ public sealed partial class ScnVm
                         int sum = (mixed[p + k] * left[o + k] & 0xFFFF) + (mixed[p + 4 + k] * right[o + k] & 0xFFFF) & 0xFFFF;
                         output[o + k] = (byte)(sum >> 8);
                     }
+                    if (opaque)
+                        output[o] = 0xFF;
                 }
                 WriteBytes(dstBase + r * dstPitch, output);
             }

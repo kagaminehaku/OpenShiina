@@ -71,8 +71,10 @@ public sealed partial class ScnVm
             return 0;
         });
         // 0028 ms (0x415B70 -> FUN_00415ab0): the task waits ms, the engine pumping the window's
-        // messages meanwhile (an end of the game gives 1); here a frame at a time
-        Register234(0x0028, (vm, c, i) =>
+        // messages meanwhile (an end of the game gives 1); here a frame at a time. v2.47's
+        // (Oreimo 0x425B8D) waits the same way (Sleep(1) until ms have passed; Hitozuma Gui's
+        // menus, v2.45), so it is every version's
+        Register(0x0028, (vm, c, i) =>
         {
             int ms = vm.Value(c, i.Args[0]);
             if (!vm.m_sleeps234.TryGetValue(c.Slot, out uint start))

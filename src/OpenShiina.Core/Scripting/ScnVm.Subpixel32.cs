@@ -31,9 +31,11 @@ public sealed partial class ScnVm
     /// covered right pixel takes the source pixel right of it with the weight D4 in every lane
     /// (not the covered fraction in the alpha lane), and on the whole rows from two source rows is
     /// the average of its 2 x 2 source pixels, byte by byte ((a + b + c + d) >> 2).
+    /// <paramref name="bottomTwo"/> false: The Pillagers of Raillore's other build (START 3D39F9) -
+    /// a partly covered bottom row from two source rows is not drawn (from one source row it is).
     /// </summary>
     public bool Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, int src, int srcPitch, int stx, int sty, bool v250 = false,
-                           bool averageEdge = false)
+                           bool averageEdge = false, bool bottomTwo = true)
     {
         if (dtx < 0 || dty < 0 || stx < 0 || sty < 0 || w < 0 || h < 0)
             return true;
@@ -81,7 +83,7 @@ public sealed partial class ScnVm
             srcRow += srcPitch;
             dstRow += dstPitch;
         }
-        if (tailY != 0 && !v250)
+        if (tailY != 0 && !v250 && (tailY <= srcTailY || bottomTwo))
             rows.Add((tailY > srcTailY ? SubpixelRow.BottomTwo : SubpixelRow.BottomOne, srcRow, dstRow));
 
         int outPixels = (ax != 0 ? 1 : 0) + (int)middle + (tailX != 0 ? 1 : 0);

@@ -78,6 +78,32 @@ public sealed partial class X86Cpu
             case Mnemonic.Movaps or Mnemonic.Movups or Mnemonic.Movdqa or Mnemonic.Movdqu or Mnemonic.Movapd or Mnemonic.Movupd:
                 SetX(ins, 0, GetX(ins, 1));
                 return true;
+            // Double-precision scalars (The Pillagers of Raillore's RIOSUB.DLL, tested against its C#)
+            case Mnemonic.Movsd:
+                // from memory the high half is cleared, from a register it stays; to memory 8 bytes
+                if (!IsXmm(ins, 0))
+                    Store64(Address(ins), GetX(ins, 1).Lo);
+                else if (IsXmm(ins, 1))
+                    SetX(ins, 0, (GetX(ins, 1).Lo, GetX(ins, 0).Hi));
+                else
+                    SetX(ins, 0, (GetX(ins, 1).Lo, 0));
+                return true;
+            case Mnemonic.Comisd or Mnemonic.Ucomisd:
+            {
+                double x = Double(GetX(ins, 0)), y = Double(GetX(ins, 1));
+                bool unordered = double.IsNaN(x) || double.IsNaN(y);
+                m_zf = unordered || x == y;
+                m_pf = unordered;
+                m_cf = unordered || x < y;
+                m_of = m_sf = m_af = false;
+                return true;
+            }
+            case Mnemonic.Cvttsd2si:
+            {
+                double x = Double(GetX(ins, 1));
+                Set(ins, 0, x >= -2147483648.0 && x < 2147483648.0 ? (uint)(int)x : 0x80000000);
+                return true;
+            }
         }
         var a = GetX(ins, 0);
         var b = ins.OpCount > 1 ? GetX(ins, 1) : default;
@@ -167,6 +193,17 @@ public sealed partial class X86Cpu
                 r = Dwords(k => Dword(k < 2 ? a : b, (order >> (2 * k)) & 3));
                 break;
             }
+            case Mnemonic.Pcmpeqb: r = Halves(a, b, 8, (x, y) => x == y ? 0xFF : 0, false); break;
+            // Double-precision floats: scalars in the low half (the high half is the first's)
+            case Mnemonic.Addsd: r = (Bits(Double(a) + Double(b)), a.Hi); break;
+            case Mnemonic.Subsd: r = (Bits(Double(a) - Double(b)), a.Hi); break;
+            case Mnemonic.Mulsd: r = (Bits(Double(a) * Double(b)), a.Hi); break;
+            case Mnemonic.Divsd: r = (Bits(Double(a) / Double(b)), a.Hi); break;
+            // (the second when they are not ordered or both zero)
+            case Mnemonic.Minsd: r = (Double(a) < Double(b) ? a.Lo : b.Lo, a.Hi); break;
+            case Mnemonic.Maxsd: r = (Double(a) > Double(b) ? a.Lo : b.Lo, a.Hi); break;
+            case Mnemonic.Cvtdq2pd: r = (Bits((double)(int)Dword(b, 0)), Bits((double)(int)Dword(b, 1))); break;
+            case Mnemonic.Unpcklpd: r = (a.Lo, b.Lo); break;
             default:
                 r = default;
                 return false;
@@ -200,6 +237,10 @@ public sealed partial class X86Cpu
     private static float Float((ulong Lo, ulong Hi) v, int k) => BitConverter.UInt32BitsToSingle(Dword(v, k));
 
     private static uint Bits(float f) => BitConverter.SingleToUInt32Bits(f);
+
+    private static double Double((ulong Lo, ulong Hi) v) => BitConverter.UInt64BitsToDouble(v.Lo);
+
+    private static ulong Bits(double d) => BitConverter.DoubleToUInt64Bits(d);
 
     // cvt(t)ps2dq: out of range or NaN gives the "integer indefinite" 0x80000000
     private static uint ToInt(float f) => f >= -2147483648f && f < 2147483648f ? (uint)(int)f : 0x80000000;

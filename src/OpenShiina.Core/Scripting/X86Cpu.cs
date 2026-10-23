@@ -523,6 +523,19 @@ public sealed partial class X86Cpu
                     Set(ins, 0, Condition(ins.ConditionCode) ? 1u : 0);
                     break;
                 }
+                if (ins.ConditionCode != ConditionCode.None && ins.Mnemonic.ToString().StartsWith("Cmov", StringComparison.Ordinal))
+                {
+                    // (a 32-bit cmov writes its register either way)
+                    uint value = Get(ins, 1);
+                    Set(ins, 0, Condition(ins.ConditionCode) ? value : Get(ins, 0));
+                    break;
+                }
+                if (ins.Mnemonic == Mnemonic.Lahf)
+                {
+                    // AH = SF ZF 0 AF 0 PF 1 CF
+                    R[0] = (R[0] & 0xFFFF00FF) | (Flags() & 0xD5 | 2) << 8;
+                    break;
+                }
                 if (!Sse(ins) && !Mmx(ins))
                     throw new NotSupportedException($"x86 instruction {ins} at {ins.IP32:X8} is not supported");
                 break;

@@ -37,7 +37,7 @@ static class ScnDisasm
     }
 
     // One operand; returns text, advances p. Throws on unknown type.
-    public static string Operand(byte[] b, ref int p, out int? target)
+    public static string Operand(byte[] b, ref int p, out int? target, bool declaration = false)
     {
         target = null;
         int at = p;
@@ -68,7 +68,9 @@ static class ScnDisasm
             case 0x12: case 0x13:
                 {
                     int s = p;
-                    while (p < b.Length && b[p] != 0 && b[p] != (byte)'}') p++;
+                    // 03CE / 03CF's declarations read their names to the 0 (Oreimo FUN_0041D0D0)
+                    bool whole = declaration && !Version.StartsWith("2.34");
+                    while (p < b.Length && b[p] != 0 && (whole || b[p] != (byte)'}')) p++;
                     var name = Sjis.GetString(b, s, p - s);
                     // 2.34 names it up to the first '}' and goes on to the 0
                     if (Version.StartsWith("2.34")) while (p < b.Length && b[p] != 0) p++;
@@ -190,7 +192,7 @@ static class ScnDisasm
             if (item == "N2V")
             {
                 int count = BitConverter.ToUInt16(b, p); p += 2; ops.Add($"#{count}");
-                for (int i = 0; i < count; i++) ops.Add(Operand(b, ref p, out _));
+                for (int i = 0; i < count; i++) ops.Add(Operand(b, ref p, out _, op is 0x3CE or 0x3CF));
                 continue;
             }
             if (item == "V") { ops.Add(Operand(b, ref p, out var t)); if (t.HasValue && (info.Jump || CodeRefs.Contains(op))) tg.Add(t.Value); continue; }

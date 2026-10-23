@@ -17,11 +17,11 @@ row when something changes (see [Updating](#updating) at the end).
 Every game whose archives OpenShiina can open: the eleven GRAND†CROSS "Plus" games it started
 with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archives open, every
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
-version. The interpreter runs engine versions 2.45, 2.47, 2.49 and 2.50, and 2.34 in part; see
+version. The interpreter runs engine versions 2.45 and 2.47 to 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 33 games, 34 releases, tried; all of them
-play through, as the table above has them). Then ScnBoot
+scripts the player does not run yet (none in the 40 games, 41 releases, tried, but for Hitozuma
+Gui's `FE10`, which no engine has; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -84,7 +84,7 @@ of those versions it does not list.
 | Tsuyoimo x Yowaimo | 強妹×弱妹 | 2008-10-24 | [v2185](https://vndb.org/v2185) | v2.45 | ⚪ Not tried |  |
 | Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | ✅ Plays through | 2026-10-13 |
 | Manin Chijo Densha 2 | 満淫痴女電車2～姉とふたごと人妻と～ | 2008-11-28 | [v5511](https://vndb.org/v5511) | v2.45 | ⚪ Not tried |  |
-| Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 人妻喰い ～万引きGメン恥辱日記～ | 2008-12-16 | [v2897](https://vndb.org/v2897) | v2.45 | ⚪ Not tried |  |
+| Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 人妻喰い ～万引きGメン恥辱日記～ | 2008-12-16 | [v2897](https://vndb.org/v2897) | v2.45 | ✅ Plays through | 2026-10-24 |
 | Niizuma to Yuukaihan | 新妻と誘拐犯 ～寝取り孕ませ計画～ | 2008-12-19 | [v6456](https://vndb.org/v6456) | v2.45 | ⚪ Not tried |  |
 | Reizoku ~Kyonyuu Shimai Choukyou Jugyou~ | 隷属 ～巨乳姉妹調教授業～ | 2009-01-30 | [r13972](https://vndb.org/r13972) | v2.40 | ⚪ Not tried |  |
 | Idol Koukai Chijoku Sex | アイドル公開恥辱SEX | 2009-02-13 | [v3063](https://vndb.org/v3063) | v2.46 | ⚪ Not tried |  |
@@ -104,7 +104,7 @@ of those versions it does not list.
 | Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | ⚪ Not tried |  |
 | Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ⚪ Not tried |  |
 | Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ⚪ Not tried |  |
-| Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ⚪ Not tried |  |
+| Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ✅ Plays through | 2026-10-24 |
 | Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ✅ Plays through | 2026-10-20 |
 | Pure Love! | ぴゅあらっ！ | 2010-02-19 | [v2930](https://vndb.org/v2930) | v2.47 | ✅ Plays through | 2026-10-15 |
 | Saimin Seikatsu | 催眠生活 ～校則だから仕方ない！？～ | 2010-02-26 | [v3370](https://vndb.org/v3370) | v2.47 | ⚪ Not tried |  |
@@ -125,7 +125,7 @@ of those versions it does not list.
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ⚪ Not tried |  |
 | Damatte Watashi no Muko ni Nare! | 黙って私のムコになれ！ | 2011-01-28 | [v5289](https://vndb.org/v5289) | v2.48 | ✅ Plays through | 2026-10-20 |
-| Gakushoku no Oba-san The Motion | 学食のおばさん The Motion ～母さんの汁の味～ | 2011-02-25 | [r12508](https://vndb.org/r12508) | v2.48 | ⚪ Not tried |  |
+| Gakushoku no Oba-san The Motion | 学食のおばさん The Motion ～母さんの汁の味～ | 2011-02-25 | [r12508](https://vndb.org/r12508) | v2.48 | ✅ Plays through | 2026-10-22 |
 | Tanetsuke Mura | 種憑け村 ～白濁神、念仏講ノ儀～ | 2011-02-25 | [v6353](https://vndb.org/v6353) | v2.48 | ⚪ Not tried |  |
 | Sensei! Shite Ageru | 先生っ！ シてあげる | 2011-03-04 | [v6444](https://vndb.org/v6444) | v2.48 | ⚪ Not tried |  |
 | Onegan! | おねガン！ | 2011-04-22 | [v6585](https://vndb.org/v6585) | v2.48 | ⚪ Not tried |  |
@@ -136,7 +136,7 @@ of those versions it does not list.
 | Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Puchipuchi Idol Kouhosei | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012-02-24 | [v9973](https://vndb.org/v9973) | v2.49 | ✅ Plays through | 2026-10-15 |
-| Shinigami no Testament | 死神のテスタメント ～menuet of epistula～ | 2012-02-24 | [v7650](https://vndb.org/v7650) | v2.49 | ⚪ Not tried |  |
+| Shinigami no Testament | 死神のテスタメント ～menuet of epistula～ | 2012-02-24 | [v7650](https://vndb.org/v7650) | v2.49 | ✅ Plays through | 2026-10-24 |
 | Kuroneko Plus | 黒猫プラス | 2012-05-18 | [v10586](https://vndb.org/v10586) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Intruder | イントルーダー ～侵入者～ | 2012-06-22 | [v10533](https://vndb.org/v10533) | v2.49 | ⚪ Not tried |  |
 | Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-13 |
@@ -147,10 +147,10 @@ of those versions it does not list.
 | Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | 2012-12-14 | [v11603](https://vndb.org/v11603) | v2.49 | ⚪ Not tried |  |
 | Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Gensou no Idea ~Oratorio Phantasm Historia~ | 幻創のイデア～Oratorio Phantasm Historia～ | 2013-06-28 | [v11881](https://vndb.org/v11881) | v2.49 | ✅ Plays through | 2026-10-21 |
-| Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ⚪ Not tried |  |
+| Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ✅ Plays through | 2026-10-24 |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | 2014-05-30 | [v14614](https://vndb.org/v14614) | v2.49 | ⚪ Not tried |  |
 | Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ⚪ Not tried |  |
-| Kanojo ga Ore ni Kureta Mono | 彼女が俺にくれたもの。俺が彼女にあげるもの。 | 2014-09-26 | [v14321](https://vndb.org/v14321) | v2.50 | ⚪ Not tried |  |
+| Kanojo ga Ore ni Kureta Mono | 彼女が俺にくれたもの。俺が彼女にあげるもの。 | 2014-09-26 | [v14321](https://vndb.org/v14321) | v2.50 | ✅ Plays through | 2026-10-24 |
 | Kinpatsu Tarou Monogatari | 金髪太郎物語 | 2014-10-03 | [v16102](https://vndb.org/v16102) | v2.50 | ⚪ Not tried |  |
 | Gyaku Katei Kyoushi | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014-12-12 | [v16306](https://vndb.org/v16306) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-13 |
@@ -179,6 +179,7 @@ of those versions it does not list.
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ⚪ Not tried |  |
 | Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
+| The Pillagers of Raillore | レイルロアの略奪者 (English) | 2025-05-29 | [r84728](https://vndb.org/r84728) | v2.50 | ✅ Plays through | 2026-10-23 |
 
 ### No keys yet
 
@@ -477,6 +478,72 @@ they stopped the scenarios that play them (`05C9` failed) until the player took 
 it is. The game is found by its archives' names too, so its executable is not needed. Swept: 82
 scenarios, every one to its end.
 
+**Gakushoku no Oba-san The Motion** (GuiltyPLUS, GAKUOBAm.EXE, engine v2.48, 800 x 600) needed
+nothing new: its 812 S25, 68 TXT and 2,548 OGV come out whole, opcheck found nothing missing, and
+its two embedded routines (a thumbnail and xorstream) already had their C# versions. Its "Motion"
+animations (a\*.a) are MPEG-1 system streams, which played before. Swept: 68 scenarios, every one
+to its end.
+
+**The Pillagers of Raillore** (the English Raillore no Ryakudatsusha, RAILLOREe.exe, engine v2.50,
+1920 x 1080) had no scheme; its own was read from its executable as the other English releases'
+were: the HelperKey after the IEND of its key image, the image's length (45,492) from the routine
+that reads it, and its YPK plug-in, a bytecode program that is AltCountCrypt. Its DecodeBin has
+its own build date, 0x20210815 (the executable has it too). Its START calls RIOSUB.DLL's colour
+changes of a picture (`rsS25ChangeHSL`, `rsS25ColorBalance`, `rsS25ChangeCBHSL`), now in C#
+(ScnVm.RioSub.cs, written from the DLL's code and run against it), and its DXGI presentation,
+which does not start here (the scripts draw as without it); it asks kernel32 for
+`IsWow64Process` through `GetModuleHandleA` / `GetProcAddress`. Its title fades in a loop that
+draws, paints and reads the clock (`03BD`) until 500 ms have passed: a task that painted since
+it last read the clock in a frame now waits for the next one. Its pool of full-screen pictures
+is cut from one VirtualAlloc, whose first picture was freed when its slot got another: such
+blocks are never a slot's now. Its new embedded routines were all given C# and checked against
+their x86 code (random cases or SCNBOOT_VERIFY_NATIVE): two subpixel32 builds (one does not draw
+its bottom row from two source rows), a blur32 and an enlarge32 of other padding, pictures
+enlarged two, three and four times and 3:2 into 1920 x 1080, a 750 x 420 thumbnail with its row
+copies and its 24 to 32-bit copy, a mask, a text width, and dwords inverted or XORed with a
+byte. The x86 interpreter, which those checks run on, has SSE2's double instructions, CMOVcc
+and LAHF now. Swept: 130 scenarios, every one to its end.
+
+**Shinigami no Testament** (3rdEye, TESTAMENT.EXE, engine v2.49, 1280 x 720): opcheck found
+nothing missing; three embedded routines ran as x86 code until they were given C# (its save
+thumbnail, 116 x 65 from blocks of 11 x 11, its rows' copy, and a copy with every byte
+inverted), checked against their x86 code. Swept: 75 scenarios, every one to its end.
+
+**Tojita Sekai no Tori Colony** (TinyBell, TRC.EXE, engine v2.49, 1280 x 720) had its scheme but
+not its executable's name: `TRC.EXE` is mapped to it now. Its START frees picture slots over
+0x100 (`04B1` stopped it): v2.49 takes 0x400 slots now, as v2.50 does. Its text uses `_n`, which
+swaps the text record with record n (FUN_004315C0 of v2.47; the record keeps its place in the
+text and draws its font again). Four embedded routines were given C#: its save thumbnail (240 x
+135 from blocks of 5 x 5), two copies of its rows and Raillore's inversion of dwords with other
+padding. Swept: 501 scenarios, every one to its end.
+
+**Kanojo ga Ore ni Kureta Mono** (Onomatope*, MONOMONO.EXE, engine v2.50, 1024 x 768): opcheck
+found nothing missing; two embedded routines were given C# (the copy of its save thumbnail's
+rows and a 22 x 22 mask from a picture), checked against their x86 code. Swept: 53 scenarios,
+every one to its end.
+
+**Hana to Otome ni Shukufuku o Royal Bouquet** (ensemble, HANARB.EXE, engine v2.47) had its
+scheme but not its executable's name: `HANARB.EXE` is mapped to it now. START checks its
+executable's checksum (`03C2`, as Can Fes! does); it was added. It loops a piece of music that
+has no loop point by its length, `06F0` (the stream's length in ms, its PCM bytes * 1000 / its
+bytes a second). Its text uses `_n` too. Two embedded routines were given C#: its enlarge16, the
+known one but for its weights and the first byte of each pixel it mixes made FF, and a stream
+of dwords XORed with a key that changes after each. Swept: 44 scenarios, every one to its end.
+
+**Hitozuma Gui ~Manbiki G-man Chijoku Nikki~** (Guilty, hitoz.exe, engine v2.45) had its scheme
+but not its executable's name: `hitoz.exe` is mapped to it now. Its START sets the most tasks
+(`000A`), reads timeGetTime (`03B6`), sets a timer up before a movie (`0320`, `0321`) and paces
+its frames with `07BF` (a wait that input ends early); `0028`, the wait of its menus, is every
+version's now. It opens its system save as DataPath + "\hit_sys.bin": the double backslash made
+the path's last part a UNC root, no name with a '.', so it was taken for the save folder, which
+`010E` says is there and `0154` could not open. Its START declares the local "{ret_flag}": the
+declarations (`03CE`, `03CF`) read their names to the 0, where other names stop at a '}' (the
+two readers of a memory dump of the game are those of v2.47). Its two embedded routines had
+their C# versions. opcheck finds one opcode, `FE10`, in a branch of CONFIG.SCN taken when an
+entry of a table there is 2 (none is in the file): neither its engine nor v2.47 has a handler
+for it, so the game would stop there as the player does. Swept: 141 scenarios, every one to its
+end.
+
 **Damatte Watashi no Muko ni Nare!** (ensemble, DAMAMUKO.EXE, engine v2.48, 800 x 600) had its
 scheme but not its executable's name: `DAMAMUKO.EXE` is mapped to it now. Its RIO.INI says v2.48,
 the scheme v2.47; it runs with v2.49's opcodes, opcheck finding nothing missing. Its 1,913 S25,
@@ -529,11 +596,13 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 28 games (29 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+The 40 games (41 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
 2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love!,
 School Saimin Paradise! and Sis△Camp on 2026-10-15; Tsugou no Ii Idol on 2026-10-17; Hin wa
 Bokura no Fuku no Kami, Libra's fan disc, Iyashinbo The Motion and Damatte Watashi no Muko ni
-Nare! on 2026-10-20; Gensou no Idea on 2026-10-21): none stopped, none stuck.
+Nare! on 2026-10-20; Gensou no Idea on 2026-10-21; Gakushoku no Oba-san The Motion on
+2026-10-22; Raillore, Testament, Tori Colony, Kanojo ga Ore ni Kureta Mono, Royal Bouquet and
+Hitozuma Gui on 2026-10-23 and 24): none stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -571,6 +640,13 @@ Nare! on 2026-10-20; Gensou no Idea on 2026-10-21): none stopped, none stuck.
 | Iyashinbo The Motion | 82 | 53.5% (messages of two lines, the second shown with the first) |
 | Damatte Watashi no Muko ni Nare! | 163 | 61.0% (messages of two or three lines) |
 | Gensou no Idea ~Oratorio Phantasm Historia~ | 70 | 77.7% (messages of two or three lines, and the branches of choices not taken) |
+| Gakushoku no Oba-san The Motion | 68 | 57.5% (messages of two or three lines) |
+| The Pillagers of Raillore (English) | 130 | 95.2% |
+| Shinigami no Testament | 75 | 80.2% (messages of two or three lines) |
+| Tojita Sekai no Tori Colony | 501 | 99.6% |
+| Kanojo ga Ore ni Kureta Mono | 53 | 98.3% |
+| Hana to Otome ni Shukufuku o Royal Bouquet | 44 | 98.1% |
+| Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 141 | 61.4% (messages of two lines, the second shown with the first) |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

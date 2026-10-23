@@ -43,6 +43,8 @@ public sealed partial class ScnVm
         public bool Compressed;
         public int StartMs, LoopMs = -1;
         public int SampleRate;
+        // The whole stream in ms (06F0)
+        public int LengthMs;
         // 06EC's fade: a step of Delta every StepMs up to Target (the stream stops there when
         // StopAtEnd and it went down), the time the last step was due; StepMs 0: none
         public int FadeStepMs, FadeDelta, FadeTarget;
@@ -103,6 +105,7 @@ public sealed partial class ScnVm
                 Handle = platform,
                 Compressed = magic == 0x5367674F || (magic & 0xFFFFFF) == 0x56474F,
                 SampleRate = MusicSampleRate(data),
+                LengthMs = MusicLengthMs(data),
             };
             if (slot >= 0)
                 vm.m_musicTable[slot] = handle;
@@ -226,6 +229,17 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], s?.Status ?? 0);
             return 0;
         });
+        // 06F0 s, v: v = the stream's length in ms (FUN_00422B90 -> FUN_00454DD0 of v2.47); only
+        // compressed streams (Hana to Otome ni Shukufuku o Royal Bouquet loops a piece with no loop
+        // point at its end)
+        Register(0x06F0, (vm, c, i) =>
+        {
+            var s = vm.Stream(vm.Value(c, i.Args[0]));
+            if (s == null || !s.Compressed)
+                return 2;
+            vm.Store(c, i.Args[1], s.LengthMs);
+            return 0;
+        });
         // 06EF s, start ms, loop ms, loop count (-1 each: unchanged); only compressed streams
         Register(0x06EF, (vm, c, i) =>
         {
@@ -241,6 +255,30 @@ public sealed partial class ScnVm
                 s.LoopCount = count;
             return 0;
         });
+    }
+
+    /// <summary>
+    /// A compressed music file's length in ms as the engine has it (06F0, FUN_00454DD0 of v2.47:
+    /// its PCM bytes * 1000 / its bytes a second, truncated): an OGV's from its header, an Ogg
+    /// stream's from the granule position of its last page and its sample rate; 0 for others.
+    /// </summary>
+    private static int MusicLengthMs(byte[] data)
+    {
+        var span = data.AsSpan();
+        uint magic = BitConverter.ToUInt32(data, 0);
+        if ((magic & 0xFFFFFF) == 0x56474F && span.Length >= 44 && span.Slice(12, 4).SequenceEqual("fmt "u8))
+        {
+            int perSecond = BitConverter.ToInt32(data, 28), bytes = BitConverter.ToInt32(data, 40);
+            return perSecond > 0 ? (int)(bytes * 1000.0 / perSecond) : 0;
+        }
+        if (magic != 0x5367674F)
+            return 0;
+        int rate = MusicSampleRate(data);
+        int last = span.LastIndexOf("OggS"u8);
+        if (last < 0 || last + 14 > span.Length || rate <= 0)
+            return 0;
+        long samples = BitConverter.ToInt64(data, last + 6);
+        return samples > 0 ? (int)(samples * 1000.0 / rate) : 0;
     }
 
     /// <summary>The steps of 06EC's fades due by now (before each frame).</summary>

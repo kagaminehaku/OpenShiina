@@ -184,9 +184,10 @@ public sealed partial class ScnVm
         });
 
         // Sis△Camp START C1E08 (Kyuuketsuki no Libra's C0668 but for the partly covered right
-        // pixel): every row drawn, as v2.47's build draws them (ScnVm.Subpixel32, averageEdge; 609
-        // calls and 392 random cases the same as its x86 code). Arguments as above
-        RegisterNative("5E66FE0CE791241C0CD6FE7991B5368C3CC00308", "subpixel32 (Sis△Camp)", (vm, c, a) =>
+        // pixel; The Pillagers of Raillore 3D2C44, other padding, 495 random cases the same): every
+        // row drawn, as v2.47's build draws them (ScnVm.Subpixel32, averageEdge; 609 calls and 392
+        // random cases the same as its x86 code). Arguments as above
+        RegisterNative(["5E66FE0CE791241C0CD6FE7991B5368C3CC00308", "60F3511CD794A57D2C8AFDC92BFC3D9822298A92"], "subpixel32 (Sis△Camp)", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
@@ -197,14 +198,30 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
         });
 
+        // The Pillagers of Raillore START 3D39F9: Sis△Camp's build but for the partly covered bottom
+        // row from two source rows, which it does not draw (ScnVm.Subpixel32, averageEdge and
+        // bottomTwo false; 495 random cases the same as its x86 code). Arguments as above
+        RegisterNative("44E63699447A41599F15C8F84A9A5464F0C0E517", "subpixel32 (Raillore)", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
+            int length = x < 0 || y < 0 || w < 0 || h < 0 ? 0 : pitch * ((y + h) >> 4) + (((x + w) >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegion(c, a, dst, length);
+            if (!vm.Subpixel32(dst, pitch, x, y, w, h, vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9),
+                               averageEdge: true, bottomTwo: false))
+                throw vm.Error(c, "Embedded x86 routine (subpixel32): a rectangle under one pixel (the x86 code would not end)");
+        });
+
         // Oreimo START 77108 (Azu 6BBB8; Sena 77556 and the other v2.49 games; Re: Rem Plus 866A8,
-        // Maki Fes! 85B38; Sis△Camp C375C, Re: Rem Plus's with other padding; MMX): the
+        // Maki Fes! 85B38; Sis△Camp C375C and The Pillagers of Raillore 3D459A, Re: Rem Plus's
+        // with other padding; MMX): the
         // enlarging case of the same copy, written out in
         // ScnVm.Enlarge32.cs (each build: 150 or more random cases the same as its x86 code; Re:
         // Rem Plus's 130 % zoom took 50 ms a frame translated, 4 ms as C#). Arguments as scale32's;
         // rectangles the C# version does not take run as x86 code (RunX86)
         RegisterNative(["67FD294324E188D2D3891314AB51537274147A92", "5F055480EAF613D53B5AAF6EE2475EA9FF247A76",
-                        "E17C33CA39A48D249E621A1EB13D0FBE757B99D8", "F420A46FA68357CAF25DF581DD343F81250B5636"], "enlarge32", (vm, c, a) =>
+                        "E17C33CA39A48D249E621A1EB13D0FBE757B99D8", "F420A46FA68357CAF25DF581DD343F81250B5636",
+                        "7F07033B27136BB4DD8136A878743AAE486A98B9"], "enlarge32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
@@ -265,13 +282,14 @@ public sealed partial class ScnVm
         // Bitch Nee-chan START 9F5E6 (SSE2; Bitch Gakuen A1B46, Bitch Shimai A1712: the same code,
         // its two work buffers 4 bytes further on; Chuuni Hime no Teikoku 9406E, 8 bytes; Chiccha na
         // Hanayome 9764A, 20 bytes; Libra of the Vampire Princess B93E3, 27 bytes, its fan disc B90AF,
-        // 31 bytes): the blur of
+        // 31 bytes; The Pillagers of Raillore 3B0939, 21 bytes): the blur of
         // ScnVm.Blur32.cs (15 s a call on the interpreter, which Shimai's would run on: its calls
         // keep X86Jit from it). l[0] dst, l[1] its stride, l[2] width, l[3] height, l[4] src,
         // l[5] its stride, l[6] / l[7] the radii across and down
         RegisterNative(["1276382986E6312B58F7F1B31302308A07B97B92", "CD7D21630A140CC934220F956BB41155BF171ACF",
                         "E4A694FDFEB6B98B6B486A905F1B3116D4C4DBA9", "1C6CA4B22558BD5DDE1CBD2C2D3FF11E3ED6D1DE",
-                        "AD91701A1AAD2E04C4C45F84178FDADBBB22B95D", "C2A3BC695326D0A369634C6A4922F01C4E93C14C"], "blur32", (vm, c, a) =>
+                        "AD91701A1AAD2E04C4C45F84178FDADBBB22B95D", "C2A3BC695326D0A369634C6A4922F01C4E93C14C",
+                        "1D845BAE4B226F73879EBDE7E29E9CF94319678E"], "blur32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), stride = vm.NativeArg(a, 1), w = vm.NativeArg(a, 2), h = vm.NativeArg(a, 3);
             using var verify = vm.VerifyRegion(c, a, dst, w <= 0 || h <= 0 ? 0 : stride * (h - 1) + w * 4);
@@ -321,22 +339,29 @@ public sealed partial class ScnVm
         // ScnVm.Enlarge16.cs. l[0] dst, l[1] its stride, l[2..5] dst left, top, right, bottom,
         // l[6] src, l[7] its stride, l[8..11] src left, top, right, bottom (1/16 pixels), l[12] the
         // weight table. Rectangles it does not enlarge run as x86 code
-        RegisterNative("27A535558D763B2B8F0008F2476F0FA14EB45AAB", "enlarge16", (vm, c, a) =>
+        RegisterNative("27A535558D763B2B8F0008F2476F0FA14EB45AAB", "enlarge16", (vm, c, a) => vm.Enlarge16Native(c, a, 257, opaque: false));
+        // Hana to Otome ni Shukufuku o Royal Bouquet START 4D062 (v2.47): the same but for its weight
+        // table, i * 256 / sW, and the first byte of each pixel it mixes, made FF (por with 0xFF
+        // after packuswb); the pixels it copies keep theirs. Arguments as above
+        RegisterNative("D6BC2828FE749484BEC89684F01FD4469FF9BA0C", "enlarge16 (opaque)", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: true));
+    }
+
+    /// <summary>enlarge16's arguments (RegisterNativeKernels) checked, its rectangles enlarged.</summary>
+    private void Enlarge16Native(ScnContext c, ScnNativeArgs a, int scale, bool opaque)
+    {
+        int dst = NativeArg(a, 0), pitch = NativeArg(a, 1);
+        int dl = NativeArg(a, 2), dt = NativeArg(a, 3), dr = NativeArg(a, 4), db = NativeArg(a, 5);
+        long columns = (uint)(dr - dl) >> 4, rows = (uint)(db - dt) >> 4;
+        int sl = NativeArg(a, 8), st = NativeArg(a, 9), sr = NativeArg(a, 10), sb = NativeArg(a, 11);
+        if (sr - sl < 0 || sb - st < 0 || dr - dl < sr - sl || db - dt < sb - st)
         {
-            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
-            int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), dr = vm.NativeArg(a, 4), db = vm.NativeArg(a, 5);
-            long columns = (uint)(dr - dl) >> 4, rows = (uint)(db - dt) >> 4;
-            int sl = vm.NativeArg(a, 8), st = vm.NativeArg(a, 9), sr = vm.NativeArg(a, 10), sb = vm.NativeArg(a, 11);
-            if (sr - sl < 0 || sb - st < 0 || dr - dl < sr - sl || db - dt < sb - st)
-            {
-                vm.RunX86(c, a);
-                return;
-            }
-            int length = rows == 0 || columns == 0 ? 0 : (int)(pitch * (((uint)dt >> 4) + rows - 1) + (((uint)dl >> 4) + columns) * 4);
-            using var verify = vm.VerifyRegion(c, a, dst, length);
-            if (!vm.Enlarge16(dst, pitch, dl, dt, dr, db, vm.NativeArg(a, 6), vm.NativeArg(a, 7), sl, st, sr, sb, vm.NativeArg(a, 12)))
-                throw vm.Error(c, "Embedded x86 routine (enlarge16): rectangles too large");
-        });
+            RunX86(c, a);
+            return;
+        }
+        int length = rows == 0 || columns == 0 ? 0 : (int)(pitch * (((uint)dt >> 4) + rows - 1) + (((uint)dl >> 4) + columns) * 4);
+        using var verify = VerifyRegion(c, a, dst, length);
+        if (!Enlarge16(dst, pitch, dl, dt, dr, db, NativeArg(a, 6), NativeArg(a, 7), sl, st, sr, sb, NativeArg(a, 12), scale, opaque))
+            throw Error(c, "Embedded x86 routine (enlarge16): rectangles too large");
     }
 
     /// <summary>The rule fade's alpha (rulealpha, see RegisterNativeKernels); the mask's byte is 255 - m when <paramref name="invert"/>.</summary>
