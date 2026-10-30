@@ -74,13 +74,15 @@ public sealed partial class ScnVm
     // 03C2's checksums of the unchanged executables, by game: Azu Plus (START 0x002F0 wants
     // v ^ 306723180 = 1804523910), Chuuchuu Nurse (CHUCHU.EXE, v2.45: START 0x0033F wants
     // -462117567, the CRC-32 of its decrypted code XOR that of 0x8000 bytes at 47B774), Can Fes!
-    // (CANFES.EXE, v2.47: START 0x004EE wants v ^ 306723180 = -1948973168)
+    // (CANFES.EXE, v2.47: START 0x004EE wants v ^ 306723180 = -1948973168), Saimin Seikatsu
+    // (SAIMIN.EXE, v2.47: START 0x00484 wants v ^ 306723180 = -628140931)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
         ["Chuuchuu Nurse"] = unchecked((int)0xF63C9C2D),
         ["Can Fes! ~Itazura Majo to Naisho no Gakuensai~"] = 306723180 ^ -1948973168,
         ["Hana to Otome ni Shukufuku o Royal Bouquet"] = 306723180 ^ 1872894084,
+        ["Saimin Seikatsu"] = 306723180 ^ -628140931,
     };
 
     private void RegisterSystem()

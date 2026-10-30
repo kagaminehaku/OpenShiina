@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45 and 2.47 to 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 40 games, 41 releases, tried, but for Hitozuma
+scripts the player does not run yet (none in the 42 games, 43 releases, tried, but for Hitozuma
 Gui's `FE10`, which no engine has; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
@@ -107,7 +107,7 @@ of those versions it does not list.
 | Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ✅ Plays through | 2026-10-24 |
 | Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ✅ Plays through | 2026-10-20 |
 | Pure Love! | ぴゅあらっ！ | 2010-02-19 | [v2930](https://vndb.org/v2930) | v2.47 | ✅ Plays through | 2026-10-15 |
-| Saimin Seikatsu | 催眠生活 ～校則だから仕方ない！？～ | 2010-02-26 | [v3370](https://vndb.org/v3370) | v2.47 | ⚪ Not tried |  |
+| Saimin Seikatsu | 催眠生活 ～校則だから仕方ない！？～ | 2010-02-26 | [v3370](https://vndb.org/v3370) | v2.47 | ✅ Plays through | 2026-10-31 |
 | Najimi no Oba-chan | 馴染みのオバちゃん | 2010-03-19 | [v3815](https://vndb.org/v3815) | v2.47 | ⚪ Not tried |  |
 | Danchi Wife ~Hitozuma Nude Model no Kenshin~ | 団地ワイフ～人妻ヌードモデルの献身～ | 2010-04-23 | [v3917](https://vndb.org/v3917) | v2.47 | ⚪ Not tried |  |
 | Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | ✅ Plays through | 2026-10-13 |
@@ -120,7 +120,7 @@ of those versions it does not list.
 | Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ⚪ Not tried |  |
 | Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Ryoumaden ~Houkago no Rakuen~ | 凌魔伝 ～放課後の楽園～ | 2010-10-15 | [v5325](https://vndb.org/v5325) | v2.47 | ⚪ Not tried |  |
-| Ren'ai Saimin ~Tsun na Kanojo ga dereru Saimin~ | 恋愛催眠～ツンな彼女がデレる催眠～ | 2010-11-26 | [v5108](https://vndb.org/v5108) | v2.47 | ⚪ Not tried |  |
+| Ren'ai Saimin ~Tsun na Kanojo ga dereru Saimin~ | 恋愛催眠～ツンな彼女がデレる催眠～ | 2010-11-26 | [v5108](https://vndb.org/v5108) | v2.47 | ✅ Plays through | 2026-10-31 |
 | Saint ~Aa Shu yo | セイント ～あぁ主よ、教え子達に堕とされた私をお許し下さい～ | 2010-12-10 | [v5773](https://vndb.org/v5773) | v2.47 | ⚪ Not tried |  |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ⚪ Not tried |  |
@@ -581,6 +581,23 @@ ScnVm.Scale32.cs; 505 random cases the same as its x86 code; SCNBOOT_VERIFY_NATI
 thumbnail's copy into a picture and the rule fade without inversion are the known routines with
 other numbers. opcheck: nothing missing.
 
+**Saimin Seikatsu ~Kousoku dakara Shikatanai!?~** (C:drive., SAIMIN.EXE, engine v2.47, 800 x 600)
+had its scheme and executable's name. START checks its executable's checksum (`03C2`, as Can
+Fes! does) and stopped with "Program Revision Error": its value was added. Its archives' 1,854
+S25, 181 TXT and 13,352 OGV come out whole (its `OGV.OGV` is a copy of its executable, not a
+sound). Five embedded routines ran as translated x86 code or on the interpreter until they had
+C#: its thumbnail (76 x 56 from blocks of 10 x 10), builds of shift32 and blend32 with loops of
+their own (the same bytes), and its zoom and pan, builds of Ero-On!'s scale16 and enlarge16
+(the same bytes); each checked against its x86 code (SCNBOOT_VERIFY_NATIVE) in the scenarios
+that call it. Swept: 181 scenarios, every one to
+its end.
+
+**Ren'ai Saimin ~Tsun na Kanojo ga Dereru Saimin~** (C:drive., RENSAI.EXE, engine v2.47, 800 x
+600) had its scheme and executable's name. Its 2,142 S25, 215 TXT and 12,600 OGV come out whole
+(`OGV.OGV`: its executable again). Its save thumbnail (84 x 63 from blocks of 9 x 9) ran as
+translated x86 code until it had C#, checked against its x86 code. Swept: 215 scenarios, every
+one to its end.
+
 ## Sweeping
 
 `tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through ScnBoot, each from
@@ -596,13 +613,14 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 40 games (41 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+The 42 games (43 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
 2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love!,
 School Saimin Paradise! and Sis△Camp on 2026-10-15; Tsugou no Ii Idol on 2026-10-17; Hin wa
 Bokura no Fuku no Kami, Libra's fan disc, Iyashinbo The Motion and Damatte Watashi no Muko ni
 Nare! on 2026-10-20; Gensou no Idea on 2026-10-21; Gakushoku no Oba-san The Motion on
 2026-10-22; Raillore, Testament, Tori Colony, Kanojo ga Ore ni Kureta Mono, Royal Bouquet and
-Hitozuma Gui on 2026-10-23 and 24): none stopped, none stuck.
+Hitozuma Gui on 2026-10-23 and 24; Saimin Seikatsu and Ren'ai Saimin on 2026-10-31): none
+stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -647,6 +665,8 @@ Hitozuma Gui on 2026-10-23 and 24): none stopped, none stuck.
 | Kanojo ga Ore ni Kureta Mono | 53 | 98.3% |
 | Hana to Otome ni Shukufuku o Royal Bouquet | 44 | 98.1% |
 | Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 141 | 61.4% (messages of two lines, the second shown with the first) |
+| Saimin Seikatsu ~Kousoku dakara Shikatanai!?~ | 181 | 95.9% (the branches of choices not taken) |
+| Ren'ai Saimin ~Tsun na Kanojo ga Dereru Saimin~ | 215 | 99.5% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

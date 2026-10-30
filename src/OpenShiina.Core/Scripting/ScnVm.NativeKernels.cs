@@ -87,9 +87,10 @@ public sealed partial class ScnVm
         // pixels, w = rB * 257 / (rA + rB); A' takes B's colour where A's alpha is 0 (and B' A's).
         // l[0] dst, l[1] A, l[2] B, l[3..5] their row strides, l[6] width, l[7] height, l[8] rA, l[9] rB.
         // Ero-On!'s START 5E878 is other code that gives the same bytes (300 random cases on the
-        // interpreter against 79366)
+        // interpreter against 79366). Saimin Seikatsu START 7384A: a build that takes two pixels at
+        // a time (and a lone first one to align the destination to 8 bytes), the same bytes
         RegisterNative(["A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "4A177932B7CDFCE9D2FBC516D15DCB24243F0A00",
-                        "9B44AD3EA3AFD3BEE7FA87EF120DEC2088989FA9"], "blend32", (vm, c, a) =>
+                        "9B44AD3EA3AFD3BEE7FA87EF120DEC2088989FA9", "F4220D18813B1FBCD4BFE3D56FFECD202AA02DD8"], "blend32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), sa = vm.NativeArg(a, 4), sb = vm.NativeArg(a, 5);
@@ -125,8 +126,10 @@ public sealed partial class ScnVm
         // by a fraction of a pixel, each byte the 2 x 2 source pixels from the one at the same
         // place with the weights (16 - fx)(16 - fy), fx(16 - fy), (16 - fx)fy, fx fy, >> 8 (16-bit
         // lanes: pmullw, paddw). l[0] dst, l[1] src, l[2] / l[3] their row strides, l[4] width,
-        // l[5] height, l[6] fx, l[7] fy (sixteenths). Counts of 0 or less run as x86 code
-        RegisterNative("5763B8B12978519D193DA1B8FA85C2C96E97DB7D", "shift32", (vm, c, a) =>
+        // l[5] height, l[6] fx, l[7] fy (sixteenths). Counts of 0 or less run as x86 code.
+        // Saimin Seikatsu START 72C9E: a build with a loop of its own for each of fx and fy 0 or
+        // not (a plain copy when both are 0), the same bytes
+        RegisterNative(["5763B8B12978519D193DA1B8FA85C2C96E97DB7D", "F88736CDB18021E599B041F6292C7AF13E8A3A62"], "shift32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1), sd = vm.NativeArg(a, 2), ss = vm.NativeArg(a, 3);
             int width = vm.NativeArg(a, 4), height = vm.NativeArg(a, 5), fx = vm.NativeArg(a, 6), fy = vm.NativeArg(a, 7);
@@ -314,8 +317,9 @@ public sealed partial class ScnVm
         // l[2..5] dst left, top, right, bottom, l[6] src, l[7] its stride, l[8..11] src left, top,
         // right, bottom (1/16 pixels), l[12] / l[13] the column / row weights, l[14] / l[15] the
         // column / row entries (24 bytes each). The x86 code makes the row entries before the
-        // column tables: where those run into them, it runs as x86 code instead
-        RegisterNative("31DAD459219DC78270C7147720CA1959DFEA5AFB", "scale16", (vm, c, a) =>
+        // column tables: where those run into them, it runs as x86 code instead. Saimin Seikatsu
+        // (v2.47) START 732A8 is another build of it, the same bytes
+        RegisterNative(["31DAD459219DC78270C7147720CA1959DFEA5AFB", "28E03A81F50DA1148767337586B04780E33409B6"], "scale16", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), dr = vm.NativeArg(a, 4), db = vm.NativeArg(a, 5);
@@ -338,8 +342,10 @@ public sealed partial class ScnVm
         // Ero-On! START 5DFA5 (MMX, the enlarging case of 0x14BCE), written out in
         // ScnVm.Enlarge16.cs. l[0] dst, l[1] its stride, l[2..5] dst left, top, right, bottom,
         // l[6] src, l[7] its stride, l[8..11] src left, top, right, bottom (1/16 pixels), l[12] the
-        // weight table. Rectangles it does not enlarge run as x86 code
-        RegisterNative("27A535558D763B2B8F0008F2476F0FA14EB45AAB", "enlarge16", (vm, c, a) => vm.Enlarge16Native(c, a, 257, opaque: false));
+        // weight table. Rectangles it does not enlarge run as x86 code. Saimin Seikatsu (v2.47)
+        // START 72F77 is another build of it, the same bytes
+        RegisterNative(["27A535558D763B2B8F0008F2476F0FA14EB45AAB", "1C0B5DBD306E520A9EB62FA41DF3484C397A4C39"], "enlarge16",
+                       (vm, c, a) => vm.Enlarge16Native(c, a, 257, opaque: false));
         // Hana to Otome ni Shukufuku o Royal Bouquet START 4D062 (v2.47): the same but for its weight
         // table, i * 256 / sW, and the first byte of each pixel it mixes, made FF (por with 0xFF
         // after packuswb); the pixels it copies keep theirs. Arguments as above

@@ -66,6 +66,10 @@ public sealed partial class ScnVm
         RegisterNative("1174F52A9A080EAEF9B086E491846FF3D5B35EB8", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 50, 16, 12));
         // Can Fes! START 71211: 68 x 51 from blocks of 11 x 11 (the rest of the 800 x 600 picture left out)
         RegisterNative("4D0B738FCFB0B45B214E4DFE0C8F5F46129F0B09", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 11, 68, 51));
+        // Ren'ai Saimin START 865B1 (v2.47): 84 x 63 from blocks of 9 x 9 (the rest left out too);
+        // Saimin Seikatsu START 72760: 76 x 56 from blocks of 10 x 10
+        RegisterNative("B51FD501F22CF51D019EF26160C1C35D6154CB2C", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 9, 84, 63));
+        RegisterNative("13CE585B31BB34E5FA674268BD852030B126B3E6", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 76, 56));
         // Chuuchuu Nurse START 70036AF3 / 70036B67 (v2.45): 160 x 120 from blocks of 5 x 5, and the
         // same code with blocks of 2 x 2 for 400 x 300
         RegisterNative("42515BD6BA1FCC24A41CA6A734692CC90E6577DB", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 160, 120));

@@ -4,8 +4,17 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.8 (2026-10-31)
 
+Two new games: 42 games (43 releases) now play through; and the player's screens are easier to
+read.
+
+- **New: Saimin Seikatsu ~Kousoku dakara Shikatanai!?~ (催眠生活 ～校則だから仕方ない！？～, 2010)**
+  plays through. Its check of its executable no longer stops it with "Program Revision Error".
+- **New: Ren'ai Saimin ~Tsun na Kanojo ga Dereru Saimin~ (恋愛催眠～ツンな彼女がデレる催眠～, 2010)**
+  plays through.
+- Their picture routines (save thumbnails, the zoom and pan, the moves by a fraction of a pixel,
+  the blends) run as C# code instead of translated x86 code.
 - **Easier to read:** every text of the player's screens now reads at 4.5 to 1 against its
   ground or more, in the three themes, with the same colours:
   - The gold as text (Continue, the settings' group names, Undo) is a deeper gold on Parchment.
