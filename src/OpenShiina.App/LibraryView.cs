@@ -9,13 +9,16 @@
 // whose folder is gone shows faded and cannot be played. Colours come from the theme (PlayerTheme.cs).
 
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Path = Avalonia.Controls.Shapes.Path;
 using OpenShiina.Game;
@@ -65,6 +68,10 @@ public sealed class LibraryView : UserControl
     {
         this.Use(BackgroundProperty, PlayerTheme.Keys.Background);
         Styles.AddRange(PlayerTheme.CardStyles());
+        Styles.Add(new Style(x => x.OfType<Button>().Class("rail").Template().OfType<ContentPresenter>().Name("PART_ContentPresenter"))
+        {
+            Setters = { new Setter(Animatable.TransitionsProperty, PlayerTheme.EaseBrushes()) },
+        });
         m_empty.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
         m_message.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink);
 
@@ -80,11 +87,10 @@ public sealed class LibraryView : UserControl
             Child = new StackPanel
             {
                 Spacing = 6, Margin = new Thickness(0, 12),
-                HorizontalAlignment = HorizontalAlignment.Center,
                 Children =
                 {
                     new Image { Source = LogoBitmap(), Width = 36, Height = 36, Margin = new Thickness(0, 0, 0, 14) },
-                    m_railLibrary, add, m_railSettings,
+                    RailItem(m_railLibrary), RailItem(add), RailItem(m_railSettings),
                 },
             },
         }.Use(Border.BackgroundProperty, PlayerTheme.Keys.Surface).Use(Border.BorderBrushProperty, PlayerTheme.Keys.Border);
@@ -217,7 +223,7 @@ public sealed class LibraryView : UserControl
 
         var heading = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 4, 0) };
         if (game.LastPlayed != null && m_games.FirstOrDefault()?.Folder == game.Folder)
-            heading.Children.Add(new TextBlock { Text = Strings.Continue, FontSize = 13, FontWeight = FontWeight.SemiBold }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Highlight));
+            heading.Children.Add(new TextBlock { Text = Strings.Continue, FontSize = 13, FontWeight = FontWeight.SemiBold }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.HighlightText));
         heading.Children.Add(new TextBlock
         {
             Text = game.Name, FontSize = m_compact ? 19 : 22, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap,
@@ -226,11 +232,13 @@ public sealed class LibraryView : UserControl
 
         var more = new Button
         {
-            Content = "…", FontSize = 18, Width = 44, Height = 40, Padding = new Thickness(0),
+            Content = new Path { Data = Icons.More, Width = 18, Stretch = Stretch.Uniform }.Use(Shape.FillProperty, PlayerTheme.Keys.Ink),
+            Width = 44, Height = 44, Padding = new Thickness(0), CornerRadius = new CornerRadius(22),
             HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
             Background = Brushes.Transparent, VerticalAlignment = VerticalAlignment.Top,
         };
         AutomationProperties.SetName(more, Strings.More);
+        ToolTip.SetTip(more, Strings.More);
         var menu = Menu(game);
         more.Click += (_, e) =>
         {
@@ -333,7 +341,7 @@ public sealed class LibraryView : UserControl
             menu.Items.Add(folder);
         }
         menu.Items.Add(new Separator());
-        var remove = new MenuItem { Header = Strings.RemoveMenu }.Use(MenuItem.ForegroundProperty, PlayerTheme.Keys.Accent);
+        var remove = new MenuItem { Header = Strings.RemoveMenu }.Use(MenuItem.ForegroundProperty, PlayerTheme.Keys.Danger);
         remove.Click += (_, _) => ShowRemove(game);
         menu.Items.Add(remove);
         return menu;
@@ -475,7 +483,7 @@ public sealed class LibraryView : UserControl
         };
         if (undo != null)
         {
-            var button = new Button { Content = Strings.Undo, Background = Brushes.Transparent }.Use(ForegroundProperty, PlayerTheme.Keys.Highlight);
+            var button = new Button { Content = Strings.Undo, Background = Brushes.Transparent }.Use(ForegroundProperty, PlayerTheme.Keys.HighlightText);
             button.Click += (_, _) =>
             {
                 m_toast.IsVisible = false;
@@ -603,7 +611,7 @@ public sealed class LibraryView : UserControl
                 {
                     Text = game.Name.Length > 0 ? game.Name[..1] : "?", FontSize = size * 0.47, FontFamily = PlayerTheme.TitleFont(game.Name.Length > 0 ? game.Name[..1] : "?"), FontWeight = FontWeight.Bold,
                     HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Highlight),
+                }.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.HighlightText),
             }.Use(Border.BackgroundProperty, PlayerTheme.Keys.SurfaceHigh),
         };
         var task = GameIcons.Of(game.Exe);
@@ -632,18 +640,33 @@ public sealed class LibraryView : UserControl
             Background = Brushes.Transparent, HorizontalAlignment = HorizontalAlignment.Center,
             Content = new Path { Data = icon, Stretch = Stretch.Uniform }.Use(Shape.FillProperty, ink),
         };
+        button.Classes.Add("rail");
         AutomationProperties.SetName(button, name);
         ToolTip.SetTip(button, name);
         return button;
     }
 
-    /// <summary>The rail's page shown: a lighter square behind it.</summary>
+    /// <summary>A rail button with, at the rail's left edge, the gold mark of the page shown (as the settings' page list has).</summary>
+    private static Panel RailItem(Button button)
+    {
+        var mark = new Border
+        {
+            Width = 3, Height = 24, CornerRadius = new CornerRadius(0, 2, 2, 0), IsVisible = false, IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
+        }.Use(Border.BackgroundProperty, PlayerTheme.Keys.Highlight);
+        button.Tag = mark;
+        return new Panel { Children = { button, mark } };
+    }
+
+    /// <summary>The rail's page shown: a lighter square behind it and the gold mark beside it.</summary>
     private static void Chosen(Button button, bool chosen)
     {
         if (chosen)
             button.Use(BackgroundProperty, PlayerTheme.Keys.SurfaceHigh);
         else
             button.Background = Brushes.Transparent;
+        if (button.Tag is Control mark)
+            mark.IsVisible = chosen;
     }
 
     private static TextBlock Fact(string text, bool trim = false) =>
@@ -726,5 +749,7 @@ public sealed class LibraryView : UserControl
         public static readonly Geometry Settings = Geometry.Parse(
             "M3,6 H21 V7.5 H3 Z M3,11.25 H21 V12.75 H3 Z M3,16.5 H21 V18 H3 Z M6,4.5 H10 V9 H6 Z M14,9.75 H18 V14.25 H14 Z M8,15 H12 V19.5 H8 Z");
         public static readonly Geometry Play = Geometry.Parse("M6,3 L21,12 L6,21 Z");
+        // Three dots in a row
+        public static readonly Geometry More = Geometry.Parse("M3,12 A2,2 0 1 1 7,12 A2,2 0 1 1 3,12 Z M10,12 A2,2 0 1 1 14,12 A2,2 0 1 1 10,12 Z M17,12 A2,2 0 1 1 21,12 A2,2 0 1 1 17,12 Z");
     }
 }

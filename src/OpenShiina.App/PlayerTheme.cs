@@ -5,13 +5,16 @@
 // in red, the sin in the name (tools/LogoGen).
 
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using Avalonia.Media.Transformation;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using OpenShiina.Game;
@@ -44,26 +47,33 @@ public static class PlayerTheme
         public const string Highlight = "OpenShiina.Highlight";
         /// <summary>Text on the gold.</summary>
         public const string OnHighlight = "OpenShiina.OnHighlight";
+        /// <summary>The gold as text (a group's name, Continue, Undo): deeper on a light theme, to read as well as the ink.</summary>
+        public const string HighlightText = "OpenShiina.HighlightText";
+        /// <summary>The text of what removes or deletes (Remove…): the red, lighter on a dark theme to read on it.</summary>
+        public const string Danger = "OpenShiina.Danger";
         /// <summary>The wordmark's letters and its red ones.</summary>
         public const string WordmarkInk = "OpenShiina.WordmarkInk";
         public const string WordmarkRed = "OpenShiina.WordmarkRed";
     }
 
     private sealed record Palette(bool Dark, Color Background, Color Surface, Color SurfaceHigh, Color Border, Color Ink, Color InkMuted,
-                                  Color Accent, Color OnAccent, Color Highlight, Color OnHighlight, Color WordmarkInk, Color WordmarkRed);
+                                  Color Accent, Color OnAccent, Color Highlight, Color OnHighlight, Color HighlightText, Color Danger,
+                                  Color WordmarkInk, Color WordmarkRed);
 
     private static Color C(string hex) => Color.Parse(hex);
 
     // The logo's colours (tools/LogoGen): night #1A0A10, leather #2A0A12, spine #4A0A18, cover
-    // #6B1024, red #C8102E (#E23B4E on dark), gold #D4A649 (#A9792B its shade), pages #F3E6C8
+    // #6B1024, red #C8102E (#E23B4E on dark), gold #D4A649 (#A9792B its shade), pages #F3E6C8.
+    // Text has 4.5 times the light of its ground (WCAG's AA) or more: so the gold as text is
+    // #7F5719 on the pages, Play's text on their gold the leather, and Remove #F0606E on the dark themes.
     private static Palette Of(AppTheme theme) => theme switch
     {
         AppTheme.Parchment => new(false, C("#F3E6C8"), C("#FBF6EC"), C("#EADBB8"), C("#D6C49C"), C("#2B1A20"), C("#6B4E44"),
-                                  C("#C8102E"), C("#FBF6EC"), C("#A9792B"), C("#FBF6EC"), C("#2B1A20"), C("#C8102E")),
+                                  C("#C8102E"), C("#FBF6EC"), C("#A9792B"), C("#2A0A12"), C("#7F5719"), C("#C8102E"), C("#2B1A20"), C("#C8102E")),
         AppTheme.Graphite => new(true, C("#16161A"), C("#222228"), C("#30303A"), C("#3A3A44"), C("#EDEDF0"), C("#A8A8B2"),
-                                 C("#C8102E"), C("#FFFFFF"), C("#D4A649"), C("#16161A"), C("#EDEDF0"), C("#E23B4E")),
+                                 C("#C8102E"), C("#FFFFFF"), C("#D4A649"), C("#16161A"), C("#D4A649"), C("#F0606E"), C("#EDEDF0"), C("#E23B4E")),
         _ => new(true, C("#1A0A10"), C("#2A0A12"), C("#4A0A18"), C("#4A0A18"), C("#F3E6C8"), C("#C9B49A"),
-                 C("#C8102E"), C("#FBF6EC"), C("#D4A649"), C("#2A0A12"), C("#F3E6C8"), C("#E23B4E")),
+                 C("#C8102E"), C("#FBF6EC"), C("#D4A649"), C("#2A0A12"), C("#D4A649"), C("#F0606E"), C("#F3E6C8"), C("#E23B4E")),
     };
 
     /// <summary>The choices of the settings, in the screens' language: each theme with its name and a line about it.</summary>
@@ -113,6 +123,8 @@ public static class PlayerTheme
         resources[Keys.OnAccent] = new SolidColorBrush(p.OnAccent);
         resources[Keys.Highlight] = new SolidColorBrush(p.Highlight);
         resources[Keys.OnHighlight] = new SolidColorBrush(p.OnHighlight);
+        resources[Keys.HighlightText] = new SolidColorBrush(p.HighlightText);
+        resources[Keys.Danger] = new SolidColorBrush(p.Danger);
         resources[Keys.WordmarkInk] = new SolidColorBrush(p.WordmarkInk);
         resources[Keys.WordmarkRed] = new SolidColorBrush(p.WordmarkRed);
 
@@ -236,11 +248,13 @@ public static class PlayerTheme
     /// <summary>
     /// Buttons of the class "card": the theme's surface with a hairline round it, lighter with a
     /// gold line when pointed at or pressed (Fluent's button colours otherwise); with "chosen" too,
-    /// a gold line always (the settings' theme samples)
+    /// a gold line always (the settings' theme samples). The colours ease from one to the other
+    /// (a sudden change reads as a flicker), a pressed card gives a little without moving what is
+    /// round it, and a mouse over one shows a hand.
     /// </summary>
     public static IEnumerable<IStyle> CardStyles()
     {
-        yield return new Style(x => x.OfType<Button>().Class("card"))
+        var card = new Style(x => x.OfType<Button>().Class("card"))
         {
             Setters =
             {
@@ -248,7 +262,22 @@ public static class PlayerTheme
                 new Setter(TemplatedControl.BorderBrushProperty, new DynamicResourceExtension(Keys.Border)),
                 new Setter(TemplatedControl.BorderThicknessProperty, new Thickness(1)),
                 new Setter(TemplatedControl.CornerRadiusProperty, new CornerRadius(12)),
+                new Setter(Animatable.TransitionsProperty, new Transitions
+                {
+                    new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = TimeSpan.FromMilliseconds(100) },
+                }),
             },
+        };
+        if (!PlayerPlatform.Touch)
+            card.Setters.Add(new Setter(InputElement.CursorProperty, new Cursor(StandardCursorType.Hand)));
+        yield return card;
+        yield return new Style(x => x.OfType<Button>().Class("card").Class(":pressed"))
+        {
+            Setters = { new Setter(Visual.RenderTransformProperty, TransformOperations.Parse("scale(0.98)")) },
+        };
+        yield return new Style(x => x.OfType<Button>().Class("card").Template().OfType<ContentPresenter>().Name("PART_ContentPresenter"))
+        {
+            Setters = { new Setter(Animatable.TransitionsProperty, EaseBrushes()) },
         };
         yield return new Style(x => x.OfType<Button>().Class("card").Class("chosen"))
         {
@@ -268,4 +297,11 @@ public static class PlayerTheme
                 },
             };
     }
+
+    /// <summary>A button's ground and line easing to their new colours in 150 ms (a card's, the rail's, a page in a list).</summary>
+    public static Transitions EaseBrushes() =>
+    [
+        new BrushTransition { Property = ContentPresenter.BackgroundProperty, Duration = TimeSpan.FromMilliseconds(150) },
+        new BrushTransition { Property = ContentPresenter.BorderBrushProperty, Duration = TimeSpan.FromMilliseconds(150) },
+    ];
 }

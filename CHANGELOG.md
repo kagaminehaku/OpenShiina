@@ -4,6 +4,18 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **Easier to read:** every text of the player's screens now reads at 4.5 to 1 against its
+  ground or more, in the three themes, with the same colours:
+  - The gold as text (Continue, the settings' group names, Undo) is a deeper gold on Parchment.
+  - Play's text is dark on Parchment's gold.
+  - Remove… is a lighter red on the dark themes.
+- **Smoother:** the tiles, the card, the rail and the settings' page list ease to their new
+  colours. A pressed card gives a little, and on a desktop the pointer is a hand over one.
+- The rail marks the page shown with a gold line, as the settings' page list does.
+- The card's "…" is drawn (three dots), a finger's size, with a tooltip.
+
 ## 0.7.7 (2026-10-24)
 
 Seven new games: 40 games (41 releases) now play through.

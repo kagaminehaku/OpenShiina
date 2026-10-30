@@ -372,7 +372,7 @@ public sealed class SettingsView : UserControl
             Children =
             {
                 new TextBlock { Text = title.ToUpperInvariant(), FontSize = 12, FontWeight = FontWeight.SemiBold, LetterSpacing = 1.2, Margin = new Thickness(4, 0, 0, 0) }
-                    .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Highlight),
+                    .Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.HighlightText),
                 new Border { Padding = new Thickness(16, 14), CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Child = card }
                     .Use(Border.BackgroundProperty, PlayerTheme.Keys.Surface).Use(Border.BorderBrushProperty, PlayerTheme.Keys.Border),
             },
@@ -457,9 +457,13 @@ public sealed class SettingsView : UserControl
         return control;
     }
 
-    /// <summary>The page list: rounded rows, the chosen one lighter with a gold mark on its left.</summary>
+    /// <summary>The page list: rounded rows, the chosen one lighter with a gold mark on its left, easing to it.</summary>
     private static IEnumerable<IStyle> PageListStyles()
     {
+        yield return new Style(x => x.OfType<ListBoxItem>().Class("page").Template().OfType<ContentPresenter>().Name("PART_ContentPresenter"))
+        {
+            Setters = { new Setter(Animatable.TransitionsProperty, PlayerTheme.EaseBrushes()) },
+        };
         yield return new Style(x => x.OfType<ListBoxItem>().Class("page"))
         {
             Setters =
