@@ -16,7 +16,9 @@
 //       The entries of a game's archives, or those files decoded (GameFiles.cs).
 //   ScnTools routines <game folder> [--like <game folder>...]
 //   ScnTools routine <game folder> <module> <hex offset> [--like <game folder> <module> <hex offset>]
-//       The embedded x86 routines, their signatures and C# versions (Routines.cs).
+//   ScnTools routinecheck <game folder> <module> <hex offset> <l[] spec> [cases]
+//       The embedded x86 routines, their signatures and C# versions; a C# version against the
+//       x86 code on random input (Routines.cs).
 //   The steps of trying a new game with these: docs/adding-a-game.md (tests/newgame.ps1).
 
 // Engine builds already analysed. The executables are memory dumps of the unpacked games;
@@ -56,6 +58,7 @@ switch (args.Length > 0 ? args[0] : "")
     case "extract": return GameFiles.Extract(args[1..]);
     case "routines": return Routines.RunAll(args[1..]);
     case "routine": return Routines.RunOne(args[1..]);
+    case "routinecheck": return Routines.RunCheck(args[1..]);
 }
 if (args.Length >= 4 && args[0] == "dis")
 {
@@ -74,5 +77,6 @@ Console.WriteLine("""
     ScnTools extract <game folder> <pattern> <out folder>
     ScnTools routines <game folder> [--like <game folder>...]
     ScnTools routine <game folder> <module> <hex offset> [--like <game folder> <module> <hex offset>]
+    ScnTools routinecheck <game folder> <module> <hex offset> <l[] spec: b65536,300,3840-7680,_> [cases]
     """);
 return 1;

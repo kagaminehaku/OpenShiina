@@ -6,6 +6,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 
 ## Unreleased
 
+- Chiccha na Hanayome: five more of its picture routines (in its menus and saves) run as C#
+  code instead of x86 code.
+
 ### Testing games
 
 - **A way of trying a new game, written down:** [docs/adding-a-game.md](docs/adding-a-game.md)
@@ -15,7 +18,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **New in ScnTools:** `arccheck` (whether every file of a game's archives comes out whole),
   `datefind` (the date in a scheme's DecodeBin that makes them whole, and `--apply` to write it),
   `files` / `extract` (a game's files), `routines` / `routine` (its x86 routines, their C#
-  versions, and the routines of other games with the same shape).
+  versions, and the routines of other games with the same shape), `routinecheck` (a routine's C#
+  version against its x86 code on random input).
 
 ## 0.7.8 (2026-10-31)
 

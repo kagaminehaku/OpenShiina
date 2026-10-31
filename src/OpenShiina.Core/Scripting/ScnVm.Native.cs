@@ -47,6 +47,27 @@ public sealed partial class ScnVm
     /// <summary>The name of the C# version registered for a signature, or null.</summary>
     public string? NativeName(string signature) => m_natives.TryGetValue(signature, out var native) ? native.Name : null;
 
+    /// <summary>
+    /// Runs the routine at <paramref name="target"/> with its l[] at <paramref name="stack"/>: its C#
+    /// version (false when it has none) or, with <paramref name="x86"/>, its x86 code on the
+    /// interpreter. For comparing the two outside a game (ScnTools routinecheck).
+    /// </summary>
+    public bool RunRoutine(int target, int stack, bool x86)
+    {
+        var args = new ScnNativeArgs(BAddress(0), AAddress(0), SAddress(0), FAddress(0, 0), stack);
+        var context = new ScnContext { Slot = 0 };
+        m_nativeTarget = target;
+        if (x86)
+        {
+            Interpret(context, target, args);
+            return true;
+        }
+        if (RoutineAt(target).Native is not { } native)
+            return false;
+        native.Run(this, context, args);
+        return true;
+    }
+
     /// <summary>The signature of the routine at an address (X86Routine.Signature).</summary>
     public string NativeSignature(int address) => RoutineAt(address).Code.Signature;
 

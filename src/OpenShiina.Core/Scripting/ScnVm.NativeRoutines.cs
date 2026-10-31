@@ -76,10 +76,12 @@ public sealed partial class ScnVm
         RegisterNative("2853439284672B39391C2DEA48F204032D81382A", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 2, 400, 300));
         // Gensou no Idea START A3F6F (v2.49, 1280 x 720): 192 x 108 from blocks of 6 x 6, rows of 3,840 bytes
         RegisterNative("A358C4BDF44489F7DFB8A57F3BF7D3B7E63A31FF", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 6, 192, 108, 3840));
-        // Gensou no Idea F5440 (The Pillagers of Raillore EFCLIB 3568, other padding): l[3] dwords
-        // from l[4] to l[0], each XORed with the byte l[5] in all four bytes (b | b << 8, then
-        // | << 16, as the x86 code builds it); a count under 1 runs as x86 code
-        RegisterNative(["304020D68894542344EA2C8F8D67586EF480BE6F", "EC6DD9EC7E160D8BA47F26DB38B9A688C63951ED"], "xor dwords", (vm, c, a) =>
+        // Gensou no Idea F5440 (The Pillagers of Raillore EFCLIB 3568, Chiccha na Hanayome EFCLIB
+        // 2C29, other padding): l[3] dwords from l[4] to l[0], each XORed with the byte l[5] in
+        // all four bytes (b | b << 8, then | << 16, as the x86 code builds it); a count under 1
+        // runs as x86 code
+        RegisterNative(["304020D68894542344EA2C8F8D67586EF480BE6F", "EC6DD9EC7E160D8BA47F26DB38B9A688C63951ED",
+                        "1C6C23B7891138CF24BA9870804BA7213B69A774"], "xor dwords", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), count = vm.NativeArg(a, 3), src = vm.NativeArg(a, 4);
             uint key = (uint)vm.NativeArg(a, 5);
@@ -337,6 +339,9 @@ public sealed partial class ScnVm
         RegisterNative("9721452713208958DEE71DA51F85540180359028", "block", (vm, c, a) => vm.BlockCopy(c, a, 12, 48, 2400));
         RegisterNative("C4839FCEF4CF13538D043A595B66E1D7B9B04E21", "block", (vm, c, a) => vm.BlockCopy(c, a, 90, 480, 3840));
         RegisterNative("0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
+        // Chiccha na Hanayome B9224 / B9270: 75 rows of 396 bytes, 3840 apart / l[2] apart
+        RegisterNative("8477782400863E751B269B913DC8D4319F6F5BDF", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 396, 3840));
+        RegisterNative("1253D6DD445B3CE501A06A6ED7C8F50CC32F44BF", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 396, vm.NativeArg(a, 2)));
         // Can Fes! START 71583: 51 rows of 204 bytes, 2400 apart (its 68 x 51 thumbnail into an
         // 800 x 600 picture)
         RegisterNative("1249F52FDF84986E2917C68EBA9DC210A93F1B1C", "block", (vm, c, a) => vm.BlockCopy(c, a, 51, 204, 2400));
@@ -347,15 +352,10 @@ public sealed partial class ScnVm
 
         // Bitch Nee-chan C7C2C (Bitch Gakuen CA19C, Bitch Shimai C9D6C; once at the start): 25 x 25
         // samples of the first byte of 24-bit pixels from l[0] (rows 3840 bytes apart) to l[1],
-        // each b * 64 / 255; read and written in the x86 code's order
-        RegisterNative("36FEBAB2B4673E7C14FF5B69625F879475C6F6AE", "samples25", (vm, c, a) =>
-        {
-            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1);
-            using var verify = vm.VerifyRegion(c, a, dst, 25 * 25);
-            for (int y = 0; y < 25; y++)
-                for (int x = 0; x < 25; x++)
-                    vm.WriteByte(dst++, (byte)((vm.ReadByte(src + y * 3840 + x * 3) << 6) / 255));
-        });
+        // each b * 64 / 255; read and written in the x86 code's order. Chiccha na Hanayome C04AC:
+        // the same code with 26 x 26 (its row step 3840 - 26 * 3)
+        RegisterNative("36FEBAB2B4673E7C14FF5B69625F879475C6F6AE", "samples25", (vm, c, a) => vm.Samples(c, a, 25));
+        RegisterNative("06344B77ECB765B91AC2094D95D2976F0E228EE7", "samples26", (vm, c, a) => vm.Samples(c, a, 26));
 
         // Bitch Gakuen 2B8BC (Bitch Shimai 2B70C): strrchr for Shift-JIS text: l[0] = the
         // address of the last byte l[2] in the string at l[1], lead bytes 81-9F and E0-FC
@@ -538,9 +538,10 @@ public sealed partial class ScnVm
             vm.MapDwords(dst, src, (int)bytes, x => x ^ v);
         });
 
-        // EFCLIB 54A0 / 549E / 6D79: l[1] dwords at l[0] inverted in place
+        // EFCLIB 54A0 / 549E / 6D79 (Chiccha na Hanayome 7766, other padding): l[1] dwords at l[0]
+        // inverted in place
         RegisterNative(["4158148EFBFBC3AA4CE88FF4D6D5D2B9C5707615", "8DC1060C677A722C3CACF4865B7E506824EB7942",
-                        "863B772CB1F64D67213C7F27F74AEEC6471CBD3A"], "invert32", (vm, c, a) =>
+                        "863B772CB1F64D67213C7F27F74AEEC6471CBD3A", "98CFC5C0D6A29A93EC9E2A728E0017AEE4027AE1"], "invert32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0);
             uint count = (uint)vm.NativeArg(a, 1);
@@ -1221,6 +1222,19 @@ public sealed partial class ScnVm
         using var verify = VerifyRegion(c, a, (int)dstSpan.Start, (int)dstSpan.Length);
         for (int y = 0; y < rows; y++)
             MoveMemory(dst + y * stride, src + y * rowBytes, rowBytes);
+    }
+
+    /// <summary>
+    /// n x n samples of the first byte of 24-bit pixels from l[0] (rows 3840 bytes apart) to
+    /// l[1], each b * 64 / 255, in the x86 code's order.
+    /// </summary>
+    private void Samples(ScnContext c, ScnNativeArgs a, int n)
+    {
+        int src = NativeArg(a, 0), dst = NativeArg(a, 1);
+        using var verify = VerifyRegion(c, a, dst, n * n);
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+                WriteByte(dst++, (byte)((ReadByte(src + y * 3840 + x * 3) << 6) / 255));
     }
 
     private void Move16(ScnContext c, ScnNativeArgs a)

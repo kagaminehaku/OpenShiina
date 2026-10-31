@@ -381,6 +381,7 @@ dotnet run --project tools/ScnTools -c Release -- files <game folder> [pattern]
 dotnet run --project tools/ScnTools -c Release -- extract <game folder> <pattern> <out folder>
 dotnet run --project tools/ScnTools -c Release -- routines <game folder> [--like <game folder>...]
 dotnet run --project tools/ScnTools -c Release -- routine <game folder> <module> <offset> [--like <game folder> <module> <offset>]
+dotnet run --project tools/ScnTools -c Release -- routinecheck <game folder> <module> <offset> <l[] spec> [cases]
 ```
 
 The steps of trying a new game with them, and `tests/newgame.ps1` that runs them all:
@@ -388,7 +389,9 @@ adding-a-game.md. `arccheck` checks every S25, TXT and Ogg file of a game's arch
 scheme and says which use DecodeBin's date; `datefind` works that date out (section 1,
 "DecodeBin's date"); `routines` lists the x86 routines the scripts call (`0276`) with their
 signatures and C# versions, and matches those without one against other games' by their shape
-(the instructions without their numbers); `routine --like` shows where two differ.
+(the instructions without their numbers); `routine --like` shows where two differ;
+`routinecheck` runs a routine's C# version and its x86 code (ScnVm.RunRoutine) on random input
+and compares every byte, for routines no run reaches.
 
 `opcheck` (ScnTools/OpCheck.cs) reads every SCN of a game's archives, disassembles it with the
 player's own opcode table for the game's engine version, and lists the opcodes ScnVm has no

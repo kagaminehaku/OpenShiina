@@ -104,6 +104,85 @@ static class Routines
     static string Relative(string line, int entry) =>
         Regex.Replace(Regex.Replace(line, @"^\s*[0-9A-F]{5}\s+", ""), @"L_([0-9A-F]+)", m => $"L+{Convert.ToInt32(m.Groups[1].Value, 16) - entry:X}");
 
+    /// <summary>
+    /// ScnTools routinecheck <game folder> <module> <hex offset> <l[] spec> [cases]: the routine's
+    /// C# version against its x86 code on random input, for a routine no game run reaches (a
+    /// sweep skips menus and saves). The spec gives each l[i], comma-separated: "b65536" a buffer
+    /// of so many random bytes, "300" a number, "3840-7680" a random number in that range, "_" 0.
+    /// Every buffer and l[] after the C# version must be byte for byte what the x86 code left.
+    /// </summary>
+    public static int RunCheck(string[] args)
+    {
+        if (args.Length is not (4 or 5))
+        {
+            Console.WriteLine("usage: ScnTools routinecheck <game folder> <module> <hex offset> <l[] spec> [cases]");
+            return 1;
+        }
+        using var game = GameArchives.Open(args[0], out string? why);
+        var found = game?.Entries().FirstOrDefault(e => e.Entry.Name.Equals(args[1], StringComparison.OrdinalIgnoreCase));
+        if (game == null || found?.Entry == null)
+        {
+            Console.WriteLine($"{args[0]}: {why ?? "no " + args[1] + " in its archives"}");
+            return 3;
+        }
+        var vm = NewVm(game.EngineVersion.Length > 0 ? game.EngineVersion : "2.49");
+        int target = vm.AllocateCopy(WarcOpener.OpenEntry(found.Value.Warc, found.Value.Entry)) + Convert.ToInt32(args[2], 16);
+        string signature = vm.NativeSignature(target);
+        if (vm.NativeName(signature) is not { } name)
+        {
+            Console.WriteLine($"{args[1]} {args[2]}: {signature} has no C# version");
+            return 2;
+        }
+        var spec = args[3].Split(',');
+        int cases = args.Length == 5 ? int.Parse(args[4]) : 200;
+        var random = new Random(1);
+        // The buffers, and l[] (14 dwords, past it what a routine may read beyond)
+        var buffers = spec.Select(s => s.StartsWith('b') ? vm.Allocate(int.Parse(s[1..])) : 0).ToArray();
+        int stack = vm.Allocate(64 * 4);
+        var regions = buffers.Select((b, i) => (Address: b, Length: b == 0 ? 0 : int.Parse(spec[i][1..])))
+                             .Where(r => r.Address != 0).Append((Address: stack, Length: 64 * 4)).ToArray();
+        for (int n = 0; n < cases; n++)
+        {
+            for (int i = 0; i < spec.Length; i++)
+            {
+                string s = spec[i];
+                int value = s switch
+                {
+                    "_" => 0,
+                    _ when s.StartsWith('b') => buffers[i],
+                    _ when s.IndexOf('-', 1) is > 0 and int dash => random.Next(int.Parse(s[..dash]), int.Parse(s[(dash + 1)..]) + 1),
+                    _ => int.Parse(s),
+                };
+                vm.Write32(stack + 4 * i, value);
+            }
+            foreach (var (address, length) in regions.SkipLast(1))
+            {
+                var bytes = new byte[length];
+                random.NextBytes(bytes);
+                vm.WriteBytes(address, bytes);
+            }
+            var before = regions.Select(r => vm.ReadBytes(r.Address, r.Length)).ToArray();
+            vm.RunRoutine(target, stack, x86: true);
+            var expected = regions.Select(r => vm.ReadBytes(r.Address, r.Length)).ToArray();
+            for (int r = 0; r < regions.Length; r++)
+                vm.WriteBytes(regions[r].Address, before[r]);
+            vm.RunRoutine(target, stack, x86: false);
+            for (int r = 0; r < regions.Length; r++)
+            {
+                var actual = vm.ReadBytes(regions[r].Address, regions[r].Length);
+                int at = actual.AsSpan().CommonPrefixLength(expected[r]);
+                if (at < actual.Length)
+                {
+                    string where = r == regions.Length - 1 ? $"l[] + {at:X}" : $"buffer of l[{Array.IndexOf(buffers, regions[r].Address)}] + {at:X}";
+                    Console.WriteLine($"case {n}: C# {name} differs from the x86 code at {where} ({actual[at]:X2} instead of {expected[r][at]:X2})");
+                    return 2;
+                }
+            }
+        }
+        Console.WriteLine($"{args[1]} {args[2]} ({signature}, C# {name}): {cases} random cases, the same bytes as the x86 code.");
+        return 0;
+    }
+
     /// <summary>Every routine 0276 calls in a game's SCN modules, or null when its archives do not open.</summary>
     static List<Found>? Collect(string folder, bool quiet = false)
     {

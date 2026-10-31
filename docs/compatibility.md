@@ -359,7 +359,11 @@ story read the scene replay's scenarios of CHIPPANA_E3.WAR, which name voices th
 have (`0158` stopped on v\HAR0140.ogv): files are now taken from the archives the scripts
 mounted, in their order. Its blur (START 9764A) is Chuuni Hime's code with other offsets: on the
 interpreter until its signature was given the C# blur32 (SCNBOOT_VERIFY_NATIVE: the same bytes).
-Swept again: 111 scenarios, every one to its end.
+Swept again: 111 scenarios, every one to its end. Five more of its routines, which neither the
+start nor the sweep runs (its menus' and saves'), were given C# versions on 2026-10-31 (ScnTools
+routines found them alike other games'): START C04AC samples of 26 x 26 (Chuuni Hime's are
+25 x 25), B9224 / B9270 blocks of 75 rows of 396 bytes, EFCLIB 2C29 xor dwords and 7766 invert32
+(other padding); each the same bytes as its x86 code on 200 random cases (ScnTools routinecheck).
 
 **Kyuuketsuki no Libra** (engine v2.50, LIBRA.EXE, with its patch of the first edition
 LIBRA_HP.WAR and its update LIBRA_U1.WAR) opcheck: nothing missing. Its scheme has no DecodeBin,

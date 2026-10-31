@@ -100,7 +100,10 @@ numbers):
   results, byte for byte.
 - **Check**: `SCNBOOT_VERIFY_NATIVE=<signature>` in ScnBoot runs the x86 code as well and stops
   at the first byte the C# version writes otherwise (`=1`: every C# routine; large zooms take
-  long on the interpreter).
+  long on the interpreter). A routine neither the start nor the sweep reaches (menus, saves) is
+  checked on its own: `ScnTools routinecheck <game> <module> <offset> <l[] spec>` runs both on
+  random input (the spec gives each l[i]: `b<bytes>` a buffer, `300` a number, `396-7680` a
+  random one, `_` 0; Chiccha's block: `b29700,b576000,396-7680`).
 
 A routine the sweep runs without a C# version shows in its logs (`routine ... : interpreter` or
 `translated`); newgame.ps1 lists them.
