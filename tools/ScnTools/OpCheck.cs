@@ -60,7 +60,7 @@ static class OpCheck
         var table = ScnDisasm.LoadTable(ScnOpcodes.TableText(version).Split('\n'));
         ScnDisasm.Version = version;
         ScnDisasm.Uncertain.Clear();
-        var vm = new ScnVm(ScnOpcodes.ForVersion(version), new NoHost())
+        var vm = new ScnVm(ScnOpcodes.ForVersion(version), new ToolHost())
         {
             EngineVersion = (int)Math.Round(double.Parse(version, System.Globalization.CultureInfo.InvariantCulture) * 100),
         };
@@ -126,20 +126,5 @@ static class OpCheck
             result.Add((key, scheme.Name));
         }
         return result;
-    }
-
-    // The VM only answers which opcodes and DLL functions it has: nothing is read or shown
-    sealed class NoHost : IScnHost
-    {
-        public byte[]? ReadFile(string name) => null;
-        public byte[]? ReadLooseFile(string name) => null;
-        public uint Milliseconds => 0;
-        public void SetTitle(string title) { }
-        public void SetFullScreen(bool fullScreen) { }
-        public string SaveFolder => Path.GetTempPath();
-        public byte[]? ReadSaveFile(string name) => null;
-        public void WriteSaveFile(string name, byte[] data) { }
-        public void DeleteSaveFile(string name) { }
-        public int MessageBox(string text, string caption, int type) => 1;
     }
 }

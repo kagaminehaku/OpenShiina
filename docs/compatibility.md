@@ -676,7 +676,8 @@ cut a scenario longer than the game's first one short (START asks its length fir
 
 ## Updating
 
-When a game's state changes:
+How a new game is tried and fixed, step by step: [adding-a-game.md](adding-a-game.md). When a
+game's state changes:
 
 1. In the **Games** table, set its **Status** to the row of the legend that fits and **Checked**
    to the date (YYYY-MM-DD); once it was run, its **ShiinaRio** column is the engine version

@@ -148,6 +148,8 @@ player reads, are in [docs/tools.md](docs/tools.md#translation-translate-a-game)
   saves, environment variables.
 - [`docs/tools.md`](docs/tools.md): how to use OpenShiina Tools, with pictures: archives,
   extracting, repacking, translating a game.
+- [`docs/adding-a-game.md`](docs/adding-a-game.md): how a new game is tried, fixed and recorded,
+  with the tools that do it (`tests/newgame.ps1`, ScnTools).
 - [`docs/todo.md`](docs/todo.md): what is planned and not done yet.
 - [`docs/engine-notes.md`](docs/engine-notes.md): what is known about the engine's archives,
   images, scenario commands, SCN bytecode and screens.

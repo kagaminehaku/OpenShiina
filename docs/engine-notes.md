@@ -375,7 +375,20 @@ in the git history. What it found about the engine is in sections 3, 8 and 9.
 dotnet run --project tools/ScnTools -- opscan oreimoplus <OREIMOPLUS_dump_SCY.exe> ops.tsv
 dotnet run --project tools/ScnTools -- dis tools/ScnTools/tables/ops_oreimoplus.tsv out.txt SRC_MAIN.SCN
 dotnet run --project tools/ScnTools -c Release -- opcheck [-o <folder>] <game folder>...
+dotnet run --project tools/ScnTools -c Release -- arccheck <game folder>
+dotnet run --project tools/ScnTools -c Release -- datefind <game folder> [--apply <Formats.Json>]
+dotnet run --project tools/ScnTools -c Release -- files <game folder> [pattern]
+dotnet run --project tools/ScnTools -c Release -- extract <game folder> <pattern> <out folder>
+dotnet run --project tools/ScnTools -c Release -- routines <game folder> [--like <game folder>...]
+dotnet run --project tools/ScnTools -c Release -- routine <game folder> <module> <offset> [--like <game folder> <module> <offset>]
 ```
+
+The steps of trying a new game with them, and `tests/newgame.ps1` that runs them all:
+adding-a-game.md. `arccheck` checks every S25, TXT and Ogg file of a game's archives with its
+scheme and says which use DecodeBin's date; `datefind` works that date out (section 1,
+"DecodeBin's date"); `routines` lists the x86 routines the scripts call (`0276`) with their
+signatures and C# versions, and matches those without one against other games' by their shape
+(the instructions without their numbers); `routine --like` shows where two differ.
 
 `opcheck` (ScnTools/OpCheck.cs) reads every SCN of a game's archives, disassembles it with the
 player's own opcode table for the game's engine version, and lists the opcodes ScnVm has no

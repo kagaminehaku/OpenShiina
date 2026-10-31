@@ -44,6 +44,9 @@ public sealed partial class ScnVm
             RegisterNative(signature, name, run);
     }
 
+    /// <summary>The name of the C# version registered for a signature, or null.</summary>
+    public string? NativeName(string signature) => m_natives.TryGetValue(signature, out var native) ? native.Name : null;
+
     /// <summary>The signature of the routine at an address (X86Routine.Signature).</summary>
     public string NativeSignature(int address) => RoutineAt(address).Code.Signature;
 

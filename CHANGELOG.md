@@ -4,6 +4,19 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+### Testing games
+
+- **A way of trying a new game, written down:** [docs/adding-a-game.md](docs/adding-a-game.md)
+  gives the steps, what went wrong with the games before and what fixed it, and what to update
+  once a game plays through. `tests/newgame.ps1 -Folder <game>` runs the steps on their own and
+  writes a report of what is left to do.
+- **New in ScnTools:** `arccheck` (whether every file of a game's archives comes out whole),
+  `datefind` (the date in a scheme's DecodeBin that makes them whole, and `--apply` to write it),
+  `files` / `extract` (a game's files), `routines` / `routine` (its x86 routines, their C#
+  versions, and the routines of other games with the same shape).
+
 ## 0.7.8 (2026-10-31)
 
 Two new games: 42 games (43 releases) now play through; and the player's screens are easier to

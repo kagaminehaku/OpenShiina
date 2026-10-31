@@ -8,6 +8,16 @@
 //   ScnTools opcheck [-o <folder>] <game folder>...
 //       The opcodes and DLL functions of a game's scripts the player does not run yet (OpCheck.cs);
 //       -o writes each game's disassembly there.
+//   ScnTools arccheck <game folder>
+//       Whether every file of a game's archives comes out whole with its scheme (ArcCheck.cs).
+//   ScnTools datefind <game folder> [--apply <Formats.Json>]
+//       The date of DecodeBin at 0x1020 that makes the game's files whole (DateFind.cs).
+//   ScnTools files <game folder> [pattern] / extract <game folder> <pattern> <out folder>
+//       The entries of a game's archives, or those files decoded (GameFiles.cs).
+//   ScnTools routines <game folder> [--like <game folder>...]
+//   ScnTools routine <game folder> <module> <hex offset> [--like <game folder> <module> <hex offset>]
+//       The embedded x86 routines, their signatures and C# versions (Routines.cs).
+//   The steps of trying a new game with these: docs/adding-a-game.md (tests/newgame.ps1).
 
 // Engine builds already analysed. The executables are memory dumps of the unpacked games;
 // the addresses are those of that dump.
@@ -38,6 +48,15 @@ if (args.Length >= 11 && args[0] == "opscan")
 }
 if (args.Length >= 2 && args[0] == "opcheck")
     return OpCheck.Run(args.Skip(1).ToArray());
+switch (args.Length > 0 ? args[0] : "")
+{
+    case "arccheck": return ArcCheck.Run(args[1..]);
+    case "datefind": return DateFind.Run(args[1..]);
+    case "files": return GameFiles.List(args[1..]);
+    case "extract": return GameFiles.Extract(args[1..]);
+    case "routines": return Routines.RunAll(args[1..]);
+    case "routine": return Routines.RunOne(args[1..]);
+}
 if (args.Length >= 4 && args[0] == "dis")
 {
     ScnDisasm.Run(args.Skip(1).ToArray());
@@ -49,5 +68,11 @@ Console.WriteLine("""
     ScnTools opscan <exe> <interp> <dispStart> <loopHead> <invalid> <getVar> <setVar> <getVarAdr> <out.tsv> <dispEnd> [ctxReg] [pcPtrReg] [pcGlobal]
     ScnTools dis <table.tsv> <out.txt> <file.scn>...
     ScnTools opcheck [-o <folder>] <game folder>...
+    ScnTools arccheck <game folder>
+    ScnTools datefind <game folder> [--apply <Formats.Json>]
+    ScnTools files <game folder> [pattern]
+    ScnTools extract <game folder> <pattern> <out folder>
+    ScnTools routines <game folder> [--like <game folder>...]
+    ScnTools routine <game folder> <module> <hex offset> [--like <game folder> <module> <hex offset>]
     """);
 return 1;
