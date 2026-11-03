@@ -18,6 +18,8 @@ sealed class GameArchives : IDisposable
     public List<(string Name, WarcArchive Archive)> Archives { get; } = new();
     /// <summary>The archives that could not be opened with the scheme.</summary>
     public List<string> NotOpened { get; } = new();
+    /// <summary>.WAR files that are MPEG movies, not archives (Doushite Daite Kurenai no!?'s _A and _Z).</summary>
+    public List<string> Movies { get; } = new();
 
     GameArchives(string folder, EncryptionScheme scheme, string source, string version)
     {
@@ -70,11 +72,19 @@ sealed class GameArchives : IDisposable
                 // counted as not opened
             }
             if (warc == null)
-                game.NotOpened.Add(Path.GetFileName(war));
+                (IsMpeg(war) ? game.Movies : game.NotOpened).Add(Path.GetFileName(war));
             else
                 game.Archives.Add((Path.GetFileName(war), warc));
         }
         return game;
+    }
+
+    /// <summary>The file starts as an MPEG program stream does (a pack header, 00 00 01 BA).</summary>
+    static bool IsMpeg(string path)
+    {
+        var head = new byte[4];
+        using var file = File.OpenRead(path);
+        return file.Read(head) == 4 && head is [0, 0, 1, 0xBA];
     }
 
     /// <summary>Every entry with its archive, in the archives' order.</summary>

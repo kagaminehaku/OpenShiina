@@ -1110,7 +1110,11 @@ the functions they call from the decompile. First findings:
 - `01A4 -, dll, function, arguments..., FF, v` calls a DLL function (FUN_0041DA80). The games
   call gdi32 CreateSolidBrush, CreatePen, SelectObject, Ellipse, DeleteObject (EFCLIB's circle
   wipe draws grey discs into a surface's device context, op_0529), user32 GetForegroundWindow,
-  AdjustWindowRect and kernel32 GlobalMemoryStatusEx. Brushes and pens are kept by the VM;
+  AdjustWindowRect and kernel32 GlobalMemoryStatusEx (the others a game needs are in ScnVm.Gdi.cs's
+  DllCall, each with the game it was added for: shlwapi PathStripPathA and RIOSUB
+  rsDialogViewText for Oni ga Kuru; kernel32 FindResourceA, SizeofResource, LoadResource and
+  LockResource for Yoyogi Hitozuma Senmon Gakuin, whose START compares its executable's icon 2
+  with icon.bin of its archives: the resource is read from the .exe file as data). Brushes and pens are kept by the VM;
   shapes go to IScnShapes: GDI itself on Windows (GdiShapes), elsewhere DibShapes. Worked out
   from Windows 10's pixels (`GdiEllipseCheck dump`): Ellipse(l, t, r, b) in GM_COMPATIBLE is the
   path StrokeAndFillPath would draw (the same pixels): four Béziers around the box (16l, 16t,
@@ -1256,6 +1260,34 @@ the functions they call from the decompile. First findings:
   decoding by a row and a column; the order is the same (overlap: vertical edges, then
   horizontal; loop filter: horizontal, then vertical; macroblocks in raster order). A 1280 x 720
   frame takes 8-13 ms on one core.
+
+### The games of 2026-11-04 (ScnVm)
+
+- `049D v` sets and `049C v` reads an engine flag (REMPLUS.EXE 0x423340 / 0x423320: 0xD0AD3C);
+  the Guilty and Material games' START set it from RIO.INI's MouseLR_Change. `04E7 mode, a, b, c`
+  (REMPLUS.EXE 0x42B335) gives the renderer `04E8` last set (-1 before: GDI by RIO.INI) and the
+  filters `04E8` gave it, the engine's first ones until then (GDI 3, 3; Direct3D 2, 2; OpenGL
+  GL_LINEAR 9729). `0105 section, key, v` writes a number into the settings file (the counterpart
+  of `0107`); the player keeps it for the session, the game folder is not written.
+- The Guilty and Material games' TOPMENU.SCN calls the title (a gosub to START's) and then starts
+  the module its choice in b[43] names: "Play from here" (ScnVm.Warp.cs) makes the call a jump to
+  the block that starts t\..._MAI.SCN (MainModuleBlock), as the title's first choice does.
+- Tanetsuke Mura's add-ons (ADD\TANE_00A.WAR and on, which START looks for under the folder 0A28
+  gives and mounts by that path) load a DLL of their own and call its ProtectCheck before they
+  mount the rest: a copy protection the player does not answer for. The game plays without them
+  (START finds none: the player opens the archives of the game folder alone).
+- New routines (ScnVm.NativeRoutines.cs): Yoyogi Hitozuma Senmon Gakuin's rule wipe (v2.37, MMX:
+  two pictures mixed by a mask, 16-bit words compared signed), Nukitashi's enlargements to
+  1600 x 900 (x2, x3 and 3:2 of pictures 800 / 532 / 1066 wide: 1600 is not three times a whole
+  number, so each row of three starts 16 bytes, and each pair of the picture's rows 2 bytes,
+  before where the last ended), the frame of its thumbnail cleared and its first bytes scaled,
+  Sorcery Jokers' (Japanese) count of the set pixels in three squares of 32 x 32, Miko Dashi's
+  memcmp, and the blank S25 of the Japanese Sorcery Jokers (nothing cleared first). The rest
+  were builds of known ones with other numbers (thumbnails, masks, row copies, enlarge16 with
+  its weight table i * 256 / sW and nothing made opaque).
+- Nukige Mitai na Shima ni Sunderu 2's archives are named NUKITASHI2_*.WAR: without its .exe in
+  GameMap the first game's scheme was taken (its name is in theirs). Its DecodeBin date is
+  20190329 (`ScnTools datefind`).
 
 ### Hot embedded x86 in C# (ScnVm, 2026-10-06)
 

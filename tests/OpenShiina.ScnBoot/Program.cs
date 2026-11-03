@@ -127,10 +127,19 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_PROFILE") == "1" || profileFrame
 // frames (default 9000: 2.5 minutes; a movie playing is not counted); then a "[sweep]" line:
 // how it ended, the frames, the lines shown of all, the last, the slowest frame, the heap's peak
 bool sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
-// (SCNBOOT_SWEEP_CLICKS="x,y;x,y..." clicks there instead)
-host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") is { Length: > 0 } clicks
-    ? clicks.Split(';').Select(c => c.Split(',')).Select(c => (int.Parse(c[0]), int.Parse(c[1]))).ToArray()
-    : [.. from y in new[] { 28, 50, 72 } from x in new[] { 50, 25, 75 } select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)];
+// (SCNBOOT_SWEEP_CLICKS="x,y;x,y..." clicks there instead; for a game where a place of the grid is a
+// button that opens a screen of its own, "safe" leaves out the grid's lower right (Doushite Daite
+// Kurenai no!?'s message window has a button there) and adds a row at 40% (its choices are at
+// 30-45% of the height, between the grid's rows), and "center" clicks only in the middle:
+// tests\sweep.ps1 runs a stuck scenario again so)
+host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") switch
+{
+    "center" => [(vm.ScreenWidth / 2, vm.ScreenHeight / 2)],
+    "safe" => [.. from y in new[] { 28, 40, 50, 72 } from x in new[] { 50, 25, 75 } where !(x == 75 && y == 72)
+                  select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)],
+    { Length: > 0 } clicks => clicks.Split(';').Select(c => c.Split(',')).Select(c => (int.Parse(c[0]), int.Parse(c[1]))).ToArray(),
+    _ => [.. from y in new[] { 28, 50, 72 } from x in new[] { 50, 25, 75 } select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)],
+};
 int sweepStuck = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_STUCK"), out int stuckFrames) ? stuckFrames : 9000;
 string? sweepFile = null, sweepEnd = null, sweepLast = null, slowestAt = null;
 int sweepTotal = 0, sweepLastNew = 0;

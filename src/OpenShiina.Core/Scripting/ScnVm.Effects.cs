@@ -234,6 +234,30 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[4], mode == 0 ? 1 : 0);
             return 0;
         });
+        // 04E7 mode, a, b, c (REMPLUS.EXE 0x42B335): the renderer 04E8 last set (-1 when none
+        // was: GDI as RIO.INI has it) and its a, b, c as 04E8 last gave them, the engine's first
+        // ones until then (GDI 3, 3; Direct3D 2, 2; OpenGL GL_LINEAR); Boku Igai no Otoko o
+        // Shiranai Kanojo's START keeps them to go back to when another renderer fails
+        Register(0x04E7, (vm, c, i) =>
+        {
+            int mode = vm.EngineGlobals.GetValueOrDefault(0x487F30, -1);
+            vm.Store(c, i.Args[0], mode);
+            (int a, int b)? filters = mode switch
+            {
+                0 => (vm.EngineGlobals.GetValueOrDefault(0x482940, 3), vm.EngineGlobals.GetValueOrDefault(0x482944, 3)),
+                1 => (0, 0),
+                2 => (2, 2),
+                3 => (9729, 9729),
+                _ => null,
+            };
+            if (filters is { } f)
+            {
+                vm.Store(c, i.Args[1], f.a);
+                vm.Store(c, i.Args[2], f.b);
+                vm.Store(c, i.Args[3], 0);
+            }
+            return 0;
+        });
         // 04EE x, y, w, h: the part of the window the picture is shown in, 04F0 sx, sy: its
         // scale (floats). Full screen stretches the picture (FUN_00413300); the host does that,
         // so the scripts see the picture shown at (0, 0) at its own size.

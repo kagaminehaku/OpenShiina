@@ -70,6 +70,19 @@ public sealed partial class ScnVm
         // Saimin Seikatsu START 72760: 76 x 56 from blocks of 10 x 10
         RegisterNative("B51FD501F22CF51D019EF26160C1C35D6154CB2C", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 9, 84, 63));
         RegisterNative("13CE585B31BB34E5FA674268BD852030B126B3E6", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 76, 56));
+        // Shojo Mama START 6DF9F (v2.49; Miko Dashi's 63DD0, v2.47, "ret 4"): 104 x 78 from blocks
+        // of 7 x 7; Bloody Rondo START A224F (v2.48): 244 x 183 from blocks of 3 x 3
+        RegisterNative(["406D794CB83B2D60453AF6F8308F363D17998154", "E911B635E098CED69A383DEBA48A1FED4FFDA179"], "thumbnail",
+                       (vm, c, a) => vm.Thumbnail(c, a, 7, 104, 78));
+        RegisterNative("B989AD7F42B182825C37945A4E8FDB2D4805E5F9", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 3, 244, 183));
+        // The rows of those thumbnails from l[0] (one after the other) to l[1], 2,400 bytes apart:
+        // Shojo Mama 6E233 (78 rows of 312 bytes; Miko Dashi 64143), Bloody Rondo A2581 (183 of 732)
+        RegisterNative(["051CABA443EBCE28334111E6AF738B88F7FA7EB3", "C003D60A4E7F37520E7404C93B6592FCB4123B9A"], "rows 104 x 78", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 2400, vm.NativeArg(a, 0), 312, 78, 312));
+        RegisterNative("6BA61D3CAF2525A790BFE440BE6267D30CD8BC65", "rows 244 x 183", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 2400, vm.NativeArg(a, 0), 732, 183, 732));
+        // Doushite Daite Kurenai no!? START 8822F: 232 x 174 from blocks of 3 x 3 (the rest left out)
+        RegisterNative("EFC1A7C2555C74261AD0BADB864569B4BF210B9D", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 3, 232, 174));
         // Chuuchuu Nurse START 70036AF3 / 70036B67 (v2.45): 160 x 120 from blocks of 5 x 5, and the
         // same code with blocks of 2 x 2 for 400 x 300
         RegisterNative("42515BD6BA1FCC24A41CA6A734692CC90E6577DB", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 160, 120));
@@ -107,8 +120,13 @@ public sealed partial class ScnVm
                     vm.Write32(dst + 4 * i, vm.Read32(src + 4 * i) ^ (int)key);
         });
         // Ao no Juuai 188BE (START2 18950; v2.34): the same 100 x 75 thumbnail, f[0] src, f[1] dst
-        RegisterNative("FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "thumbnail",
+        // (Boku Igai no Otoko o Shiranai Kanojo 58A3E, v2.49: "ret")
+        RegisterNative(["FBBBFACF8D7BA58AC19D6E3581A07D1C7E6E96BB", "90D9CC3BB0ED87CFB81342B8E2A4EB00FDF1AB18"], "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F)));
+        // Ran→Sem 6741B (v2.47): the same, its rows 2,400 bytes apart (in a picture of 800 x 600);
+        // Boku Igai 58AB1 (v2.49: "ret")
+        RegisterNative(["D9ABA7030C439C1EE095B165A3AE1098350BD572", "DDCBD9B3052D1E5DBBEE7D6C0400BCA5684C7B5C"], "thumbnail",
+                       (vm, c, a) => vm.Thumbnail(c, a, 8, 100, 75, vm.Read32(a.F + 4), vm.Read32(a.F), 2400, 2400));
         // Ayakashibito START2 12B77 (v2.34): 80 x 60 from blocks of 10 x 10, the same arguments
         RegisterNative("D9036751E14B2CD371970392C16FD29EB60CF5A8", "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 10, 80, 60, vm.Read32(a.F + 4), vm.Read32(a.F)));
@@ -122,7 +140,41 @@ public sealed partial class ScnVm
         // pixels into 3 x 3 - the corners as they are, the edges' middles the averages of their
         // two, the middle the average of all four (Sorcery Jokers' movie 3:2 in 32 bits)
         RegisterNative("5D890BED7B136019B7D8848E93992501D2519721", "enlarge x4", (vm, c, a) => vm.EnlargeWhole(c, a, 4, 480, 270));
-        RegisterNative("11726E4688DF316677B49171683930D9ED17D545", "enlarge 3:2", (vm, c, a) => vm.EnlargeThreeHalves(c, a));
+        RegisterNative("11726E4688DF316677B49171683930D9ED17D545", "enlarge 3:2", (vm, c, a) => vm.EnlargeThreeHalves(c, a, 640, 360));
+        // Nukige Mitai na Shima ni Sunderu 1 and 2 (the same code; 2's START offsets): their
+        // pictures made 1600 x 900. D4574 (SSE2): 800 x 450 twice; D4703: 400 x 225 four times;
+        // D45C7: 532 x 300 three times and D3474 (MMX): 1066 x 600 by 3:2, whose next rows start
+        // a little before the last ones' ends (1600 is not three times a whole number): each row
+        // of three 16 bytes before the last's end, each pair of the picture's rows 2 bytes
+        RegisterNative("4D34AEE67A84463DE527AA823BF6703BAFC5F16E", "enlarge x2", (vm, c, a) => vm.EnlargeWhole(c, a, 2, 800, 450));
+        RegisterNative("EBAD70D00F39BA77E3B4272838E6A6DF725D5EE5", "enlarge x4", (vm, c, a) => vm.EnlargeWhole(c, a, 4, 400, 225));
+        RegisterNative("45C0801C7C075557BECA31CE724D5A3899BA3671", "enlarge x3", (vm, c, a) => vm.EnlargeWhole(c, a, 3, 532, 300, 4, 16));
+        RegisterNative("6E629A2EDD2C4A7A623FDAA306E08BCDDB859BE9", "enlarge 3:2", (vm, c, a) => vm.EnlargeThreeHalves(c, a, 533, 300, 2, 4));
+        // Nukitashi's save thumbnail: CCA40, 233 x 131 made 32-bit (as Raillore's); D343C, its
+        // mask, 44 x 44 of a picture 1600 wide; D3590, the frame of a 348 x 208 picture cleared
+        // (ClearFrame); D3644, the first byte of each of its pixels times l[2], / 256 (l[0], rows
+        // l[1] bytes apart)
+        RegisterNative("2034E898B55E6D1D2BA78066F7C3EECB13900E83", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 233, 131));
+        RegisterNative("0CE30104B494F4C8DAC2285DDD309A45CA43381C", "mask44", (vm, c, a) => vm.Samples(c, a, 44, 4800));
+        RegisterNative("37DC5CFF62785C36A6B9C66344AB58AAE8861E43", "clear frame", (vm, c, a) => vm.ClearFrame(c, a));
+        RegisterNative("0DD98CFE48694D28F52A04E8BE4C8E5B2A312B50", "scale first bytes", (vm, c, a) =>
+        {
+            const int Width = 348, Height = 208;
+            int dst = vm.NativeArg(a, 0), stride = vm.NativeArg(a, 1);
+            uint factor = (uint)vm.NativeArg(a, 2);
+            if (stride < Width * 4)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, (Height - 1) * stride + Width * 4);
+            for (int y = 0; y < Height; y++)
+            {
+                var row = vm.Bytes(dst + y * stride, Width * 4);
+                for (int x = 0; x < Width * 4; x += 4)
+                    row[x] = (byte)(row[x] * factor >> 8);
+            }
+        });
         // Raillore 3D243F: the 750 x 420 thumbnail of a 1920-pixel wide 24-bit picture, each byte the
         // average of 2 x 2; 3D24B7: 420 rows of 2,250 bytes from l[4] (rows 5,760 bytes apart) to
         // l[0] one after the other; 3D2765: the other way, from l[0] to l[1], rows l[2] bytes apart
@@ -132,32 +184,11 @@ public sealed partial class ScnVm
         RegisterNative("9AAFA46F7AE7F2DC37E76C780EDEC870012BB309", "rows 750 x 420", (vm, c, a) =>
             vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 2250, 420, 2250));
         // Raillore 3D27BC: 750 x 420 pixels of 24 bits at l[0] (one after the other) into 32 bits at
-        // l[1] (rows l[2] bytes apart): FF, then the pixel's three bytes
-        RegisterNative("4E7AFE31B6653D60E34B305DB2A5E68023317F69", "24 to 32 bits", (vm, c, a) =>
-        {
-            const int Width = 750, Height = 420;
-            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1), stride = vm.NativeArg(a, 2);
-            var target = RowsSpan(dst, stride, Height, Width * 4);
-            if (Math.Abs((long)stride) < Width * 4 || !Apart(target, (src, (long)Width * 3 * Height)))
-            {
-                vm.RunX86(c, a);
-                return;
-            }
-            using var verify = vm.VerifyRegion(c, a, (int)target.Start, (int)target.Length);
-            var input = new byte[Width * 3];
-            for (int y = 0; y < Height; y++, src += Width * 3, dst += stride)
-            {
-                vm.ReadBytes(src, input);
-                var row = vm.Bytes(dst, Width * 4);
-                for (int x = 0; x < Width; x++)
-                {
-                    row[4 * x] = 0xFF;
-                    row[4 * x + 1] = input[3 * x];
-                    row[4 * x + 2] = input[3 * x + 1];
-                    row[4 * x + 3] = input[3 * x + 2];
-                }
-            }
-        });
+        // l[1] (rows l[2] bytes apart): FF, then the pixel's three bytes; Oni ga Kuru CD7A0: 238 x 133;
+        // Doushite Daite Kurenai no!? 8855E: 232 x 174
+        RegisterNative("BB68DCB924B8DB5AEF56E5452A05737BD1DF9BFA", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 232, 174));
+        RegisterNative("4E7AFE31B6653D60E34B305DB2A5E68023317F69", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 750, 420));
+        RegisterNative("62C3E0DAEA9FBD9D4945C17A3F12DBC00A96F7FA", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 238, 133));
         // The save thumbnails of the 1280 x 720 games (24-bit pictures, rows of 3,840 bytes):
         // Shinigami no Testament START 8255F, 116 x 65 from blocks of 11 x 11; Tojita Sekai no Tori
         // Colony START 8824F, 240 x 135 from blocks of 5 x 5. Arguments as Gensou no Idea's
@@ -174,6 +205,9 @@ public sealed partial class ScnVm
             vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 720, 135, 720));
         RegisterNative("1B4BCE0BEC3B4D1CD9E7C9606521224E6C26C6B4", "rows", (vm, c, a) =>
             vm.CopyRows(c, a, vm.NativeArg(a, 1), 3072, vm.NativeArg(a, 0), 450, 84, 450));
+        // Gohoushi Nurse 86C14 and Lovecha 89924: 99 rows of 528 bytes, 3,840 apart
+        RegisterNative("16F409F8E433571CD49C781CBDA5B49C512E8D1A", "rows", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 3840, vm.NativeArg(a, 0), 528, 99, 528));
         // Testament 827CD: l[2] bytes from l[1] to l[0], each dword inverted - eight bytes a step when
         // l[3] is 0 (the bytes past the last eight left), else four. A count of 0 runs as x86 code
         RegisterNative("2E87AFFFFF1105B79D31E2277BFF3CB1DA38B2E8", "copy inverted", (vm, c, a) =>
@@ -293,8 +327,8 @@ public sealed partial class ScnVm
         });
 
         // Ao no Juuai 7F562 (START2 7F7B2; v2.34): l[0] = the index of the first word l[1] in the
-        // string of words at l[0] (before its 0), else -1
-        RegisterNative("974E8152ACDBC5F4413632178D75F40431C4A296", "wcsindex", (vm, c, a) =>
+        // string of words at l[0] (before its 0), else -1. Boku Igai 69231 (v2.49): "ret"
+        RegisterNative(["974E8152ACDBC5F4413632178D75F40431C4A296", "D9C263218CAF74B4CC2C4D3B24E32216D31F01FC"], "wcsindex", (vm, c, a) =>
         {
             int start = vm.NativeArg(a, 0), result = -1;
             ushort ch = (ushort)vm.NativeArg(a, 1);
@@ -339,7 +373,9 @@ public sealed partial class ScnVm
         RegisterNative("9721452713208958DEE71DA51F85540180359028", "block", (vm, c, a) => vm.BlockCopy(c, a, 12, 48, 2400));
         RegisterNative("C4839FCEF4CF13538D043A595B66E1D7B9B04E21", "block", (vm, c, a) => vm.BlockCopy(c, a, 90, 480, 3840));
         RegisterNative("0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
-        // Chiccha na Hanayome B9224 / B9270: 75 rows of 396 bytes, 3840 apart / l[2] apart
+        // Chiccha na Hanayome B9224 / B9270: 75 rows of 396 bytes, 3840 apart / l[2] apart;
+        // Doushite Daite Kurenai no!? 884C3: 174 rows of 696 bytes, 2400 apart (its thumbnail)
+        RegisterNative("D8A858C959C1C8906AF1F02A9BF4F2B2AC6940E4", "block", (vm, c, a) => vm.BlockCopy(c, a, 174, 696, 2400));
         RegisterNative("8477782400863E751B269B913DC8D4319F6F5BDF", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 396, 3840));
         RegisterNative("1253D6DD445B3CE501A06A6ED7C8F50CC32F44BF", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 396, vm.NativeArg(a, 2)));
         // Can Fes! START 71583: 51 rows of 204 bytes, 2400 apart (its 68 x 51 thumbnail into an
@@ -420,11 +456,12 @@ public sealed partial class ScnVm
             vm.Write32(a.F + 8, result);
         });
 
-        // START 75FEE / 76434 / 858D0 (Ero-On! 5DC31, Aneiro 889E6): l[0] = NOT l[1], l[2] bytes, by 8 bytes
+        // START 75FEE / 76434 / 858D0 (Ero-On! 5DC31, Aneiro 889E6, Miko Dashi 6421C): l[0] = NOT l[1], l[2] bytes, by 8 bytes
         // (l[3] = 0: the count rounded down to 8) or by 4
         RegisterNative(["8EE6D4D8C30D61F6379F0F7FA42BAB648AE0483E", "0CF868D5FF21E737808C7235BF0D164BFDE48B4F",
                         "516F6F4090493362A1590006FF9F3031DFFC9346", "039192F71200D43AF29A5F5AE0682CCAC4317F2C",
-                        "7B2B7B77BACDED981FFB2FEBE08F68CBFB09DB09", "CD4D7E16634D0824BA915D35DFE8555BC0971D1B"], "not", (vm, c, a) =>
+                        "7B2B7B77BACDED981FFB2FEBE08F68CBFB09DB09", "CD4D7E16634D0824BA915D35DFE8555BC0971D1B",
+                        "F09D5672C0E378DB7DEAB4703FE65D4FB6983E76"], "not", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
             uint count = (uint)vm.NativeArg(a, 2);
@@ -517,12 +554,13 @@ public sealed partial class ScnVm
                 vm.MoveMemory(dst + y * sd, src + y * ss, (int)rowBytes);
         });
 
-        // EFCLIB 1E9E (Re: Rem Plus 2792; Bitch Gakuen and Shimai 285A, Ao no Juuai 1978: other padding): the
+        // EFCLIB 1E9E (Re: Rem Plus 2792; Bitch Gakuen and Shimai 285A, Ao no Juuai 1978, Ran→Sem and Boku Igai 2074: other padding): the
         // negative and other fills: l[3] dwords from l[4] to l[0], each XORed with l[5]'s byte in
         // every byte
         RegisterNative(["EB59CB1AF7084D666150A58C5866638D49AAC562", "BD87E97A68BDF28ECD10B4E3EBDBD6799D5A0F1D",
                         "997E3DD49B9B61739720F69D2E180ADAC4C9D884", "D299BA54CDEF926F62CDC0733BC018D56CDA54D5",
-                        "683B763EC4CA9666F13D288DF45400CB2F498B4E"], "xor32", (vm, c, a) =>
+                        "683B763EC4CA9666F13D288DF45400CB2F498B4E", "D7BB0B77AF051FEA644DBDCBAB9E624522D31AF8",
+                        "1FD120C0ED9408FF1CFA70D8D389AE41A6C97FD9", "0AFC04E0141EBB21410CD23BEFECF1869702A705"], "xor32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
             uint count = (uint)vm.NativeArg(a, 3), v = (uint)vm.NativeArg(a, 5);
@@ -538,10 +576,11 @@ public sealed partial class ScnVm
             vm.MapDwords(dst, src, (int)bytes, x => x ^ v);
         });
 
-        // EFCLIB 54A0 / 549E / 6D79 (Chiccha na Hanayome 7766, other padding): l[1] dwords at l[0]
-        // inverted in place
+        // EFCLIB 54A0 / 549E / 6D79 (Chiccha na Hanayome 7766, Yoyogi Hitozuma Senmon Gakuin 3F54,
+        // other padding): l[1] dwords at l[0] inverted in place
         RegisterNative(["4158148EFBFBC3AA4CE88FF4D6D5D2B9C5707615", "8DC1060C677A722C3CACF4865B7E506824EB7942",
-                        "863B772CB1F64D67213C7F27F74AEEC6471CBD3A", "98CFC5C0D6A29A93EC9E2A728E0017AEE4027AE1"], "invert32", (vm, c, a) =>
+                        "863B772CB1F64D67213C7F27F74AEEC6471CBD3A", "98CFC5C0D6A29A93EC9E2A728E0017AEE4027AE1",
+                        "459983DF2974D9D4EE797EEC75AAC21D02DC41C9"], "invert32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0);
             uint count = (uint)vm.NativeArg(a, 1);
@@ -630,6 +669,33 @@ public sealed partial class ScnVm
             }
         });
 
+        // Oni ga Kuru START D14F0: in the l[1] bytes at l[0], each 81 40 (the full-width space)
+        // made 87 40, looked for at every byte (not by characters), as the x86 code counts: a
+        // pair needs its second byte inside the l[1] bytes
+        RegisterNative("4C42D9E01CAAD99B51CB398660F6EDF9DCC2FE21", "space 8740", (vm, c, a) =>
+        {
+            int p = vm.NativeArg(a, 0), n = vm.NativeArg(a, 1);
+            using var verify = vm.VerifyRegion(c, a, p, Math.Max(n, 0));
+            if (n == 0 || --n == 0)
+                return;
+            do
+            {
+                if (vm.Read16(p) == 0x4081)
+                {
+                    vm.Write16(p, 0x4087);
+                    p += 2;
+                    if (--n == 0)
+                        break;
+                    n--;
+                }
+                else
+                {
+                    p++;
+                    n--;
+                }
+            } while (n != 0);
+        });
+
         // Re: Rem Plus START 88FEC: the string at l[1] to l[0] with half-width characters (20-7E)
         // made full-width by the table of words inside the routine (+34h + 2 c); the lead bytes
         // 81-9F and E0-FC take their next byte with them
@@ -670,8 +736,10 @@ public sealed partial class ScnVm
         });
 
         // Re: Rem Plus START 8911E: l[2] BGR pixels from l[1] to l[0] with their saturation
-        // changed by l[3] through the tables inside the routine (+A72h)
-        RegisterNative("ED8F3CADF6C30D98C2133F56F7209213D4423519", "saturation", (vm, c, a) => vm.Saturation(c, a));
+        // changed by l[3] through the tables inside the routine (+A72h); Oni ga Kuru D1523: its
+        // tables 5 bytes nearer (+A6Dh)
+        RegisterNative("ED8F3CADF6C30D98C2133F56F7209213D4423519", "saturation", (vm, c, a) => vm.Saturation(c, a, 0xA72));
+        RegisterNative("08CDE22C44BB4C9077EFF9DF15685E56D14C49E4", "saturation", (vm, c, a) => vm.Saturation(c, a, 0xA6D));
 
         // Re: Rem Plus START 8BB90: swaps l[2] bytes at l[0] and l[1] (dwords, then bytes)
         RegisterNative("341D72D8264C3FAF28CF53828124786719214DCB", "swap", (vm, c, a) =>
@@ -769,15 +837,11 @@ public sealed partial class ScnVm
         });
 
         // Re: Rem Plus START 8BD9C: a 28 x 28 mask from the first byte of each pixel of a BGR
-        // picture 1280 wide at l[0]: (v << 6) / 255 into l[1]
-        RegisterNative("B0BB28FCE0DED80456A7AC465F671A3E703C7897", "mask28", (vm, c, a) =>
-        {
-            int src = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1);
-            using var verify = vm.VerifyRegion(c, a, dst, 28 * 28);
-            for (int y = 0; y < 28; y++, src += 3840)
-                for (int x = 0; x < 28; x++)
-                    vm.WriteByte(dst++, (byte)((vm.ReadByte(src + 3 * x) << 6) / 255));
-        });
+        // picture 1280 wide at l[0]: (v << 6) / 255 into l[1] (samples25's code); Oni ga Kuru
+        // D419C: 45 x 45 of a picture 1600 wide; Gohoushi Nurse 8D33C and Lovecha 9004C: 24 x 24
+        RegisterNative("B0BB28FCE0DED80456A7AC465F671A3E703C7897", "mask28", (vm, c, a) => vm.Samples(c, a, 28));
+        RegisterNative("B16300E32869D8C30FCC3BDD27211F7E9544C677", "mask24", (vm, c, a) => vm.Samples(c, a, 24));
+        RegisterNative("84BAB7E3B467E7FF146EE14A147E96ABF7740FA0", "mask45", (vm, c, a) => vm.Samples(c, a, 45, 4800));
 
         // Re: Rem Plus START 904F4: matches the 48-byte records from l[1] (b[93] on to b[92])
         // against the b[94] left in the table at l[2] (40 bytes compared; a matched one is set
@@ -794,39 +858,10 @@ public sealed partial class ScnVm
         // "S25", l[5] frames of l[4] bytes each (their offsets after the header), each l[6] x
         // l[7] at (0, 0) with rows l[3] bytes apart, every row one run of l[6] ABGR pixels (the
         // code dword l[2] << 16: no length before the run, method 4 from l[2] 0x8000) left
-        // clear; l[8] counts the frames down to 0
-        RegisterNative("DE3A498EFE2D198ACE0A0AA10C6CD571E986461A", "blank s25", (vm, c, a) =>
-        {
-            int dst = vm.NativeArg(a, 0), bytes = vm.NativeArg(a, 1), code = vm.NativeArg(a, 2), stride = vm.NativeArg(a, 3);
-            int frameBytes = vm.NativeArg(a, 4), frames = vm.NativeArg(a, 5), w = vm.NativeArg(a, 6), h = vm.NativeArg(a, 7);
-            // Counts the x86 code would take round 4 billion times, or that write past the bytes cleared
-            if (bytes < 0 || frames <= 0 || h <= 0 || 8L + 4L * frames + (long)frameBytes * (frames - 1) + 0x14 + 4L * h + (long)stride * (h - 1) + 8 > bytes)
-            {
-                vm.RunX86(c, a);
-                return;
-            }
-            using var verify = vm.VerifyRegions(c, a, (dst, bytes), (a.Stack + 32, 4));
-            vm.FillMemory(dst, bytes, 0);
-            vm.Write32(dst, 0x353253);
-            vm.Write32(dst + 4, frames);
-            int frame = dst + 8 + 4 * frames;
-            for (int f = 0; f < frames; f++)
-                vm.Write32(dst + 8 + 4 * f, 4 * frames + 8 + f * frameBytes);
-            for (int f = 0; f < frames; f++, frame += frameBytes)
-            {
-                vm.Write32(frame, w);
-                vm.Write32(frame + 4, h);
-                int rows = frame + 0x14, row = rows + 4 * h;
-                for (int y = 0; y < h; y++)
-                    vm.Write32(rows + 4 * y, row + y * stride - dst);
-                for (int y = 0; y < h; y++, row += stride)
-                {
-                    vm.Write32(row, code << 16);
-                    vm.Write32(row + 4, w);
-                }
-            }
-            vm.SetL(a, 8, 0);
-        });
+        // clear; l[8] counts the frames down to 0. The Japanese Sorcery Jokers' 1EE588: the same
+        // but nothing cleared first (l[1] not read)
+        RegisterNative("DE3A498EFE2D198ACE0A0AA10C6CD571E986461A", "blank s25", (vm, c, a) => vm.BlankS25(c, a, clear: true));
+        RegisterNative("C0A25921BDF8B7EF6B50997CB9E7D82673808205", "blank s25", (vm, c, a) => vm.BlankS25(c, a, clear: false));
 
         // Libra of the Vampire Princess START F777: the Shift-JIS string at l[0] copied to l[1],
         // each single byte among the first five of l[2] written twice (the sixth is looked at
@@ -1003,6 +1038,80 @@ public sealed partial class ScnVm
             vm.SetL(a, 1, b == 0 ? 0 : p);
         });
 
+        // Sorcery Jokers' save thumbnail (START 21198F; the Japanese release's 1EA55F): 856 x 482
+        // from blocks of 2 x 2 of a picture 1920 wide; 211CAE (1EA87E): its 482 rows of 2,568
+        // bytes from l[0] (one after the other) to l[1], l[2] apart; 211CFE (1EA8CE): the same
+        // made 32-bit
+        RegisterNative("1B616D8D7564F0A1C77F845271C312CE3B4D7158", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 2, 856, 482, 5760));
+        RegisterNative("BE88BAA40723DF58AAAA5A38831998ACFDCB399D", "rows 856 x 482", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 2568, 482, 2568));
+        RegisterNative("044D48B9A8BDED69F0BBBBB73EE8C5A6A76C9592", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 856, 482));
+        // Yoyogi Hitozuma Senmon Gakuin START 28408 (v2.37, MMX): its rule wipe, 360,000 pixels of
+        // pictures A (l[1]) and B (l[2]) by the mask M (l[3]) into l[0], one after the other; per
+        // byte, with words compared signed: m <= max(l[4], 0) gives A's byte, m >= l[4] + l[5]
+        // B's, between them t = ((m - l[4]) * q >> 8) & 255 (16-bit words) mixes
+        // (A * ((-t) & 255) + B * t) >> 8. q is the dword 0x10000 / l[5] put in both halves of a
+        // dword (when it is 0x10000 the words alternate 0 and 1)
+        RegisterNative("5A3FAD758A876FE96A7F5B31B97E9D27CEF8C1D4", "rule wipe", (vm, c, a) =>
+        {
+            const int Pixels = 360000;
+            int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2), pm = vm.NativeArg(a, 3);
+            int from = vm.NativeArg(a, 4), span = vm.NativeArg(a, 5);
+            if (span == 0 || !Apart(dst, Pixels * 4L, pa, Pixels * 4L) || !Apart(dst, Pixels * 4L, pb, Pixels * 4L) || !Apart(dst, Pixels * 4L, pm, Pixels * 4L))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            short low = (short)Math.Max(from, 0), high = (short)(from + span);
+            ushort start = (ushort)from;
+            uint quotient = 0x10000u / (uint)span, packed = quotient << 16 | quotient;
+            Span<ushort> q = [(ushort)packed, (ushort)(packed >> 16)];
+            using var verify = vm.VerifyRegion(c, a, dst, Pixels * 4);
+            byte[] bytesA = vm.ReadBytes(pa, Pixels * 4), bytesB = vm.ReadBytes(pb, Pixels * 4), mask = vm.ReadBytes(pm, Pixels * 4);
+            var output = new byte[Pixels * 4];
+            for (int i = 0; i < output.Length; i++)
+            {
+                short m = mask[i];
+                bool aboveLow = m > low, belowHigh = high > m, between = aboveLow && belowHigh;
+                int t = between ? (ushort)((ushort)(m - start) * q[i & 1]) >> 8 & 0xFF : 0;
+                int rest = between ? (ushort)-t & 0xFF : 0;
+                int outside = (aboveLow ? 0 : bytesA[i]) | (belowHigh ? 0 : bytesB[i]);
+                output[i] = (byte)((ushort)(bytesA[i] * rest + bytesB[i] * t) >> 8 | outside);
+            }
+            vm.WriteBytes(dst, output);
+        });
+        // Miko Dashi START 0086D (v2.47): l[3] = 0 when the l[2] bytes at l[0] and l[1] are the
+        // same (or l[2] is 0), else 1
+        RegisterNative("8FB1D89A2807A081E0BB98462D2D0323A39C10E3", "memcmp", (vm, c, a) =>
+        {
+            int x = vm.NativeArg(a, 0), y = vm.NativeArg(a, 1), count = vm.NativeArg(a, 2);
+            if (count < 0 || count > 0x10000000)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, a.Stack + 12, 4);
+            vm.SetL(a, 3, vm.ReadBytes(x, count).AsSpan().SequenceEqual(vm.ReadBytes(y, count)) ? 0 : 1);
+        });
+        // The Japanese Sorcery Jokers' START 0406D: in three squares of 32 x 32 side by side of a
+        // picture 1920 wide at l[0] (none when it is 0), how many pixels' first byte is not 0, into
+        // l[1], l[2], l[3]
+        RegisterNative("865BD2B3A91252B3DE759CEDB32B5D7BAC091417", "count 32x32", (vm, c, a) =>
+        {
+            int src = vm.NativeArg(a, 0);
+            using var verify = vm.VerifyRegion(c, a, a.Stack + 4, 12);
+            for (int k = 0; k < 3; k++)
+            {
+                int count = 0;
+                if (src != 0)
+                    for (int y = 0; y < 32; y++)
+                        for (int x = 0; x < 32; x++)
+                            if (vm.ReadByte(src + k * 96 + y * 5760 + x * 3) != 0)
+                                count++;
+                vm.SetL(a, 1 + k, count);
+            }
+        });
+
         // Sorcery Jokers START 211A07: 482 rows of 856 BGR pixels from l[4] (a picture 1920
         // wide) to l[0], one after the other (a byte at a time: blocks that share bytes run as x86)
         RegisterNative("8E6C33413435C5ACB0FE26A1264354E76D077DA0", "copy 856x482", (vm, c, a) =>
@@ -1095,14 +1204,17 @@ public sealed partial class ScnVm
     /// <summary>
     /// A width x height 32-bit picture (l[2], rows l[3] bytes apart) each pixel repeated n times
     /// across and down into l[0] (rows l[1] bytes apart); pictures that share bytes run as x86 code.
+    /// With srcBack / dstBack, each row of the picture starts so many bytes before where the last
+    /// ended, and each row of n of the output too.
     /// </summary>
-    private void EnlargeWhole(ScnContext c, ScnNativeArgs a, int n, int width, int height)
+    private void EnlargeWhole(ScnContext c, ScnNativeArgs a, int n, int width, int height, int srcBack = 0, int dstBack = 0)
     {
         int dst = NativeArg(a, 0), dstStride = NativeArg(a, 1), src = NativeArg(a, 2), srcStride = NativeArg(a, 3);
         int inBytes = width * 4, outBytes = inBytes * n;
         var target = RowsSpan(dst, dstStride, height * n, outBytes);
         // (rows written over each other: the order the x86 code writes them in tells)
-        if (Math.Abs((long)dstStride) < outBytes || !Apart(target, RowsSpan(src, srcStride, height, inBytes)))
+        if (Math.Abs((long)dstStride) < outBytes || dstBack > 0 && dstStride < outBytes + dstBack
+            || !Apart(target, RowsSpan(src, srcStride, height, inBytes)))
         {
             RunX86(c, a);
             return;
@@ -1112,7 +1224,7 @@ public sealed partial class ScnVm
         var output = new byte[outBytes];
         var pixels = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(input.AsSpan());
         var repeated = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(output.AsSpan());
-        for (int y = 0; y < height; y++, src += srcStride)
+        for (int y = 0; y < height; y++, src += srcStride - srcBack, dst -= dstBack)
         {
             ReadBytes(src, input);
             for (int x = 0; x < width; x++)
@@ -1122,28 +1234,61 @@ public sealed partial class ScnVm
         }
     }
 
-    /// <summary>1280 x 720 32-bit pixels (l[2], rows l[3] bytes apart) into 1920 x 1080 (l[0], rows l[1] apart), 2 x 2 into 3 x 3.</summary>
-    private void EnlargeThreeHalves(ScnContext c, ScnNativeArgs a)
+    /// <summary>
+    /// Nukitashi's frame cleared in a 348 x 208 32-bit picture at l[0] (rows l[1] bytes apart):
+    /// l[2] rows at the top, l[3] at the bottom, and between them l[4] pixels at the left and
+    /// l[5] at the right. A count of 0 runs as x86 code (it would go round 4 billion times).
+    /// </summary>
+    private void ClearFrame(ScnContext c, ScnNativeArgs a)
     {
-        const int Pairs = 640, PairRows = 360, InBytes = Pairs * 8, OutBytes = Pairs * 12;
+        const int Width = 348, Height = 208;
+        int dst = NativeArg(a, 0), stride = NativeArg(a, 1), top = NativeArg(a, 2), bottom = NativeArg(a, 3);
+        int left = NativeArg(a, 4), right = NativeArg(a, 5), middle = Height - top - bottom;
+        if (top <= 0 || bottom <= 0 || left <= 0 || right <= 0 || middle <= 0 || top > Height || bottom > Height
+            || left > Width || right > Width || stride < Width * 4)
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegion(c, a, dst, (Height - 1) * stride + Width * 4);
+        for (int y = 0; y < top; y++)
+            FillMemory(dst + y * stride, Width * 4, 0);
+        for (int y = 0; y < bottom; y++)
+            FillMemory(dst + (Height - bottom + y) * stride, Width * 4, 0);
+        for (int y = 0; y < middle; y++)
+        {
+            FillMemory(dst + (top + y) * stride, left * 4, 0);
+            FillMemory(dst + (top + y) * stride + (Width - right) * 4, right * 4, 0);
+        }
+    }
+
+    /// <summary>
+    /// pairs x 2 by pairRows x 2 32-bit pixels (l[2], rows l[3] bytes apart) into pairs x 3 by
+    /// pairRows x 3 (l[0], rows l[1] apart), 2 x 2 into 3 x 3; each pair of rows srcBack bytes
+    /// before where the last ended (two rows on), each row of three dstBack bytes before.
+    /// </summary>
+    private void EnlargeThreeHalves(ScnContext c, ScnNativeArgs a, int pairs, int pairRows, int srcBack = 0, int dstBack = 0)
+    {
+        int inBytes = pairs * 8, outBytes = pairs * 12;
         int dst = NativeArg(a, 0), dstStride = NativeArg(a, 1), src = NativeArg(a, 2), srcStride = NativeArg(a, 3);
-        var target = RowsSpan(dst, dstStride, PairRows * 3, OutBytes);
-        if (Math.Abs((long)dstStride) < OutBytes || !Apart(target, RowsSpan(src, srcStride, PairRows * 2, InBytes)))
+        var target = RowsSpan(dst, dstStride, pairRows * 3, outBytes);
+        if (dstStride < outBytes + dstBack || srcStride < inBytes || !Apart(target, RowsSpan(src, srcStride, pairRows * 2, inBytes)))
         {
             RunX86(c, a);
             return;
         }
         using var verify = VerifyRegion(c, a, (int)target.Start, (int)target.Length);
-        var top = new byte[InBytes];
-        var bottom = new byte[InBytes];
-        for (int y = 0; y < PairRows; y++)
+        var top = new byte[inBytes];
+        var bottom = new byte[inBytes];
+        for (int y = 0; y < pairRows; y++)
         {
-            ReadBytes(src + 2 * y * srcStride, top);
-            ReadBytes(src + (2 * y + 1) * srcStride, bottom);
-            var r0 = Bytes(dst + 3 * y * dstStride, OutBytes);
-            var r1 = Bytes(dst + (3 * y + 1) * dstStride, OutBytes);
-            var r2 = Bytes(dst + (3 * y + 2) * dstStride, OutBytes);
-            for (int i = 0, o = 0; i < InBytes; i += 8, o += 12)
+            int from = src + y * (2 * srcStride - srcBack), to = dst + y * (3 * dstStride - dstBack);
+            ReadBytes(from, top);
+            ReadBytes(from + srcStride, bottom);
+            var r0 = Bytes(to, outBytes);
+            var r1 = Bytes(to + dstStride, outBytes);
+            var r2 = Bytes(to + 2 * dstStride, outBytes);
+            for (int i = 0, o = 0; i < inBytes; i += 8, o += 12)
                 for (int k = 0; k < 4; k++)
                 {
                     int pa = top[i + k], pb = top[i + 4 + k], pc = bottom[i + k], pd = bottom[i + 4 + k];
@@ -1181,10 +1326,16 @@ public sealed partial class ScnVm
     private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int stride = 2400) =>
         Thumbnail(c, a, block, columns, rows, NativeArg(a, 0), NativeArg(a, 4), stride);
 
-    /// <summary>Each byte the average of a block of block x block pixels of a BGR picture (rows of <paramref name="stride"/> bytes; 800 x 600 unless said).</summary>
-    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int dst, int src, int stride = 2400)
+    /// <summary>
+    /// Each byte the average of a block of block x block pixels of a BGR picture (rows of
+    /// <paramref name="stride"/> bytes; 800 x 600 unless said), written one row after the other or
+    /// rows <paramref name="dstStride"/> bytes apart.
+    /// </summary>
+    private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int dst, int src, int stride = 2400, int dstStride = 0)
     {
-        int outBytes = columns * rows * 3, inRows = rows * block;
+        int rowBytes = columns * 3, inRows = rows * block;
+        dstStride = dstStride == 0 ? rowBytes : dstStride;
+        int outBytes = (rows - 1) * dstStride + rowBytes;
         if (!Apart(dst, outBytes, src, (long)stride * inRows))
         {
             RunX86(c, a);
@@ -1192,9 +1343,11 @@ public sealed partial class ScnVm
         }
         using var verify = VerifyRegion(c, a, dst, outBytes);
         byte[] picture = ReadBytes(src, stride * (inRows - 1) + columns * block * 3);
-        var output = new byte[outBytes];
-        int o = 0;
+        // Rows apart: the bytes between them stay as they are
+        var output = dstStride == rowBytes ? new byte[outBytes] : ReadBytes(dst, outBytes);
         for (int by = 0; by < rows; by++)
+        {
+            int o = by * dstStride;
             for (int bx = 0; bx < columns; bx++)
                 for (int k = 0; k < 3; k++)
                 {
@@ -1207,6 +1360,7 @@ public sealed partial class ScnVm
                     }
                     output[o++] = (byte)(sum / (block * block));
                 }
+        }
         WriteBytes(dst, output);
     }
 
@@ -1224,17 +1378,90 @@ public sealed partial class ScnVm
             MoveMemory(dst + y * stride, src + y * rowBytes, rowBytes);
     }
 
+    /// <summary>The blank S25 picture of Sorcery Jokers' saves (above), its l[1] bytes cleared first or not.</summary>
+    private void BlankS25(ScnContext c, ScnNativeArgs a, bool clear)
+    {
+        int dst = NativeArg(a, 0), bytes = NativeArg(a, 1), code = NativeArg(a, 2), stride = NativeArg(a, 3);
+        int frameBytes = NativeArg(a, 4), frames = NativeArg(a, 5), w = NativeArg(a, 6), h = NativeArg(a, 7);
+        long written = 8L + 4L * frames + (long)frameBytes * (frames - 1) + 0x14 + 4L * h + (long)stride * (h - 1) + 8;
+        // Counts the x86 code would take round 4 billion times, or that write past the bytes cleared
+        if (frames <= 0 || h <= 0 || frameBytes < 0 || stride < 0 || (clear ? bytes < 0 || written > bytes : written > 0x10000000))
+        {
+            RunX86(c, a);
+            return;
+        }
+        int region = clear ? bytes : (int)written;
+        using var verify = VerifyRegions(c, a, (dst, region), (a.Stack + 32, 4));
+        if (clear)
+            FillMemory(dst, bytes, 0);
+        Write32(dst, 0x353253);
+        Write32(dst + 4, frames);
+        int frame = dst + 8 + 4 * frames;
+        for (int f = 0; f < frames; f++)
+            Write32(dst + 8 + 4 * f, 4 * frames + 8 + f * frameBytes);
+        for (int f = 0; f < frames; f++, frame += frameBytes)
+        {
+            Write32(frame, w);
+            Write32(frame + 4, h);
+            if (!clear)
+            {
+                Write32(frame + 8, 0);
+                Write32(frame + 0xC, 0);
+                Write32(frame + 0x10, 0);
+            }
+            int rows = frame + 0x14, row = rows + 4 * h;
+            for (int y = 0; y < h; y++)
+                Write32(rows + 4 * y, row + y * stride - dst);
+            for (int y = 0; y < h; y++, row += stride)
+            {
+                Write32(row, code << 16);
+                Write32(row + 4, w);
+            }
+        }
+        SetL(a, 8, 0);
+    }
+
     /// <summary>
-    /// n x n samples of the first byte of 24-bit pixels from l[0] (rows 3840 bytes apart) to
-    /// l[1], each b * 64 / 255, in the x86 code's order.
+    /// n x n samples of the first byte of 24-bit pixels from l[0] (rows <paramref name="stride"/>
+    /// bytes apart) to l[1], each b * 64 / 255, in the x86 code's order.
     /// </summary>
-    private void Samples(ScnContext c, ScnNativeArgs a, int n)
+    private void Samples(ScnContext c, ScnNativeArgs a, int n, int stride = 3840)
     {
         int src = NativeArg(a, 0), dst = NativeArg(a, 1);
         using var verify = VerifyRegion(c, a, dst, n * n);
         for (int y = 0; y < n; y++)
             for (int x = 0; x < n; x++)
-                WriteByte(dst++, (byte)((ReadByte(src + y * 3840 + x * 3) << 6) / 255));
+                WriteByte(dst++, (byte)((ReadByte(src + y * stride + x * 3) << 6) / 255));
+    }
+
+    /// <summary>
+    /// width x height pixels of 24 bits at l[0] (one after the other) into 32 bits at l[1] (rows
+    /// l[2] bytes apart): FF, then the pixel's three bytes; rows that overlap the source, or
+    /// closer than a row, run as x86 code.
+    /// </summary>
+    private void To32Bits(ScnContext c, ScnNativeArgs a, int width, int height)
+    {
+        int src = NativeArg(a, 0), dst = NativeArg(a, 1), stride = NativeArg(a, 2);
+        var target = RowsSpan(dst, stride, height, width * 4);
+        if (Math.Abs((long)stride) < width * 4 || !Apart(target, (src, (long)width * 3 * height)))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegion(c, a, (int)target.Start, (int)target.Length);
+        var input = new byte[width * 3];
+        for (int y = 0; y < height; y++, src += width * 3, dst += stride)
+        {
+            ReadBytes(src, input);
+            var row = Bytes(dst, width * 4);
+            for (int x = 0; x < width; x++)
+            {
+                row[4 * x] = 0xFF;
+                row[4 * x + 1] = input[3 * x];
+                row[4 * x + 2] = input[3 * x + 1];
+                row[4 * x + 3] = input[3 * x + 2];
+            }
+        }
     }
 
     private void Move16(ScnContext c, ScnNativeArgs a)
@@ -1288,11 +1515,11 @@ public sealed partial class ScnVm
         }
     }
 
-    private void Saturation(ScnContext c, ScnNativeArgs a)
+    private void Saturation(ScnContext c, ScnNativeArgs a, int tableOffset)
     {
         int dst = NativeArg(a, 0), src = NativeArg(a, 1), k = NativeArg(a, 3);
         uint count = (uint)NativeArg(a, 2);
-        int tables = m_nativeTarget + 0xA72;
+        int tables = m_nativeTarget + tableOffset;
         if (count == 0)
             return;
         long bytes = count * 3L;

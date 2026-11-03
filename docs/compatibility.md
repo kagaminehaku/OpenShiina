@@ -20,8 +20,9 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.45 and 2.47 to 2.50, and 2.34 in part; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 42 games, 43 releases, tried, but for Hitozuma
-Gui's `FE10`, which no engine has; all of them play through, as the table above has them). Then ScnBoot
+scripts the player does not run yet (none in the 54 games, 55 releases, tried, but for Hitozuma
+Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
+taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
 `tests/sweep.ps1` runs every scenario of it through ([Sweeping](#sweeping)).
 
@@ -49,7 +50,7 @@ of those versions it does not list.
 | Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | ⚪ Not tried |  |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ⚪ Not tried |  |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.39 | ⚪ Not tried |  |
-| Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ⚪ Not tried |  |
+| Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | 🔴 Stops | 2026-11-04 |
 | Ao no Juuai | 青の獣愛 | 2005-06-24 | [v4048](https://vndb.org/v4048) | v2.34 | ✅ Plays through | 2026-10-13 |
 | Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | v2.34 | 🟢 Plays | 2026-10-21 |
 | ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | ⚪ Not tried |  |
@@ -61,6 +62,7 @@ of those versions it does not list.
 | Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | ⚪ Not tried |  |
 | Shinseki no Oba-san | 親戚の小母さん ～離れの熟女、本家の後妻～ | 2006-03-31 | [v4399](https://vndb.org/v4399) | v2.36 | ⚪ Not tried |  |
 | Sabae no Ou | 蠅声の王 | 2006-04-28 | [v607](https://vndb.org/v607) | v2.36 | ⚪ Not tried |  |
+| Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | v2.37 | 🔴 Stops | 2026-11-04 |
 | Classmate no Okaa-san | クラスメイトのお母さん | 2006-08-04 | [v5862](https://vndb.org/v5862) | v2.37 | ⚪ Not tried |  |
 | Otome Juurin Yuugi | 乙女蹂躙遊戯～Maiden Infringement Play～ | 2006-12-22 | [v4352](https://vndb.org/v4352) | v2.37 | ⚪ Not tried |  |
 | Jukubo Gui ~Moto Guradoru no Okaa-san~ | 熟母喰い ～元グラドルのお母さん～ | 2007-01-19 | [v3358](https://vndb.org/v3358) | v2.37 | ⚪ Not tried |  |
@@ -100,9 +102,9 @@ of those versions it does not list.
 | Chikan Circle 3 | 痴漢サークル3 | 2009-08-21 | [v2424](https://vndb.org/v2424) | v2.47 | ⚪ Not tried |  |
 | Mimi o Sumaseba | みみをすませば | 2009-08-28 | [v2208](https://vndb.org/v2208) | v2.47 | ⚪ Not tried |  |
 | Mahou Shoujo no Taisetsu na Koto | 魔法少女の大切なこと。 | 2009-09-25 | [v2616](https://vndb.org/v2616) | v2.47 | ⚪ Not tried |  |
-| Rin x Sen | RIN×SEN～白濁女教師と野郎ども～ | 2009-09-25 | [v2611](https://vndb.org/v2611) | v2.47 | ⚪ Not tried |  |
-| Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | ⚪ Not tried |  |
-| Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ⚪ Not tried |  |
+| Rin x Sen | RIN×SEN～白濁女教師と野郎ども～ | 2009-09-25 | [v2611](https://vndb.org/v2611) | v2.47 | ✅ Plays through | 2026-11-04 |
+| Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | 🟢 Plays | 2026-11-04 |
+| Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ⚪ Not tried |  |
 | Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ✅ Plays through | 2026-10-24 |
 | Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ✅ Plays through | 2026-10-20 |
@@ -116,23 +118,23 @@ of those versions it does not list.
 | You~Gaku | よう∽ガク | 2010-05-28 | [v3810](https://vndb.org/v3810) | v2.47 | ⚪ Not tried |  |
 | Can Fes! ~Itazura Majo to Naisho no Gakuensai~ | きゃん☆フェス！～いたずら魔女とナイショの学園祭～ | 2010-06-25 | [v4143](https://vndb.org/v4143) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Tenki Ane | 天気姉 | 2010-07-09 | [v4543](https://vndb.org/v4543) | v2.47 | ⚪ Not tried |  |
-| Ran→Sem | RAN→SEM～白濁デルモ妻のミイラ捕り～ | 2010-07-23 | [v4645](https://vndb.org/v4645) | v2.47 | ⚪ Not tried |  |
+| Ran→Sem | RAN→SEM～白濁デルモ妻のミイラ捕り～ | 2010-07-23 | [v4645](https://vndb.org/v4645) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ⚪ Not tried |  |
 | Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Ryoumaden ~Houkago no Rakuen~ | 凌魔伝 ～放課後の楽園～ | 2010-10-15 | [v5325](https://vndb.org/v5325) | v2.47 | ⚪ Not tried |  |
 | Ren'ai Saimin ~Tsun na Kanojo ga dereru Saimin~ | 恋愛催眠～ツンな彼女がデレる催眠～ | 2010-11-26 | [v5108](https://vndb.org/v5108) | v2.47 | ✅ Plays through | 2026-10-31 |
 | Saint ~Aa Shu yo | セイント ～あぁ主よ、教え子達に堕とされた私をお許し下さい～ | 2010-12-10 | [v5773](https://vndb.org/v5773) | v2.47 | ⚪ Not tried |  |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-13 |
-| Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ⚪ Not tried |  |
+| Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ✅ Plays through | 2026-11-04 |
 | Damatte Watashi no Muko ni Nare! | 黙って私のムコになれ！ | 2011-01-28 | [v5289](https://vndb.org/v5289) | v2.48 | ✅ Plays through | 2026-10-20 |
 | Gakushoku no Oba-san The Motion | 学食のおばさん The Motion ～母さんの汁の味～ | 2011-02-25 | [r12508](https://vndb.org/r12508) | v2.48 | ✅ Plays through | 2026-10-22 |
-| Tanetsuke Mura | 種憑け村 ～白濁神、念仏講ノ儀～ | 2011-02-25 | [v6353](https://vndb.org/v6353) | v2.48 | ⚪ Not tried |  |
+| Tanetsuke Mura | 種憑け村 ～白濁神、念仏講ノ儀～ | 2011-02-25 | [v6353](https://vndb.org/v6353) | v2.48 | ✅ Plays through | 2026-11-04 |
 | Sensei! Shite Ageru | 先生っ！ シてあげる | 2011-03-04 | [v6444](https://vndb.org/v6444) | v2.48 | ⚪ Not tried |  |
 | Onegan! | おねガン！ | 2011-04-22 | [v6585](https://vndb.org/v6585) | v2.48 | ⚪ Not tried |  |
 | Aneiro | アネイロ | 2011-06-24 | [v6590](https://vndb.org/v6590) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Homu☆Plus | ほむ☆プラス | 2011-08-14 | [v8019](https://vndb.org/v8019) | v2.49 | ✅ Plays through | 2026-10-13 |
-| Doushite Daite Kurenai no!? | どうして抱いてくれないのっ!?～女の子だってヤりたいの！～ | 2011-08-26 | [v6991](https://vndb.org/v6991) | v2.49 | ⚪ Not tried |  |
-| Shojo Mama | 処女ママ | 2011-11-04 | [v8077](https://vndb.org/v8077) | v2.49 | ⚪ Not tried |  |
+| Doushite Daite Kurenai no!? | どうして抱いてくれないのっ!?～女の子だってヤりたいの！～ | 2011-08-26 | [v6991](https://vndb.org/v6991) | v2.50 | ✅ Plays through | 2026-11-03 |
+| Shojo Mama | 処女ママ | 2011-11-04 | [v8077](https://vndb.org/v8077) | v2.49 | ✅ Plays through | 2026-11-04 |
 | Yuru Plus | ゆるプラス | 2011-11-25 | [v10125](https://vndb.org/v10125) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Sena Plus | 星奈プラス | 2011-12-31 | [v10126](https://vndb.org/v10126) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Puchipuchi Idol Kouhosei | ぷちぷちアイドル候補生 ～早くシてよ！マネージャーでしょ～ | 2012-02-24 | [v9973](https://vndb.org/v9973) | v2.49 | ✅ Plays through | 2026-10-15 |
@@ -141,7 +143,7 @@ of those versions it does not list.
 | Intruder | イントルーダー ～侵入者～ | 2012-06-22 | [v10533](https://vndb.org/v10533) | v2.49 | ⚪ Not tried |  |
 | Nyaru Plus | ニャルプラス | 2012-08-12 | [v10779](https://vndb.org/v10779) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Hin wa Bokura no Fuku no Kami | 貧は僕らの福の神 | 2012-08-24 | [v10042](https://vndb.org/v10042) | v2.49 | ✅ Plays through | 2026-10-20 |
-| Boku Igai no Otoko o Shiranai Kanojo | 僕以外の男を知らない彼女が他の男に抱かれていた | 2012-08-31 | [v10816](https://vndb.org/v10816) | v2.49 | ⚪ Not tried |  |
+| Boku Igai no Otoko o Shiranai Kanojo | 僕以外の男を知らない彼女が他の男に抱かれていた | 2012-08-31 | [v10816](https://vndb.org/v10816) | v2.49 | ✅ Plays through | 2026-11-04 |
 | Son of a ☆ Bitch | サノバ☆ビッチ ～早乙女野薔薇ちゃん、マジ天使!～ | 2012-09-07 | [v11089](https://vndb.org/v11089) | v2.49 | ⚪ Not tried |  |
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | 2012-09-28 | [v10217](https://vndb.org/v10217) | v2.49 | ⚪ Not tried |  |
 | Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | 2012-12-14 | [v11603](https://vndb.org/v11603) | v2.49 | ⚪ Not tried |  |
@@ -156,26 +158,26 @@ of those versions it does not list.
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Shuukatsu Katei Kyoushi | シュウカツ家庭教師 | 2015-03-13 | [v16904](https://vndb.org/v16904) | v2.50 | ⚪ Not tried |  |
 | Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ✅ Plays through | 2026-10-17 |
-| Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | ⚪ Not tried |  |
-| Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | 2015-09-18 | [v17971](https://vndb.org/v17971) | v2.50 | ⚪ Not tried |  |
+| Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | 🟢 Plays | 2026-11-04 |
+| Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | 2015-09-18 | [v17971](https://vndb.org/v17971) | v2.50 | ✅ Plays through | 2026-11-04 |
 | Kyuuketsuki no Libra | 吸血姫のリブラ | 2015-10-30 | [v17825](https://vndb.org/v17825) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | 2016-04-28 | [v18781](https://vndb.org/v18781) | v2.50 | ✅ Plays through | 2026-10-13 |
-| Lovecha ~Tsumasakidachi de, Hitomi o Tojite~ | らぶちゃ ～つま先立ちで、瞳をとじて～ | 2016-04-28 | [v18590](https://vndb.org/v18590) | v2.50 | ⚪ Not tried |  |
+| Lovecha ~Tsumasakidachi de, Hitomi o Tojite~ | らぶちゃ ～つま先立ちで、瞳をとじて～ | 2016-04-28 | [v18590](https://vndb.org/v18590) | v2.50 | ✅ Plays through | 2026-11-04 |
 | Signalist Stars!! | しぐなリストスタ～ズ!! | 2016-10-28 | [v19590](https://vndb.org/v19590) | v2.50 | ⚪ Not tried |  |
 | Bitch Shimai ga Seijun na Hazu ga Nai!! | ビッチ姉妹が清純なはずがないっ！！ | 2017-01-27 | [v20429](https://vndb.org/v20429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Libra of the Vampire Princess | 吸血姫のリブラ (English) | 2017-05-03 | [r44159](https://vndb.org/r44159) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Libra of the Vampire Princess: Lycoris & Aoi in "The Promise" PLUS Iris in "Homeworld" | 吸血姫のリブラ (English, fan disc) | 2017-07-07 | [v21459](https://vndb.org/v21459) | v2.50 | ✅ Plays through | 2026-10-20 |
 | Chiccha na Hanayome ~Mada Mada Tsubomi da mon~ | ちっちゃな花嫁 ～まだまだつぼみだもんっ～ | 2017-05-26 | [v20284](https://vndb.org/v20284) | v2.50 | ✅ Plays through | 2026-10-14 |
-| Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ⚪ Not tried |  |
+| Oni ga Kuru | 鬼がくる。～姉がひん死でピンチです～ | 2017-09-29 | [v21123](https://vndb.org/v21123) | v2.50 | ✅ Plays through | 2026-11-03 |
 | Bitch Gakuen ga Seijun na Hazu ga Nai!!? | ビッチ学園が清純なはずがないっ！！？ | 2017-11-24 | [v21429](https://vndb.org/v21429) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Sorcery Jokers [English] | ソーサリージョーカーズ (English) | 2018-01-12 | [r47518](https://vndb.org/r47518) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Chuuni Hime no Teikoku | 厨二姫の帝国 | 2018-02-23 | [v17900](https://vndb.org/v17900) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Nukige Mitai na Shima ni Sunderu [Trial] | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 体験版 | 2018-06-22 | [r57518](https://vndb.org/r57518) | v2.50 | ⚪ Not tried |  |
 | Kiki Mimi | ききミミ | 2018-07-26 | [v23506](https://vndb.org/v23506) | v2.50 | ⚪ Not tried |  |
-| Nukige Mitai na Shima ni Sunderu | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? | 2018-07-27 | [v22899](https://vndb.org/v22899) | v2.50 | ⚪ Not tried |  |
+| Nukige Mitai na Shima ni Sunderu | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? | 2018-07-27 | [v22899](https://vndb.org/v22899) | v2.50 | ✅ Plays through | 2026-11-04 |
 | Saimin Paradise! | 催眠ぱらだいす! ～催眠術でツゴウノイイ美少女学園性活～ | 2018-09-28 | [v23063](https://vndb.org/v23063) | v2.50 | ⚪ Not tried |  |
-| Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ⚪ Not tried |  |
+| Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | 🟢 Plays | 2026-11-04 |
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ⚪ Not tried |  |
 | Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
@@ -206,7 +208,6 @@ so they cannot be opened or played until a scheme is found (docs/engine-notes.md
 | EDEN V |  | 2003-07-18 | [v4604](https://vndb.org/v4604) | FORST | 14 | 🔒 No keys |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | propeller | 33 | 🔒 No keys |
 | Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | Amanatto | 22 | 🔒 No keys |
-| Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | LUCHA! | 43 | 🔒 No keys |
 | Nakadashi Hara Maid | なかだし孕メイド | 2007-08-17 | [v2672](https://vndb.org/v2672) | Chain-Reaction | 14 | 🔒 No keys |
 | Sis☆Pon ~Haramase♪ Gochisou-sama!~ | シス☆ぽん～孕ませ♪ご馳走さまっ！～ | 2007-11-30 | [v2858](https://vndb.org/v2858) | Sumomo | 22 | 🔒 No keys |
 | Gakuen Pets ~Houkago no Shiikusha~ | 学園ペッツ ～放課後の飼育舎～ | 2007-12-21 | [v5267](https://vndb.org/v5267) | Goku-Fero | 2 | 🔒 No keys |
@@ -602,6 +603,128 @@ its end.
 translated x86 code until it had C#, checked against its x86 code. Swept: 215 scenarios, every
 one to its end.
 
+**Oni ga Kuru** (Enishi Soft, ONIKURU.EXE, engine v2.50, with RIOSUB.DLL) had its scheme and
+executable's name; its 13,247 S25, TXT and Ogg files come out whole with GARbro's DecodeBin date
+(0x20170428). Tried with tests/newgame.ps1 (2026-11-03, the first game so). It needed two DLL
+functions: shlwapi `PathStripPathA` (its START keeps a file's name of a path; every scenario
+stopped on it) and RIOSUB `rsDialogViewText` (a menu shows a text file in a dialog: the host's
+message box shows it). Its routines all run as C#: one new (D14F0, every full-width space 81 40
+of a text made 87 40) and five builds of known ones with other numbers (24 to 32 bits for
+238 x 133, a 45 x 45 mask of a picture 1600 wide, saturation with its tables 5 bytes nearer,
+xor32 with other padding), each the same bytes as its x86 code on 200 random cases (ScnTools
+routinecheck). Swept: 80 scenarios, every one to its end.
+
+**Doushite Daite Kurenai no!?** (chococo, DODAKURE.EXE, engine v2.50, 800 x 600) had its scheme and
+executable's name; its 14,127 files come out whole (no entry uses Decrypt2). DODAKURE_A.WAR and
+_Z.WAR are MPEG movies under an archive's name, played by name. Its START checks its executable:
+`03C2` gives this one's checksum (it wants v ^ 306723180 = -1421357033). Its save thumbnail (232 x
+174 from blocks of 3 x 3, then copied and made 32-bit) ran as translated x86 code until it had C#
+(three routines, each the same bytes as its x86 code on 200 random cases). The sweep's grid of
+clicks hit a button of its message window (at 75% across, 72% down) and missed its choices (30-45%
+down): sweep.ps1 now runs a stuck scenario again with other clicks. Swept: 237 scenarios, every
+one to its end.
+
+The games of 2026-11-04 were tried one after another with tests/newgame.ps1; what each needed:
+
+**Rin x Sen** (Guilty+, RINxSEN.exe, engine v2.47 with RINxSEN.INI), **Last Waltz ~Hakudaku
+Mamire no Natsu Gasshuku~** (Guilty, WALTZ.exe, v2.47) and **Ran→Sem** (Guilty+, its download
+edition, RANDL_.exe, v2.47) had their schemes and executables' names (Rin x Sen's added the day
+before); their 3,964, 7,176 and 3,970 files come out whole. Their START, as every Guilty game's
+tried since (Tanetsuke Mura, and Material's Boku Igai below), sets an engine flag from RIO.INI's
+MouseLR_Change with `049D` (and reads it with `049C`), which the player did not do. Ran→Sem's
+routines ran as translated x86 code until they had C#: its xor32 and enlarge16 (Ero-On!'s with
+other padding), and its save thumbnail (100 x 75 from blocks of 8 x 8, the rows written 2,400 bytes
+apart), each the same bytes as its x86 code on random cases. Swept: 188, 130 and 169 scenarios,
+every one to its end; their lines shown are fewer than their lines, as Hitozuma Gui's: a message
+of two or three lines, and the speaker's name before it, show at once.
+
+**Tanetsuke Mura** (Guilty, tane.exe, engine v2.48 with tane.ini) had its scheme and executable's
+name; START's `049D` was all it lacked. Its two add-on scenarios (ADD\TANE_00A.WAR and on, which
+START looks for and mounts by their path) each load a copy protection DLL of their own before
+they mount the rest; the player does not answer for it, and plays the game without them (START
+finds none: only the archives of the game folder are opened). `FE10` is in its menus' branches
+for a state they do not know, as in Hitozuma Gui. Swept: 380 scenarios, every one to its end
+(messages of several lines).
+
+**Bloody Rondo** (3rdEye, BR.EXE, engine v2.48) was found by trying the schemes: its executable's
+name went into GameMap. Its 15,857 files come out whole (OGV.OGV of BR_D.WAR is a copy of its
+executable). Its save thumbnail (244 x 183 from blocks of 3 x 3) and the copy of its rows ran as
+x86 code until they had C#. Swept: 80 scenarios, every one to its end (the speakers' names are
+lines of their own).
+
+**Shojo Mama** (桃色劇場, SHOJOMAMA.EXE, engine v2.49): its 2,347 files come out whole; its save
+thumbnail (104 x 78 from blocks of 7 x 7) and the copy of its rows needed C#. Swept: 26
+scenarios, every one to its end.
+
+**Boku Igai no Otoko o Shiranai Kanojo** (Material, MATNTR.exe, engine v2.49): its 3,340 files
+come out whole. Its START asks which renderer the engine has and its filters (`04E7`, read from
+v2.50's handler: the renderer `04E8` last set, -1 for GDI as RIO.INI has it) to go back to them
+when another fails. `FDF2` and `FE10` are only in the branch its menus take for a state they do
+not know (an error), never reached. Five routines are builds of known ones ("ret" for "ret 4", or
+other padding: xor32, both thumbnails, wcsindex, enlarge16). Its TOPMENU.SCN calls the title,
+then starts the game's module when the title left 7 in b[43] (0 at boot starts nothing): "Play
+from here" makes the call a jump to the block that starts t\..._MAI.SCN (Hitozuma Gui's is the
+same; swept again, the same as before). Swept: 79 scenarios, every one to its end (messages of
+several lines).
+
+**Sorcery Jokers** (3rdEye, SJS.exe, engine v2.50, 1920 x 1080), the Japanese release of the
+English one above: its 15,407 files come out whole. Five routines needed C#: three of its save
+thumbnail (856 x 482 from blocks of 2 x 2 of a picture 1920 wide, its rows copied, then made
+32-bit; the English release has the same three, which no sweep reached), its blank S25 (the
+English one's without clearing first) and a count of the set pixels in three squares of 32 x 32,
+each the same bytes as its x86 code on random cases. Swept: 101 scenarios, every one to its end
+but B001.TXT, which shows its last line and then stands at the game's map of routes, where the
+sweep's clicks choose none.
+
+**Gohoushi Nurse ~Mayonaka no Kyousei Call~** (Hot Pink, GHNURSE.exe, engine v2.50, 1280 x 720)
+and **Lovecha ~Tsumasakidachi de, Hitomi o Tojite~** (Tangerine, LOVECHA.EXE, v2.50; its .exe
+went into GameMap) share two routines of their saves, a copy of 99 rows of 528 bytes and a 24 x
+24 mask (Re: Rem Plus's mask28 with 24), now C#. Their 1,673 and 3,836 files come out whole.
+Swept: 19 and 78 scenarios, every one to its end.
+
+**Nukige Mitai na Shima ni Sunderu** (Qruppo, NUKITASHI.EXE, engine v2.50, 1600 x 900, with
+RIOSUB.DLL) and its sequel **Nukige Mitai na Shima ni Sunderu... 2** (NUKITASHI2.EXE) run the
+same picture routines, eight of them without C# until now (each the same bytes as its x86 code on
+random cases): enlargements of their pictures to 1600 x 900 (two, three and four times, and by
+3:2 - 1600 is not three times a whole number, so the rows of three overlap the last ones by a
+few bytes, as the x86 code writes them), and for the save thumbnail 233 x 131 made 32-bit, a
+mask of 44 x 44, its frame cleared and its first bytes scaled. The sequel's archives
+(NUKITASHI2_*.WAR) were taken for the first game's, whose name is in theirs: its .exe went into
+GameMap, and its DecodeBin date is 20190329 (`ScnTools datefind`); then its 18,231 files come out
+whole. Swept: the first, 133 scenarios, every one to its end; the second, 122, every one to its
+end but one, 02_C23.TXT, which runs out of the scripts' memory (1.1 GB in use and a block of 190
+MB asked for; todo.md).
+
+**Nakadashi Trilogy**: its new game, **Miko Dashi** (巫女だし, Cdrive, MIKODS.EXE, engine v2.47),
+was tried (the trilogy's other two are the earlier Nakadashi Hara Maid games, not installed). Its
+.exe went into GameMap; its 7,449 files come out whole. Its START checks its executable twice:
+`03C2` gives this one's checksum (v ^ 306723180 = 228471671), and it reads the .exe whole and
+compares it with X.WAV of MIKODS_D.WAR, a copy of it (its memcmp is an embedded routine, now C#).
+The copy tried had an .exe altered in 52 bytes (another program's patch), and stopped there with
+"Program File Error", as the engine would; with the .exe it shipped with (X.WAV) it plays. Five
+more routines needed C# (builds of known ones: its thumbnail and its rows, NOT, enlarge16 with
+the weight table i * 256 / sW); its START 646B8, a scale of 1,124 instructions, has none yet,
+and no scenario ran it. Swept: 153 scenarios; 147 show their last message and then the game
+stands at its menu of scenes (`$EX,0,019` ends each), which the sweep does not choose from; the
+two menus of one line (SEN01, SEN02) and SAKU001 (382 of its 613 lines) stand there too.
+
+**Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~** (LUCHA!, YODUMA.EXE, engine v2.37
+with YODUMA.INI) had no keys: CC Hospital's scheme opens its 10,506 files whole, so it has a
+scheme of its own with those keys now (and its .exe in GameMap). Its START compares its
+executable's icon resource with icon.bin of its archives: kernel32 FindResourceA and the three
+after it read the resource from the .exe file. `0105` writes its FullScreen. Its rule wipe (MMX)
+has C#, the same bytes as its x86 code on random cases. It stops being worked on at its first
+wipe, before the title: a loop reads `03BD` until it gives what it gave before, which a clock
+never does. The interpreter runs v2.37 with v2.49's opcode table and v2.34's handlers where they
+differ (below 2.40); the table of v2.37 has to be read from its executable first (todo.md).
+
+**Cleavage** (Empress, CLEAVAGE.EXE, engine v2.33): its .exe went into GameMap (its scheme
+existed; Ao no Juuai's keys open it too) and its 2,521 files come out whole. opcheck finds 11
+opcodes without a handler (`0029`, `0263`, `0578`, `0579`, `057A`, `057E`, `057F`, `06DE`,
+`073A`, `07BE`, `09CF`);
+it stops on `073A` at its first frame. Engine v2.33 needs its own table and handlers, as v2.34
+had.
+
 ## Sweeping
 
 `tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through ScnBoot, each from
@@ -609,7 +732,9 @@ its first line in a process of its own (four at a time): the game starts at once
 scenario, as OpenShiina Tools' "Play from here" does (no logos, no title), and runs with Ctrl
 held (the games' skip) while Return and clicks make the choices. A scenario is done when a line
 of another one shows or every line of it has; it is stuck when no new line shows for 9,000
-frames (a movie playing is not counted); it stopped when the scripts stop. The summary gives the
+frames (a movie playing is not counted), and is then run again with other clicks (the grid
+without its lower right and with a row at 40%, then the middle only); it stopped when the scripts
+stop. The summary gives the
 lines shown of all, the slowest frames with the line then shown, and the peak of the scripts'
 memory. Lines not shown are the branches of choices not taken, or lines shown with the one
 before (Ao no Juuai's messages of two lines). What it does not check: the pictures (a scene that
@@ -617,13 +742,16 @@ draws wrong still runs), the waits and effects the skip leaves out, and what ear
 set (each scenario starts a new game). A game whose every scenario is done counts as playing
 through.
 
-The 42 games (43 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
+The 54 games (55 releases) tried, swept on 2026-10-13 (Chiccha na Hanayome and Aneiro again on
 2026-10-14; both Libras, Sorcery Jokers, Puchipuchi Idol Kouhosei, Gyaku Katei Kyoushi, Pure Love!,
 School Saimin Paradise! and Sis△Camp on 2026-10-15; Tsugou no Ii Idol on 2026-10-17; Hin wa
 Bokura no Fuku no Kami, Libra's fan disc, Iyashinbo The Motion and Damatte Watashi no Muko ni
 Nare! on 2026-10-20; Gensou no Idea on 2026-10-21; Gakushoku no Oba-san The Motion on
 2026-10-22; Raillore, Testament, Tori Colony, Kanojo ga Ore ni Kureta Mono, Royal Bouquet and
-Hitozuma Gui on 2026-10-23 and 24; Saimin Seikatsu and Ren'ai Saimin on 2026-10-31): none
+Hitozuma Gui on 2026-10-23 and 24; Saimin Seikatsu and Ren'ai Saimin on 2026-10-31; Oni ga Kuru
+and Doushite Daite Kurenai no!? on 2026-11-03; Rin x Sen, Last Waltz, Ran→Sem, Bloody Rondo,
+Tanetsuke Mura, Shojo Mama, Boku Igai no Otoko o Shiranai Kanojo, Gohoushi Nurse, Lovecha and
+Nukige Mitai na Shima ni Sunderu on 2026-11-04, Hitozuma Gui, Raillore and Sorcery Jokers (English) again): none
 stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
@@ -671,6 +799,18 @@ stopped, none stuck.
 | Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 141 | 61.4% (messages of two lines, the second shown with the first) |
 | Saimin Seikatsu ~Kousoku dakara Shikatanai!?~ | 181 | 95.9% (the branches of choices not taken) |
 | Ren'ai Saimin ~Tsun na Kanojo ga Dereru Saimin~ | 215 | 99.5% |
+| Oni ga Kuru | 80 | 91.3% (the branches of choices not taken) |
+| Doushite Daite Kurenai no!? | 237 | 99.3% |
+| Rin x Sen | 188 | 63.2% (messages of two or three lines, and the speaker's name, shown at once) |
+| Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | 130 | 52.6% (as Rin x Sen) |
+| Ran→Sem | 169 | 58.4% (as Rin x Sen) |
+| Bloody Rondo | 80 | 73.9% (the speakers' names, lines of their own) |
+| Tanetsuke Mura | 380 | 62.0% (as Rin x Sen) |
+| Shojo Mama | 26 | 98.0% |
+| Boku Igai no Otoko o Shiranai Kanojo | 79 | 63.1% (as Rin x Sen) |
+| Gohoushi Nurse ~Mayonaka no Kyousei Call~ | 19 | 98.9% |
+| Lovecha ~Tsumasakidachi de, Hitomi o Tojite~ | 78 | 99.1% |
+| Nukige Mitai na Shima ni Sunderu | 133 | 99.7% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

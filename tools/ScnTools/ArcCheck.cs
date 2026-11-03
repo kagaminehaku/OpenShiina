@@ -25,6 +25,8 @@ static class ArcCheck
         Console.WriteLine(game.Scheme.DecodeBin == null ? "  DecodeBin: none" : $"  DecodeBin date: {date:X8}");
         foreach (var name in game.NotOpened)
             Console.WriteLine($"  {name}: NOT OPENED with this scheme");
+        foreach (var name in game.Movies)
+            Console.WriteLine($"  {name}: an MPEG movie, not an archive");
 
         int bad = 0, checkedFiles = 0, dateFiles = 0, dateChecked = 0, decrypt2After = 0, decrypt2Before = 0;
         var problems = new List<string>();

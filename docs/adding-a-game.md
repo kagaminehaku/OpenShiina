@@ -1,6 +1,6 @@
 # Adding a game
 
-How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 43 releases
+How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 55 releases
 that play went through these steps; most of what goes wrong with a new one is in the table of
 symptoms below, with what fixed it before.
 
@@ -103,7 +103,10 @@ numbers):
   long on the interpreter). A routine neither the start nor the sweep reaches (menus, saves) is
   checked on its own: `ScnTools routinecheck <game> <module> <offset> <l[] spec>` runs both on
   random input (the spec gives each l[i]: `b<bytes>` a buffer, `300` a number, `396-7680` a
-  random one, `_` 0; Chiccha's block: `b29700,b576000,396-7680`).
+  random one, `_` 0; Chiccha's block: `b29700,b576000,396-7680`; after a `;` the same for f[],
+  for a routine that takes its arguments from there: `_;b1440000,b22500`). A routine that
+  pushes one more dword before it reads its arguments takes them from l[], not f[]: a check
+  that differs from the first byte on says so.
 
 A routine the sweep runs without a C# version shows in its logs (`routine ... : interpreter` or
 `translated`); newgame.ps1 lists them.
@@ -129,7 +132,13 @@ It stops on a script error with the opcode and where; the usual first stops:
 - **Stopped**: the scenario's log (`logs\<scenario>.txt`) says where; a missing file the scripts
   ask for (`0158`) may be one read from the wrong archive (step 2).
 - **Stuck / no summary**: SCNBOOT_STALL_REPORT in the log says which instructions ran; a loop
-  that runs on and on over a table often means memory written over (below).
+  that runs on and on over a table often means memory written over (below). A game standing at
+  a screen of its own (SCNBOOT_HOT shows its loop over buttons, no file read) was opened by a
+  click of the sweep's grid, or waits for a choice no place of the grid hits: sweep.ps1 runs a
+  stuck scenario again with other clicks (`SCNBOOT_SWEEP_CLICKS=safe`, then `center`); when
+  that is not enough, try one point at a time (`SCNBOOT_SWEEP_CLICKS=x,y`) to find the button
+  and where the choices are (Doushite Daite Kurenai no!?: a button at the grid's lower right,
+  choices at 30-45% of the height).
 - **Slow frames** (the slowest are listed): a routine on the x86 interpreter (step 4), or a
   file read again and again.
 - **Lines under 90%**: choices' other branches, or messages of several lines shown together
@@ -166,4 +175,6 @@ a C# routine others use), sweep the games it touches again before committing.
 | A script error on an opcode | a handler not written yet (opcheck) | most games |
 | Frames of seconds | an x86 routine on the interpreter (a new build of a known one) | Chuuni Hime, Chiccha na Hanayome, Sorcery Jokers |
 | 1 frame a second in the menus | SSE2 routines on the interpreter | the Bitch games |
-| Out of the scripts' memory | the heap's size | Bitch Gakuen, Kyuuketsuki no Libra |
+| Out of the scripts' memory | the heap's size | Bitch Gakuen, Kyuuketsuki no Libra; Nukitashi 2 (one scenario, not fixed yet) |
+| Every scenario of the sweep stuck with no line shown | "Play from here" did not find the new game in TOPMENU.SCN (ScnVm.Warp.cs) | Boku Igai no Otoko o Shiranai Kanojo |
+| The archives open with another game's scheme, files not whole | GameMap lacks the .exe and the archives' names hold another game's | Nukitashi 2 |

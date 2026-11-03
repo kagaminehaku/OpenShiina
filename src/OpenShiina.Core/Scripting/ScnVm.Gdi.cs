@@ -32,6 +32,62 @@ public sealed partial class ScnVm
     private int m_memoryFonts;
     // SetWindowLongA's values, by window and index
     private readonly Dictionary<(int Window, int Index), int> m_windowLongs = new();
+    // The executable's resources found (FindResourceA), their handles ResourceHandles + 1, + 2...,
+    // and where LockResource copied each
+    private readonly List<(byte[] Data, int Address)> m_resources = new();
+    private const int ResourceHandles = 0x00080000;
+
+    private (byte[] Data, int Address)? Resource(int handle) =>
+        handle > ResourceHandles && handle <= ResourceHandles + m_resources.Count ? m_resources[handle - ResourceHandles - 1] : null;
+
+    /// <summary>
+    /// The resource of the game's executable with the type and name numbers given (its first
+    /// language), read from the file as data, or null.
+    /// </summary>
+    private byte[]? ExeResource(int name, int type)
+    {
+        if (ExeFileName() is not { } exe || m_host.ReadLooseFile(exe) is not { Length: > 0x40 } pe)
+            return null;
+        try
+        {
+            int header = BitConverter.ToInt32(pe, 0x3C);
+            int sections = BitConverter.ToUInt16(pe, header + 6), optional = header + 0x18;
+            int rootRva = BitConverter.ToInt32(pe, optional + 96 + 2 * 8);
+            int Offset(int rva)
+            {
+                for (int s = 0, at = optional + BitConverter.ToUInt16(pe, header + 0x14); s < sections; s++, at += 40)
+                {
+                    int va = BitConverter.ToInt32(pe, at + 12), size = Math.Max(BitConverter.ToInt32(pe, at + 8), BitConverter.ToInt32(pe, at + 16));
+                    if (rva >= va && rva < va + size)
+                        return rva - va + BitConverter.ToInt32(pe, at + 20);
+                }
+                return -1;
+            }
+            int root = Offset(rootRva);
+            // A directory's entry for an id (numbers come after the named ones), or the first
+            int? Entry(int directory, int? id)
+            {
+                int named = BitConverter.ToUInt16(pe, directory + 12), ids = BitConverter.ToUInt16(pe, directory + 14);
+                for (int e = 0; e < named + ids; e++)
+                {
+                    int at = directory + 16 + 8 * e;
+                    if (id == null || BitConverter.ToInt32(pe, at) == id)
+                        return BitConverter.ToInt32(pe, at + 4);
+                }
+                return null;
+            }
+            if (root < 0 || Entry(root, type) is not { } types || types >= 0 || Entry(root + (types & 0x7FFFFFFF), name) is not { } names
+                || names >= 0 || Entry(root + (names & 0x7FFFFFFF), null) is not { } language || language < 0)
+                return null;
+            int data = root + language, at = Offset(BitConverter.ToInt32(pe, data)), length = BitConverter.ToInt32(pe, data + 4);
+            return at < 0 || length < 0 || at + length > pe.Length ? null : pe.AsSpan(at, length).ToArray();
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     // Without the platform's GDI: GDI's shapes as Wine's DIB driver draws them
     private static readonly Platform.DibShapes s_dibShapes = new();
     private const int WhiteBrush = 0x00050000, BlackPen = 0x00050001, NullBrush = 0x00050002, NullPen = 0x00050003;
@@ -372,6 +428,61 @@ public sealed partial class ScnVm
             case ("riosub", "rsS25ChangeCBHSL"):
                 RioChangeCbHsl(Arg(0), Arg(1), Arg(2), Arg(3), Arg(4), Arg(5), Arg(6), Arg(7), Arg(9), Arg(10));
                 return 0;
+            case ("riosub", "rsDialogViewText"):
+            {
+                // window, title, text, ?: a dialog showing a text file (Oni ga Kuru's menu loads
+                // "<name>.txt" with 00C9 and shows it so): its Shift-JIS text in the host's message
+                // box, with the file's name as its title
+                int text = Arg(2);
+                int length = m_fileSizes.TryGetValue(text, out int size) ? size : StringLength(text);
+                m_host.MessageBox(Encodings.cp932.GetString(ReadBytes(text, length)).TrimEnd('\0'), ReadString(Arg(1)), 0);
+                return 1;
+            }
+            case ("kernel32", "FindResourceA"):
+            {
+                // module (0 or the game's own), name, type (numbers): a resource of the game's
+                // executable, read from the file (Yoyogi Hitozuma Senmon Gakuin's START checks its
+                // icon 2 against icon.bin of its archives); a handle, 0 when there is none
+                if (Arg(1) is <= 0 or > 0xFFFF || Arg(2) is <= 0 or > 0xFFFF || ExeResource(Arg(1), Arg(2)) is not { } resource)
+                    return 0;
+                m_resources.Add((resource, 0));
+                return ResourceHandles + m_resources.Count;
+            }
+            case ("kernel32", "SizeofResource"):
+                // module, resource: its size
+                return Resource(Arg(1)) is { } sized ? sized.Data.Length : 0;
+            case ("kernel32", "LoadResource"):
+                // module, resource: a handle LockResource takes (the same)
+                return Resource(Arg(1)) != null ? Arg(1) : 0;
+            case ("kernel32", "LockResource"):
+            {
+                // handle: the resource's bytes in the scripts' memory (copied there once)
+                int index = Arg(0) - ResourceHandles - 1;
+                if (Resource(Arg(0)) is not { } locked)
+                    return 0;
+                if (locked.Address == 0)
+                    m_resources[index] = locked = (locked.Data, AllocateCopy(locked.Data));
+                return locked.Address;
+            }
+            case ("shlwapi", "PathStripPathA"):
+            {
+                // path: what follows its last '\', '/' or ':' moved to its start, in place (Oni ga
+                // Kuru's START keeps a file's name); Shift-JIS lead bytes take their next byte
+                int path = Arg(0), name = path;
+                for (int p = path, b; (b = ReadByte(p)) != 0; p++)
+                {
+                    if (b is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC)
+                    {
+                        if (ReadByte(++p) == 0)
+                            break;
+                    }
+                    else if (b is '\\' or '/' or ':')
+                        name = p + 1;
+                }
+                if (name != path)
+                    MoveMemory(path, name, StringLength(name) + 1);
+                return 0;
+            }
             case ("kernel32", "MultiByteToWideChar"):
             {
                 // Aneiro's START turns its UTF-8 .wav.sli files into Shift-JIS through UTF-16:

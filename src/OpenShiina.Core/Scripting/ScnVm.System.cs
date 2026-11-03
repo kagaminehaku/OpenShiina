@@ -75,7 +75,9 @@ public sealed partial class ScnVm
     // v ^ 306723180 = 1804523910), Chuuchuu Nurse (CHUCHU.EXE, v2.45: START 0x0033F wants
     // -462117567, the CRC-32 of its decrypted code XOR that of 0x8000 bytes at 47B774), Can Fes!
     // (CANFES.EXE, v2.47: START 0x004EE wants v ^ 306723180 = -1948973168), Saimin Seikatsu
-    // (SAIMIN.EXE, v2.47: START 0x00484 wants v ^ 306723180 = -628140931)
+    // (SAIMIN.EXE, v2.47: START 0x00484 wants v ^ 306723180 = -628140931), Doushite Daite Kurenai
+    // no!? (DODAKURE.EXE, v2.50: START 0x006A6 wants v ^ 306723180 = -1421357033), Nakadashi
+    // Trilogy's Miko Dashi (MIKODS.EXE, v2.47: START 0x0037A wants v ^ 306723180 = 228471671)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -83,6 +85,8 @@ public sealed partial class ScnVm
         ["Can Fes! ~Itazura Majo to Naisho no Gakuensai~"] = 306723180 ^ -1948973168,
         ["Hana to Otome ni Shukufuku o Royal Bouquet"] = 306723180 ^ 1872894084,
         ["Saimin Seikatsu"] = 306723180 ^ -628140931,
+        ["Doushite Daite Kurenai no!?"] = 306723180 ^ -1421357033,
+        ["Nakadashi Trilogy"] = 306723180 ^ 228471671,
     };
 
     private void RegisterSystem()
@@ -128,6 +132,10 @@ public sealed partial class ScnVm
         // 06BA flags / 06BB v: DirectSound flags (0x13B52F0)
         Register(0x06BA, (vm, c, i) => vm.SetGlobal(0x13B52F0, c, i));
         Register(0x06BB, (vm, c, i) => { vm.Store(c, i.Args[0], vm.EngineGlobal(0x13B52F0)); return 0; });
+        // 049D v / 049C v: set / get the engine's flag at 0xD0AD3C (REMPLUS.EXE 0x423340 and
+        // 0x423320); Tanetsuke Mura's START sets it from RIO.INI's MouseLR_Change
+        Register(0x049D, (vm, c, i) => vm.SetGlobal(0xD0AD3C, c, i));
+        Register(0x049C, (vm, c, i) => { vm.Store(c, i.Args[0], vm.EngineGlobal(0xD0AD3C)); return 0; });
         // 07E8 v: v = RIO.INI's Background (0x13B43D0), as 07E5 / 07E6 last set it
         Register(0x07E8, (vm, c, i) => { vm.Store(c, i.Args[0], vm.RunsInBackground ? 1 : 0); return 0; });
         // 073F v: the COM objects for movies were created

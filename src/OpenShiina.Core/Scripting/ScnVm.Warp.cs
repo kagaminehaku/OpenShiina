@@ -170,15 +170,45 @@ public sealed partial class ScnVm
             c.Pc = c.Base + found.Block;
             return;
         }
+        if (MainModuleBlock(c) is { } main)
+        {
+            SkipTitleCall(c, main);
+            return;
+        }
         SkipTitleCall(c);
+    }
+
+    /// <summary>
+    /// The TOPMENU.SCN of Guilty's and Material's games calls the title (a gosub to START's), then
+    /// by the choice it left in b[43] starts the replay's module or the game's, "t\..._MAI.SCN"
+    /// (Hitozuma Gui: any but 6; Boku Igai no Otoko o Shiranai Kanojo: 7, and 0 starts none).
+    /// The block that starts the game's ("local", then "lea" of that name): the call of the title
+    /// becomes a jump there. Null when there is none before the module's first "end".
+    /// </summary>
+    private int? MainModuleBlock(ScnContext c)
+    {
+        int at = c.CodeBase, end = c.CodeBase + c.CodeSize, previous = -1, previousOp = -1;
+        while (at < end)
+        {
+            var instruction = Decode(c, at);
+            if (instruction.Length <= 0 || instruction.Op == 0x0000)
+                return null;
+            if (instruction.Op == 0x02D5 && previousOp == 0x03CF
+                && Encoding.ASCII.GetString(ReadBytes(at, Math.Min(instruction.Length, end - at))).ToUpperInvariant().Contains("_MAI.SCN"))
+                return previous;
+            (previous, previousOp) = (at, instruction.Op);
+            at += instruction.Length;
+        }
+        return null;
     }
 
     /// <summary>
     /// Ao no Juuai (v2.34): its TOPMENU.SCN calls the title (a gosub to START's), then by the
     /// choice loads the replay's module (b[43] 6) or the game's. The call becomes a jump to the
-    /// instruction after it, so the game's module starts at once (a new game, b[43] 0 at boot).
+    /// instruction after it, so the game's module starts at once (a new game, b[43] 0 at boot);
+    /// or a jump to <paramref name="target"/> (MainModuleBlock).
     /// </summary>
-    private void SkipTitleCall(ScnContext c)
+    private void SkipTitleCall(ScnContext c, int? target = null)
     {
         int at = c.CodeBase, end = c.CodeBase + c.CodeSize;
         for (int i = 0; i < 8 && at < end; i++)
@@ -188,7 +218,7 @@ public sealed partial class ScnVm
             if (instruction.Op == 0x0267 && instruction.Length == 7 && at + 7 < end && Decode(c, at + 7).Op == 0x01F4)
             {
                 m_decoded.Remove(at);
-                WriteBytes(at, [0x58, 0x02, 0x84, .. BitConverter.GetBytes(at + 7 - c.Base)]);
+                WriteBytes(at, [0x58, 0x02, 0x84, .. BitConverter.GetBytes((target ?? at + 7) - c.Base)]);
                 return;
             }
             at += instruction.Length;

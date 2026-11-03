@@ -14,7 +14,10 @@ param(
 # Build ScnBoot first (Release). A scenario ends "done" when a line of another one shows or every
 # line of it has, "stuck" when no new line shows for 9000 frames (a movie playing is not counted),
 # "stopped" when the scripts stop (an error: its log says which). Lines left are the branches of
-# choices not taken, or lines shown with the one before (two lines of a message).
+# choices not taken, or lines shown with the one before (two lines of a message). A scenario stuck
+# is run again with the grid's lower right left out, then with clicks only in the middle of the
+# screen (SCNBOOT_SWEEP_CLICKS=safe, center): a place of the grid the sweep clicks can be a button
+# that opens a screen of the game's own.
 
 $scnboot = Join-Path $PSScriptRoot 'OpenShiina.ScnBoot\bin\Release\net10.0\scnboot.exe'
 if (-not (Test-Path -LiteralPath $scnboot)) { throw "Build ScnBoot first (Release): $scnboot" }
@@ -27,26 +30,44 @@ $list = & $scnboot $Folder | ForEach-Object { ($_ -split "`t")[0] }
 Remove-Item Env:SCNBOOT_LIST
 $env:SCNBOOT_SWEEP = '1'; $env:SCNBOOT_CACHE = '256'; $env:SCNBOOT_STALL = '30'
 
-$running = @{}
 $seconds = @{}
-$queue = [Collections.Queue]::new(@($list))
 $clock = [Diagnostics.Stopwatch]::StartNew()
-while ($queue.Count -gt 0 -or $running.Count -gt 0) {
-    while ($queue.Count -gt 0 -and $running.Count -lt $Parallel) {
-        $name = $queue.Dequeue()
-        $env:SCNBOOT_PLAYFROM = "${name}:1"
-        $log = Join-Path $Out "logs\$name"
-        $running[$name] = Start-Process -FilePath $scnboot -ArgumentList "`"$Folder`"", $Frames -NoNewWindow -PassThru `
-            -RedirectStandardOutput "$log.txt" -RedirectStandardError "$log.err"
-        $seconds[$name] = $clock.Elapsed.TotalSeconds
-    }
-    Start-Sleep -Milliseconds 300
-    foreach ($name in @($running.Keys)) {
-        if ($running[$name].HasExited) {
-            $running.Remove($name)
-            $seconds[$name] = [Math]::Round($clock.Elapsed.TotalSeconds - $seconds[$name], 1)
+function RunAll($names) {
+    $running = @{}
+    $queue = [Collections.Queue]::new(@($names))
+    while ($queue.Count -gt 0 -or $running.Count -gt 0) {
+        while ($queue.Count -gt 0 -and $running.Count -lt $Parallel) {
+            $name = $queue.Dequeue()
+            $env:SCNBOOT_PLAYFROM = "${name}:1"
+            $log = Join-Path $Out "logs\$name"
+            $running[$name] = Start-Process -FilePath $scnboot -ArgumentList "`"$Folder`"", $Frames -NoNewWindow -PassThru `
+                -RedirectStandardOutput "$log.txt" -RedirectStandardError "$log.err"
+            $seconds[$name] = $clock.Elapsed.TotalSeconds
+        }
+        Start-Sleep -Milliseconds 300
+        foreach ($name in @($running.Keys)) {
+            if ($running[$name].HasExited) {
+                $running.Remove($name)
+                $seconds[$name] = [Math]::Round($clock.Elapsed.TotalSeconds - $seconds[$name], 1)
+            }
         }
     }
+}
+function Stuck($names) {
+    @($names | Where-Object {
+        (Get-Content (Join-Path $Out "logs\$_.txt") -Encoding UTF8 -ErrorAction SilentlyContinue | Where-Object { $_ -like '`[sweep`]*' } |
+            Select-Object -First 1) -match "^\[sweep\]`t[^`t]*`tstuck`t" })
+}
+RunAll $list
+$retried = @{}
+$stuck = Stuck $list
+foreach ($clicks in 'safe', 'center') {
+    if ($stuck.Count -eq 0) { break }
+    $env:SCNBOOT_SWEEP_CLICKS = $clicks
+    RunAll $stuck
+    Remove-Item Env:SCNBOOT_SWEEP_CLICKS
+    foreach ($name in $stuck) { $retried[$name] = $clicks }
+    $stuck = Stuck $stuck
 }
 
 $rows = foreach ($name in $list) {
@@ -56,7 +77,7 @@ $rows = foreach ($name in $list) {
     $f = if ($sweep) { $sweep -split "`t" } else { @('', $name, 'no summary', '', '0/0', '', '', '') }
     [pscustomobject]@{
         Scenario = $name; Result = $f[2]; Frames = $f[3]; Lines = $f[4]; Last = $f[5]; Slowest = $f[6]
-        Heap = $f[7]; Error = "$why"; Seconds = $seconds[$name]
+        Heap = $f[7]; Error = "$why"; Seconds = $seconds[$name]; Clicks = $(if ($retried[$name]) { $retried[$name] } else { 'grid' })
     }
 }
 $rows | Export-Csv (Join-Path $Out 'summary.tsv') -Delimiter "`t" -NoTypeInformation -Encoding UTF8
@@ -68,6 +89,7 @@ $all = ($rows | ForEach-Object { All $_ } | Measure-Object -Sum).Sum
 $heap = ($rows | ForEach-Object { if ($_.Heap -match '(\d+) MB') { [int]$Matches[1] } } | Measure-Object -Maximum).Maximum
 "{0} scenarios in {1:N0} s, lines {2}/{3} ({4:P1}), heap peak {5} MB" -f $rows.Count, $clock.Elapsed.TotalSeconds, $shown, $all, ($shown / [Math]::Max(1, $all)), $heap
 $rows | Group-Object Result | ForEach-Object { "  {0}: {1}" -f $_.Name, $_.Count }
+if ($retried.Count -gt 0) { "  run again with other clicks (stuck with the grid): {0}" -f $retried.Count }
 '  stopped, stuck, or under 90% of the lines:'
 $rows | Where-Object { $_.Result -notlike 'done*' -or ((All $_) -gt 0 -and (Shown $_) / (All $_) -lt 0.9) } | ForEach-Object {
     "    {0,-18} {1,-22} {2,-10} last {3} {4}" -f $_.Scenario, $_.Result, $_.Lines, $_.Last, $_.Error

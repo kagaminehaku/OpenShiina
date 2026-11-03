@@ -343,13 +343,17 @@ public sealed partial class ScnVm
         // ScnVm.Enlarge16.cs. l[0] dst, l[1] its stride, l[2..5] dst left, top, right, bottom,
         // l[6] src, l[7] its stride, l[8..11] src left, top, right, bottom (1/16 pixels), l[12] the
         // weight table. Rectangles it does not enlarge run as x86 code. Saimin Seikatsu (v2.47)
-        // START 72F77 is another build of it, the same bytes
-        RegisterNative(["27A535558D763B2B8F0008F2476F0FA14EB45AAB", "1C0B5DBD306E520A9EB62FA41DF3484C397A4C39"], "enlarge16",
+        // START 72F77 is another build of it, the same bytes; Ran→Sem's (v2.47) START 9C8AA and Boku
+        // Igai no Otoko o Shiranai Kanojo's (v2.49) 6BDFE, other padding
+        RegisterNative(["27A535558D763B2B8F0008F2476F0FA14EB45AAB", "1C0B5DBD306E520A9EB62FA41DF3484C397A4C39",
+                        "B36E81F1360892F4CD8E7B6FE2C8AA0765B2FF23", "91176C1C026354F51ED12B93A2BB29146DD8F02D"], "enlarge16",
                        (vm, c, a) => vm.Enlarge16Native(c, a, 257, opaque: false));
         // Hana to Otome ni Shukufuku o Royal Bouquet START 4D062 (v2.47): the same but for its weight
         // table, i * 256 / sW, and the first byte of each pixel it mixes, made FF (por with 0xFF
         // after packuswb); the pixels it copies keep theirs. Arguments as above
         RegisterNative("D6BC2828FE749484BEC89684F01FD4469FF9BA0C", "enlarge16 (opaque)", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: true));
+        // Nakadashi Trilogy's Miko Dashi START 64396 (v2.47): that weight table, nothing made opaque
+        RegisterNative("39773A9714C8846EA6402C83B201C0FEA2A58775", "enlarge16", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: false));
     }
 
     /// <summary>enlarge16's arguments (RegisterNativeKernels) checked, its rectangles enlarged.</summary>

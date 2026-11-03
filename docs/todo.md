@@ -59,16 +59,23 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 141 games; 43 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 142 games; 55 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
-- [ ] **Keys for the 31 games without them** (compatibility.md, "No keys yet"), once their files
+- [ ] **Keys for the 30 games without them** (compatibility.md, "No keys yet"), once their files
   are found. From Niflheim's WARC_unpack.c: the DecodeBin (0x2000 bytes) is read by the code
   near the constant 0x40000000; v2.50's Extra picture is unpacked at run time (follow
   `push 202` through GetProcAddress).
 - [ ] Other v2.34 games: the 11 opcodes with other operands than v2.47's (0686-068B, 055A, 055B,
   04EC, 0B7D), the 9 new ones (007D-0080, 060E-0610, 0614, 077B) and 03BF. Ao no Juuai uses none.
-- [ ] Opcode tables for 2.35-2.46 and 2.48 (opscan on the game's executable).
+- [ ] Opcode tables for 2.35-2.46 and 2.48 (opscan on the game's executable). Yoyogi Hitozuma
+  Senmon Gakuin (v2.37) runs with v2.49's and stands at its first wipe (a loop on `03BD`);
+  Cleavage (v2.33) stops on 11 opcodes no handler takes (compatibility.md, Notes).
+- [ ] Miko Dashi (Nakadashi Trilogy) START 646B8: a scale of 1,124 instructions (four cases, two
+  weight tables), no C# yet; no scenario of the sweep ran it.
+- [ ] **A larger heap for Nukitashi 2**: one scenario (02_C23.TXT) has 1.1 GB of the scripts'
+  heap in use and asks for 190 MB more in one block (1.5 GB below the modules' code at
+  0x70000000; the code region only grows, so moving it up leaves less room for modules).
 - [ ] The ExtraCrypts (PostAdler, PreAdler, Count, AltCount, Ushimitsu, Nukitashi2,
   Saimin) checked against their archives.
 - [ ] **WMV9 P-picture loop filter**: Windows' decoder chooses some loop filter edges of WMV3

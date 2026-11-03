@@ -29,9 +29,15 @@ public sealed partial class ScnVm
         return (int)(negative ? -value : value);
     }
 
-    /// <summary>A value of an INI file of the game folder, or null.</summary>
+    // What 0105 wrote to the settings files, by file, section and key: kept for this session, as
+    // nothing is written into the game folder
+    private readonly Dictionary<(string File, string Section, string Key), string> m_iniWritten = new();
+
+    /// <summary>A value of an INI file of the game folder (as 0105 last wrote it), or null.</summary>
     public string? IniString(string file, string section, string key)
     {
+        if (m_iniWritten.TryGetValue((file.ToUpperInvariant(), section.ToUpperInvariant(), key.ToUpperInvariant()), out var written))
+            return written;
         var bytes = m_host.ReadLooseFile(file);
         if (bytes == null)
             return null;
@@ -389,6 +395,15 @@ public sealed partial class ScnVm
             string key = vm.ReadString(vm.Value(c, i.Args[1]));
             int fallback = vm.Value(c, i.Args[2]);
             vm.Store(c, i.Args[2], vm.IniInt(vm.m_iniFile, section, key, fallback));
+            return 0;
+        });
+        // 0105 section, key, v: v written as a number into the settings file (Yoyogi Hitozuma
+        // Senmon Gakuin's FullScreen when the window is switched); 0107 reads it back
+        Register(0x0105, (vm, c, i) =>
+        {
+            string section = vm.ReadString(vm.Value(c, i.Args[0]));
+            string key = vm.ReadString(vm.Value(c, i.Args[1]));
+            vm.m_iniWritten[(vm.m_iniFile.ToUpperInvariant(), section.ToUpperInvariant(), key.ToUpperInvariant())] = vm.Value(c, i.Args[2]).ToString();
             return 0;
         });
         // 0108 section, key, buffer, size: the text in the settings file, up to size - 1 bytes and a

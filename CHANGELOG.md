@@ -4,8 +4,35 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.7.9 (2026-11-04)
 
+Twelve new games: 54 games (55 releases) now play through, three more play, and a written way of
+trying a new game.
+
+- **New: ten more games play through**: Rin x Sen (RIN×SEN, 2009), Last Waltz (2009), Ran→Sem
+  (2010), Bloody Rondo (BLOODY†RONDO, 2011), Tanetsuke Mura (種憑け村, 2011; without its add-ons,
+  which need a copy protection DLL of their own), Shojo Mama (処女ママ, 2011), Boku Igai no Otoko o
+  Shiranai Kanojo (僕以外の男を知らない彼女が他の男に抱かれていた, 2012), Gohoushi Nurse (ご奉仕ナース,
+  2015), Lovecha (らぶちゃ, 2016) and Nukige Mitai na Shima ni Sunderu (抜きゲーみたいな島に住んでる
+  貧乳はどうすりゃいいですか?, 2018). What they needed: the engine flag their START sets from
+  MouseLR_Change (`049C` / `049D`), the renderer query of `04E7`, "Play from here" for the menus
+  of Guilty's and Material's games, and their picture routines (save thumbnails, masks, the
+  enlargements of Nukitashi's pictures to 1600 x 900) as C# code.
+- **Nukige Mitai na Shima ni Sunderu 2** and the Japanese **Sorcery Jokers** play (one scenario
+  each not to its end: compatibility.md). Nukitashi 2's archives were opened with the first
+  game's keys; its own scheme is used now, with its DecodeBin date. **Miko Dashi** (Nakadashi
+  Trilogy) plays with the executable it shipped with: its START compares the .exe with a copy in
+  its archives.
+- **Yoyogi Hitozuma Senmon Gakuin** has keys now (CC Hospital's) and gets past its check of its
+  executable's icon; it stands still before its title (engine v2.37). **Cleavage** (v2.33) opens
+  but stops on opcodes of its engine version the player does not have yet.
+- Sorcery Jokers (English): the three routines of its save thumbnail run as C# code.
+- ScnTools routinecheck fills f[] too (after a `;` in the spec).
+- **New: Doushite Daite Kurenai no!? (どうして抱いてくれないのっ!?, 2011)** plays through: its check
+  of its executable no longer stops it with "Program Revision Error", and its save thumbnail runs
+  as C# code.
+- **New: Oni ga Kuru (鬼がくる。, 2017)** plays through: two functions of Windows and of its
+  RIOSUB.DLL its menus and scenes call, and its picture routines as C# code.
 - Chiccha na Hanayome: five more of its picture routines (in its menus and saves) run as C#
   code instead of x86 code.
 
