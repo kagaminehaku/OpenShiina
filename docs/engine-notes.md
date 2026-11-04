@@ -36,8 +36,8 @@ GARbro build; a merge of its own result gives the same file). Their extra cipher
 GARbro-Mod's, PostAdler / PreAdler / Binbo / Count / AltCount / Ushimitsu / Nukitashi2 / Saimin
 ported for them (not checked against those games' archives: none is here). 102 GameMap entries.
 By engine version: 30 below 2.39, 26 from 2.39 to 2.46, 35 2.47-2.48, 18 2.49, 29 2.50 and
-later. The interpreter knows the opcodes of 2.47, 2.49 and 2.50 (ScnOpcodes picks 2.47's for
-2.36 too): the others need more (todo.md).
+later. The interpreter knows the opcodes of 2.33, 2.34, 2.37, 2.47, 2.49 and 2.50 (ScnOpcodes picks
+2.47's for 2.36 too): the others need more (todo.md).
 
 **DecodeBin's date.** The DecodeBins of all schemes are the same but for one dword at 0x1020, a
 date of the engine's build (0x20161012 for Chiccha na Hanayome and Signalist Stars!!, 0x20171006
@@ -80,6 +80,19 @@ the same: the HelperKey 12 bytes after the first IEND, the image's length (45,49
 routine at 0x75A10, its plug-in at 0xD4934. The plug-in is a small bytecode machine whose
 program is the Japanese release's AltCountCrypt; its DecodeBin's date is 0x20210815, which the
 executable holds too.
+Love & Piss's LOVEPISS.EXE (Bonbon Company, v2.49, 2013) is encrypted by a `.riox` stub as
+Chuuchuu Nurse's (`.text` and the first 0x30000 bytes of `.data`, one key running over both,
+from 0xF1C97F95; ~crc 0x1A787D24; then 44F902). Decrypted, it is laid out as Hin wa Bokura no
+Fuku no Kami's BINBO.EXE (the same stub; its parts found where its scheme's are): the HelperKey
+the 20 bytes 4 after the first IEND, the ShiinaImage the common JPEG up to the length its routine
+gives (`mov eax, 10233h / and eax, 0FFFFh`: 563 bytes, less than the JPEG), and a plug-in the
+same as Binbo's (BinboCrypt). Its DecodeBin's date 0x20130723 came from LOVEPISS_G's
+EFF_009.S25, whose row 158 started outside the file: the right start is row 157's end.
+Imouto Smile's IMOSMILE.EXE (C:drive. / Citoron Soft, v2.47, 2009) is encrypted the same way
+(the key from 0x39C739C5, ~crc 0x16DFD191); its HelperKey is 4 bytes after the first IEND too, its
+ShiinaImage the common JPEG alone (33,438 bytes), with no plug-in and no file flagged for
+Decrypt2. Tekoire Princess!'s TEKOIRE.EXE (propeller, v2.37, the budget release of 2006) is
+encrypted as YODUMA.EXE (`.text` alone) and opens with CC Hospital's keys, as Yoyogi does.
 
 **WARC versions** (Archives/WarcOpener.cs, from GARbro's ArcWARC.cs and ArcWARC1.0.cs), all
 eight open: 1.7 (the index zlib-packed; the eleven games), 1.2-1.6 (the index packed with a
@@ -260,6 +273,20 @@ fewer, no stream handle), 055A takes one operand and 055B none, 04BD 11, 04EC 9 
 New in v2.34 only: 007D-0080 (3 operands each), 060E-0610 (none), 0614 (one), 077B (four).
 Ao no Juuai boots with it and stops at 0A28 (frame 0): an opcode every version has (one
 operand, a string copied to 722B5C) that the GRAND†CROSS games never use.
+
+**v2.33** (Cleavage's CLEAVAGE.EXE, 2005; Vanquish's VANQ.EXE is the same build; table
+Data/ScnOps/ops_v233.tsv): laid out as v2.34 (`ScnTools opscan CLEAVAGE.EXE 41e4f0 41e525 0
+41f27c 40d6b0 40cfb0 40d4d0 ...`), 542 opcodes, v2.34's but for 06EC, which it lacks.
+
+**v2.37** (Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE, 2006; table Data/ScnOps/ops_v237.tsv):
+encrypted as v2.45's, by a `.riox` stub over `.text` alone (0x57630 bytes at 401000, the key
+from 0x0A1DC0F8, ~crc 0xA08BD6C8, then 457FDE). Decrypted, its interpreter is laid out as
+v2.45's (a context register, handlers inside the interpreter's function): 568 opcodes, v2.47's
+operands but for 04EC, 055A and 055B, which are v2.34's, and five of v2.34's that v2.47 lacks.
+Its handlers are the newer ones too: below 2.35 (`ScnVm.OldEngine`) the player takes v2.34's
+handlers where they differ (a task wait ends the frame, names are read up to `}`, `051E`
+invalidates); v2.37's scripts read the clock twice in a row expecting the same value (`03BD`), as
+the newer engines give it.
 
 Of the 704 opcodes both builds know, 699 have the same signature; 0x02DB (varargs, overridden),
 0x04E7, 0x05D5, 0x05D6, 0x0C30 differ (Oreimo is the older engine). Either table decodes Oreimo's
@@ -1265,6 +1292,32 @@ the functions they call from the decompile. First findings:
   frame takes 8-13 ms on one core.
 
 ### The games of 2026-11-04 (ScnVm)
+
+- v2.33 (Cleavage, ScnVm.Engine233.cs): `0029 ms` sleeps the task as `0028`; `0263` is a gosub
+  by index (a switch table as `0259`'s: it pushes the return and goes to the target; an index out
+  of the table is an error). `06DD` / `06DE stream, ms, d` are the old music fades (CLEAVAGE.EXE
+  43F5B0): the volume moves by d (0 = 1) a step every (max(ms / 5, 1) + 1) * 5 ms, up to 100,
+  where the fade ends, or below 0, where the stream stops; a paused stream does not count. The
+  movies of MovieMode 0 and 1 are drawn onto the window: `0578` the rectangle, `0579` opens and
+  plays, `057F` the position (0 until it plays), `057E` the state (0x20E playing, 0x20D stopped),
+  `057A` stops; `07BE` waits for a message, `09CF` chooses MCI or DirectShow. `03B6` is read as
+  v2.34's clock reads (a second read in one frame waits for the next frame).
+- `04C8` / `04CB` before 2.40 (aoj.EXE 0x411290, YODUMA.EXE 0x41F79A): a missing frame is no
+  error; the handler stores a rectangle the lookup did not write, the last one found here.
+  Yoyogi's START asks for frames system.s25 lacks.
+- v2.37 (Tekoire Princess!, read in YODUMA.EXE): `000E slot` / `0011 slot` set the slot's flags
+  to 0 (it stops where it is) / 1 (it goes on from there; an error for a slot no label was
+  given); `0263` is v2.33's; `06DD` / `06DE s, ms, d` are `06EC` with d and the target 100 / with
+  -d and the target 0; `FDF2`, `FE06` and `FE10` read their operand and do nothing (v2.47 has
+  handlers of its own for them, not read yet: the player takes v2.37's below 2.40 only).
+- The clock below 2.40: a task that reads `03BD` or `03B6` again where it read it last, in the
+  same frame, waits for the next frame (Tekoire Princess!'s START waits 30 ms in a loop on
+  `03BD` alone and its title polls `03B6` until it changes; Yoyogi's START reads `03BD` at two
+  places in a row wanting the same value, which it gets).
+- `04EF x, y, w, h` / `04F1 sx, sy` (Oreimo 0x4254B9 / 0x42553D) set where and how large the
+  picture is shown (w, h -1: to the window's edges), the counterparts of `04EE` / `04F0`; the
+  host places and scales the picture itself, so they change nothing (Imouto Smile's START gives
+  its saved zoom).
 
 - `049D v` sets and `049C v` reads an engine flag (REMPLUS.EXE 0x423340 / 0x423320: 0xD0AD3C);
   the Guilty and Material games' START set it from RIO.INI's MouseLR_Change. `04E7 mode, a, b, c`

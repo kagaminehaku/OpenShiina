@@ -275,6 +275,21 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], BitConverter.SingleToInt32Bits(1f));
             return 0;
         });
+        // 04EF x, y, w, h / 04F1 sx, sy (Oreimo 0x4254B9 / 0x42553D): set them (w, h -1: to the
+        // window's right and bottom; the scale sets w and h too). The host places and scales the
+        // picture itself, so they change nothing here (Imouto Smile's START gives its saved zoom)
+        Register(0x04EF, (vm, c, i) =>
+        {
+            foreach (var arg in i.Args)
+                vm.Value(c, arg);
+            return 0;
+        });
+        Register(0x04F1, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            vm.Value(c, i.Args[1]);
+            return 0;
+        });
     }
 
     private int AddSubtract(ScnContext c, ScnInstruction i, bool add)

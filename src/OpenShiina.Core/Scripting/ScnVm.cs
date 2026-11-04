@@ -272,6 +272,7 @@ public sealed partial class ScnVm : IDisposable
         RegisterMenus();
         RegisterEngine250();
         RegisterEngine234();
+        RegisterEngine233();
     }
 
     public ScnContext Slot(int index) => m_slots[index];
@@ -279,18 +280,35 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>Adds (or replaces) an opcode outside the core.</summary>
     public void Register(int op, OpHandler handler) => m_handlers[op] = handler;
 
-    // Handlers of the engines before 2.40 (v2.34) where theirs differ from the later ones'
+    // Handlers of the old engines (v2.34, v2.33) where theirs differ from the later ones'
     private readonly Dictionary<int, OpHandler> m_handlers234 = new();
 
-    /// <summary>A handler for engines before 2.40 only (EngineVersion below 240), in place of the later one.</summary>
+    /// <summary>
+    /// The old engines, v2.34 and v2.33 (Ao no Juuai, Ayakashibito, Cleavage): their own handlers
+    /// (Register234), names read up to their first '}', and a frame that ends where a task waits.
+    /// v2.37 (Yoyogi Hitozuma Senmon Gakuin) is not one: its operands are v2.47's but for three
+    /// opcodes, and its scripts read the clock twice in a row expecting the same millisecond,
+    /// which 2.34's rule of a clock read again waiting for the next frame never gives.
+    /// </summary>
+    public bool OldEngine => EngineVersion < 235;
+
+    /// <summary>A handler for the old engines only (<see cref="OldEngine"/>), in place of the later one.</summary>
     public void Register234(int op, OpHandler handler) => m_handlers234[op] = handler;
+
+    // Handlers of the engines before 2.40 only, for opcodes the later ones have handlers of their
+    // own for that the player does not have
+    private readonly Dictionary<int, OpHandler> m_handlersBefore240 = new();
+
+    public void RegisterBefore240(int op, OpHandler handler) => m_handlersBefore240[op] = handler;
 
     /// <summary>Whether this engine version (<see cref="EngineVersion"/>) runs the opcode (tools/ScnTools opcheck).</summary>
     public bool HasHandler(int op) => HandlerFor(op) != null;
 
     /// <summary>The handler of an opcode for this engine version.</summary>
     private OpHandler? HandlerFor(int op) =>
-        EngineVersion < 240 && m_handlers234.TryGetValue(op, out var old) ? old : m_handlers.GetValueOrDefault(op);
+        OldEngine && m_handlers234.TryGetValue(op, out var old) ? old
+            : EngineVersion < 240 && m_handlersBefore240.TryGetValue(op, out var before) ? before
+            : m_handlers.GetValueOrDefault(op);
 
     #region Memory
 
@@ -695,7 +713,7 @@ public sealed partial class ScnVm : IDisposable
             PumpMessages();
             // 2.34 shows its pictures as it goes and takes time only where a task waits (0028, 03BE,
             // the mouse read again): a frame ends there, not at the first picture
-            if ((EngineVersion < 240 ? m_taskWaited : FrameShown) && !m_textWentOn)
+            if ((OldEngine ? m_taskWaited : FrameShown) && !m_textWentOn)
                 break;
         }
         return !QuitRequested;
@@ -983,12 +1001,12 @@ public sealed partial class ScnVm : IDisposable
                 // Gui's v2.45, whose START declares the local "{ret_flag}"). 2.34 (aoj.EXE
                 // 0x40D635) goes on to the 0 for every name and names it up to the first '}'
                 // ("{ret_flag}" is "{ret_flag")
-                bool whole = declaration && EngineVersion >= 240;
+                bool whole = declaration && !OldEngine;
                 int start = p;
                 while (ReadByte(p) != 0 && (whole || ReadByte(p) != (byte)'}'))
                     p++;
                 string name = Encodings.cp932.GetString(ReadBytes(start, p - start));
-                if (EngineVersion < 240)
+                if (OldEngine)
                     while (ReadByte(p) != 0)
                         p++;
                 p++;

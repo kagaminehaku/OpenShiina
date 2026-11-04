@@ -30,10 +30,12 @@ public sealed partial class ScnVm
     private readonly HashSet<int> m_virtualBlocks = new();
 
     // WM_PAINTs that showed the window (Paint), those of each task's 07D1, and the frame and count
-    // of the latter each task last read the clock (03BD) at
+    // of the latter each task last read the clock (03BD) at, and where
     private int m_paints;
     private readonly Dictionary<int, int> m_taskPaints = new();
-    private readonly Dictionary<int, (int Frame, int Paints)> m_clockReads = new();
+    private readonly Dictionary<int, (int Frame, int Paints, int Pc)> m_clockReads = new();
+    // The frame and place each task last read timeGetTime (03B6) at
+    private readonly Dictionary<int, (int Frame, int Pc)> m_timeReads = new();
 
     private void RegisterWindow()
     {

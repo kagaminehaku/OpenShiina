@@ -752,6 +752,21 @@ public sealed partial class ScnVm
         return (x, y, x + Read32(f), y + Read32(f + 4));
     }
 
+    private (int L, int T, int R, int B) m_lastFrameRect;
+
+    /// <summary>
+    /// <see cref="FrameRect"/> as 04C8 and 04CB take it. Before 2.40 a missing frame is no error:
+    /// the handler (aoj.EXE 0x411290, v2.34; YODUMA.EXE 0x41F79A, v2.37) stores a rectangle on the
+    /// stack that the frame lookup (0x40AA40; 0x40CF50) leaves unwritten, which here is the last
+    /// one found (Yoyogi Hitozuma Senmon Gakuin's START asks for frames system.s25 lacks).
+    /// </summary>
+    public (int L, int T, int R, int B)? FrameRectOrLast(int slot, int frame)
+    {
+        if (FrameRect(slot, frame) is { } r)
+            return m_lastFrameRect = r;
+        return EngineVersion < 240 ? m_lastFrameRect : null;
+    }
+
     /// <summary>
     /// FUN_004114B0: from the highest priority down (unsigned; shown or not), the first entry
     /// whose frame has a run of method 1 or more under (x, y) gives <paramref name="hit"/> = its
@@ -987,10 +1002,11 @@ public sealed partial class ScnVm
             return 0;
         });
         // 04C8 slot, frame, l, t, r, b: the frame's rectangle (its offset and size); 04CB slot,
-        // frame, w, h: its size (FUN_004116A0; a missing frame is a script error)
+        // frame, w, h: its size (FUN_004116A0; a missing frame is a script error). Before 2.40 a
+        // missing frame is no error (see FrameRectOrLast)
         Register(0x04C8, (vm, c, i) =>
         {
-            if (vm.FrameRect(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1])) is not { } r)
+            if (vm.FrameRectOrLast(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1])) is not { } r)
                 return 2;
             vm.Store(c, i.Args[2], r.L);
             vm.Store(c, i.Args[3], r.T);
@@ -1000,7 +1016,7 @@ public sealed partial class ScnVm
         });
         Register(0x04CB, (vm, c, i) =>
         {
-            if (vm.FrameRect(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1])) is not { } r)
+            if (vm.FrameRectOrLast(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1])) is not { } r)
                 return 2;
             vm.Store(c, i.Args[2], r.R - r.L);
             vm.Store(c, i.Args[3], r.B - r.T);
@@ -1036,7 +1052,7 @@ public sealed partial class ScnVm
             {
                 vm.PresentedByDirect3D(v[1], v[2], v[1] + v[3], v[2] + v[4]);
                 // v2.34's 051E (aoj.EXE 0x418BF0) invalidates what it drew into surface 0 itself
-                if (vm.EngineVersion < 240)
+                if (vm.OldEngine)
                     vm.InvalidateWindow(Math.Min(v[1], v[1] + v[3]), Math.Min(v[2], v[2] + v[4]), Math.Max(v[1], v[1] + v[3]), Math.Max(v[2], v[2] + v[4]));
                 vm.FrameShown = true;
             }

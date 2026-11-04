@@ -77,7 +77,8 @@ public sealed partial class ScnVm
     // (CANFES.EXE, v2.47: START 0x004EE wants v ^ 306723180 = -1948973168), Saimin Seikatsu
     // (SAIMIN.EXE, v2.47: START 0x00484 wants v ^ 306723180 = -628140931), Doushite Daite Kurenai
     // no!? (DODAKURE.EXE, v2.50: START 0x006A6 wants v ^ 306723180 = -1421357033), Nakadashi
-    // Trilogy's Miko Dashi (MIKODS.EXE, v2.47: START 0x0037A wants v ^ 306723180 = 228471671)
+    // Trilogy's Miko Dashi (MIKODS.EXE, v2.47: START 0x0037A wants v ^ 306723180 = 228471671), Imouto
+    // Smile (IMOSMILE.EXE, v2.47: START 0x003C4 wants v ^ 306723180 = 969238634)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -87,6 +88,7 @@ public sealed partial class ScnVm
         ["Saimin Seikatsu"] = 306723180 ^ -628140931,
         ["Doushite Daite Kurenai no!?"] = 306723180 ^ -1421357033,
         ["Nakadashi Trilogy"] = 306723180 ^ 228471671,
+        ["Imouto Smile"] = 306723180 ^ 969238634,
     };
 
     private void RegisterSystem()

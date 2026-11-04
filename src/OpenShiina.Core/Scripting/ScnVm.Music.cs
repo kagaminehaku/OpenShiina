@@ -49,6 +49,8 @@ public sealed partial class ScnVm
         // StopAtEnd and it went down), the time the last step was due; StepMs 0: none
         public int FadeStepMs, FadeDelta, FadeTarget;
         public bool FadeStopAtEnd;
+        /// <summary>v2.33's fade (06DD / 06DE): no target, it ends past 100 or 0.</summary>
+        public bool FadeOld;
         public uint FadeDue;
     }
 
@@ -72,6 +74,23 @@ public sealed partial class ScnVm
     private IScnMusic? Music => m_host.Music;
 
     private MusicStream? Stream(int handle) => m_music.GetValueOrDefault(handle);
+
+    /// <summary>
+    /// 06EC's fade: the volume goes by delta (0: -1) every ms (counted in 5 ms ticks) until it
+    /// reaches target (0-100); going down to a target without bit 31 the stream stops there.
+    /// Nothing for a stream not playing or already at the target.
+    /// </summary>
+    private void FadeTo(MusicStream? s, int ms, int delta, int target)
+    {
+        if (s == null || (s.Status & 1) == 0 || s.Volume == (target & 0x7FFFFFFF))
+            return;
+        s.FadeStepMs = Math.Max((int)((uint)ms / 5), 1) * 5;
+        s.FadeDelta = delta == 0 ? -1 : delta;
+        s.FadeTarget = target & 0x7FFFFFFF;
+        s.FadeStopAtEnd = target >= 0;
+        s.FadeOld = false;
+        s.FadeDue = Clock + (uint)s.FadeStepMs;
+    }
 
     private void RegisterMusic()
     {
@@ -196,13 +215,23 @@ public sealed partial class ScnVm
         {
             var s = vm.Stream(vm.Value(c, i.Args[0]));
             int ms = vm.Value(c, i.Args[1]), delta = vm.Value(c, i.Args[2]), target = vm.Value(c, i.Args[3]);
-            if (s == null || (s.Status & 1) == 0 || s.Volume == (target & 0x7FFFFFFF))
-                return 0;
-            s.FadeStepMs = Math.Max((int)((uint)ms / 5), 1) * 5;
-            s.FadeDelta = delta == 0 ? -1 : delta;
-            s.FadeTarget = target & 0x7FFFFFFF;
-            s.FadeStopAtEnd = target >= 0;
-            s.FadeDue = vm.Clock + (uint)s.FadeStepMs;
+            vm.FadeTo(s, ms, delta, target);
+            return 0;
+        });
+        // 06DD s, ms, d / 06DE s, ms, d (YODUMA.EXE 0x41B7D0 / 0x41B840, v2.37): 06EC with d and
+        // the target 100 / with -d and the target 0 (v2.34 and older: ScnVm.Engine233.cs)
+        Register(0x06DD, (vm, c, i) =>
+        {
+            var s = vm.Stream(vm.Value(c, i.Args[0]));
+            int ms = vm.Value(c, i.Args[1]), delta = vm.Value(c, i.Args[2]);
+            vm.FadeTo(s, ms, delta, 100);
+            return 0;
+        });
+        Register(0x06DE, (vm, c, i) =>
+        {
+            var s = vm.Stream(vm.Value(c, i.Args[0]));
+            int ms = vm.Value(c, i.Args[1]), delta = vm.Value(c, i.Args[2]);
+            vm.FadeTo(s, ms, -delta, 0);
             return 0;
         });
         // 06E3 s, v (aoj.EXE 0x41D460 -> FUN_0043f860): v = the volume (0-100; -1 without a stream)
@@ -289,7 +318,29 @@ public sealed partial class ScnVm
             for (int steps = 0; s.FadeStepMs > 0 && Clock - s.FadeDue < 0x80000000u && steps < 1000; steps++)
             {
                 s.FadeDue += (uint)s.FadeStepMs;
+                // v2.33's timer counts no ticks while the stream is paused
+                if (s.FadeOld && (s.Status & 4) != 0)
+                    continue;
                 s.Volume += s.FadeDelta;
+                if (s.FadeOld)
+                {
+                    if (s.Volume > 100)
+                    {
+                        s.Volume = 100;
+                        s.FadeStepMs = 0;
+                    }
+                    else if (s.Volume < 0)
+                    {
+                        s.FadeStepMs = 0;
+                        if (s.Handle != 0)
+                            Music?.Stop(s.Handle);
+                        s.Status = 0;
+                        continue;
+                    }
+                    if (s.Handle != 0)
+                        Music?.SetVolume(s.Handle, s_musicVolumes[Math.Clamp(s.Volume, 0, 100)]);
+                    continue;
+                }
                 bool reached = s.FadeDelta > 0 ? s.Volume >= s.FadeTarget : s.Volume <= s.FadeTarget;
                 if (reached)
                 {

@@ -225,6 +225,29 @@ public sealed partial class ScnVm
             vm.TasksChanged();
             return 0;
         });
+        // 000E slot / 0011 slot (YODUMA.EXE 0x41CDE2 / 0x41CEE5, v2.37): the slot's flags 0 (it stops
+        // where it is) / 1 (it goes on from there); 0011 on a slot no label was given is an error
+        Register(0x000E, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]);
+            if (slot is < 0 or > 256)
+                return 2;
+            vm.m_slots[slot].Flags = 0;
+            vm.TasksChanged();
+            return 0;
+        });
+        Register(0x0011, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]);
+            if (slot is < 0 or > 256)
+                return 2;
+            var s = vm.m_slots[slot];
+            if (s.CodeBase == 0)
+                return 2;
+            s.Flags = 1;
+            vm.TasksChanged();
+            return 0;
+        });
         // 001E / 001F: set / clear task flag 4
         Register(0x001E, (vm, c, i) => { c.Flags |= 4; return 0; });
         Register(0x001F, (vm, c, i) => { c.Flags &= ~4; return 0; });
@@ -486,22 +509,42 @@ public sealed partial class ScnVm
         // 03BD v: the time in ms. The engine's clock runs on while it paints the window; here it
         // moves between frames, so a task that has painted (07D1) since it last read the clock in
         // this frame waits for the next one (The Pillagers of Raillore's title fades in a loop
-        // that draws, paints and reads the clock until 500 ms have passed, with no other wait)
+        // that draws, paints and reads the clock until 500 ms have passed, with no other wait).
+        // Before 2.40 a task that reads it again where it read it last, in the same frame, waits
+        // too: Tekoire Princess!'s START (v2.37) waits 30 ms in a loop on the clock alone, and
+        // Yoyogi Hitozuma Senmon Gakuin's reads it at two places in a row wanting the same value
         Register(0x03BD, (vm, c, i) =>
         {
             int paints = vm.m_taskPaints.GetValueOrDefault(c.Slot);
-            if (vm.m_clockReads.TryGetValue(c.Slot, out var read) && read.Frame == vm.m_frameNumber && read.Paints != paints)
+            if (vm.m_clockReads.TryGetValue(c.Slot, out var read) && read.Frame == vm.m_frameNumber &&
+                (read.Paints != paints || vm.EngineVersion < 240 && read.Pc == c.Current))
             {
                 c.Pc = c.Current;
                 vm.FrameShown = true;
                 return 3;
             }
-            vm.m_clockReads[c.Slot] = (vm.m_frameNumber, paints);
+            vm.m_clockReads[c.Slot] = (vm.m_frameNumber, paints, c.Current);
             vm.Store(c, i.Args[0], (int)vm.Clock);
             return 0;
         });
-        // 03B6 v: timeGetTime (Oreimo FUN_0041CE30), the clock 03BD reads (Hitozuma Gui's movies)
-        Register(0x03B6, (vm, c, i) => { vm.Store(c, i.Args[0], (int)vm.Clock); return 0; });
+        // 03B6 v: timeGetTime (Oreimo FUN_0041CE30), the clock 03BD reads (Hitozuma Gui's movies).
+        // Before 2.40 a task that reads it again where it read it last, in the same frame, waits
+        // for the next one: Tekoire Princess!'s title (v2.37) polls it until it changes
+        Register(0x03B6, (vm, c, i) =>
+        {
+            if (vm.EngineVersion < 240)
+            {
+                if (vm.m_timeReads.TryGetValue(c.Slot, out var read) && read == (vm.m_frameNumber, c.Current))
+                {
+                    c.Pc = c.Current;
+                    vm.FrameShown = true;
+                    return 3;
+                }
+                vm.m_timeReads[c.Slot] = (vm.m_frameNumber, c.Current);
+            }
+            vm.Store(c, i.Args[0], (int)vm.Clock);
+            return 0;
+        });
         // 0320 n, ms / 0321 n, v (Oreimo FUN_0041CD20 / FUN_0041CD50): timer n's period (0: 1) /
         // its start, at v and the time now; 0322-0325 would read them (Hitozuma Gui sets one up
         // before a movie and reads it with none of them)

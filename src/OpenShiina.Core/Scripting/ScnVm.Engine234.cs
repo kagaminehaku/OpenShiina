@@ -103,12 +103,13 @@ public sealed partial class ScnVm
             }
             return 0;
         });
-        // The mouse (0456 position, 0458 buttons) and the time (03BD, 03BC): 2.34's menus and
+        // The mouse (0456 position, 0458 buttons) and the time (03BD, 03BC; 03B6, timeGetTime,
+        // which Cleavage's (v2.33) title polls until it changes): 2.34's menus and
         // transitions poll them in a loop until they change - the engine runs it as fast as it
         // can (its main loop takes a step of every task and pumps the window's messages only
         // after 0033) and a frame ends only where a task waits (RunFrame). Both change between
         // frames here, so a task that reads one again in a frame waits for the next one
-        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC })
+        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6 })
         {
             var later = m_handlers[op];
             Register234(op, (vm, c, i) =>

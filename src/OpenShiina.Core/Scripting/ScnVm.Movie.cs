@@ -38,6 +38,8 @@ public sealed partial class ScnVm
         public bool Target;
         public int X, Y;
         public int DirectSurface = -1;
+        /// <summary>v2.33's movie window (0579): its frames drawn into the game window there, not into a surface.</summary>
+        public ScreenArea? Window;
         public byte[]? LastRows;
         /// <summary>The movie's sound as a WAVE (null when it has none) and its music stream while it plays.</summary>
         public byte[]? Wave;
@@ -52,7 +54,7 @@ public sealed partial class ScnVm
     private Movie? MovieSlot(int n) => n is >= 0 and < MovieSlots ? m_movies[n] : null;
 
     /// <summary>A movie of either player runs (ScnBoot's sweep does not count its time as standing still).</summary>
-    public bool MoviePlaying => m_movies.Any(m => m.State == 3) || m_graphMovies.Any(m => m.State == 3);
+    public bool MoviePlaying => m_movies.Any(m => m.State == 3) || m_graphMovies.Any(m => m.State == 3) || m_windowMovie.State == 3;
 
     /// <summary>
     /// Opens the movie file of a record (FUN_0040B450); false when it cannot be played. A
@@ -205,7 +207,9 @@ public sealed partial class ScnVm
                 break;
             movie.Decoded++;
         }
-        if (frame != null)
+        if (frame != null && movie.Window is { } area)
+            DrawMovieToWindow(frame, area);
+        else if (frame != null)
             DrawMovieFrame(movie, frame);
         else if (movie.Decoded <= due)
         {

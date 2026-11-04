@@ -70,17 +70,24 @@ public sealed partial class ScnVm
         // Saimin Seikatsu START 72760: 76 x 56 from blocks of 10 x 10
         RegisterNative("B51FD501F22CF51D019EF26160C1C35D6154CB2C", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 9, 84, 63));
         RegisterNative("13CE585B31BB34E5FA674268BD852030B126B3E6", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 76, 56));
+        // Imouto Smile START 6D500: 80 x 60 from blocks of 10 x 10
+        RegisterNative("98EF46C517E4F797E130C2D3003A186ACE788B2F", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 80, 60));
         // Shojo Mama START 6DF9F (v2.49; Miko Dashi's 63DD0, v2.47, "ret 4"): 104 x 78 from blocks
         // of 7 x 7; Bloody Rondo START A224F (v2.48): 244 x 183 from blocks of 3 x 3
         RegisterNative(["406D794CB83B2D60453AF6F8308F363D17998154", "E911B635E098CED69A383DEBA48A1FED4FFDA179"], "thumbnail",
                        (vm, c, a) => vm.Thumbnail(c, a, 7, 104, 78));
         RegisterNative("B989AD7F42B182825C37945A4E8FDB2D4805E5F9", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 3, 244, 183));
+        // Cleavage START 2901E (v2.33): 96 x 72 from blocks of 8 x 8, Azu Plus's code
+        RegisterNative("EB31FA3CE0C4767074D322AC5A636A0B5C68D427", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 8, 96, 72));
         // The rows of those thumbnails from l[0] (one after the other) to l[1], 2,400 bytes apart:
         // Shojo Mama 6E233 (78 rows of 312 bytes; Miko Dashi 64143), Bloody Rondo A2581 (183 of 732)
         RegisterNative(["051CABA443EBCE28334111E6AF738B88F7FA7EB3", "C003D60A4E7F37520E7404C93B6592FCB4123B9A"], "rows 104 x 78", (vm, c, a) =>
             vm.CopyRows(c, a, vm.NativeArg(a, 1), 2400, vm.NativeArg(a, 0), 312, 78, 312));
         RegisterNative("6BA61D3CAF2525A790BFE440BE6267D30CD8BC65", "rows 244 x 183", (vm, c, a) =>
             vm.CopyRows(c, a, vm.NativeArg(a, 1), 2400, vm.NativeArg(a, 0), 732, 183, 732));
+        // Cleavage 29313: 72 rows of 288 bytes
+        RegisterNative("C4E2EF445D41ADB0A605D700A9FD74D4FD8C18F7", "rows 96 x 72", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 2400, vm.NativeArg(a, 0), 288, 72, 288));
         // Doushite Daite Kurenai no!? START 8822F: 232 x 174 from blocks of 3 x 3 (the rest left out)
         RegisterNative("EFC1A7C2555C74261AD0BADB864569B4BF210B9D", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 3, 232, 174));
         // Chuuchuu Nurse START 70036AF3 / 70036B67 (v2.45): 160 x 120 from blocks of 5 x 5, and the
@@ -191,9 +198,11 @@ public sealed partial class ScnVm
         RegisterNative("62C3E0DAEA9FBD9D4945C17A3F12DBC00A96F7FA", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 238, 133));
         // The save thumbnails of the 1280 x 720 games (24-bit pictures, rows of 3,840 bytes):
         // Shinigami no Testament START 8255F, 116 x 65 from blocks of 11 x 11; Tojita Sekai no Tori
-        // Colony START 8824F, 240 x 135 from blocks of 5 x 5. Arguments as Gensou no Idea's
+        // Colony START 8824F, 240 x 135 from blocks of 5 x 5; Love & Piss START 82F2F, 232 x 130 from
+        // blocks of 5 x 5. Arguments as Gensou no Idea's
         RegisterNative("F9C7EC158AD7FFF292E04686FA8D4254D94CEFF1", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 11, 116, 65, 3840));
         RegisterNative("75728C1CF427254DADD9B1E12944A9352FA74A7B", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 240, 135, 3840));
+        RegisterNative("5AFCED6431EF9C381EDAAE59D1055B5F3DE655F7", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 5, 232, 130, 3840));
         // Rows of a thumbnail from l[0] (one after the other) to l[1]: Testament 82648, 65 rows of 348
         // bytes, 3,840 apart; Tori Colony 884E3, 135 of 720, 3,840 apart, and 8852E, l[2] apart;
         // Kanojo ga Ore ni Kureta Mono 909A4, 84 rows of 450 bytes, 3,072 apart
@@ -249,22 +258,11 @@ public sealed partial class ScnVm
             vm.WriteBytes(dst, output);
         });
         // Hana to Otome ni Shukufuku o Royal Bouquet 4CAEC: 892,740 dwords at l[1] XORed with a key
-        // from l[0], after each the key + 1, rotated left by 3, its bytes reversed
-        RegisterNative("B4937B7F8A71BA951426F3E44AC8D0ED313E669A", "xor stream", (vm, c, a) =>
-        {
-            const int Count = 0xD9F44;
-            uint key = (uint)vm.NativeArg(a, 0);
-            int at = vm.NativeArg(a, 1);
-            using var verify = vm.VerifyRegion(c, a, at, Count * 4);
-            var bytes = vm.ReadBytes(at, Count * 4);
-            var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytes.AsSpan());
-            for (int i = 0; i < words.Length; i++)
-            {
-                words[i] ^= key;
-                key = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Numerics.BitOperations.RotateLeft(key + 1, 3));
-            }
-            vm.WriteBytes(at, bytes);
-        });
+        // from l[0], after each the key + 1, rotated left by 3, its bytes reversed; Tekoire
+        // Princess! 2FEBC: 1,734,936 dwords; Imouto Smile 6D5EC: 1,317,920
+        RegisterNative("B4937B7F8A71BA951426F3E44AC8D0ED313E669A", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0xD9F44));
+        RegisterNative("9598BC877F66A2208AD03940D710BD0620B464F4", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x1A7518));
+        RegisterNative("A470F7A6AA684E2AF9F1EBF445D60C63C4269657", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x141C20));
         // Raillore EFCLIB 92F0 (Tojita Sekai no Tori Colony EFCLIB 666C, other padding): l[1] dwords at
         // l[0] inverted (XOR FFFFFFFF); a count under 1 runs as x86 code
         RegisterNative(["F79705977D2B17A02E3A733E04EF5BA87A031A92", "C4E79AD74DF00F25B64339C72CF808E9E7627276"], "invert dwords", (vm, c, a) =>
@@ -373,9 +371,13 @@ public sealed partial class ScnVm
         RegisterNative("9721452713208958DEE71DA51F85540180359028", "block", (vm, c, a) => vm.BlockCopy(c, a, 12, 48, 2400));
         RegisterNative("C4839FCEF4CF13538D043A595B66E1D7B9B04E21", "block", (vm, c, a) => vm.BlockCopy(c, a, 90, 480, 3840));
         RegisterNative("0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
+        // Imouto Smile START 6D8C0: 60 rows of 240 bytes, l[2] apart
+        RegisterNative("BEEA1D31822C5C23C3EACC3DBE9424F89897724B", "block", (vm, c, a) => vm.BlockCopy(c, a, 60, 240, vm.NativeArg(a, 2)));
         // Chiccha na Hanayome B9224 / B9270: 75 rows of 396 bytes, 3840 apart / l[2] apart;
-        // Doushite Daite Kurenai no!? 884C3: 174 rows of 696 bytes, 2400 apart (its thumbnail)
+        // Doushite Daite Kurenai no!? 884C3: 174 rows of 696 bytes, 2400 apart (its thumbnail); Love &
+        // Piss 831C3: 130 rows of 696 bytes, 3840 apart
         RegisterNative("D8A858C959C1C8906AF1F02A9BF4F2B2AC6940E4", "block", (vm, c, a) => vm.BlockCopy(c, a, 174, 696, 2400));
+        RegisterNative("D9795CF83BFC96E0F066C4BFA6DF8DA484186E3D", "block", (vm, c, a) => vm.BlockCopy(c, a, 130, 696, 3840));
         RegisterNative("8477782400863E751B269B913DC8D4319F6F5BDF", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 396, 3840));
         RegisterNative("1253D6DD445B3CE501A06A6ED7C8F50CC32F44BF", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 396, vm.NativeArg(a, 2)));
         // Can Fes! START 71583: 51 rows of 204 bytes, 2400 apart (its 68 x 51 thumbnail into an
@@ -554,13 +556,14 @@ public sealed partial class ScnVm
                 vm.MoveMemory(dst + y * sd, src + y * ss, (int)rowBytes);
         });
 
-        // EFCLIB 1E9E (Re: Rem Plus 2792; Bitch Gakuen and Shimai 285A, Ao no Juuai 1978, Ran→Sem and Boku Igai 2074: other padding): the
+        // EFCLIB 1E9E (Re: Rem Plus 2792; Bitch Gakuen and Shimai 285A, Ao no Juuai 1978, Ran→Sem and Boku Igai 2074, Cleavage 1973: other padding): the
         // negative and other fills: l[3] dwords from l[4] to l[0], each XORed with l[5]'s byte in
         // every byte
         RegisterNative(["EB59CB1AF7084D666150A58C5866638D49AAC562", "BD87E97A68BDF28ECD10B4E3EBDBD6799D5A0F1D",
                         "997E3DD49B9B61739720F69D2E180ADAC4C9D884", "D299BA54CDEF926F62CDC0733BC018D56CDA54D5",
                         "683B763EC4CA9666F13D288DF45400CB2F498B4E", "D7BB0B77AF051FEA644DBDCBAB9E624522D31AF8",
-                        "1FD120C0ED9408FF1CFA70D8D389AE41A6C97FD9", "0AFC04E0141EBB21410CD23BEFECF1869702A705"], "xor32", (vm, c, a) =>
+                        "1FD120C0ED9408FF1CFA70D8D389AE41A6C97FD9", "0AFC04E0141EBB21410CD23BEFECF1869702A705",
+                        "17C12A8F901EFC316D09685A7A84F78F067502D2"], "xor32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
             uint count = (uint)vm.NativeArg(a, 3), v = (uint)vm.NativeArg(a, 5);
@@ -577,10 +580,10 @@ public sealed partial class ScnVm
         });
 
         // EFCLIB 54A0 / 549E / 6D79 (Chiccha na Hanayome 7766, Yoyogi Hitozuma Senmon Gakuin 3F54,
-        // other padding): l[1] dwords at l[0] inverted in place
+        // Love & Piss 6693, other padding): l[1] dwords at l[0] inverted in place
         RegisterNative(["4158148EFBFBC3AA4CE88FF4D6D5D2B9C5707615", "8DC1060C677A722C3CACF4865B7E506824EB7942",
                         "863B772CB1F64D67213C7F27F74AEEC6471CBD3A", "98CFC5C0D6A29A93EC9E2A728E0017AEE4027AE1",
-                        "459983DF2974D9D4EE797EEC75AAC21D02DC41C9"], "invert32", (vm, c, a) =>
+                        "459983DF2974D9D4EE797EEC75AAC21D02DC41C9", "13C8A2EA74D9219B5D33A3F1C2B47AE8D9B9B8FA"], "invert32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0);
             uint count = (uint)vm.NativeArg(a, 1);
@@ -1052,7 +1055,8 @@ public sealed partial class ScnVm
         // B's, between them t = ((m - l[4]) * q >> 8) & 255 (16-bit words) mixes
         // (A * ((-t) & 255) + B * t) >> 8. q is the dword 0x10000 / l[5] put in both halves of a
         // dword (when it is 0x10000 the words alternate 0 and 1)
-        RegisterNative("5A3FAD758A876FE96A7F5B31B97E9D27CEF8C1D4", "rule wipe", (vm, c, a) =>
+        // Cleavage START 290D0 (v2.33) is the same code with other padding
+        RegisterNative(["5A3FAD758A876FE96A7F5B31B97E9D27CEF8C1D4", "0493BD7B4F8D747B0470A7B98BCF1DF1F15FB3DE"], "rule wipe", (vm, c, a) =>
         {
             const int Pixels = 360000;
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2), pm = vm.NativeArg(a, 3);
@@ -1321,6 +1325,21 @@ public sealed partial class ScnVm
             ReadBytes(src + y * srcStride, row);
             WriteBytes(dst + y * dstStride, row);
         }
+    }
+
+    private void XorStream(ScnContext c, ScnNativeArgs a, int count)
+    {
+        uint key = (uint)NativeArg(a, 0);
+        int at = NativeArg(a, 1);
+        using var verify = VerifyRegion(c, a, at, count * 4);
+        var bytes = ReadBytes(at, count * 4);
+        var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytes.AsSpan());
+        for (int i = 0; i < words.Length; i++)
+        {
+            words[i] ^= key;
+            key = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Numerics.BitOperations.RotateLeft(key + 1, 3));
+        }
+        WriteBytes(at, bytes);
     }
 
     private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int stride = 2400) =>

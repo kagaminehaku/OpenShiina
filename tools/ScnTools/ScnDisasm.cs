@@ -69,11 +69,11 @@ static class ScnDisasm
                 {
                     int s = p;
                     // 03CE / 03CF's declarations read their names to the 0 (Oreimo FUN_0041D0D0)
-                    bool whole = declaration && !Version.StartsWith("2.34");
+                    bool whole = declaration && !Old;
                     while (p < b.Length && b[p] != 0 && (whole || b[p] != (byte)'}')) p++;
                     var name = Sjis.GetString(b, s, p - s);
-                    // 2.34 names it up to the first '}' and goes on to the 0
-                    if (Version.StartsWith("2.34")) while (p < b.Length && b[p] != 0) p++;
+                    // 2.34 (and 2.33) names it up to the first '}' and goes on to the 0
+                    if (Old) while (p < b.Length && b[p] != 0) p++;
                     p++;
                     return $"{pre}{(k == 0x13 ? "*" : "")}{name}";
                 }
@@ -107,6 +107,9 @@ static class ScnDisasm
     /// <summary>The engine version being disassembled ("2.34"): layouts of one version only (as ScnOpcodes).</summary>
     public static string Version = "";
 
+    // v2.34 and v2.33: names read up to their first '}', 04BD's operands as many as its flags say
+    private static bool Old => Version.StartsWith("2.34") || Version.StartsWith("2.33");
+
     /// <summary>Instructions whose length depends on a variable: decoded with the longer layout.</summary>
     public static readonly List<string> Uncertain = new();
 
@@ -130,7 +133,7 @@ static class ScnDisasm
         var sig = Overrides.TryGetValue(op, out var ov) ? ov : info.Sig;
         // 04BD of v2.34: seven operands, one more (an alpha) when the third has bits 0x60000000,
         // three more (a tint) when it has 0x20000000
-        if (op == 0x04BD && Version.StartsWith("2.34"))
+        if (op == 0x04BD && Old)
         {
             var a = new List<string>();
             for (int k = 0; k < 7; k++) a.Add(Operand(b, ref p, out _));

@@ -350,8 +350,10 @@ public sealed partial class ScnVm
                        (vm, c, a) => vm.Enlarge16Native(c, a, 257, opaque: false));
         // Hana to Otome ni Shukufuku o Royal Bouquet START 4D062 (v2.47): the same but for its weight
         // table, i * 256 / sW, and the first byte of each pixel it mixes, made FF (por with 0xFF
-        // after packuswb); the pixels it copies keep theirs. Arguments as above
-        RegisterNative("D6BC2828FE749484BEC89684F01FD4469FF9BA0C", "enlarge16 (opaque)", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: true));
+        // after packuswb); the pixels it copies keep theirs. Arguments as above. Imouto Smile START
+        // 6DB16 (v2.47), other padding
+        RegisterNative(["D6BC2828FE749484BEC89684F01FD4469FF9BA0C", "0169B9BC91EFAFDFFF4DD7F9D7796D093E121ED9"], "enlarge16 (opaque)",
+                       (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: true));
         // Nakadashi Trilogy's Miko Dashi START 64396 (v2.47): that weight table, nothing made opaque
         RegisterNative("39773A9714C8846EA6402C83B201C0FEA2A58775", "enlarge16", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: false));
         // Miko Dashi START 646B8 (MMX): the scaling-down case beside it, written out in ScnVm.ScaleArea.cs

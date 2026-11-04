@@ -142,7 +142,8 @@ host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") sw
 };
 int sweepStuck = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_STUCK"), out int stuckFrames) ? stuckFrames : 9000;
 string? sweepFile = null, sweepEnd = null, sweepLast = null, slowestAt = null;
-int sweepTotal = 0, sweepLastNew = 0;
+int sweepTotal = 0, sweepLastNew = 0, sweepLastBlock = int.MaxValue;
+bool sweepReachedEnd = false;
 long slowestMs = 0, heapPeak = 0;
 var sweepSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && playFrom.LastIndexOf(':') is > 0 and int colon)
@@ -152,7 +153,21 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && pl
     vm.PlayFrom(sweepFile, int.Parse(playFrom[(colon + 1)..]), scenarios.Select(s => s.Name).ToList());
     // Message lines as text.tsv counts them: not empty, not a comment, command or speaker
     if (scenarios.FirstOrDefault(s => s.Name.Equals(sweepFile, StringComparison.OrdinalIgnoreCase)).Data is { } scenario)
-        sweepTotal = Encoding.GetEncoding(932).GetString(scenario).Split('\n').Count(l => l.Trim() is { Length: > 0 } t && t[0] is not (';' or '$' or '【'));
+    {
+        var text = Encoding.GetEncoding(932).GetString(scenario).Split('\n');
+        static bool Message(string l) => l.Trim() is { Length: > 0 } t && t[0] is not (';' or '$' or '【');
+        sweepTotal = text.Count(Message);
+        // The first line (1-based) of the scenario's last message: lines of it shown together are
+        // not counted apart, and the game may stand at a screen of its own after it
+        int last = Array.FindLastIndex(text, Message);
+        if (last >= 0)
+        {
+            int first = last;
+            while (first > 0 && Message(text[first - 1]))
+                first--;
+            sweepLastBlock = first + 1;
+        }
+    }
     vm.LineShown += id =>
     {
         Console.WriteLine($"  [line] {id} at {host.Frame}");
@@ -163,6 +178,9 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && pl
         else
         {
             sweepLast = id;
+            // A later line may repeat an earlier one's text, so the block is kept once reached
+            if (int.TryParse(id[(id.LastIndexOf(':') + 1)..], out int line) && line >= sweepLastBlock)
+                sweepReachedEnd = true;
             if (sweepSeen.Add(id))
                 sweepLastNew = host.Frame;
         }
@@ -314,7 +332,8 @@ try
             if (vm.MoviePlaying)
                 sweepLastNew = frame;
             if (sweepEnd == null && frame - sweepLastNew > sweepStuck)
-                sweepEnd = "stuck";
+                // Standing still after the scenario's last message shows is its end
+                sweepEnd = sweepReachedEnd ? "done (end)" : "stuck";
             if (sweepEnd != null)
                 break;
         }
@@ -561,13 +580,17 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
             .ToList();
 
     // SCNBOOT_SWEEP: Ctrl held but for frames 12-35 of every 48 (a game may not let a choice be
-    // made while it skips: Ero-On), Return down 2 frames of every 12
+    // made while it skips: Ero-On), Return down 2 frames of every 12; SCNBOOT_SWEEP_FROM=frame:
+    // from that frame on (before it SCNBOOT_MOUSE's clicks, as a title's START)
     private readonly bool m_sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
+    private readonly int m_sweepFrom = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_FROM"), out int from) ? from : 0;
 
-    private bool SweepCtrl => m_sweep && Frame % 48 is < 12 or >= 36;
+    private bool Sweeping => m_sweep && Frame >= m_sweepFrom;
+
+    private bool SweepCtrl => Sweeping && Frame % 48 is < 12 or >= 36;
 
     public bool KeyDown(int virtualKey) =>
-        virtualKey is 0x11 or 0xA2 && SweepCtrl || m_sweep && virtualKey == 0x0D && Frame % 12 < 2
+        virtualKey is 0x11 or 0xA2 && SweepCtrl || Sweeping && virtualKey == 0x0D && Frame % 12 < 2
         || m_presses.Any(p => p.Key == virtualKey && Frame >= p.From && Frame <= p.To);
 
     // SCNBOOT_MOUSE: (first frame, x, y, buttons, last frame the buttons are held)
@@ -591,13 +614,13 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     /// </summary>
     public (int X, int Y)[] SweepClicks { get; set; } = [(0, 0)];
 
-    private bool SweepClicking => m_sweep && Frame % 48 is 24 or 25;
+    private bool SweepClicking => Sweeping && Frame % 48 is 24 or 25;
 
     public (int X, int Y) MousePosition
     {
         get
         {
-            if (m_sweep)
+            if (Sweeping)
                 return SweepClicks[Frame / 48 % SweepClicks.Length];
             var started = m_mouse.Where(m => m.From <= Frame).ToList();
             return started.Count > 0 ? (started[^1].X, started[^1].Y) : (0, 0);
@@ -609,9 +632,9 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     /// <summary>The window messages of this frame: keys and buttons that go down or up.</summary>
     public IEnumerable<(int Message, int WParam)> Messages()
     {
-        if (m_sweep)
+        if (Sweeping)
         {
-            if (Frame == 0 || Frame % 48 == 36)
+            if (Frame == m_sweepFrom || Frame % 48 == 36)
                 yield return (ScnMessage.KeyDown, 0x11);
             if (Frame % 48 == 12)
                 yield return (ScnMessage.KeyUp, 0x11);

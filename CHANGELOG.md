@@ -12,6 +12,21 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - The scaling-down case of the zoom of Miko Dashi, Pure Love!, Iyashinbo The Motion and
   Gakushoku no Oba-san The Motion (the v2.47 builds that keep two tables of weights) runs as C#
   code instead of x86 code.
+- **Engine versions 2.33 and 2.37 run**: their opcode tables were read from their executables
+  (YODUMA.EXE's code decrypted as its own start-up stub does it), with their handlers where they
+  differ from the later engines' (the old movie and music-fade opcodes, gosub by index, the
+  missing frames 2.37 takes without an error, the clock read in a loop).
+  **Yoyogi Hitozuma Senmon Gakuin** (代々木人妻専門学院, 2006) and **Cleavage** (2005) play
+  through; **Tekoire Princess!** (てこいれぷりんせす！, 2004) plays.
+- **New: Love & Piss** (Love＆Piss ～少女のガマンが世界を救う～, 2013) plays through: its keys were
+  taken from its executable (decrypted as its start-up stub does it), with its DecodeBin date.
+- 57 games (58 releases) now play through. **Imouto Smile** (妹スマイル, 2009) plays (its keys
+  from its executable; one scenario stands still before its last line); **S.D.I.-Sadistic
+  Daughter Incident-** and **Sadistic Little** (サディスティックりとる) have keys now, from their
+  executables, and start.
+- ScnBoot: `SCNBOOT_SWEEP_FROM` starts the sweep's keys and clicks at a frame (a title's START
+  clicked with `SCNBOOT_MOUSE` first); a scenario that stands still after a line of its last
+  message is "done (end)", not "stuck".
 
 ## 0.7.9 (2026-11-04)
 

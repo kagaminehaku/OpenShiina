@@ -1,6 +1,6 @@
 # Adding a game
 
-How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 55 releases
+How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 58 releases
 that play went through these steps; most of what goes wrong with a new one is in the table of
 symptoms below, with what fixed it before.
 
@@ -32,8 +32,8 @@ written into the game folder; the tests save in their own folders.
 ## 1. The game
 
 The engine version is in RIO.INI's first line (`[椎名里緒 v2.50]`; builds older than 2.4x name
-the .INI after the .exe: Ao no Juuai's aoj.INI). The player picks the opcode table by it (2.47,
-2.49 and 2.50 are known; 2.36 runs with 2.47's; others need a table: todo.md).
+the .INI after the .exe: Ao no Juuai's aoj.INI). The player picks the opcode table by it (2.33,
+2.34, 2.37, 2.47, 2.49 and 2.50 are known; 2.36 runs with 2.47's; others need a table: todo.md).
 
 Never run a game's executable that is not what its maker shipped (a repacked or "fixed" .exe
 can carry anything: Iyashinbo The Motion's was flagged). The archives and the scripts are all the
@@ -127,7 +127,15 @@ It stops on a script error with the opcode and where; the usual first stops:
 ## 6. The sweep
 
 `tests/sweep.ps1 -Folder <game folder>` runs every scenario from its first line with skip held
-(compatibility.md, "Sweeping"). Every scenario "done" is the goal.
+(compatibility.md, "Sweeping"). Every scenario "done" is the goal ("done (end)" too: it stood
+still after a line of its last message).
+
+A game whose story is in SCN modules and has no scenario TXT (Cleavage, Tekoire Princess!) cannot
+be swept: run it from its title in ScnBoot for a long time instead, with `SCNBOOT_SWEEP=1`,
+`SCNBOOT_SWEEP_STUCK` very large, `SCNBOOT_MOUSE` clicking the title's START (`frame:x,y:1`) and
+`SCNBOOT_SWEEP_FROM` after it, and `SCNBOOT_FILES=1` to see which modules load; a route the
+clicks never choose can be started by `SCNBOOT_FILE` (its first module read in place of the
+other route's).
 
 - **Stopped**: the scenario's log (`logs\<scenario>.txt`) says where; a missing file the scripts
   ask for (`0158`) may be one read from the wrong archive (step 2).

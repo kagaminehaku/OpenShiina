@@ -21,6 +21,7 @@ public sealed class ScnOpcodes
         [0x0281] = ["V", "V", "N2V"],   // call a label with arguments
         [0x0280] = ["N2V"],             // a called slot takes its arguments
         [0x0259] = ["SW"],
+        [0x0263] = ["SW"],              // gosub by index, the same table
         [0x0209] = ["CASE"],
         [0x02DB] = ["VARGS"],           // printf-like message
         [0x01A4] = ["V", "V", "V", "VARGS", "V"],   // DLL call: -, dll, function, arguments, result
@@ -39,6 +40,7 @@ public sealed class ScnOpcodes
     private static readonly Dictionary<string, Dictionary<int, string[]>> s_versionOverrides = new()
     {
         ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v233"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v250"] = new() { [0x009C] = ["GLYPH250"] },
     };
 
@@ -71,7 +73,11 @@ public sealed class ScnOpcodes
     /// the numbers below 0C30 are v2.49's but for 0C30's operands and 11 new ones, and the block
     /// v2.49 numbers from 0C31 comes from 1069 on). v2.34 has its own (read from Ao no Juuai's
     /// aoj.EXE: 543 opcodes, 534 of them numbered as in v2.47 and 523 of those with v2.47's
-    /// operands; its music has one stream, so 0686-068B take no stream). v2.45 takes v2.47's: the
+    /// operands; its music has one stream, so 0686-068B take no stream). v2.33 has its own (read
+    /// from Cleavage's CLEAVAGE.EXE, Vanquish's VANQ.EXE the same build): v2.34's but for 06EC,
+    /// which it lacks. v2.37 has its own (read from Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE,
+    /// its code decrypted as its .riox stub does it: 568 opcodes, v2.47's operands but for 04EC,
+    /// 055A and 055B, which are v2.34's, and five of v2.34's v2.47 lacks). v2.45 takes v2.47's: the
     /// 679 opcodes of Chuuchuu Nurse's executable are v2.47's, with the same operands.
     /// </summary>
     public static ScnOpcodes ForVersion(string version)
@@ -89,6 +95,8 @@ public sealed class ScnOpcodes
     public static string TableName(string version) =>
         version.StartsWith("2.47") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
             : version.StartsWith("2.34") ? "ops_v234"
+            : version.StartsWith("2.33") ? "ops_v233"
+            : version.StartsWith("2.37") ? "ops_v237"
             : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
 
     /// <summary>The text of that table as tools/ScnTools opscan wrote it (Data/ScnOps), for tools.</summary>
