@@ -200,6 +200,44 @@ public sealed class GameData : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// The copy of the game's executable a game keeps in its archives under another name (Miko
+    /// Dashi's X.WAV, Saimin Seikatsu's OGV.OGV: START compares its executable with it), found by
+    /// what it is: a Windows executable (MZ, then PE). Entries of 64 KB to 16 MB are tried, those
+    /// nearest <paramref name="exeSize"/> first (the executable in the game folder, when there is
+    /// one), else those of the smallest archives; null when none is. Looked for once.
+    /// </summary>
+    public byte[]? ExecutableCopy(long? exeSize)
+    {
+        if (m_executableSearched)
+            return m_executableCopy;
+        m_executableSearched = true;
+        var candidates = m_byStem.Values.SelectMany(l => l)
+            .Where(c => c.Entry.UnpackedSize is >= 0x10000 and <= 0x1000000
+                        && (exeSize is not { } n || c.Entry.UnpackedSize >= n / 2 && c.Entry.UnpackedSize <= n * 2))
+            .OrderBy(c => exeSize is { } n ? Math.Abs(c.Entry.UnpackedSize - n) : c.Archive.Entries.Count())
+            .Take(64);
+        foreach (var (warc, entry) in candidates)
+        {
+            byte[]? data;
+            try
+            {
+                data = WarcOpener.OpenEntry(warc, entry);
+            }
+            catch (Exception e) when (e is IOException or InvalidDataException)
+            {
+                continue;
+            }
+            if (data is { Length: > 0x40 } && data[0] == 'M' && data[1] == 'Z' && BitConverter.ToInt32(data, 0x3C) is int pe
+                && pe > 0 && pe <= data.Length - 4 && data.AsSpan(pe, 4).SequenceEqual("PE\0\0"u8))
+                return m_executableCopy = data;
+        }
+        return null;
+    }
+
+    private bool m_executableSearched;
+    private byte[]? m_executableCopy;
+
     /// <summary>Full path of a loose file of the game folder (movies: "mv\ev03a.mpg"), or null.</summary>
     public string? LooseFile(string path) =>
         ResolveListed(path) ?? (path.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? EngineIni(Folder) : null);

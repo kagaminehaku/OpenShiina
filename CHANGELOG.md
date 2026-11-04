@@ -4,6 +4,15 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- A game whose start compares its executable with a copy of it in its archives (Can Fes!, Saimin
+  Seikatsu, Bloody Rondo, Miko Dashi) is given that copy as the executable: an .exe patched by
+  another program (as for playing without the disc), or none, no longer stops it.
+- The scaling-down case of the zoom of Miko Dashi, Pure Love!, Iyashinbo The Motion and
+  Gakushoku no Oba-san The Motion (the v2.47 builds that keep two tables of weights) runs as C#
+  code instead of x86 code.
+
 ## 0.7.9 (2026-11-04)
 
 Twelve new games: 54 games (55 releases) now play through, three more play, and a written way of

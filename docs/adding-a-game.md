@@ -172,6 +172,7 @@ a C# routine others use), sweep the games it touches again before committing.
 | A garbled script, a broken picture, memory written over, a process of gigabytes | DecodeBin's date | Bitch Nee-chan, Chiccha na Hanayome, Libra (English), Sorcery Jokers (English) |
 | A file the scripts ask for is missing | a file of another archive read (mount order) | Chiccha na Hanayome |
 | A message box at the start | `03C2` checksum, the disc check | Can Fes!, Chuuchuu Nurse, Saimin Seikatsu |
+| "Program File Error" at the start | START compares its .exe with a copy in its archives; that copy is given for the .exe now (GameData.ExecutableCopy) | Miko Dashi (a patched .exe) |
 | A script error on an opcode | a handler not written yet (opcheck) | most games |
 | Frames of seconds | an x86 routine on the interpreter (a new build of a known one) | Chuuni Hime, Chiccha na Hanayome, Sorcery Jokers |
 | 1 frame a second in the menus | SSE2 routines on the interpreter | the Bitch games |

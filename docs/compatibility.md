@@ -700,11 +700,15 @@ was tried (the trilogy's other two are the earlier Nakadashi Hara Maid games, no
 .exe went into GameMap; its 7,449 files come out whole. Its START checks its executable twice:
 `03C2` gives this one's checksum (v ^ 306723180 = 228471671), and it reads the .exe whole and
 compares it with X.WAV of MIKODS_D.WAR, a copy of it (its memcmp is an embedded routine, now C#).
-The copy tried had an .exe altered in 52 bytes (another program's patch), and stopped there with
-"Program File Error", as the engine would; with the .exe it shipped with (X.WAV) it plays. Five
+The copy tried had an .exe altered in 52 bytes (another program's patch) and stopped there with
+"Program File Error"; the player now gives the scripts the copy as its own executable (it runs
+no .exe: it is the engine as it shipped, as for 03C2), so the game starts with any .exe, or
+none. Five
 more routines needed C# (builds of known ones: its thumbnail and its rows, NOT, enlarge16 with
-the weight table i * 256 / sW); its START 646B8, a scale of 1,124 instructions, has none yet,
-and no scenario ran it. Swept: 153 scenarios; 147 show their last message and then the game
+the weight table i * 256 / sW), and its START 646B8, the scaling-down case of its zoom (1,124
+instructions; no scenario of the sweep ran it), is written out in ScnVm.ScaleArea.cs, the same
+bytes as its x86 code on random cases in each of its four cases (Pure Love!, Iyashinbo The Motion
+and Gakushoku no Oba-san The Motion have it too, with each pixel's first byte made FF). Swept: 153 scenarios; 147 show their last message and then the game
 stands at its menu of scenes (`$EX,0,019` ends each), which the sweep does not choose from; the
 two menus of one line (SEN01, SEN02) and SAKU001 (382 of its 613 lines) stand there too.
 

@@ -129,6 +129,7 @@ public sealed class GameSession : IDisposable
         public long? ArchiveFileSize(string name) => m_session.Data.Size(name);
         public long? ArchiveFileSize(string archive, string name) => m_session.Data.Size(archive, name);
         public bool MountArchive(string archive, bool mounted) => m_session.Data.Mount(archive, mounted);
+        public byte[]? ExecutableCopy(string name) => m_session.Data.ExecutableCopy(LooseFileSize(name));
 
         public byte[]? ReadLooseFile(string name) => m_session.Data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
         public long? LooseFileSize(string name) => m_session.Data.LooseFile(name) is { } path ? new FileInfo(path).Length : null;

@@ -1114,7 +1114,10 @@ the functions they call from the decompile. First findings:
   DllCall, each with the game it was added for: shlwapi PathStripPathA and RIOSUB
   rsDialogViewText for Oni ga Kuru; kernel32 FindResourceA, SizeofResource, LoadResource and
   LockResource for Yoyogi Hitozuma Senmon Gakuin, whose START compares its executable's icon 2
-  with icon.bin of its archives: the resource is read from the .exe file as data). Brushes and pens are kept by the VM;
+  with icon.bin of its archives: the resource is read from the .exe file as data). The file
+  kernel32 GetModuleFileNameA names, when the scripts read it, is the copy of the executable the
+  game keeps in its archives under another name (X.WAV, OGV.OGV: a Windows executable of about
+  the .exe's size, GameData.ExecutableCopy), not the file in the folder. Brushes and pens are kept by the VM;
   shapes go to IScnShapes: GDI itself on Windows (GdiShapes), elsewhere DibShapes. Worked out
   from Windows 10's pixels (`GdiEllipseCheck dump`): Ellipse(l, t, r, b) in GM_COMPATIBLE is the
   path StrokeAndFillPath would draw (the same pixels): four Béziers around the box (16l, 16t,
@@ -1282,7 +1285,10 @@ the functions they call from the decompile. First findings:
   number, so each row of three starts 16 bytes, and each pair of the picture's rows 2 bytes,
   before where the last ended), the frame of its thumbnail cleared and its first bytes scaled,
   Sorcery Jokers' (Japanese) count of the set pixels in three squares of 32 x 32, Miko Dashi's
-  memcmp, and the blank S25 of the Japanese Sorcery Jokers (nothing cleared first). The rest
+  memcmp, the blank S25 of the Japanese Sorcery Jokers (nothing cleared first), and Miko Dashi's
+  scaling down (START 646B8, ScnVm.ScaleArea.cs: area averaging with two tables of weights
+  i * 256 / s in its work buffers; Pure Love!'s, Iyashinbo's and Gakushoku's builds make each
+  pixel's first byte FF). The rest
   were builds of known ones with other numbers (thumbnails, masks, row copies, enlarge16 with
   its weight table i * 256 / sW and nothing made opaque).
 - Nukige Mitai na Shima ni Sunderu 2's archives are named NUKITASHI2_*.WAR: without its .exe in

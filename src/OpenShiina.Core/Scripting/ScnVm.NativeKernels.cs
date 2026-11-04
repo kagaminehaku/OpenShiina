@@ -354,6 +354,12 @@ public sealed partial class ScnVm
         RegisterNative("D6BC2828FE749484BEC89684F01FD4469FF9BA0C", "enlarge16 (opaque)", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: true));
         // Nakadashi Trilogy's Miko Dashi START 64396 (v2.47): that weight table, nothing made opaque
         RegisterNative("39773A9714C8846EA6402C83B201C0FEA2A58775", "enlarge16", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: false));
+        // Miko Dashi START 646B8 (MMX): the scaling-down case beside it, written out in ScnVm.ScaleArea.cs
+        RegisterNative("50C6BCDFA745FC3B3FC7F4785C7C2BC691D7893B", "scale area", (vm, c, a) => vm.ScaleArea(c, a, opaque: false));
+        // Pure Love! 5A163 and Iyashinbo The Motion 5FBF3 (the same bytes), Gakushoku no Oba-san The
+        // Motion 60DA1: the same, each pixel's first byte made FF
+        RegisterNative(["DE002226CC93F6BF1FDCC5650EA61E0CE00339C7", "3E60D8F60F11B9D53570CAA6049A3FD0D66955B1"], "scale area (opaque)",
+                       (vm, c, a) => vm.ScaleArea(c, a, opaque: true));
     }
 
     /// <summary>enlarge16's arguments (RegisterNativeKernels) checked, its rectangles enlarged.</summary>

@@ -332,10 +332,12 @@ public sealed partial class ScnVm
             {
                 // The game's .exe (Can Fes!'s START reads it whole and compares it with a copy in
                 // CANFES_D.WAR): its name in the game folder, which the file opcodes read as a
-                // loose file (a full path, with its drive, they would not)
+                // loose file (a full path, with its drive, they would not) - as it shipped, from
+                // that copy, when the game has one (ModuleFile)
                 int buffer = Arg(1), size = Arg(2);
                 if (buffer == 0 || size <= 0 || ExeFileName() is not { } exe)
                     return 0;
+                m_moduleFile = exe;
                 byte[] name = Encodings.cp932.GetBytes(exe);
                 int n = Math.Min(name.Length, size - 1);
                 WriteBytes(buffer, name.AsSpan(0, n));

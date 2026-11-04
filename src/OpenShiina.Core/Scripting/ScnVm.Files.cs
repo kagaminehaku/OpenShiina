@@ -102,6 +102,31 @@ public sealed partial class ScnVm
         return (false, path);
     }
 
+    // The executable's name GetModuleFileNameA gave the scripts, and its copy (ModuleFile)
+    private string? m_moduleFile;
+    private byte[]? m_moduleCopy;
+    private bool m_moduleCopyLooked;
+
+    /// <summary>
+    /// The engine's own executable when the scripts read it (the name GetModuleFileNameA gave):
+    /// the copy the game keeps in its archives, when it has one, whatever the file in the game
+    /// folder is. START compares the two (Can Fes!, Miko Dashi); OpenShiina is the engine and runs
+    /// no executable, so it is the one that shipped, as 03C2's checksum is (an executable patched
+    /// by another program, as for a game without its disc, makes no difference). Null for any
+    /// other file, or when the game keeps no copy (the file in the folder is read).
+    /// </summary>
+    private byte[]? ModuleFile(string name)
+    {
+        if (m_moduleFile == null || !name.Equals(m_moduleFile, StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (!m_moduleCopyLooked)
+        {
+            m_moduleCopyLooked = true;
+            m_moduleCopy = m_host.ExecutableCopy(m_moduleFile);
+        }
+        return m_moduleCopy;
+    }
+
     /// <summary>
     /// A file the scripts open for reading: a save file, a file of the archives (kept decoded,
     /// see <see cref="FileCacheBytes"/>) or of the game folder's translation\ (which comes first),
@@ -117,6 +142,8 @@ public sealed partial class ScnVm
             return null;
         if (p.Save)
             return ReadSave(p.Name);
+        if (ModuleFile(p.Name) is { } module)
+            return module;
         // "Play from here": the scenario put in place of the one asked for (ScnVm.Warp.cs)
         if (PlayFromScenario(p.Name, load) is { } play)
         {
@@ -286,6 +313,8 @@ public sealed partial class ScnVm
             return null;
         if (p.Save)
             return ReadSave(p.Name)?.Length;
+        if (ModuleFile(p.Name) is { } module)
+            return module.Length;
         if (p.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || TranslationFileSize(p.Name) != null)
             return ReadScriptFile(path, load: false)?.Length;
         return m_host.ArchiveFileSize(p.Name) ?? m_host.LooseFileSize(p.Name);

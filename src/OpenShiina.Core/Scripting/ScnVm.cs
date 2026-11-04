@@ -39,6 +39,14 @@ public interface IScnHost
     /// </summary>
     bool MountArchive(string archive, bool mounted) => false;
 
+    /// <summary>
+    /// The game's executable as it shipped, from a copy the game keeps in its archives under
+    /// another name (Miko Dashi's X.WAV, Saimin Seikatsu's OGV.OGV), for START's comparison of its
+    /// executable with that copy; null when there is none. <paramref name="name"/> is the
+    /// executable in the game folder (its size narrows the search).
+    /// </summary>
+    byte[]? ExecutableCopy(string name) => null;
+
     /// <summary>A file of the game folder itself (RIO.INI, movies), or null.</summary>
     byte[]? ReadLooseFile(string name);
 
