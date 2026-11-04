@@ -6,7 +6,10 @@
 // corner under the right thumb. A tap anywhere on the card plays; a tile chooses (a double tap
 // plays). The card's "…" opens the save folder (and the game's on a desktop) or removes the game:
 // from the list only (with Undo), or its folder too, after a dialog that says what goes. A game
-// whose folder is gone shows faded and cannot be played. Colours come from the theme (PlayerTheme.cs).
+// whose folder is gone shows faded and cannot be played. Above the tiles a search (the games whose
+// name, .exe or folder has the text; Ctrl+F, Esc clears it, Enter plays the one chosen) and the
+// order: the one played last first, or by name (PlayerSettings.LibraryByName). Colours come from
+// the theme (PlayerTheme.cs).
 
 using Avalonia;
 using Avalonia.Animation;
@@ -14,6 +17,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -42,6 +46,14 @@ public sealed class LibraryView : UserControl
         TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 16),
     };
     private readonly TextBlock m_message = new() { TextWrapping = TextWrapping.Wrap, IsVisible = false };
+    private readonly TextBlock m_noMatch = new()
+    {
+        Text = Strings.NoGamesMatch,
+        TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 16), IsVisible = false,
+    };
+    private readonly TextBox m_search = new() { PlaceholderText = Strings.SearchGames, CornerRadius = new CornerRadius(10) };
+    private readonly Button m_order = new() { CornerRadius = new CornerRadius(10), VerticalAlignment = VerticalAlignment.Stretch };
+    private bool m_byName = PlayerSettings.Load().LibraryByName;
     // A question under the card (ChooseAsync): its text and a button an answer, then Cancel
     private readonly StackPanel m_choice = new() { Spacing = 6, IsVisible = false };
     private readonly Panel m_overlay = new() { IsVisible = false };
@@ -74,6 +86,39 @@ public sealed class LibraryView : UserControl
         });
         m_empty.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
         m_message.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.Ink);
+        m_noMatch.Use(TextBlock.ForegroundProperty, PlayerTheme.Keys.InkMuted);
+        m_search.Classes.Add("clearButton");
+        AutomationProperties.SetName(m_search, Strings.SearchGames);
+        m_search.TextChanged += (_, _) => ShowTiles();
+        m_search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape && !string.IsNullOrEmpty(m_search.Text))
+                m_search.Text = "";
+            else if (e.Key == Key.Enter && m_games.FirstOrDefault(g => g.Folder == m_chosen) is { } chosen)
+                PlayGame(chosen);
+            else
+                return;
+            e.Handled = true;
+        };
+        ToolTip.SetTip(m_order, Strings.OrderTip);
+        AutomationProperties.SetName(m_order, Strings.OrderTip);
+        m_order.Click += (_, _) =>
+        {
+            m_byName = !m_byName;
+            var settings = PlayerSettings.Load();
+            settings.LibraryByName = m_byName;
+            settings.Save();
+            ShowTiles();
+        };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.F && e.KeyModifiers is KeyModifiers.Control or KeyModifiers.Meta && m_page.Content == m_home)
+            {
+                m_search.Focus();
+                m_search.SelectAll();
+                e.Handled = true;
+            }
+        };
 
         m_railLibrary = RailButton(Icons.Library, Strings.Library, PlayerTheme.Keys.Ink);
         m_railLibrary.Click += (_, _) => ShowHome();
@@ -98,8 +143,15 @@ public sealed class LibraryView : UserControl
         var wordmark = PlayerTheme.Wordmark(26);
         wordmark.Margin = new Thickness(8, 0, 0, 10);
         m_wordmark = wordmark;
-        var list = new StackPanel { Children = { m_tiles, m_empty } };
-        var tiles = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        var list = new StackPanel { Children = { m_tiles, m_empty, m_noMatch } };
+        var scroll = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        // The search and the order over the tiles, level with them (they stand 5 inside their places)
+        var bar = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 8, Margin = new Thickness(5, 0, 5, 6),
+            Children = { m_search, At(m_order, 1) },
+        };
+        var tiles = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), Children = { bar, At(scroll, 0, 1) } };
         var messages = new ScrollViewer
         {
             MaxHeight = 220,
@@ -163,15 +215,39 @@ public sealed class LibraryView : UserControl
         m_tiles.Children.Clear();
         m_tileOf.Clear();
         foreach (var game in m_games)
-        {
-            var tile = Tile(game);
-            m_tileOf[game.Folder] = tile;
-            m_tiles.Children.Add(tile);
-        }
+            m_tileOf[game.Folder] = Tile(game);
         m_empty.IsVisible = m_games.Count == 0;
         Choose(m_games.FirstOrDefault(g => g.Folder == m_chosen) ?? m_games.FirstOrDefault());
+        ShowTiles();
         StartupLog.Mark($"the library read: {m_games.Count} games");
     }
+
+    /// <summary>
+    /// The tiles of the games the search finds (all of them without one), in the order chosen; the
+    /// game chosen becomes the first shown when the search leaves it out.
+    /// </summary>
+    private void ShowTiles()
+    {
+        m_order.Content = m_byName ? Strings.OrderByName : Strings.OrderRecent;
+        string query = Folded(m_search.Text);
+        var games = m_byName ? m_games.OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList() : m_games;
+        var shown = games.Where(g => query.Length == 0 || Matches(g, query)).ToList();
+        m_tiles.Children.Clear();
+        foreach (var game in shown)
+            m_tiles.Children.Add(m_tileOf[game.Folder]);
+        m_noMatch.IsVisible = m_games.Count > 0 && shown.Count == 0;
+        if (shown.Count > 0 && !shown.Any(g => g.Folder == m_chosen))
+            Choose(shown[0]);
+    }
+
+    private static bool Matches(LibraryGame game, string query) =>
+        Folded(game.Name).Contains(query, StringComparison.Ordinal)
+        || Folded(System.IO.Path.GetFileName(game.Folder)).Contains(query, StringComparison.Ordinal)
+        || Folded(System.IO.Path.GetFileNameWithoutExtension(game.Exe)).Contains(query, StringComparison.Ordinal);
+
+    /// <summary>Text to compare: full-width letters and half-width kana as their usual forms (NFKC), lower case.</summary>
+    private static string Folded(string? text) =>
+        string.IsNullOrWhiteSpace(text) ? "" : text.Trim().Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant();
 
     private void Choose(LibraryGame? game)
     {

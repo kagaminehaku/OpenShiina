@@ -68,6 +68,9 @@ public sealed class PlayerSettings
     [JsonConverter(typeof(JsonStringEnumConverter<AppTheme>))]
     public AppTheme Theme { get; set; } = AppTheme.Shiina;
 
+    /// <summary>The library's games in the order of their names, not the one played last first.</summary>
+    public bool LibraryByName { get; set; }
+
     /// <summary>The memory for the archives' decoded files (FileCachePresets).</summary>
     [JsonConverter(typeof(JsonStringEnumConverter<FileCacheSize>))]
     public FileCacheSize FileCache { get; set; } = FileCacheSize.Auto;

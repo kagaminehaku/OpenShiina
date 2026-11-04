@@ -6,6 +6,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 
 ## Unreleased
 
+- **The library has a search and an order**: the games whose name, .exe or folder has the text
+  typed (full-width letters match too; Ctrl+F, Esc clears, Enter plays the game chosen), and a
+  button between the one played last first and A–Z, kept in the settings.
 - A game whose start compares its executable with a copy of it in its archives (Can Fes!, Saimin
   Seikatsu, Bloody Rondo, Miko Dashi) is given that copy as the executable: an .exe patched by
   another program (as for playing without the disc), or none, no longer stops it.

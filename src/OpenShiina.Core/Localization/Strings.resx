@@ -9,6 +9,11 @@
   <data name="AddGame" xml:space="preserve"><value>Add games…</value></data>
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="NoGamesYet" xml:space="preserve"><value>No games yet. Add the folder of an installed game: the one with its .exe and .WAR files.</value></data>
+  <data name="SearchGames" xml:space="preserve"><value>Search games</value></data>
+  <data name="NoGamesMatch" xml:space="preserve"><value>No game matches.</value></data>
+  <data name="OrderRecent" xml:space="preserve"><value>Recent</value></data>
+  <data name="OrderByName" xml:space="preserve"><value>A–Z</value></data>
+  <data name="OrderTip" xml:space="preserve"><value>Order: the one played last first, or by name</value></data>
   <data name="WelcomeText" xml:space="preserve"><value>Add the folder of an installed game (the one with its .exe and .WAR files), on this device or a memory card.</value></data>
   <data name="Continue" xml:space="preserve"><value>Continue</value></data>
   <data name="More" xml:space="preserve"><value>More</value></data>

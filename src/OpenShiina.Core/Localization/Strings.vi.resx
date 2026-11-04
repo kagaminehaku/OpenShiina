@@ -9,6 +9,11 @@
   <data name="AddGame" xml:space="preserve"><value>Thêm game…</value></data>
   <data name="Settings" xml:space="preserve"><value>Cài đặt</value></data>
   <data name="NoGamesYet" xml:space="preserve"><value>Chưa có game nào. Hãy thêm thư mục của một game đã cài: thư mục có file .exe và các file .WAR của game.</value></data>
+  <data name="SearchGames" xml:space="preserve"><value>Tìm game</value></data>
+  <data name="NoGamesMatch" xml:space="preserve"><value>Không có game nào khớp.</value></data>
+  <data name="OrderRecent" xml:space="preserve"><value>Gần đây</value></data>
+  <data name="OrderByName" xml:space="preserve"><value>A–Z</value></data>
+  <data name="OrderTip" xml:space="preserve"><value>Thứ tự: game chơi gần nhất trước, hoặc theo tên</value></data>
   <data name="WelcomeText" xml:space="preserve"><value>Thêm thư mục của một game đã cài (thư mục có file .exe và các file .WAR), trên máy hoặc trên thẻ nhớ.</value></data>
   <data name="Continue" xml:space="preserve"><value>Chơi tiếp</value></data>
   <data name="More" xml:space="preserve"><value>Thêm</value></data>
