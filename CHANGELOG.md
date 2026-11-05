@@ -6,6 +6,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 
 ## Unreleased
 
+- The scale-down routine of the v2.47 zooms (Miko Dashi, Pure Love!, Imouto Smile...) takes
+  the source rows and columns it reads exactly: a picture halved into the one right after it in
+  memory no longer runs as x86 code.
 - **The library has a search and an order**: the games whose name, .exe or folder has the text
   typed (full-width letters match too; Ctrl+F, Esc clears, Enter plays the game chosen), and a
   button between the one played last first and A–Z, kept in the settings.
@@ -23,8 +26,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   through; **Tekoire Princess!** (てこいれぷりんせす！, 2004) plays.
 - **New: Love & Piss** (Love＆Piss ～少女のガマンが世界を救う～, 2013) plays through: its keys were
   taken from its executable (decrypted as its start-up stub does it), with its DecodeBin date.
-- 57 games (58 releases) now play through. **Imouto Smile** (妹スマイル, 2009) plays (its keys
-  from its executable; one scenario stands still before its last line); **S.D.I.-Sadistic
+- 58 games (59 releases) now play through, **Imouto Smile** (妹スマイル, 2009) among them (its
+  keys from its executable); **S.D.I.-Sadistic
   Daughter Incident-** and **Sadistic Little** (サディスティックりとる) have keys now, from their
   executables, and start.
 - ScnBoot: `SCNBOOT_SWEEP_FROM` starts the sweep's keys and clicks at a frame (a title's START

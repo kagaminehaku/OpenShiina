@@ -45,9 +45,12 @@ public sealed partial class ScnVm
         var wy = AreaWeights(dH, sH);
         int start = src + (sty >> 4) * srcStride + (stx >> 4) * 4;
         int target = dst + (dty >> 4) * dstStride + (dtx >> 4) * 4;
-        // the source rows and columns the destination takes: up to sH / dH + 1 rows past each
-        // row's start, and as many of them as the destination has rows
-        long srcRows = (long)rows * sH / dH + 2, srcBytes = ((long)cols * sW / dW + 2) * 4;
+        // the source rows and columns the destination takes, exactly: a source pixel is dH (dW)
+        // units, a destination pixel takes sH (sW) of them from where the one before ended, the
+        // first from ry0 (rx0) units in; a pixel that ends where a source pixel starts does not
+        // read it (Imouto Smile's zoom halves a picture into the one right after it)
+        int rx0 = (int)((uint)((stx & 15) * dW) >> 4), ry0 = (int)((uint)((sty & 15) * dH) >> 4);
+        long srcRows = (ry0 + (long)rows * sH + dH - 1) / dH, srcBytes = (rx0 + (long)cols * sW + dW - 1) / dW * 4;
         var dstSpan = RowsSpan(target, dstStride, rows, cols * 4);
         if (!Apart(dstSpan, RowsSpan(start, srcStride, (int)Math.Min(srcRows, 0x100000), srcBytes))
             || !Apart(dstSpan, (tableX, (dW + 1) * 8L)) || !Apart(dstSpan, (tableY, (dH + 1) * 8L)))
@@ -60,7 +63,7 @@ public sealed partial class ScnVm
         WriteAreaWeights(tableY, wy);
 
         ushort wholeX = wx[dW], wholeY = wy[dH];
-        int rx0 = (int)((uint)((stx & 15) * dW) >> 4), ry = (int)((uint)((sty & 15) * dH) >> 4);
+        int ry = ry0;
         var sum = new ushort[4];
         for (int row = 0; row < rows; row++, target += dstStride)
         {

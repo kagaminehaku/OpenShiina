@@ -51,6 +51,10 @@ public sealed class LibraryView : UserControl
         Text = Strings.NoGamesMatch,
         TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 16), IsVisible = false,
     };
+    // The search bar's height with its gap under it
+    private const double SearchBarHeight = 44;
+    // The window Ctrl+F is listened to in (FindKey)
+    private TopLevel? m_window;
     private readonly TextBox m_search = new() { PlaceholderText = Strings.SearchGames, CornerRadius = new CornerRadius(10) };
     private readonly Button m_order = new() { CornerRadius = new CornerRadius(10), VerticalAlignment = VerticalAlignment.Stretch };
     private bool m_byName = PlayerSettings.Load().LibraryByName;
@@ -94,7 +98,8 @@ public sealed class LibraryView : UserControl
         {
             if (e.Key == Key.Escape && !string.IsNullOrEmpty(m_search.Text))
                 m_search.Text = "";
-            else if (e.Key == Key.Enter && m_games.FirstOrDefault(g => g.Folder == m_chosen) is { } chosen)
+            else if (e.Key == Key.Enter && m_games.FirstOrDefault(g => g.Folder == m_chosen) is { } chosen
+                     && m_tiles.Children.Contains(m_tileOf[chosen.Folder]))
                 PlayGame(chosen);
             else
                 return;
@@ -110,14 +115,16 @@ public sealed class LibraryView : UserControl
             settings.Save();
             ShowTiles();
         };
-        KeyDown += (_, e) =>
+        // Ctrl+F from the whole window (nothing may have the focus yet), while the library shows
+        AttachedToVisualTree += (_, _) =>
         {
-            if (e.Key == Key.F && e.KeyModifiers is KeyModifiers.Control or KeyModifiers.Meta && m_page.Content == m_home)
-            {
-                m_search.Focus();
-                m_search.SelectAll();
-                e.Handled = true;
-            }
+            m_window = TopLevel.GetTopLevel(this);
+            m_window?.AddHandler(KeyDownEvent, FindKey);
+        };
+        DetachedFromVisualTree += (_, _) =>
+        {
+            m_window?.RemoveHandler(KeyDownEvent, FindKey);
+            m_window = null;
         };
 
         m_railLibrary = RailButton(Icons.Library, Strings.Library, PlayerTheme.Keys.Ink);
@@ -176,6 +183,15 @@ public sealed class LibraryView : UserControl
         Refresh();
     }
 
+    private void FindKey(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.F || e.KeyModifiers is not (KeyModifiers.Control or KeyModifiers.Meta) || m_page.Content != m_home || !IsEffectivelyVisible)
+            return;
+        m_search.Focus();
+        m_search.SelectAll();
+        e.Handled = true;
+    }
+
     // ---- The layout
 
     /// <summary>The columns and tiles for the view's size: a phone held sideways has a narrower rail, two columns of tiles and a wider card.</summary>
@@ -200,7 +216,8 @@ public sealed class LibraryView : UserControl
         int columns = compact ? 2 : Math.Max(2, (int)(list / 150));
         double width = Math.Max(80, Math.Floor(list / columns));
         m_tiles.ItemWidth = width;
-        m_tiles.ItemHeight = compact ? Math.Clamp(Math.Floor((size.Height - 2 * gap) / 2), 112, 170) : Math.Round(width * 0.9);
+        // (two rows on a phone, under the search bar)
+        m_tiles.ItemHeight = compact ? Math.Clamp(Math.Floor((size.Height - 2 * gap - SearchBarHeight) / 2), 112, 170) : Math.Round(width * 0.9);
         if (compact != m_compact)
         {
             m_compact = compact;

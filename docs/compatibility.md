@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.33, 2.34, 2.37, 2.45 and 2.47 to 2.50; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 57 games, 58 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 58 games, 59 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -107,7 +107,7 @@ of those versions it does not list.
 | Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | 🟢 Plays | 2026-11-04 |
 | Sadistic Little | サディスティックりとる | 2009-11-06 | [v2850](https://vndb.org/v2850) | v2.47 | 🟡 Starts | 2026-11-05 |
 | Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ✅ Plays through | 2026-11-04 |
-| Imouto Smile | 妹スマイル | 2009-11-27 | [v2847](https://vndb.org/v2847) | v2.47 | 🟢 Plays | 2026-11-05 |
+| Imouto Smile | 妹スマイル | 2009-11-27 | [v2847](https://vndb.org/v2847) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ⚪ Not tried |  |
 | Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ✅ Plays through | 2026-10-24 |
 | Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ✅ Plays through | 2026-10-20 |
@@ -748,8 +748,12 @@ executable"); its 19,425 files come out whole (OGV.OGV of IMOSMILE_D.WAR is not 
 `03C2` gives its checksum (v ^ 306723180 = 969238634); `04EF` / `04F1` (its saved zoom) are
 taken and change nothing. Four routines needed C# (builds of known ones: its 80 x 60 thumbnail,
 its rows, an XOR stream, enlarge16 made opaque), each the same bytes as its x86 code on random
-cases. Swept: 260 scenarios, 259 to their end; EVC15A stands still after line 221, before its
-last line ("…………", after a fade and a wait of 3 s), with every click tried.
+cases. Its zoom halves an 800 x 600 picture from one right before it in memory: the scale-down
+routine (ScnVm.ScaleArea.cs) took the source to reach two rows further than it does and ran
+those calls as x86 code (92 calls, 4 billion instructions in EVC15A); it now takes the rows and
+columns the loops read, exactly. Swept: 260 scenarios, every one to its end (EVC15A's last line,
+"…………", passes in the skip and the game stands at its menu of heroines, which the sweep counts
+as stuck).
 
 **S.D.I.-Sadistic Daughter Incident-** (Tangerine, SDI.EXE, v2.49) and **Sadistic Little**
 (Tangerine, SLITTLE.EXE, v2.47) had no keys: their schemes came from their executables (S.D.I.'s
@@ -855,7 +859,7 @@ stopped, none stuck.
 | Nukige Mitai na Shima ni Sunderu | 133 | 99.7% |
 | Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 492 | 63.0% (as Ao no Juuai) |
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | 82 | 98.9% |
-| Imouto Smile | 260 | 259 to their end (EVC15A: above) |
+| Imouto Smile | 260 | every scenario to its end (EVC15A: Notes) |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in
