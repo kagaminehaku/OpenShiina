@@ -18,6 +18,12 @@ public class EncryptionScheme
     public IDecryptExtra? ExtraCrypt { get; set; }
 
     /// <summary>
+    /// The game's .exe is large address aware ("LargeAddressAware": true): for the scripts' heap
+    /// when the game folder has no .exe to read it from (ScnVm.LargeAddressAware).
+    /// </summary>
+    public bool LargeAddressAware { get; set; }
+
+    /// <summary>
     /// WARC 1.0 and 1.1 archives: 16-byte names and no keys (GARbro's EncryptionScheme.Warc110),
     /// named as the game it opens is (its folder, for a game no GameMap entry tells).
     /// </summary>

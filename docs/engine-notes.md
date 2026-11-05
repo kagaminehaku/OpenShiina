@@ -1057,7 +1057,20 @@ the functions they call from the decompile. First findings:
   of script memory". The heap is 0x10000000-0x70000000 (1.5 GB; 768 MB until 2026-10-15, when
   Kyuuketsuki no Libra's scenes of large event pictures asked for more: 688 MB in use and a
   block of 126 MB), the code 0x70000000 on: every address below 0x80000000, as in the engine's
-  process (not large address aware), so that none reads as a negative number.
+  process (not large address aware), so that none reads as a negative number. An .exe that is
+  large address aware (IMAGE_FILE_LARGE_ADDRESS_AWARE, bit 0x20 of the PE file header's
+  Characteristics: NUKITASHI2.EXE, LIBRAeS.exe, RAILLOREe.exe, SISCAMP_DDL.exe; none of the other
+  games' 138) had the 4 GB of a 32-bit process on 64-bit Windows, and Nukitashi 2's 02_C23.TXT
+  needs it: 1,125 MB in use, 288 MB free in 41 ranges below the code (the largest 35 MB), and it
+  asks for a block of 190 MB (2026-11-05). For such a game, when the heap below the code has no
+  room, blocks go on in a high heap, 0x90000000-0xFF000000 (1.7 GB): it does not cross
+  0x80000000, so two addresses compared as signed numbers (the C# routines' tests of a source
+  and a destination apart, the scripts' own) keep their order, and the modules' code keeps 512
+  MB below it ("Out of module memory" past that). GlobalMemoryStatusEx, GetSystemInfo and
+  VirtualQuery then give a 4 GB address space. The flag is read from the .exe in the game folder
+  (the one GameMap names), else from its copy in the archives, else from the scheme's
+  `"LargeAddressAware": true` in Formats.Json (the four above), when the heap below the code is
+  first full; a game it is not set for stays below 2 GB.
 - Named variables (`03CF local`) live in per-slot scopes; their memory is used again when the
   scope is left (the start-up fade alone declares thousands in a few seconds).
 - Status: START, TOPMENU's logo, white and caution screens run and are pixel-identical to the

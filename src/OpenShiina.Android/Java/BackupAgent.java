@@ -1,6 +1,7 @@
 // Android's backup of the app (Google's cloud, a new phone's transfer): the player folder (the
-// app's folder on the shared storage), nothing else (the app's own folder holds only the schemes,
-// copied out at every start). Nothing when Settings > Back up saves is off ("AndroidBackup" in
+// app's folder on the shared storage; OpenShiina on the device's storage when the player keeps it
+// there, its files copied into the app's folder first), nothing else (the app's own folder holds
+// only the schemes, copied out at every start). Nothing when Settings > Back up saves is off ("AndroidBackup" in
 // settings.json). Left out: the logs (*.log, also those in the save folders: perf.log,
 // draw-trace.log, crash.log, stall.log), the library and last-game.txt (folders of this device).
 // Android keeps 25 MB of an app (FullBackupDataOutput.getQuota) and keeps nothing when a backup
@@ -36,7 +37,15 @@ public class BackupAgent extends android.app.backup.BackupAgent
     public void onFullBackup(FullBackupDataOutput data) throws IOException
     {
         File root = getExternalFilesDir(null);
-        if (root == null || !backupOn(root))
+        if (root == null)
+            return;
+        // The player folder is OpenShiina on the device's storage once the player may write there
+        // (MainApplication.PlayerRoot); Android backs up only the app's own folders, so its files
+        // are copied into the app's folder first (those newer there), and that one backed up
+        File shared = new File(android.os.Environment.getExternalStorageDirectory(), "OpenShiina");
+        if (shared.isDirectory() && shared.canRead())
+            mirror(shared, root, true);
+        if (!backupOn(root))
             return;
         long left = data.getQuota() - MARGIN;
         // the player folder's own files (settings.json), then its folders by the time of their
@@ -86,6 +95,38 @@ public class BackupAgent extends android.app.backup.BackupAgent
             for (File file : inside)
                 fullBackupFile(file, data);
             left -= size;
+        }
+    }
+
+    /** Copies the files of a folder that go into the backup to another, where they are missing or older. */
+    private static void mirror(File from, File to, boolean inRoot)
+    {
+        File[] children = from.listFiles();
+        if (children == null)
+            return;
+        for (File child : children)
+        {
+            File target = new File(to, child.getName());
+            if (child.isDirectory())
+            {
+                if (target.isDirectory() || target.mkdirs())
+                    mirror(child, target, false);
+            }
+            else if (child.isFile() && wanted(child, inRoot)
+                     && (!target.isFile() || target.lastModified() < child.lastModified() || target.length() != child.length()))
+            {
+                try (FileInputStream in = new FileInputStream(child); java.io.FileOutputStream out = new java.io.FileOutputStream(target))
+                {
+                    byte[] buffer = new byte[1 << 16];
+                    for (int n; (n = in.read(buffer)) > 0; )
+                        out.write(buffer, 0, n);
+                }
+                catch (IOException e)
+                {
+                    continue;
+                }
+                target.setLastModified(child.lastModified());
+            }
         }
     }
 

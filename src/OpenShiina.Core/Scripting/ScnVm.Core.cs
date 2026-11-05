@@ -789,6 +789,13 @@ public sealed partial class ScnVm
     public int Global13B5198 { get; set; }
     public int Global13B519C { get; set; }
 
+    /// <summary>
+    /// Every comparison of an `if` (01F4 / 01FE; 01FF's of floats with -1): the two values and the
+    /// comparison (0 ==, 1 !=, 2 >=, 3 >, 4 &lt;=, 5 &lt;, 6 and, 7 or). For a test run that looks for
+    /// the places the scripts compare the mouse with (ScnBoot's SCNBOOT_SWEEP_CLICKS=auto).
+    /// </summary>
+    public Action<int, int, int>? CompareSeen { get; set; }
+
     private int If(ScnContext c, ScnInstruction i, int mode)
     {
         int x = Value(c, i.Args[0]), y = Value(c, i.Args[1]);
@@ -803,6 +810,7 @@ public sealed partial class ScnVm
             1 => cmp switch { 0 => x == y, 1 => x != y, 2 => x >= y, 3 => x > y, 4 => x <= y, _ => x < y },
             _ => FloatCompare(BitConverter.Int32BitsToSingle(x), BitConverter.Int32BitsToSingle(y), cmp),
         };
+        CompareSeen?.Invoke(x, y, mode == 2 ? -1 : cmp);
         if (!holds)
             c.Pc = c.Base + i.Raw[1];
         return 0;

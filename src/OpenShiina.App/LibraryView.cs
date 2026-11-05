@@ -823,7 +823,12 @@ public sealed class LibraryView : UserControl
         try
         {
             Directory.CreateDirectory(path);
-            if (TopLevel.GetTopLevel(this)?.Launcher is { } launcher)
+            if (PlayerPlatform.OpenFolder is { } open)
+            {
+                if (!open(path))
+                    Message = string.Format(Strings.FolderIsAt, path);
+            }
+            else if (TopLevel.GetTopLevel(this)?.Launcher is { } launcher)
                 await launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path));
         }
         catch (Exception ex)

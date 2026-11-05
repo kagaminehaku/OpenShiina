@@ -135,11 +135,21 @@ bool sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
 host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") switch
 {
     "center" => [(vm.ScreenWidth / 2, vm.ScreenHeight / 2)],
+    "auto" => [.. from y in new[] { 28, 50, 72 } from x in new[] { 50, 25, 75 } select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)],
     "safe" => [.. from y in new[] { 28, 40, 50, 72 } from x in new[] { 50, 25, 75 } where !(x == 75 && y == 72)
                   select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)],
     { Length: > 0 } clicks => clicks.Split(';').Select(c => c.Split(',')).Select(c => (int.Parse(c[0]), int.Parse(c[1]))).ToArray(),
     _ => [.. from y in new[] { 28, 50, 72 } from x in new[] { 50, 25, 75 } select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)],
 };
+// SCNBOOT_SWEEP_CLICKS=auto: the grid's clicks until nothing new comes (no new line, no file read
+// for the first time) for SCNBOOT_SWEEP_AUTO frames (default 900); then the clicks go where the
+// scripts look for the mouse (ClickSeeker): the buttons of the sprite list 04C7 tells apart, and
+// the boxes of the places the scripts compare the mouse's x and y with, each once, until
+// something new comes
+var seeker = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") == "auto" ? new ClickSeeker(vm.ScreenWidth, vm.ScreenHeight) : null;
+int seekAfter = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_AUTO"), out int seekFrames) ? seekFrames : 900;
+if (seeker != null)
+    vm.CompareSeen = (a, b, cmp) => seeker.Compared(host.MousePosition, a, b, cmp);
 int sweepStuck = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_STUCK"), out int stuckFrames) ? stuckFrames : 9000;
 string? sweepFile = null, sweepEnd = null, sweepLast = null, slowestAt = null;
 int sweepTotal = 0, sweepLastNew = 0, sweepLastBlock = int.MaxValue;
@@ -238,6 +248,17 @@ try
         host.Clock = (uint)(frame * 1000L / 60) + pausedFor;
         host.Frame = frame;
         frameTime.Restart();
+        // A place for each click of the sweep (they come every 48 frames), while nothing new comes
+        if (seeker != null && host.Sweeping && frame % 48 == 0)
+        {
+            if (frame - Math.Max(sweepLastNew, host.LastNewFile) > seekAfter)
+                host.SweepPoint = seeker.Next(vm.HitTargets(), frame);
+            else
+            {
+                seeker.Stop(frame);
+                host.SweepPoint = null;
+            }
+        }
         foreach (var (message, wParam) in host.Messages())
             vm.WindowMessage(message, wParam, message is >= ScnMessage.LButtonDown and <= ScnMessage.MButtonUp
                 ? ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y) : ScnMessage.Key(0, message == ScnMessage.KeyDown, false));
@@ -529,8 +550,16 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     // decode it (to find files read over and over)
     private static readonly bool s_traceFiles = Environment.GetEnvironmentVariable("SCNBOOT_FILES") == "1";
 
+    // The files read so far, and the frame of the last one read for the first time (the story
+    // going on, for SCNBOOT_SWEEP_CLICKS=auto: a game standing at a menu reads nothing new)
+    private readonly HashSet<string> m_filesRead = new(StringComparer.OrdinalIgnoreCase);
+
+    public int LastNewFile { get; private set; }
+
     public byte[]? ReadFile(string name)
     {
+        if (m_filesRead.Add(name))
+            LastNewFile = Frame;
         if (Swap(name) is { } swap)
             return File.ReadAllBytes(swap);
         long start = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -585,12 +614,18 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     private readonly bool m_sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
     private readonly int m_sweepFrom = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_FROM"), out int from) ? from : 0;
 
-    private bool Sweeping => m_sweep && Frame >= m_sweepFrom;
+    public bool Sweeping => m_sweep && Frame >= m_sweepFrom;
 
     private bool SweepCtrl => Sweeping && Frame % 48 is < 12 or >= 36;
 
+    // SCNBOOT_SWEEP_RETURN=0: no Return (a menu whose Return takes the item it last showed, not the
+    // one under the mouse: Tekoire's info menu); the clicks alone choose and go on
+    private readonly bool m_sweepReturn = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_RETURN") != "0";
+
+    private bool SweepReturn => Sweeping && m_sweepReturn;
+
     public bool KeyDown(int virtualKey) =>
-        virtualKey is 0x11 or 0xA2 && SweepCtrl || Sweeping && virtualKey == 0x0D && Frame % 12 < 2
+        virtualKey is 0x11 or 0xA2 && SweepCtrl || SweepReturn && virtualKey == 0x0D && Frame % 12 < 2
         || m_presses.Any(p => p.Key == virtualKey && Frame >= p.From && Frame <= p.To);
 
     // SCNBOOT_MOUSE: (first frame, x, y, buttons, last frame the buttons are held)
@@ -616,12 +651,23 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
 
     private bool SweepClicking => Sweeping && Frame % 48 is 24 or 25;
 
+    // SCNBOOT_SWEEP_SHUFFLE=1: the places in an order of their own (a hash of the click's number),
+    // not one after another: a menu that comes back at the same frame of the 48 after each of its
+    // choices (Tekoire's info menu) would be clicked at the same place each time
+    private readonly bool m_sweepShuffle = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_SHUFFLE") == "1";
+
+    /// <summary>SCNBOOT_SWEEP_CLICKS=auto: the place ClickSeeker chose, used instead of the grid's.</summary>
+    public (int X, int Y)? SweepPoint { get; set; }
+
     public (int X, int Y) MousePosition
     {
         get
         {
+            if (Sweeping && SweepPoint is { } point)
+                return point;
             if (Sweeping)
-                return SweepClicks[Frame / 48 % SweepClicks.Length];
+                return SweepClicks[m_sweepShuffle ? (int)((uint)(Frame / 48) * 2654435761u >> 16) % SweepClicks.Length
+                    : Frame / 48 % SweepClicks.Length];
             var started = m_mouse.Where(m => m.From <= Frame).ToList();
             return started.Count > 0 ? (started[^1].X, started[^1].Y) : (0, 0);
         }
@@ -638,9 +684,9 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
                 yield return (ScnMessage.KeyDown, 0x11);
             if (Frame % 48 == 12)
                 yield return (ScnMessage.KeyUp, 0x11);
-            if (Frame % 12 == 0)
+            if (m_sweepReturn && Frame % 12 == 0)
                 yield return (ScnMessage.KeyDown, 0x0D);
-            if (Frame % 12 == 2)
+            if (m_sweepReturn && Frame % 12 == 2)
                 yield return (ScnMessage.KeyUp, 0x0D);
             if (Frame % 48 == 24)
                 yield return (ScnMessage.LButtonDown, 1);

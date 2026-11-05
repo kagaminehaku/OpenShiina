@@ -209,13 +209,19 @@ public sealed partial class ScnVm : IDisposable
     private const int GRegion = 0x01000000, BRegion = 0x02000000, ARegion = 0x03000000, SRegion = 0x04000000;
     private const int FRegion = 0x05000000, StackRegion = 0x06000000, NamedRegion = 0x07000000;
     // The heap has 1.5 GB (Kyuuketsuki no Libra's scripts take over 800 MB), everything stays
-    // below 2 GB as in the engine's own process (not large address aware: no address seen as < 0)
+    // below 2 GB as in the engine's own process (not large address aware: no address seen as < 0).
+    // A game whose .exe is large address aware (Nukitashi 2) had the 4 GB of a 32-bit process on
+    // 64-bit Windows: when the heap below the code is full, its blocks go on in the high heap
+    // (1.7 GB), which does not cross 0x80000000, so addresses compared as signed numbers keep
+    // their order. The modules' code then has 512 MB, up to the high heap.
     private const int HeapRegion = 0x10000000, CodeRegion = 0x70000000;
+    private const uint HighHeapRegion = 0x90000000, HighHeapEnd = 0xFF000000;
 
     // The 32-bit address space (ScnAddressSpace: one block of virtual memory, an address being
     // Base + (uint)address), physical memory only for the pages written
     private readonly ScnAddressSpace m_memory = new();
     private int m_heapTop = HeapRegion, m_codeTop = CodeRegion, m_namedTop = NamedRegion;
+    private int m_highTop = unchecked((int)HighHeapRegion);
 
     private readonly ScnOpcodes m_opcodes;
     private readonly IScnHost m_host;
@@ -486,8 +492,37 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>Bytes of heap in use (for reports).</summary>
     public long HeapInUse { get; private set; }
 
-    /// <summary>Bytes of heap not in use: below the code, less the blocks in use.</summary>
-    public long HeapFree => CodeRegion - HeapRegion - HeapInUse;
+    /// <summary>Bytes of heap not in use: below the code (and the high heap's), less the blocks in use.</summary>
+    public long HeapFree => CodeRegion - HeapRegion + (LargeAddressAware ? HighHeapEnd - HighHeapRegion : 0) - HeapInUse;
+
+    /// <summary>
+    /// The game's .exe is large address aware (IMAGE_FILE_LARGE_ADDRESS_AWARE in its PE header),
+    /// so its heap may go above 2 GB: told by the .exe in the game folder, else by its copy in the
+    /// archives, else by the scheme's "LargeAddressAware" in Formats.Json; false when none tells.
+    /// Read when first needed (the heap below the code is full).
+    /// </summary>
+    public bool LargeAddressAware
+    {
+        get => m_largeAddressAware ??= ReadLargeAddressAware();
+        set => m_largeAddressAware = value;
+    }
+
+    private bool? m_largeAddressAware;
+
+    private bool ReadLargeAddressAware()
+    {
+        if (ExeFileName() is { } exe
+            && PeCharacteristics(m_host.ReadLooseFile(exe) ?? m_host.ExecutableCopy(exe)) is { } characteristics)
+            return (characteristics & 0x20) != 0;
+        return Archives.FormatManager.Instance.GetScheme(Game)?.LargeAddressAware == true;
+    }
+
+    /// <summary>The Characteristics of a Windows executable's file header, or null when it is not one.</summary>
+    public static int? PeCharacteristics(byte[]? exe) =>
+        exe is { Length: > 0x40 } && exe[0] == 'M' && exe[1] == 'Z' && BitConverter.ToInt32(exe, 0x3C) is int pe
+        && pe > 0 && pe <= exe.Length - 24 && exe.AsSpan(pe, 4).SequenceEqual("PE\0\0"u8)
+            ? BitConverter.ToUInt16(exe, pe + 22)
+            : null;
 
     /// <summary>Zeroed memory (GlobalAlloc / VirtualAlloc); <see cref="Free"/> gives it back.</summary>
     public int Allocate(int bytes) =>
@@ -512,7 +547,7 @@ public sealed partial class ScnVm : IDisposable
     {
         int? next = null;
         foreach (int start in m_blocks.Keys)
-            if (start >= address && (next == null || start < next))
+            if ((uint)start >= (uint)address && (next == null || (uint)start < (uint)next))
                 next = start;
         return next;
     }
@@ -520,7 +555,7 @@ public sealed partial class ScnVm : IDisposable
     /// <summary>As <see cref="Allocate"/>, but 0 when the heap has no room (VirtualAlloc failing).</summary>
     public int TryAllocate(int bytes)
     {
-        if (bytes < 0 || bytes > CodeRegion - HeapRegion)
+        if (bytes < 0 || bytes > HighHeapEnd - HighHeapRegion)
             return 0;
         int size = (Math.Max(bytes, 4) + 15) & ~15;
         // The smallest free range it fits in
@@ -544,14 +579,20 @@ public sealed partial class ScnVm : IDisposable
                 m_freeRanges.Add(best + size, bestSize - size);
             at = best;
         }
-        else
+        // The heap must not grow into the code of the modules; then the high heap, for a large
+        // address aware game
+        else if ((long)m_heapTop + size <= CodeRegion)
         {
-            // The heap must not grow into the code of the modules
-            if ((long)m_heapTop + size > CodeRegion)
-                return 0;
             at = m_heapTop;
             m_heapTop = at + size;
         }
+        else if ((long)(uint)m_highTop + size <= HighHeapEnd && LargeAddressAware)
+        {
+            at = m_highTop;
+            m_highTop = unchecked(at + size);
+        }
+        else
+            return 0;
         m_blocks[at] = size;
         HeapInUse += size;
         return at;
@@ -582,6 +623,8 @@ public sealed partial class ScnVm : IDisposable
         }
         if (end == m_heapTop)
             m_heapTop = start;      // the top comes down; it stays zero
+        else if (end == m_highTop)
+            m_highTop = start;
         else
             m_freeRanges.Add(start, end - start);
     }
@@ -656,8 +699,11 @@ public sealed partial class ScnVm : IDisposable
         var code = m_host.ReadFile(file);
         if (code == null)
             return false;
-        int at = m_codeTop;
-        m_codeTop += (code.Length + 0xFFF + 16) & ~0xFFF;
+        int at = m_codeTop, size = (code.Length + 0xFFF + 16) & ~0xFFF;
+        // A large address aware game's code stops at its high heap (as it ever comes near: 512 MB)
+        if ((long)(uint)at + size > HighHeapRegion && LargeAddressAware)
+            throw new ScnException($"Out of module memory: {((uint)at - CodeRegion) >> 20} MB of modules loaded, {file} asked for", -1, 0, 0);
+        m_codeTop += size;
         WriteBytes(at, code);
         RememberModule(at, file, code);
         var c = m_slots[slot];

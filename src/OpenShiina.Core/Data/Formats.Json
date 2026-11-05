@@ -1672,6 +1672,7 @@
           "Name": "Libra of the Vampire Princess",
           "OriginalTitle": "",
           "Version": 2500,
+          "LargeAddressAware": true,
           "EntryNameSize": 32,
           "CryptKey": "@CryptKey",
           "HelperKey": [
@@ -2110,6 +2111,7 @@
           "Name": "Nukige Mitai na Shima ni Sunderu... 2",
           "OriginalTitle": "抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2",
           "Version": 2500,
+          "LargeAddressAware": true,
           "EntryNameSize": 32,
           "CryptKey": "@CryptKey",
           "HelperKey": [
@@ -2525,6 +2527,7 @@
           "Name": "The Pillagers of Raillore",
           "OriginalTitle": "",
           "Version": 2500,
+          "LargeAddressAware": true,
           "EntryNameSize": 32,
           "CryptKey": "@CryptKey",
           "HelperKey": [
@@ -3955,6 +3958,7 @@
           "Name": "Sis Camp",
           "OriginalTitle": "シス△キャン",
           "Version": 2500,
+          "LargeAddressAware": true,
           "EntryNameSize": 32,
           "CryptKey": "@CryptKey",
           "HelperKey": [

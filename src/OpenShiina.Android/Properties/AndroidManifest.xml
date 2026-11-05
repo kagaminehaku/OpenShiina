@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto">
   <!-- The games are folders on the device's storage (or a memory card): reading them needs all
-       files access from Android 11, the storage permission before -->
+       files access from Android 11, the storage permission before. With it the player folder is
+       OpenShiina on the device's storage, where any file manager sees the saves (writing it
+       before Android 11 needs the permission to write) -->
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
   <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
   <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
   <!-- Android's backup (Java/BackupAgent.java): the player folder, saves and settings, but not the

@@ -767,6 +767,36 @@ public sealed partial class ScnVm
         return EngineVersion < 240 ? m_lastFrameRect : null;
     }
 
+    // The sprite list 04C7 looked in last (-1: none yet)
+    private int m_hitTestList = -1;
+
+    /// <summary>
+    /// The entries of the sprite list 04C7 looked in last that give a value (word 6 not -1), with
+    /// the rectangle of their frame on the screen: the buttons the scripts tell apart by the mouse
+    /// (for a test run that looks for where to click).
+    /// </summary>
+    public List<(int Value, int Left, int Top, int Width, int Height)> HitTargets()
+    {
+        var targets = new List<(int, int, int, int, int)>();
+        if (m_hitTestList < 0)
+            return targets;
+        int sprites = TableAddress(m_hitTestList);
+        for (int i = 0; i < m_spriteCounts[m_hitTestList]; i++)
+        {
+            int e = sprites + i * SpriteSize;
+            int value = Read32(e + 0x18), picture = Picture(Read32(e));
+            if (value == -1 || picture == 0)
+                continue;
+            uint frameIndex = (uint)Read32(e + 4);
+            if ((uint)Read32(picture + 4) <= frameIndex || Read32(picture + 8 + 4 * (int)frameIndex) is not (not 0 and int f))
+                continue;
+            int width = Read32(f), height = Read32(f + 4);
+            if (width > 0 && height > 0)
+                targets.Add((value, Read32(f + 8) + Read32(e + 0x10), Read32(f + 0xC) + Read32(e + 0x14), width, height));
+        }
+        return targets;
+    }
+
     /// <summary>
     /// FUN_004114B0: from the highest priority down (unsigned; shown or not), the first entry
     /// whose frame has a run of method 1 or more under (x, y) gives <paramref name="hit"/> = its
@@ -997,6 +1027,7 @@ public sealed partial class ScnVm
             int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
             int list = vm.m_spriteList;
             int hit = -1;
+            vm.m_hitTestList = list;
             vm.HitTest(vm.TableAddress(list), vm.m_spriteCounts[list], x, y, ref hit);
             vm.Store(c, i.Args[2], hit);
             return 0;

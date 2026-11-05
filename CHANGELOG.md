@@ -4,8 +4,23 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.8.0 (2026-11-05)
 
+- A game whose executable is large address aware (Nukitashi 2, Libra of the Vampire Princess,
+  The Pillagers of Raillore, Sis△Camp) may use the scripts' memory above 2 GB, as on 64-bit
+  Windows: Nukitashi 2's 02_C23 no longer runs out of it. The other games keep it below 2 GB.
+  **Nukige Mitai na Shima ni Sunderu... 2** (2019) and **Miko Dashi** (巫女だし, of the Nakadashi
+  Trilogy, 2009) play through.
+- Android: the saves and settings are in `OpenShiina` on the device's storage (once all files access
+  is allowed), where any file manager and a computer over USB see them and uninstalling the app
+  leaves them; those of the app's own folder are copied there once. "Open the save folder" shows
+  the folder in Files (it did nothing on Android); Android's backup keeps working.
+- OpenShiina Tools' "Play from here" lets Ctrl go after 10 seconds when no text shows (a
+  scenario that is a menu's title, as Miko Dashi's character choices): the menu takes a choice.
+- The sweep's `auto` clicks (SCNBOOT_SWEEP_CLICKS=auto): when nothing new comes, the clicks go to
+  the buttons the scripts tell apart (04C7) and to the places they compare the mouse with; and
+  `tests/sweep.ps1 -Only / -Again` runs again only the scenarios named, or those an earlier sweep
+  left stuck.
 - The scale-down routine of the v2.47 zooms (Miko Dashi, Pure Love!, Imouto Smile...) takes
   the source rows and columns it reads exactly: a picture halved into the one right after it in
   memory no longer runs as x86 code.
@@ -24,11 +39,11 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   (YODUMA.EXE's code decrypted as its own start-up stub does it), with their handlers where they
   differ from the later engines' (the old movie and music-fade opcodes, gosub by index, the
   missing frames 2.37 takes without an error, the clock read in a loop).
-  **Yoyogi Hitozuma Senmon Gakuin** (代々木人妻専門学院, 2006) and **Cleavage** (2005) play
-  through; **Tekoire Princess!** (てこいれぷりんせす！, 2004) plays.
+  **Yoyogi Hitozuma Senmon Gakuin** (代々木人妻専門学院, 2006), **Cleavage** (2005) and
+  **Tekoire Princess!** (てこいれぷりんせす！, 2004) play through.
 - **New: Love & Piss** (Love＆Piss ～少女のガマンが世界を救う～, 2013) plays through: its keys were
   taken from its executable (decrypted as its start-up stub does it), with its DecodeBin date.
-- 63 games (64 releases) now play through (the Japanese Sorcery Jokers too: its last scenario
+- 66 games (67 releases) now play through (the Japanese Sorcery Jokers too: its last scenario
   ends at its map of routes), **Imouto Smile** (妹スマイル, 2009), **S.D.I.-Sadistic
   Daughter Incident-** (2013) and **Sadistic Little** (サディスティックりとる, 2009) among them, their
   keys taken from their executables, and **Yokorenbo** (横恋母, 2008) and **Hana to Otome ni

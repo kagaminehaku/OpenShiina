@@ -143,6 +143,7 @@ public class FormatManager
             DecodeBin = GetHex(e, "DecodeBin"),
             ShiinaImage = LoadShiinaImage(e),
             ExtraCrypt = CreateExtraCrypt(e),
+            LargeAddressAware = e.TryGetProperty("LargeAddressAware", out var laa) && laa.ValueKind == JsonValueKind.True,
         };
     }
 

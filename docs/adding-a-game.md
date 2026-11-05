@@ -1,6 +1,6 @@
 # Adding a game
 
-How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 64 releases
+How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 67 releases
 that play went through these steps; most of what goes wrong with a new one is in the table of
 symptoms below, with what fixed it before.
 
@@ -147,7 +147,11 @@ other route's).
   stuck scenario again with other clicks (`SCNBOOT_SWEEP_CLICKS=safe`, then `center`); when
   that is not enough, try one point at a time (`SCNBOOT_SWEEP_CLICKS=x,y`) to find the button
   and where the choices are (Doushite Daite Kurenai no!?: a button at the grid's lower right,
-  choices at 30-45% of the height).
+  choices at 30-45% of the height). `SCNBOOT_SWEEP_CLICKS=auto` finds the buttons itself when
+  nothing new comes for 900 frames: the sprites `04C7` tells apart (the largest first) and the
+  boxes of the places the scripts compare the mouse with; its `[auto]` lines say what it tried
+  (Miko Dashi's character choices, three menus deep). Then run only the scenarios left stuck:
+  `sweep.ps1 -Again <summary.tsv>` (or `-Only name,name`), not the whole game again.
 - **Slow frames** (the slowest are listed): a routine on the x86 interpreter (step 4), or a
   file read again and again.
 - **Lines under 90%**: choices' other branches, or messages of several lines shown together
@@ -185,6 +189,6 @@ a C# routine others use), sweep the games it touches again before committing.
 | A script error on an opcode | a handler not written yet (opcheck) | most games |
 | Frames of seconds | an x86 routine on the interpreter (a new build of a known one) | Chuuni Hime, Chiccha na Hanayome, Sorcery Jokers |
 | 1 frame a second in the menus | SSE2 routines on the interpreter | the Bitch games |
-| Out of the scripts' memory | the heap's size | Bitch Gakuen, Kyuuketsuki no Libra; Nukitashi 2 (one scenario, not fixed yet) |
+| Out of the scripts' memory | the heap's size; for an .exe that is large address aware, whether the flag is read (engine-notes.md, "Heap") | Bitch Gakuen, Kyuuketsuki no Libra; Nukitashi 2 (its high heap) |
 | Every scenario of the sweep stuck with no line shown | "Play from here" did not find the new game in TOPMENU.SCN (ScnVm.Warp.cs) | Boku Igai no Otoko o Shiranai Kanojo |
 | The archives open with another game's scheme, files not whole | GameMap lacks the .exe and the archives' names hold another game's | Nukitashi 2 |

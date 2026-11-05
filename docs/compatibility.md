@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.31, 2.33, 2.34, 2.37 and 2.44 to 2.50; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 63 games, 64 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 66 games, 67 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -47,7 +47,7 @@ of those versions it does not list.
 | STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | ⚪ Not tried |  |
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ⚪ Not tried |  |
-| Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | 🟢 Plays | 2026-11-04 |
+| Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | ✅ Plays through | 2026-11-05 |
 | Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🟢 Plays | 2026-11-05 |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ⚪ Not tried |  |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.39 | ⚪ Not tried |  |
@@ -104,7 +104,7 @@ of those versions it does not list.
 | Mimi o Sumaseba | みみをすませば | 2009-08-28 | [v2208](https://vndb.org/v2208) | v2.47 | ⚪ Not tried |  |
 | Mahou Shoujo no Taisetsu na Koto | 魔法少女の大切なこと。 | 2009-09-25 | [v2616](https://vndb.org/v2616) | v2.47 | ⚪ Not tried |  |
 | Rin x Sen | RIN×SEN～白濁女教師と野郎ども～ | 2009-09-25 | [v2611](https://vndb.org/v2611) | v2.47 | ✅ Plays through | 2026-11-04 |
-| Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | 🟢 Plays | 2026-11-04 |
+| Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Sadistic Little | サディスティックりとる | 2009-11-06 | [v2850](https://vndb.org/v2850) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Imouto Smile | 妹スマイル | 2009-11-27 | [v2847](https://vndb.org/v2847) | v2.47 | ✅ Plays through | 2026-11-05 |
@@ -182,7 +182,7 @@ of those versions it does not list.
 | Kiki Mimi | ききミミ | 2018-07-26 | [v23506](https://vndb.org/v23506) | v2.50 | ⚪ Not tried |  |
 | Nukige Mitai na Shima ni Sunderu | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? | 2018-07-27 | [v22899](https://vndb.org/v22899) | v2.50 | ✅ Plays through | 2026-11-04 |
 | Saimin Paradise! | 催眠ぱらだいす! ～催眠術でツゴウノイイ美少女学園性活～ | 2018-09-28 | [v23063](https://vndb.org/v23063) | v2.50 | ⚪ Not tried |  |
-| Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | 🟢 Plays | 2026-11-04 |
+| Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ✅ Plays through | 2026-11-05 |
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ⚪ Not tried |  |
 | Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
@@ -701,8 +701,9 @@ mask of 44 x 44, its frame cleared and its first bytes scaled. The sequel's arch
 (NUKITASHI2_*.WAR) were taken for the first game's, whose name is in theirs: its .exe went into
 GameMap, and its DecodeBin date is 20190329 (`ScnTools datefind`); then its 18,231 files come out
 whole. Swept: the first, 133 scenarios, every one to its end; the second, 122, every one to its
-end but one, 02_C23.TXT, which runs out of the scripts' memory (1.1 GB in use and a block of 190
-MB asked for; todo.md).
+end (2026-11-05) once its heap could go above 2 GB: NUKITASHI2.EXE is large address aware, and
+its 02_C23.TXT has 1.1 GB of the scripts' heap in use when it asks for a block of 190 MB (heap
+peak 1,513 MB; engine-notes.md, "Heap").
 
 **Nakadashi Trilogy**: its new game, **Miko Dashi** (巫女だし, Cdrive, MIKODS.EXE, engine v2.47),
 was tried (the trilogy's other two, the earlier Nakadashi Hara Maid games, are KiriKiri games). Its
@@ -717,9 +718,13 @@ more routines needed C# (builds of known ones: its thumbnail and its rows, NOT, 
 the weight table i * 256 / sW), and its START 646B8, the scaling-down case of its zoom (1,124
 instructions; no scenario of the sweep ran it), is written out in ScnVm.ScaleArea.cs, the same
 bytes as its x86 code on random cases in each of its four cases (Pure Love!, Iyashinbo The Motion
-and Gakushoku no Oba-san The Motion have it too, with each pixel's first byte made FF). Swept: 153 scenarios; 147 show their last message and then the game
-stands at its menu of scenes (`$EX,0,019` ends each), which the sweep does not choose from; the
-two menus of one line (SEN01, SEN02) and SAKU001 (382 of its 613 lines) stand there too.
+and Gakushoku no Oba-san The Motion have it too, with each pixel's first byte made FF). Swept
+(2026-11-05): 153 scenarios, every one to its end; 151 show their last message and then the
+game stands at its menu of scenes (`$EX,0,019` ends each). SEN01 and SEN02 are its character
+choices of a day (their one line the menu's title, which no text shows): three menus deep
+(character, play style, situation), chosen by the clicks of the sweep's `auto` mode, they go on
+to the scenario chosen. Such a scenario played from had Ctrl held for ever (held until the first
+text shows, and a menu seen with Ctrl held takes no choice): now 10 seconds at most.
 
 **Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~** (LUCHA!, YODUMA.EXE, engine v2.37
 with YODUMA.INI) had no keys: CC Hospital's scheme opens its 10,506 files whole, so it has a
@@ -747,9 +752,12 @@ It needed `000E` / `0011`, `06DD` / `06DE` (v2.37's fade), `0263` and an XOR str
 (engine-notes.md, "v2.37"). Its story is in SCN modules, not scenario TXT: a long run in ScnBoot
 plays it. A run that only presses Return stops with the scripts' own "Not Enough Stack Area" at
 about frame 112,900, and so does the original engine: PROL_02.SCN's info menu calls a START
-routine (gosub 204, START 05524) that leaves 4 values on the stack each time, and the menu goes on until each of its three topics has been read. Pressing
-Return picks the same topic each time, so the stack fills; a player who reads the three topics
-leaves the menu after a few calls, and the next module's load resets the stack.
+routine (gosub 204, START 05524) that leaves 4 values on the stack each time, and the menu goes
+on until each of its three topics has been read. Pressing Return picks the same topic each time,
+so the stack fills; a player who reads the three topics leaves the menu after a few calls, and
+the next module's load resets the stack. A run with the sweep's `auto` clicks (and
+SCNBOOT_SWEEP_SHUFFLE=1, SCNBOOT_SWEEP_RETURN=0) went past that menu and its map of places to
+Z_ITEM.SCN's room, where it found nothing to click; played through by hand (2026-11-05).
 
 **Imouto Smile** (C:drive. / Citoron Soft, IMOSMILE.EXE, engine v2.47) had no keys: its scheme
 came from its executable, encrypted by a `.riox` stub (engine-notes.md, "A scheme from the
@@ -846,7 +854,8 @@ Nare! on 2026-10-20; Gensou no Idea on 2026-10-21; Gakushoku no Oba-san The Moti
 Hitozuma Gui on 2026-10-23 and 24; Saimin Seikatsu and Ren'ai Saimin on 2026-10-31; Oni ga Kuru
 and Doushite Daite Kurenai no!? on 2026-11-03; Rin x Sen, Last Waltz, Ran→Sem, Bloody Rondo,
 Tanetsuke Mura, Shojo Mama, Boku Igai no Otoko o Shiranai Kanojo, Gohoushi Nurse, Lovecha and
-Nukige Mitai na Shima ni Sunderu on 2026-11-04, Hitozuma Gui, Raillore and Sorcery Jokers (English) again): none
+Nukige Mitai na Shima ni Sunderu on 2026-11-04, Hitozuma Gui, Raillore and Sorcery Jokers (English) again;
+Miko Dashi and Nukige Mitai na Shima ni Sunderu... 2 on 2026-11-05): none
 stopped, none stuck.
 
 | Game | Scenarios | Lines shown |
@@ -913,6 +922,8 @@ stopped, none stuck.
 | Sadistic Little | 96 | 99.5% |
 | Yokorenbo ~Immoral Mother~ | 113 | 64.9% (as Rin x Sen) |
 | Hana to Otome ni Shukufuku o | 208 | 99.2% |
+| Nakadashi Trilogy (Miko Dashi) | 153 | 53.4% (messages of two lines, the second shown with the first) |
+| Nukige Mitai na Shima ni Sunderu... 2 | 122 | 99.5% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

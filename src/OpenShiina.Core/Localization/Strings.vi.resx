@@ -49,6 +49,7 @@
   <data name="DeletedFreed" xml:space="preserve"><value>Đã xóa {0}: giải phóng {1}.</value></data>
   <data name="CouldNotOpen" xml:space="preserve"><value>Không mở được {0}:
 {1}</value></data>
+  <data name="FolderIsAt" xml:space="preserve"><value>Thư mục ở {0} (mở bằng trình quản lý file).</value></data>
   <data name="AgoJustNow" xml:space="preserve"><value>vừa xong</value></data>
   <data name="AgoMinute" xml:space="preserve"><value>1 phút trước</value></data>
   <data name="AgoMinutes" xml:space="preserve"><value>{0} phút trước</value></data>

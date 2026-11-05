@@ -2,8 +2,12 @@ param(
     [Parameter(Mandatory)][string]$Folder,
     [string]$Out = '',
     [int]$Parallel = 4,
-    [int]$Frames = 30000
+    [int]$Frames = 30000,
+    [string[]]$Only = @(),
+    [string]$Again = ''
 )
+# -Only: those scenarios alone; -Again <summary.tsv of an earlier sweep>: its scenarios that did
+# not end "done" alone (a fix for the ones stuck or stopped, without running the others again)
 # Sweeps a game: every scenario with message lines run through by ScnBoot (SCNBOOT_PLAYFROM at its
 # first line, SCNBOOT_SWEEP: skip held, choices made), a process each, $Parallel at a time. Writes
 # $Out\logs\<scenario>.txt and $Out\summary.tsv, and prints how the scenarios ended, the lines
@@ -28,6 +32,11 @@ New-Item -ItemType Directory -Force (Join-Path $Out 'logs') | Out-Null
 $env:SCNBOOT_LIST = '1'
 $list = & $scnboot $Folder | ForEach-Object { ($_ -split "`t")[0] }
 Remove-Item Env:SCNBOOT_LIST
+if ($Again) {
+    $Only += @(Import-Csv -LiteralPath $Again -Delimiter "`t" | Where-Object { $_.Result -notlike 'done*' } | ForEach-Object Scenario)
+    if ($Only.Count -eq 0) { "Every scenario of $Again ended done."; return }
+}
+if ($Only.Count -gt 0) { $list = @($list | Where-Object { $Only -contains $_ }) }
 $env:SCNBOOT_SWEEP = '1'; $env:SCNBOOT_CACHE = '256'; $env:SCNBOOT_STALL = '30'
 
 $seconds = @{}

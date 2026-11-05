@@ -81,8 +81,11 @@ The home screen's Settings button opens their page. They are saved in `settings.
 ## Saves
 
 Saves and settings are kept in `%AppData%\OpenShiina` (Linux: `~/.config/OpenShiina`; Android:
-`Android/data/com.kagaminehaku.openshiina/files`). Each game's saves are in a folder of their own
-(the card's **…** opens it); `crash.log`, `stall.log` and `perf.log` are written there too.
+`OpenShiina` on the device's storage once the player may read the device's files, where any file
+manager and a computer over USB see them, and which uninstalling the app leaves; before that
+`Android/data/com.kagaminehaku.openshiina/files`, whose files are copied to `OpenShiina` once).
+Each game's saves are in a folder of their own (the card's **…** opens it, in Files on Android);
+`crash.log`, `stall.log` and `perf.log` are written there too.
 
 On Android the saves go into Android's backup (Google's cloud, a new phone) and come back when the
 app is installed again; the game library and the logs do not. Android keeps 25 MB of an app (a

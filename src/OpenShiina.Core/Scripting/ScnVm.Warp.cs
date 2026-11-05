@@ -5,8 +5,8 @@
 // waits made comments, its other commands (backgrounds, characters, music) left to run, so the
 // scene is set as the story sets it (but for what earlier scenarios and choices set). The reads
 // of the scenario asked for give that one for the rest of the game, so that a save it makes
-// loads it again; Ctrl (the games' skip) is held until the first text is shown, so that the
-// scene's transitions go by at once. The game's saves stay in memory: its own are left as they
+// loads it again; Ctrl (the games' skip) is held until the first text is shown (10 seconds at
+// most), so that the scene's transitions go by at once. The game's saves stay in memory: its own are left as they
 // are (a save of the scenario put in place would not load in the real game).
 
 using System.Text;
@@ -23,8 +23,12 @@ public sealed partial class ScnVm
     private string? m_playAlias, m_playTarget;
     private int m_playLine;
     private byte[]? m_playData;
-    // Ctrl held for the scripts: from the scenario put in place to the first text shown
+    // Ctrl held for the scripts: from the scenario put in place to the first text shown, or for
+    // PlaySkipFrames at most (a scenario whose one line is a menu's title, which no text shows:
+    // Miko Dashi's SEN01.TXT; a menu seen with Ctrl held takes no choice)
     private bool m_playSkip;
+    private int m_playSkipEnd;
+    private const int PlaySkipFrames = 600;
 
     // The saves while they stay in memory (null: on disk, through the host)
     private Dictionary<string, byte[]?>? m_memorySaves;
@@ -67,6 +71,7 @@ public sealed partial class ScnVm
             m_playAlias = name;
             m_playFrom = null;
             m_playSkip = true;
+            m_playSkipEnd = m_frameNumber + PlaySkipFrames;
         }
         if (!name.Equals(m_playAlias, StringComparison.OrdinalIgnoreCase))
             return null;
@@ -265,7 +270,8 @@ public sealed partial class ScnVm
     }
 
     /// <summary>A key held, as the scripts see it: Ctrl too while a scene is skipped to the line to play from.</summary>
-    private bool KeyHeld(int virtualKey) => m_host.KeyDown(virtualKey) || m_playSkip && virtualKey is 0x11 or 0xA2;
+    private bool KeyHeld(int virtualKey) =>
+        m_host.KeyDown(virtualKey) || m_playSkip && m_frameNumber < m_playSkipEnd && virtualKey is 0x11 or 0xA2;
 
     private byte[]? ReadSave(string name) =>
         m_memorySaves is { } saves ? saves.TryGetValue(name, out var data) ? data : m_host.ReadSaveFile(name) : m_host.ReadSaveFile(name);

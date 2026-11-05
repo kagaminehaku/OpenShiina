@@ -39,6 +39,12 @@ public static class PlayerPlatform
     /// </summary>
     public static Func<Task<bool>> EnsureFileAccessAsync { get; set; } = () => Task.FromResult(true);
 
+    /// <summary>
+    /// Shows a folder in the platform's own file app (Android's Files), false when it cannot (the
+    /// player then says where the folder is); null: the launcher's folder opening (the desktop).
+    /// </summary>
+    public static Func<string, bool>? OpenFolder { get; set; }
+
     /// <summary>The app went to the background (false) or came back (true), where the platform has no window to say so.</summary>
     public static event Action<bool>? ActiveChanged;
 

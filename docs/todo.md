@@ -59,7 +59,7 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 147 games; 64 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 149 games; 67 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
 - [ ] **Keys for the 18 games without them** (compatibility.md, "No keys yet"), once their files
@@ -70,9 +70,6 @@ is mostly for slow phones, and should follow what their perf.log shows.
   04EC, 0B7D), the 9 new ones (007D-0080, 060E-0610, 0614, 077B) and 03BF. Ao no Juuai uses none.
 - [ ] Opcode tables for 2.35, 2.38-2.43 and 2.48 (opscan on the game's executable; v2.31,
   v2.33, v2.34, v2.37 and v2.44 have theirs, 2.45 and 2.46 are v2.47's).
-- [ ] **A larger heap for Nukitashi 2**: one scenario (02_C23.TXT) has 1.1 GB of the scripts'
-  heap in use and asks for 190 MB more in one block (1.5 GB below the modules' code at
-  0x70000000; the code region only grows, so moving it up leaves less room for modules).
 - [ ] The ExtraCrypts (PostAdler, PreAdler, Count, AltCount, Ushimitsu, Nukitashi2,
   Saimin) checked against their archives.
 - [ ] **WMV9 P-picture loop filter**: Windows' decoder chooses some loop filter edges of WMV3

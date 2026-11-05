@@ -24,7 +24,7 @@ public static class AndroidStorage
     public static Task<bool> EnsureFileAccessAsync()
     {
         var activity = MainActivity.Current;
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+        if (OperatingSystem.IsAndroidVersionAtLeast(30))
         {
             if (AndroidEnvironment.IsExternalStorageManager)
                 return Task.FromResult(true);
@@ -44,12 +44,59 @@ public static class AndroidStorage
         }
         if (activity == null)
             return Task.FromResult(false);
-        if (activity.CheckSelfPermission(Manifest.Permission.ReadExternalStorage) == Permission.Granted)
+        if (HasSharedAccess(activity))
             return Task.FromResult(true);
         s_answer?.TrySetResult(false);
         s_answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        activity.RequestPermissions([Manifest.Permission.ReadExternalStorage], StorageRequest);
+        activity.RequestPermissions([Manifest.Permission.ReadExternalStorage, Manifest.Permission.WriteExternalStorage], StorageRequest);
         return s_answer.Task;
+    }
+
+    /// <summary>
+    /// The player may read and write the device's storage: all files access from Android 11, the
+    /// storage permissions before (to read the games, and to keep the player folder there).
+    /// </summary>
+    public static bool HasSharedAccess(Context context) =>
+        OperatingSystem.IsAndroidVersionAtLeast(30)
+            ? AndroidEnvironment.IsExternalStorageManager
+            : context.CheckSelfPermission(Manifest.Permission.ReadExternalStorage) == Permission.Granted
+              && context.CheckSelfPermission(Manifest.Permission.WriteExternalStorage) == Permission.Granted;
+
+    /// <summary>The player folder on the device's storage, where any file manager sees it: OpenShiina.</summary>
+    public static string SharedPlayerFolder =>
+        Path.Combine(AndroidEnvironment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0", "OpenShiina");
+
+    /// <summary>
+    /// Shows a folder of the device's storage in Android's Files (its document of the folder,
+    /// viewed); false when it is not on the device's storage or no app shows it.
+    /// </summary>
+    public static bool OpenFolder(string path)
+    {
+        var activity = MainActivity.Current;
+        string storage = AndroidEnvironment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0";
+        string full = Path.GetFullPath(path);
+        if (activity == null || !full.StartsWith(storage + "/", StringComparison.Ordinal))
+            return false;
+        // Folders under Android/data are the apps' own: Files does not show them from Android 11
+        string relative = full[(storage.Length + 1)..];
+        if (relative.StartsWith("Android/data", StringComparison.OrdinalIgnoreCase) && OperatingSystem.IsAndroidVersionAtLeast(30))
+            return false;
+        try
+        {
+            var uri = DocumentsContract.BuildDocumentUri("com.android.externalstorage.documents", "primary:" + relative);
+            var intent = new Intent(Intent.ActionView);
+            intent.SetDataAndType(uri, DocumentsContract.Document.MimeTypeDir);
+            // No grant of the URI: the player has none to give (Android refuses the intent then),
+            // and Files reads the device's storage itself
+            intent.AddFlags(ActivityFlags.NewTask);
+            activity.StartActivity(intent);
+            return true;
+        }
+        catch (Exception e) when (e is ActivityNotFoundException or Java.Lang.Exception)
+        {
+            global::Android.Util.Log.Warn("OpenShiina", $"Could not show {path} in Files: {e.Message}");
+            return false;
+        }
     }
 
     /// <summary>The user answered the permission the player asked for (MainActivity).</summary>

@@ -49,6 +49,7 @@
   <data name="DeletedFreed" xml:space="preserve"><value>{0} was deleted: {1} freed.</value></data>
   <data name="CouldNotOpen" xml:space="preserve"><value>Could not open {0}:
 {1}</value></data>
+  <data name="FolderIsAt" xml:space="preserve"><value>The folder is {0} (open it with a file manager).</value></data>
   <data name="AgoJustNow" xml:space="preserve"><value>just now</value></data>
   <data name="AgoMinute" xml:space="preserve"><value>a minute ago</value></data>
   <data name="AgoMinutes" xml:space="preserve"><value>{0} minutes ago</value></data>

@@ -180,16 +180,17 @@ public sealed partial class ScnVm
                 return 1;
             case ("kernel32", "GlobalMemoryStatusEx"):
             {
-                // MEMORYSTATUSEX of a PC with 8 GB, as a 32-bit program sees it; the address space
-                // free is the heap's (Libra of the Vampire Princess's START takes all of it but
-                // SGMemSize with VirtualAlloc while it loads its tables, then gives it back)
+                // MEMORYSTATUSEX of a PC with 8 GB, as a 32-bit program sees it (4 GB of address
+                // space when it is large address aware); the address space free is the heap's
+                // (Libra of the Vampire Princess's START takes all of it but SGMemSize with
+                // VirtualAlloc while it loads its tables, then gives it back)
                 int p = Arg(0);
                 Write32(p + 4, 25);
                 Write64(p + 8, 8L << 30);
                 Write64(p + 16, 6L << 30);
                 Write64(p + 24, 16L << 30);
                 Write64(p + 32, 12L << 30);
-                Write64(p + 40, 0x7FFE0000);
+                Write64(p + 40, LargeAddressAware ? 0xFFFE0000 : 0x7FFE0000);
                 Write64(p + 48, HeapFree);
                 Write64(p + 56, 0);
                 return 1;
@@ -197,13 +198,14 @@ public sealed partial class ScnVm
             case ("kernel32", "GetSystemInfo"):
             {
                 // SYSTEM_INFO of an x86 PC with 4 cores: pages of 4 KB, addresses from 64 KB to
-                // 2 GB, allocations at 64 KB (Libra of the Vampire Princess's START steps its
-                // search for the largest VirtualAlloc down to the page size)
+                // 2 GB (4 GB when large address aware), allocations at 64 KB (Libra of the
+                // Vampire Princess's START steps its search for the largest VirtualAlloc down to
+                // the page size)
                 int p = Arg(0);
                 Write32(p, 0);
                 Write32(p + 4, 4096);
                 Write32(p + 8, 0x10000);
-                Write32(p + 12, 0x7FFEFFFF);
+                Write32(p + 12, LargeAddressAware ? unchecked((int)0xFFFEFFFF) : 0x7FFEFFFF);
                 Write32(p + 16, 15);
                 Write32(p + 20, 4);
                 Write32(p + 24, 586);
@@ -242,7 +244,8 @@ public sealed partial class ScnVm
                 // (committed, read and write, private), else the free room up to the next one
                 // (only Libra of the Vampire Princess's map of the memory for RIO.INI's TestMMOut)
                 int address = Arg(0), info = Arg(1);
-                if (Arg(2) < 28 || (uint)address >= 0x7FFF0000u)
+                uint top = LargeAddressAware ? 0xFFFF0000u : 0x7FFF0000u;
+                if (Arg(2) < 28 || (uint)address >= top)
                     return 0;
                 if (BlockAt(address) is { } block)
                 {
@@ -256,11 +259,12 @@ public sealed partial class ScnVm
                 }
                 else
                 {
-                    int start = address & ~0xFFF, end = NextBlock(address) ?? 0x7FFF0000;
+                    int start = address & ~0xFFF;
+                    uint end = NextBlock(address) is { } next ? (uint)next : top;
                     Write32(info, start);
                     Write32(info + 4, 0);
                     Write32(info + 8, 0);
-                    Write32(info + 12, Math.Max(end - start, 0x1000));
+                    Write32(info + 12, (int)Math.Max(end - (uint)start, 0x1000u));
                     Write32(info + 16, 0x10000);
                     Write32(info + 20, 1);
                     Write32(info + 24, 0);
