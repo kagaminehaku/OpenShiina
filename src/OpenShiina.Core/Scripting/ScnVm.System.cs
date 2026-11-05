@@ -82,7 +82,8 @@ public sealed partial class ScnVm
     // no!? (DODAKURE.EXE, v2.50: START 0x006A6 wants v ^ 306723180 = -1421357033), Nakadashi
     // Trilogy's Miko Dashi (MIKODS.EXE, v2.47: START 0x0037A wants v ^ 306723180 = 228471671), Imouto
     // Smile (IMOSMILE.EXE, v2.47: START 0x003C4 wants v ^ 306723180 = 969238634), Yokorenbo
-    // (YOKOREN.EXE, v2.44: START 0x00352 wants v ^ 306723180 = -1396214426, 555116478 with f[257] bit 1)
+    // (YOKOREN.EXE, v2.44: START 0x00352 wants v ^ 306723180 = -1396214426, 555116478 with f[257] bit 1),
+    // Hana to Otome ni Shukufuku o (HANAOTO.EXE, v2.46: START 0x0037E wants v ^ 306723180 = 222200098)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -94,6 +95,7 @@ public sealed partial class ScnVm
         ["Nakadashi Trilogy"] = 306723180 ^ 228471671,
         ["Imouto Smile"] = 306723180 ^ 969238634,
         ["Yokorenbo ~Immoral Mother~"] = 306723180 ^ -1396214426,
+        ["Hana to Otome ni Shukufuku o"] = 306723180 ^ 222200098,
     };
 
     private void RegisterSystem()

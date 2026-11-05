@@ -1084,6 +1084,48 @@ public sealed partial class ScnVm
     /// of the text (RState 0) or when a wait is due. <paramref name="invalidate"/>: the surface is
     /// on screen.
     /// </summary>
+    /// <summary>
+    /// "{" (FUN_00432F00, case 0x7B): ruby over the text since "$" (its place in 0x5E3AA8 /
+    /// 0x5E3AF4, its characters from RCountMark): the place now kept (0x5E3AAC / 0x5E3AF8), the
+    /// ruby record ("_u") swapped in, and its characters up to "}" spread over the text's width -
+    /// one character (two bytes) centred, more set apart by half the text's width per character
+    /// (or by half a ruby character when that is wider), raised by its height. "}" swaps the
+    /// records back and returns to the kept place.
+    /// </summary>
+    private void RubyStart(int rec)
+    {
+        int width = (G(rec, RCount) - G(rec, RCountMark)) * G(rec, RPitch);
+        EngineGlobals[0x5E3AAC] = G(rec, RX);
+        EngineGlobals[0x5E3AF8] = G(rec, RY);
+        SwapRecords(RecordAddress(m_rubyRecord), rec);
+        S(rec, RX, EngineGlobals.GetValueOrDefault(0x5E3AA8));
+        S(rec, RY, EngineGlobals.GetValueOrDefault(0x5E3AF4));
+        int text = G(rec, RPtr), bytes = 0;
+        while (ReadByte(text + bytes) is not ((byte)'}' or 0))
+            bytes++;
+        int rubyW = G(rec, RRubyW), span;
+        if (bytes == 2)
+        {
+            span = rubyW;
+            S(rec, RPitch, 0);
+        }
+        else
+        {
+            span = rubyW * bytes / 2;
+            if (width - span <= 0 || bytes / 2 == 0)
+                S(rec, RPitch, rubyW / 2);
+            else
+            {
+                int pitch = width / (bytes / 2) / 2;
+                S(rec, RPitch, pitch);
+                span = rubyW + (bytes / 2 - 1) * pitch * 2;
+            }
+        }
+        S(rec, RX, G(rec, RX) + (width - span) / 2);
+        S(rec, RWidePitch, G(rec, RPitch) << 1);
+        S(rec, RY, G(rec, RY) - G(rec, RRubyH));
+    }
+
     private void TextStep(int rec, int surface, bool invalidate)
     {
         AlignLine(rec, surface);
@@ -1164,9 +1206,15 @@ public sealed partial class ScnVm
                         return;
                     continue;
                 case (byte)'{':
+                    if (next == b) { literal = true; break; }
+                    RubyStart(rec);
+                    continue;
                 case (byte)'}':
                     if (next == b) { literal = true; break; }
-                    throw new NotSupportedException("Ruby text ({...}) is not supported yet");
+                    SwapRecords(RecordAddress(m_rubyRecord), rec);
+                    S(rec, RX, EngineGlobals.GetValueOrDefault(0x5E3AAC));
+                    S(rec, RY, EngineGlobals.GetValueOrDefault(0x5E3AF8));
+                    continue;
                 case (byte)'|':
                     if (next == b) { literal = true; break; }
                     S(rec, RZenkaku, G(rec, RZenkaku) == 0 ? 1 : 0);
@@ -1495,7 +1543,9 @@ public sealed partial class ScnVm
     /// FUN_004325A0 with antialiasing on ("_q+"): the GGO_GRAY8 glyph blended into the surface,
     /// a = (coverage * 255 >> 6) * alpha >> 8, d += (c - d) * a >> 8 in 32-bit unsigned arithmetic.
     /// Bit 31 of <paramref name="length"/> draws every pixel as an (2 edge x + 1) x (2 edge y + 1)
-    /// block (the "_e" 0x800 outline).
+    /// block (the "_e" 0x800 outline). Without antialiasing (the engine's TextOutA, Kateinai
+    /// Choukyou's v2.31 text) every pixel the glyph covers at least half is the text colour, no
+    /// alpha: the 1-bit glyph GDI draws, from the same outline.
     /// </summary>
     private void DrawGlyph(int rec, int surface, int font, int x, int y, byte[] ch, int length)
     {
@@ -1503,8 +1553,7 @@ public sealed partial class ScnVm
         if (fonts == null)
             return;
         int count = length & 0x7FFFFFFF;
-        if (G(rec, RAntialias) == 0)
-            throw new NotSupportedException("Text without antialiasing (TextOutA) is not supported yet");
+        bool solid = G(rec, RAntialias) == 0;
         if (G(rec, RBkMode) == 2)
             throw new NotSupportedException("Opaque text background (_O) is not supported yet");
 
@@ -1585,6 +1634,8 @@ public sealed partial class ScnVm
         int row = ct;
         if (layer && (length & 0x80000000) == 0)
         {
+            if (solid)
+                throw new NotSupportedException("Text without antialiasing (TextOutA) on a layer is not supported yet");
             DrawGlyphOnLayer(rec, glyph, src, cl, ct, firstRow, endRow, firstCol, endCol, alpha);
             return;
         }
@@ -1598,7 +1649,9 @@ public sealed partial class ScnVm
                 byte v = glyph.Bits.Length > src + col ? glyph.Bits[src + (int)col] : (byte)0;
                 if (v == 0)
                     continue;
-                uint a = ((uint)v * 0xFF >> 6) * (uint)alpha >> 8;
+                uint a = solid ? (v >= 32 ? 256u : 0) : ((uint)v * 0xFF >> 6) * (uint)alpha >> 8;
+                if (a == 0)
+                    continue;
                 if ((length & 0x80000000) == 0)
                 {
                     Blend(dst, a);

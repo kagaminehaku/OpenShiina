@@ -17,10 +17,10 @@ row when something changes (see [Updating](#updating) at the end).
 Every game whose archives OpenShiina can open: the eleven GRAND†CROSS "Plus" games it started
 with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archives open, every
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
-version. The interpreter runs engine versions 2.33, 2.34, 2.37, 2.45 and 2.47 to 2.50; see
+version. The interpreter runs engine versions 2.31, 2.33, 2.34, 2.37 and 2.44 to 2.50; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 60 games, 61 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 62 games, 63 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -45,10 +45,10 @@ of those versions it does not list.
 | Hana no Kioku 7 | 花の記憶 ～第七章～ | 2002-12-20 | [v8713](https://vndb.org/v8713) | v2.18 | ⚪ Not tried |  |
 | Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ⚪ Not tried |  |
 | STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | ⚪ Not tried |  |
-| Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | ⚪ Not tried |  |
+| Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ⚪ Not tried |  |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | 🟢 Plays | 2026-11-04 |
-| Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🔴 Stops | 2026-11-05 |
+| Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🟢 Plays | 2026-11-05 |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ⚪ Not tried |  |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.39 | ⚪ Not tried |  |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ✅ Plays through | 2026-11-04 |
@@ -82,7 +82,7 @@ of those versions it does not list.
 | Chikan Densha Otoko 2 | 痴漢電車男2 ～伝説へのライナー～ | 2008-05-30 | [v5861](https://vndb.org/v5861) | v2.43 | ⚪ Not tried |  |
 | Dokodemo Sukishite Itsudemo Sukishite | どこでもすきしていつでもすきして | 2008-06-27 | [v780](https://vndb.org/v780) | v2.44 | ⚪ Not tried |  |
 | Wana II ~Gang Rape~ | 輪罠II ～Gang Rape～ | 2008-06-27 | [v4371](https://vndb.org/v4371) | v2.44 | ⚪ Not tried |  |
-| Yokorenbo ~Immoral Mother~ | 横恋母 ～Immoral Mother～ | 2008-07-18 | [v2970](https://vndb.org/v2970) | v2.44 | 🟡 Starts | 2026-11-05 |
+| Yokorenbo ~Immoral Mother~ | 横恋母 ～Immoral Mother～ | 2008-07-18 | [v2970](https://vndb.org/v2970) | v2.44 | ✅ Plays through | 2026-11-05 |
 | Engage Links | Engage Links | 2008-10-24 | [v1090](https://vndb.org/v1090) | v2.45 | ⚪ Not tried |  |
 | Tsuyoimo x Yowaimo | 強妹×弱妹 | 2008-10-24 | [v2185](https://vndb.org/v2185) | v2.45 | ⚪ Not tried |  |
 | Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | ✅ Plays through | 2026-10-13 |
@@ -94,7 +94,7 @@ of those versions it does not list.
 | Mikoko | みここ | 2009-02-27 | [v1363](https://vndb.org/v1363) | v2.46 | ⚪ Not tried |  |
 | Douryou no Oku-san ~Netori Tsuma, Netorare Tsuma~ | 同僚の奥さん～ネトリ妻、ネトラレ妻～ | 2009-03-06 | [v2280](https://vndb.org/v2280) | v2.46 | ⚪ Not tried |  |
 | Chikan Circle | 痴漢サークル | 2009-05-01 | [v1703](https://vndb.org/v1703) | v2.46 | ⚪ Not tried |  |
-| Hana to Otome ni Shukufuku o | 花と乙女に祝福を | 2009-05-29 | [v1545](https://vndb.org/v1545) | v2.46 | ⚪ Not tried |  |
+| Hana to Otome ni Shukufuku o | 花と乙女に祝福を | 2009-05-29 | [v1545](https://vndb.org/v1545) | v2.46 | ✅ Plays through | 2026-11-05 |
 | Stellula Eques Codex | ステルラエクエス コーデックス ～黄昏の姫騎士～ | 2009-05-29 | [v1651](https://vndb.org/v1651) | v2.46 | ⚪ Not tried |  |
 | Shokuinshitsu | 職員室 | 2009-06-26 | [v1696](https://vndb.org/v1696) | v2.46 | ⚪ Not tried |  |
 | Chikan Circle 2 | 痴漢サークル2 | 2009-07-03 | [v2102](https://vndb.org/v2102) | v2.47 | ⚪ Not tried |  |
@@ -763,11 +763,30 @@ nothing more (its routines were all known builds): swept, 37 scenarios, every on
 Sadistic Little's XOR stream got C# (a build of the known one, 433,120 dwords; the same bytes as
 its x86 code on random cases): swept, 96 scenarios, every one to its end.
 
+**Hana to Otome ni Shukufuku o** (ensemble, HANAOTO.EXE, engine v2.46; Royal Bouquet is its fan
+disc) had its scheme. Engine v2.46's opcodes are v2.47's (engine-notes.md, "Engine builds").
+`03C2` gives its checksum (v ^ 306723180 = 222200098). Its scenarios have ruby (`{...}` over the
+text since `$`), which the player now draws as the engine does (engine-notes.md, "The games of
+2026-11-04"), and IN0605_01.TXT names a picture by its developer's full path
+("d:\花と乙女に祝福を\script\dev\st\st0601bkl.s25"): a full path is found in the archives by
+its file name. Swept: 208 scenarios, every one to its end.
+
+**Kateinai Choukyou** (Guilty, KATEI.EXE, engine v2.31, 2004: the oldest engine tried) had its
+scheme. Engine v2.31 has its own opcode table, read from its executable (engine-notes.md,
+"Engine builds"); five opcodes its scripts have needed handlers (`02E6` / `02E7`, a byte / word
+at the task's data pointer; `03DF` / `03E0`, a float made a whole number and back; `06AC`, a
+sound's volume), and its text is drawn without antialiasing (TextOutA), which the player now
+draws from the same glyphs (every pixel covered at least half in the text colour). Its story is
+in SCN modules, not scenario TXT: run from its title in ScnBoot, it plays its first module to
+the schedule of the month (a calendar where each day's training is chosen), which the clicks of
+a run do not get past; no error.
+
 **Yokorenbo ~Immoral Mother~** (Guilty+, YOKOREN.EXE, engine v2.44) had its scheme. Engine v2.44
 has its own opcode table, read from its executable (engine-notes.md, "Engine builds"); its
 scripts have no opcode the player lacks. `03C2` gives its checksum (v ^ 306723180 =
--1396214426). It runs from the start to its title; two of its routines (an XOR stream and one
-more) have no C# yet, and its story was not swept yet.
+-1396214426). Two routines needed C# (builds of known ones: an XOR stream of 395,420 dwords,
+and xor32 reading its arguments through the argument block), each the same bytes as its x86 code
+on random cases. Swept: 113 scenarios, every one to its end.
 
 **Vanquish** (forst, VANQ.EXE, engine v2.33: the same build as CLEAVAGE.EXE, the same addresses)
 opens with its scheme and needed handlers for 14 opcodes its scripts have (ScnVm.Engine233.cs):
@@ -775,8 +794,12 @@ opens with its scheme and needed handlers for 14 opcodes its scripts have (ScnVm
 that copies files out, is not run), `039C` (rotate right), `046A`, `073E`, `07C6`, `08CA`,
 `08D4` (cursor, menu bar), `0A29` / `0A2A` (the install path made the current directory; its
 registry value `InstPath`), `06E0` (a stream's volume in DirectSound's units) and `050A` (the
-screen crossfaded from one surface to another, the engine waiting in it). It runs from the start
-without an error to its title's loop, but the window stays black: not found yet.
+screen crossfaded from the old picture to the new one, the engine waiting in it). Its story is
+103 movies (m\*.mpg) that main.scn plays one after another in a loop of `05B9` (the movie's
+state), `05C0`, `0514` and `07D0` with no other wait: `05B9` is read as the other values v2.33
+and v2.34 poll (a second read in a frame waits for the next frame). Run from its title with
+clicks in the middle of the screen, it plays its movies to the end and back to its title, with
+no error; the other branches of its choices were not taken.
 
 **Cleavage** (Empress, CLEAVAGE.EXE, engine v2.33): its .exe went into GameMap (its scheme
 existed; Ao no Juuai's keys open it too) and its 2,521 files come out whole. Engine v2.33 got its
@@ -879,6 +902,8 @@ stopped, none stuck.
 | Imouto Smile | 260 | every scenario to its end (EVC15A: Notes) |
 | S.D.I.-Sadistic Daughter Incident- | 37 | 99.5% |
 | Sadistic Little | 96 | 99.5% |
+| Yokorenbo ~Immoral Mother~ | 113 | 64.9% (as Rin x Sen) |
+| Hana to Otome ni Shukufuku o | 208 | 99.2% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

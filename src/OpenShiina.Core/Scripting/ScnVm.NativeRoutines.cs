@@ -259,11 +259,13 @@ public sealed partial class ScnVm
         });
         // Hana to Otome ni Shukufuku o Royal Bouquet 4CAEC: 892,740 dwords at l[1] XORed with a key
         // from l[0], after each the key + 1, rotated left by 3, its bytes reversed; Tekoire
-        // Princess! 2FEBC: 1,734,936 dwords; Imouto Smile 6D5EC: 1,317,920; Sadistic Little 5AE8C: 433,120
+        // Princess! 2FEBC: 1,734,936 dwords; Imouto Smile 6D5EC: 1,317,920; Sadistic Little 5AE8C: 433,120;
+        // Yokorenbo 2B5CF: 395,420
         RegisterNative("B4937B7F8A71BA951426F3E44AC8D0ED313E669A", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0xD9F44));
         RegisterNative("9598BC877F66A2208AD03940D710BD0620B464F4", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x1A7518));
         RegisterNative("A470F7A6AA684E2AF9F1EBF445D60C63C4269657", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x141C20));
         RegisterNative("6CDD92F21FABE3FBF5353F8D5A210AED96E9EF86", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x69BE0));
+        RegisterNative("1EB7C3A5BABAEC65C179ACD912C8032A77D690BC", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x6089C));
         // Raillore EFCLIB 92F0 (Tojita Sekai no Tori Colony EFCLIB 666C, other padding): l[1] dwords at
         // l[0] inverted (XOR FFFFFFFF); a count under 1 runs as x86 code
         RegisterNative(["F79705977D2B17A02E3A733E04EF5BA87A031A92", "C4E79AD74DF00F25B64339C72CF808E9E7627276"], "invert dwords", (vm, c, a) =>
@@ -559,12 +561,12 @@ public sealed partial class ScnVm
 
         // EFCLIB 1E9E (Re: Rem Plus 2792; Bitch Gakuen and Shimai 285A, Ao no Juuai 1978, Ran→Sem and Boku Igai 2074, Cleavage 1973: other padding): the
         // negative and other fills: l[3] dwords from l[4] to l[0], each XORed with l[5]'s byte in
-        // every byte
+        // every byte (Yokorenbo EFCLIB 197D reads l[] through the argument block, not a copy of it)
         RegisterNative(["EB59CB1AF7084D666150A58C5866638D49AAC562", "BD87E97A68BDF28ECD10B4E3EBDBD6799D5A0F1D",
                         "997E3DD49B9B61739720F69D2E180ADAC4C9D884", "D299BA54CDEF926F62CDC0733BC018D56CDA54D5",
                         "683B763EC4CA9666F13D288DF45400CB2F498B4E", "D7BB0B77AF051FEA644DBDCBAB9E624522D31AF8",
                         "1FD120C0ED9408FF1CFA70D8D389AE41A6C97FD9", "0AFC04E0141EBB21410CD23BEFECF1869702A705",
-                        "17C12A8F901EFC316D09685A7A84F78F067502D2"], "xor32", (vm, c, a) =>
+                        "17C12A8F901EFC316D09685A7A84F78F067502D2", "4DCD44C703951F8B10388CCB125A577E7A167FAF"], "xor32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
             uint count = (uint)vm.NativeArg(a, 3), v = (uint)vm.NativeArg(a, 5);

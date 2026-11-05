@@ -116,6 +116,10 @@ public sealed partial class GameView : UserControl, IGameWindow
         top.AddHandler(KeyDownEvent, (_, k) => Key(k, true), RoutingStrategies.Tunnel, handledEventsToo: true);
         top.AddHandler(KeyUpEvent, (_, k) => Key(k, false), RoutingStrategies.Tunnel, handledEventsToo: true);
         top.BackRequested += OnBackRequested;
+        // Phones and tablets: no status bar while OpenShiina is open, the library too (a swipe
+        // from the edge shows it for a moment)
+        if (PlayerPlatform.Touch && top.InsetsManager is { } insets)
+            insets.IsSystemBarVisible = false;
         // Phones: the app going to the background or coming back
         m_activeChanged = active =>
         {

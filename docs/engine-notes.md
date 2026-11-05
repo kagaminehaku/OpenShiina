@@ -36,7 +36,7 @@ GARbro build; a merge of its own result gives the same file). Their extra cipher
 GARbro-Mod's, PostAdler / PreAdler / Binbo / Count / AltCount / Ushimitsu / Nukitashi2 / Saimin
 ported for them (not checked against those games' archives: none is here). 102 GameMap entries.
 By engine version: 30 below 2.39, 26 from 2.39 to 2.46, 35 2.47-2.48, 18 2.49, 29 2.50 and
-later. The interpreter knows the opcodes of 2.33, 2.34, 2.37, 2.44, 2.47, 2.49 and 2.50 (ScnOpcodes
+later. The interpreter knows the opcodes of 2.31, 2.33, 2.34, 2.37, 2.44, 2.47, 2.49 and 2.50 (ScnOpcodes
 picks 2.47's for 2.36, 2.45 and 2.46 too): the others need more (todo.md).
 
 **DecodeBin's date.** The DecodeBins of all schemes are the same but for one dword at 0x1020, a
@@ -277,6 +277,15 @@ operand, a string copied to 722B5C) that the GRAND†CROSS games never use.
 **v2.33** (Cleavage's CLEAVAGE.EXE, 2005; Vanquish's VANQ.EXE is the same build; table
 Data/ScnOps/ops_v233.tsv): laid out as v2.34 (`ScnTools opscan CLEAVAGE.EXE 41e4f0 41e525 0
 41f27c 40d6b0 40cfb0 40d4d0 ...`), 542 opcodes, v2.34's but for 06EC, which it lacks.
+
+**v2.31** (Kateinai Choukyou's KATEI.EXE, 2004, not packed; table Data/ScnOps/ops_v231.tsv): the
+interpreter is FUN_00417340 (the slot as its argument, the current one at 69BB80), the tasks 0x40
+bytes from 6968B4 (their script pointer), GetVar 40B020, SetVar 40A980, GetVarAdr 40AE40, any
+other opcode 2 (417FDE): `ScnTools opscan KATEI.EXE 417340 41736d 0 417fde 40b020 40a980 40ae40
+<out> 0 None None 6968b4`. 481 opcodes, every one of them v2.33's; opscan reads the jumps
+(01F4, 01FE, 01FF, 0209, 0212, 0213, 0259, 0263) and 03CF without the offsets before their
+operands, which they have as in v2.33 (the scripts decode only so), so the table takes v2.33's
+operands for them.
 
 **v2.44** (Yokorenbo's YOKOREN.EXE, 2008, not packed; table Data/ScnOps/ops_v244.tsv): laid out
 as v2.45's (`ScnTools opscan YOKOREN.EXE 41cca0 41ccfc 41ccc3 422d96 412630 4120f0 4124a0 <out>
@@ -1322,6 +1331,14 @@ the functions they call from the decompile. First findings:
   same frame, waits for the next frame (Tekoire Princess!'s START waits 30 ms in a loop on
   `03BD` alone and its title polls `03B6` until it changes; Yoyogi's START reads `03BD` at two
   places in a row wanting the same value, which it gets).
+- Ruby (Oreimo FUN_00432F00, cases `{` and `}`): `$` marks where the text it is over starts
+  (0x5E3AA8 / 0x5E3AF4, the count of characters in RCountMark); `{` keeps the place reached
+  (0x5E3AAC / 0x5E3AF8), swaps in the ruby record of `_u n, w, h` (as `_n` swaps) and goes back
+  to the mark; its characters up to `}` are spread over the text's width W (characters since the
+  mark times the pitch): one character (two bytes) centred with pitch 0; n bytes set apart by
+  pitch W / (n / 2) / 2 (or w / 2 when n * w / 2 is as wide as W or wider), the first at
+  (W - span) / 2, all raised by h. `}` swaps the records back and returns to the kept place
+  (Hana to Otome ni Shukufuku o, v2.46, has ruby in its scenarios).
 - `04EF x, y, w, h` / `04F1 sx, sy` (Oreimo 0x4254B9 / 0x42553D) set where and how large the
   picture is shown (w, h -1: to the window's edges), the counterparts of `04EE` / `04F0`; the
   host places and scales the picture itself, so they change nothing (Imouto Smile's START gives

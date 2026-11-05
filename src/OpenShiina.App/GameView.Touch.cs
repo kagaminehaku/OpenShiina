@@ -156,10 +156,11 @@ public sealed partial class GameView
         UpdateTouchBar();
         if (!PlayerPlatform.Touch || TopLevel.GetTopLevel(this) is not { } top)
             return;
+        // The game draws edge to edge; the system bars stay hidden in the library too
         if (top.InsetsManager is { } insets)
         {
             insets.DisplayEdgeToEdgePreference = playing;
-            insets.IsSystemBarVisible = !playing;
+            insets.IsSystemBarVisible = false;
         }
         m_keepAwake?.Dispose();
         m_keepAwake = null;

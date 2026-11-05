@@ -123,6 +123,9 @@ public sealed partial class ScnVm
         return 0;
     }
 
+    // The volume 06A9 last set each buffer to (06AC)
+    private readonly Dictionary<int, int> m_soundVolumes = new();
+
     private bool MakeSound(int slot, byte[]? wave)
     {
         if (wave == null || (uint)slot >= SoundSlots)
@@ -191,7 +194,18 @@ public sealed partial class ScnVm
             int buffer = vm.SoundBuffer(vm.Value(c, i.Args[0]));
             int volume = vm.Value(c, i.Args[1]);
             if (buffer != 0)
+            {
                 vm.Sound?.SetVolume(buffer, volume);
+                vm.m_soundVolumes[buffer] = volume;
+            }
+            return 0;
+        });
+        // 06AC n, v (KATEI.EXE 0x4167B0): v = the buffer's volume (IDirectSoundBuffer::GetVolume,
+        // 1/100 dB: 0 until 06A9 sets it), or -1 for no buffer
+        Register(0x06AC, (vm, c, i) =>
+        {
+            int buffer = vm.SoundBuffer(vm.Value(c, i.Args[0]));
+            vm.Store(c, i.Args[1], buffer == 0 ? -1 : vm.m_soundVolumes.GetValueOrDefault(buffer));
             return 0;
         });
         // 06AF n, v: v = DSBSTATUS, or -1 for no buffer

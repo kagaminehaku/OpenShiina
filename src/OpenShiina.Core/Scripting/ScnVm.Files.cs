@@ -97,8 +97,14 @@ public sealed partial class ScnVm
         string data = DataPath;
         if (path.StartsWith(data, StringComparison.OrdinalIgnoreCase) || InMadeFolder(path, folderItself: false))
             return (true, path[(path.LastIndexOfAny(['\\', '/']) + 1)..]);
+        // A full path elsewhere: not found, but for a file of the archives by its name (the engine
+        // finds archive files by name alone; Hana to Otome ni Shukufuku o's IN0605_01.TXT names
+        // one by its developer's path, "d:\花と乙女に祝福を\script\dev\st\st0601bkl.s25")
         if (path.Contains(':'))
-            return null;
+        {
+            string name = path[(path.LastIndexOfAny(['\\', '/']) + 1)..];
+            return name.Length > 0 && m_host.ArchiveFileSize(name) != null ? (false, name) : null;
+        }
         return (false, path);
     }
 

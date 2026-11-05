@@ -108,8 +108,10 @@ public sealed partial class ScnVm
         // transitions poll them in a loop until they change - the engine runs it as fast as it
         // can (its main loop takes a step of every task and pumps the window's messages only
         // after 0033) and a frame ends only where a task waits (RunFrame). Both change between
-        // frames here, so a task that reads one again in a frame waits for the next one
-        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6 })
+        // frames here, so a task that reads one again in a frame waits for the next one. 05B9 (a
+        // movie's state) too: Vanquish's (v2.33) movies play in a loop of 05B9, 05C0 (the next
+        // frame), 0514 and 07D0 with no other wait
+        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6, 0x05B9 })
         {
             var later = m_handlers[op];
             Register234(op, (vm, c, i) =>

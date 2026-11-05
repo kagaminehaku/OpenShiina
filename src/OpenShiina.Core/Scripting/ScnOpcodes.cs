@@ -41,6 +41,7 @@ public sealed class ScnOpcodes
     {
         ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v233"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v231"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v250"] = new() { [0x009C] = ["GLYPH250"] },
     };
 
@@ -75,7 +76,9 @@ public sealed class ScnOpcodes
     /// aoj.EXE: 543 opcodes, 534 of them numbered as in v2.47 and 523 of those with v2.47's
     /// operands; its music has one stream, so 0686-068B take no stream). v2.33 has its own (read
     /// from Cleavage's CLEAVAGE.EXE, Vanquish's VANQ.EXE the same build): v2.34's but for 06EC,
-    /// which it lacks. v2.37 has its own (read from Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE,
+    /// which it lacks. v2.31 has its own (read from Kateinai Choukyou's KATEI.EXE: 481 opcodes, all
+    /// of them v2.33's; the jumps' operands are v2.33's, which opscan does not see in this build).
+    /// v2.37 has its own (read from Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE,
     /// its code decrypted as its .riox stub does it: 568 opcodes, v2.47's operands but for 04EC,
     /// 055A and 055B, which are v2.34's, and five of v2.34's v2.47 lacks). v2.44 has its own (read
     /// from Yokorenbo's YOKOREN.EXE: 661 opcodes, v2.47's operands but for 04EC, v2.34's, and nine
@@ -99,6 +102,7 @@ public sealed class ScnOpcodes
             : version.StartsWith("2.44") ? "ops_v244"
             : version.StartsWith("2.34") ? "ops_v234"
             : version.StartsWith("2.33") ? "ops_v233"
+            : version.StartsWith("2.31") ? "ops_v231"
             : version.StartsWith("2.37") ? "ops_v237"
             : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
 

@@ -96,14 +96,16 @@ public sealed partial class ScnVm
                 vm.Music!.SetVolume(s.Handle, volume);
             return 0;
         });
-        // 050A a, b, ms, flags (VANQ.EXE 0x411950 -> FUN_004089D0, its blend FUN_00427EE0): the
-        // screen (surface 0) goes from surface a to surface b (b with bit 31: the grey b & 0xFF)
-        // over ms, the window painted at each step: each byte (a * (255 - t) + b * t) / 255, t the
-        // part of ms passed out of 255. The engine waits in its own loop until ms have passed; here
-        // the task waits a frame at a time. At the end surface 0 is b
+        // 050A to, from, ms, flags (VANQ.EXE 0x411950 -> FUN_004089D0, its blend FUN_00427EE0): the
+        // screen (surface 0) goes from surface from (with bit 31: the grey from & 0xFF) to surface
+        // to over ms, the window painted at each step: each byte (from * (255 - t) + to * t) / 255,
+        // t the part of ms passed out of 255. The engine waits in its own loop until ms have
+        // passed; here the task waits a frame at a time. At the end surface 0 is to. Vanquish's
+        // START draws the new screen, keeps it in surface 1, puts the old one back on the screen
+        // and runs 050A 1, old
         Register234(0x050A, (vm, c, i) =>
         {
-            int from = vm.Value(c, i.Args[0]), to = vm.Value(c, i.Args[1]), ms = vm.Value(c, i.Args[2]);
+            int to = vm.Value(c, i.Args[0]), from = vm.Value(c, i.Args[1]), ms = vm.Value(c, i.Args[2]);
             vm.Value(c, i.Args[3]);
             if (!vm.m_crossfades.TryGetValue(c.Slot, out uint start))
                 vm.m_crossfades[c.Slot] = start = vm.Clock;
@@ -190,37 +192,37 @@ public sealed partial class ScnVm
         });
     }
 
-    /// <summary>06DD / 06DE: a fade of v2.33's music streams, up (sign 1) or down (-1).</summary>
     // 050A's crossfades by task: when they started
     private readonly Dictionary<int, uint> m_crossfades = new();
 
-    /// <summary>Surface 0 = surface <paramref name="from"/> mixed with <paramref name="to"/> (or the grey to &amp; 0xFF when its bit 31 is set) by t / 255.</summary>
+    /// <summary>Surface 0 = surface <paramref name="from"/> (or the grey from &amp; 0xFF when its bit 31 is set) mixed with surface <paramref name="to"/> by t / 255.</summary>
     private void Crossfade(int from, int to, int t)
     {
-        bool grey = to < 0;
-        if ((uint)from >= SurfaceCount || !grey && to >= SurfaceCount)
+        bool grey = from < 0;
+        if ((uint)to >= SurfaceCount || !grey && from >= SurfaceCount)
             return;
-        int dst = SurfaceField(0, 2), a = SurfaceField(from, 2), b = grey ? 0 : SurfaceField(to, 2);
-        if (dst == 0 || a == 0 || !grey && b == 0)
+        int dst = SurfaceField(0, 2), b = SurfaceField(to, 2), a = grey ? 0 : SurfaceField(from, 2);
+        if (dst == 0 || b == 0 || !grey && a == 0)
             return;
         int bytesPerPixel = SurfaceField(0, 9) >> 3;
-        int width = Math.Min(SurfaceField(0, 7), SurfaceField(from, 7)), height = Math.Min(SurfaceField(0, 8), SurfaceField(from, 8));
+        int width = Math.Min(SurfaceField(0, 7), SurfaceField(to, 7)), height = Math.Min(SurfaceField(0, 8), SurfaceField(to, 8));
         if (!grey)
         {
-            width = Math.Min(width, SurfaceField(to, 7));
-            height = Math.Min(height, SurfaceField(to, 8));
+            width = Math.Min(width, SurfaceField(from, 7));
+            height = Math.Min(height, SurfaceField(from, 8));
         }
-        int bytes = width * bytesPerPixel, value = to & 0xFF;
+        int bytes = width * bytesPerPixel, value = from & 0xFF;
         for (int y = 0; y < height; y++)
         {
-            var rowA = ReadBytes(a + y * SurfaceField(from, 10), bytes);
-            var rowB = grey ? null : ReadBytes(b + y * SurfaceField(to, 10), bytes);
+            var rowB = ReadBytes(b + y * SurfaceField(to, 10), bytes);
+            var rowA = grey ? null : ReadBytes(a + y * SurfaceField(from, 10), bytes);
             for (int x = 0; x < bytes; x++)
-                rowA[x] = (byte)((rowA[x] * (255 - t) + (rowB?[x] ?? value) * t) / 255);
-            WriteBytes(dst + y * SurfaceField(0, 10), rowA);
+                rowB[x] = (byte)(((rowA?[x] ?? value) * (255 - t) + rowB[x] * t) / 255);
+            WriteBytes(dst + y * SurfaceField(0, 10), rowB);
         }
     }
 
+    /// <summary>06DD / 06DE: a fade of v2.33's music streams, up (sign 1) or down (-1).</summary>
     private int FadeOld(ScnContext c, ScnInstruction i, int sign)
     {
         var s = Stream(Value(c, i.Args[0]));

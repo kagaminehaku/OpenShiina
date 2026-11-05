@@ -466,6 +466,18 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], i.Raw[0] == 1 ? BitConverter.SingleToInt32Bits((float)value) : ToInt(value));
             return 0;
         });
+        // 03DF v (KATEI.EXE 0x4123F0): v, a float, made a whole number (truncated, as ftol does);
+        // 03E0 v (0x4123A0): v, a whole number, made a float
+        Register(0x03DF, (vm, c, i) =>
+        {
+            vm.Store(c, i.Args[0], ToInt(BitConverter.Int32BitsToSingle(vm.Value(c, i.Args[0]))));
+            return 0;
+        });
+        Register(0x03E0, (vm, c, i) =>
+        {
+            vm.Store(c, i.Args[0], BitConverter.SingleToInt32Bits(vm.Value(c, i.Args[0])));
+            return 0;
+        });
         // 03AC n -> v: rand() % n
         Register(0x03AC, (vm, c, i) =>
         {
@@ -670,6 +682,20 @@ public sealed partial class ScnVm
             return 0;
         });
         Register(0x02E8, (vm, c, i) => { vm.Store(c, i.Args[0], c.DataPointer - c.Base); return 0; });
+        // 02E6 v / 02E7 v (KATEI.EXE 0x411740 / 0x411780, v2.31): v = the byte / word (unsigned) at
+        // the task's data pointer, which goes on by 1 / 2
+        Register(0x02E6, (vm, c, i) =>
+        {
+            vm.Store(c, i.Args[0], vm.ReadByte(c.DataPointer));
+            c.DataPointer += 1;
+            return 0;
+        });
+        Register(0x02E7, (vm, c, i) =>
+        {
+            vm.Store(c, i.Args[0], vm.Read16(c.DataPointer));
+            c.DataPointer += 2;
+            return 0;
+        });
 
         // ---- Strings ----
 

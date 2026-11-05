@@ -9,6 +9,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - The scale-down routine of the v2.47 zooms (Miko Dashi, Pure Love!, Imouto Smile...) takes
   the source rows and columns it reads exactly: a picture halved into the one right after it in
   memory no longer runs as x86 code.
+- Android: the status bar stays hidden while OpenShiina is open, in the library too (it was
+  hidden only while a game played).
 - **The library has a search and an order**: the games whose name, .exe or folder has the text
   typed (full-width letters match too; Ctrl+F, Esc clears, Enter plays the game chosen), and a
   button between the one played last first and A–Z, kept in the settings.
@@ -26,11 +28,15 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   through; **Tekoire Princess!** (てこいれぷりんせす！, 2004) plays.
 - **New: Love & Piss** (Love＆Piss ～少女のガマンが世界を救う～, 2013) plays through: its keys were
   taken from its executable (decrypted as its start-up stub does it), with its DecodeBin date.
-- 60 games (61 releases) now play through, **Imouto Smile** (妹スマイル, 2009), **S.D.I.-Sadistic
+- 62 games (63 releases) now play through, **Imouto Smile** (妹スマイル, 2009), **S.D.I.-Sadistic
   Daughter Incident-** (2013) and **Sadistic Little** (サディスティックりとる, 2009) among them, their
-  keys taken from their executables.
+  keys taken from their executables, and **Yokorenbo** (横恋母, 2008) and **Hana to Otome ni
+  Shukufuku o** (花と乙女に祝福を, 2009): ruby text (`{...}`) is drawn now.
 - Engine version 2.44 has its own opcode table (read from Yokorenbo's executable) and 2.46 runs
-  with 2.47's. Vanquish (v2.33) got the opcodes its scripts have; its title stays black.
+  with 2.47's; 2.31 has its own too (read from Kateinai Choukyou's executable). **Vanquish**
+  (2004, v2.33) and **Kateinai Choukyou** (家庭内調教, 2004, v2.31) play: the opcodes their
+  scripts have, Vanquish's screen crossfade and its movies, Kateinai's text drawn without
+  antialiasing.
 - ScnBoot: `SCNBOOT_SWEEP_FROM` starts the sweep's keys and clicks at a frame (a title's START
   clicked with `SCNBOOT_MOUSE` first); a scenario that stands still after a line of its last
   message is "done (end)", not "stuck".
