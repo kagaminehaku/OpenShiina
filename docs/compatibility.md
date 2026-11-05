@@ -204,6 +204,15 @@ Saimin (C:drive.; its own release is KiriKiri, only a later collection with Shii
 the engine). Stellula Eques ~Shokuzai no Himekishi~ is tied to it the same way (with Stellula Eques
 Codex) but its own releases name no engine: it stays until its files tell.
 
+**Ayaka-san to Shuugen-kun & Temptation of Fragrance** (あやかさんとしゅうげんくん＆テンプテーション・オブ・フレグランス,
+propeller, 2006-08-31, freeware, [r10317](https://vndb.org/r10317) of Ayakashibito; ayakashiban.exe)
+is not a ShiinaRio game, though it shares names with one: its `.war` files are no WARC (a count,
+then 0x108-byte entries: a 0x100-byte name, the size, the offset; nothing encrypted), its pictures
+are `.lzo` (a compressed BMP), and its two scripts (`t\ab01.SCN`, `t\ab02.SCN`) are a plain list
+of 16-bit commands with their strings inline (`0004` a picture, `0008` a transition, `0012` a
+wait, `000A` the music), no SCN code of the engine's and no RIO.INI. Only its sounds, `.ogv`, are
+ShiinaRio's. Playing it would take a small player of its own (todo.md).
+
 | Game | Japanese title | Release | VNDB | Developer | Votes | Status |
 |---|---|---|---|---|---|---|
 | Hachigatsu no Nostalgia ~The Summer with You~ | 八月のノスタルジア ～the summer with you～ | 2000-07-07 | [v3419](https://vndb.org/v3419) | BeF | 9 | 🔒 No keys |

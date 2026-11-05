@@ -88,6 +88,9 @@ is mostly for slow phones, and should follow what their perf.log shows.
   refused (patched, disc-free or translated .exes all differ).
 - [ ] A real WARC 1.0-1.6 game (1.0 / 1.1 tried only on archives made for the test, 1.2-1.6
   only against GARbro's on random input).
+- [ ] Side quest: **Ayaka-san to Shuugen-kun** (propeller's freeware of 2006) runs on an engine
+  of its own (compatibility.md, "No keys yet"): its archives, its `.lzo` pictures and the
+  commands of its two scripts, read from ayakashiban.exe.
 
 ## Platforms
 
