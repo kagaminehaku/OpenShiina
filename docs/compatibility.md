@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.31, 2.33, 2.34, 2.37 and 2.44 to 2.50; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 62 games, 63 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 63 games, 64 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -163,7 +163,7 @@ of those versions it does not list.
 | Maki Fes! | マキフェス！ | 2014-12-30 | [v16484](https://vndb.org/v16484) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Shuukatsu Katei Kyoushi | シュウカツ家庭教師 | 2015-03-13 | [v16904](https://vndb.org/v16904) | v2.50 | ⚪ Not tried |  |
 | Tsugou no Ii Idol | ツゴウノイイアイドル | 2015-04-24 | [v16469](https://vndb.org/v16469) | v2.50 | ✅ Plays through | 2026-10-17 |
-| Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | 🟢 Plays | 2026-11-04 |
+| Sorcery Jokers | ソーサリージョーカーズ | 2015-07-24 | [v16337](https://vndb.org/v16337) | v2.50 | ✅ Plays through | 2026-11-05 |
 | Gohoushi Nurse ~Mayonaka no Kyousei Call~ | ご奉仕ナース ～真夜中の強精コール～ | 2015-09-18 | [v17971](https://vndb.org/v17971) | v2.50 | ✅ Plays through | 2026-11-04 |
 | Kyuuketsuki no Libra | 吸血姫のリブラ | 2015-10-30 | [v17825](https://vndb.org/v17825) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Bitch Nee-chan ga Seijun na Hazu ga Nai! | ビッチ姉ちゃんが清純なはずがないっ！ | 2016-04-28 | [v18781](https://vndb.org/v18781) | v2.50 | ✅ Plays through | 2026-10-13 |
@@ -196,32 +196,33 @@ that are not in the table above: OpenShiina has no keys for their archives yet (
 so they cannot be opened or played until a scheme is found (docs/engine-notes.md, section 1,
 "The schemes"). Votes: the people who rated the game on VNDB that day.
 
+Seven games VNDB ties to the engine only through a release of several games are left out: Nakadashi
+Hara Maid and Nakadashi Hara Maid 2 (Chain-Reaction; the Nakadashi Trilogy release adds them to its
+new Miko Dashi, which is ShiinaRio, but they are KiriKiri games: data.xp3), Hana no Kioku Dai 2, 3,
+4 and 6 Shou (Foster; only the remakes Hana no Kioku 1-2-3 and 4-5-6 are ShiinaRio) and Riajuu
+Saimin (C:drive.; its own release is KiriKiri, only a later collection with ShiinaRio games names
+the engine). Stellula Eques ~Shokuzai no Himekishi~ is tied to it the same way (with Stellula Eques
+Codex) but its own releases name no engine: it stays until its files tell.
+
 | Game | Japanese title | Release | VNDB | Developer | Votes | Status |
 |---|---|---|---|---|---|---|
-| Hana no Kioku Dai 2 Shou | 花の記憶 第二章 | 1996-12-13 | [v8709](https://vndb.org/v8709) | Foster | 13 | 🔒 No keys |
-| Hana no Kioku Dai 3 Shou | 花の記憶 第3章 | 1997-07-18 | [v8710](https://vndb.org/v8710) | Foster | 10 | 🔒 No keys |
-| Hana no Kioku Dai 4 Shou | 花の記憶 第四章 | 1998-12-25 | [v8711](https://vndb.org/v8711) | Foster | 7 | 🔒 No keys |
 | Hachigatsu no Nostalgia ~The Summer with You~ | 八月のノスタルジア ～the summer with you～ | 2000-07-07 | [v3419](https://vndb.org/v3419) | BeF | 9 | 🔒 No keys |
 | Delicious Way |  | 2000-12-29 | [v63587](https://vndb.org/v63587) | Shinonome | 0 | 🔒 No keys |
 | Kanawanu Koi no Monogatari | 叶わぬ恋の物語 | 2001-03-30 | [v20212](https://vndb.org/v20212) | Foster | 4 | 🔒 No keys |
 | Baby, BE -Bedside Emotion- |  | 2001-04-20 | [v1942](https://vndb.org/v1942) | BeF | 5 | 🔒 No keys |
-| Hana no Kioku Dai 6 Shou | 花の記憶 第6章 | 2001-08-31 | [v8712](https://vndb.org/v8712) | Foster | 11 | 🔒 No keys |
 | Mahou no Shippo na Dai Ichi wa | 魔法のしっぽな 第一話 | 2002-03-22 | [v14674](https://vndb.org/v14674) | Sith | 2 | 🔒 No keys |
 | Itsuka, Dokoka de ~Ano Amaoto no Kioku~ | いつか、どこかで ～あの雨音の記憶～ | 2002-05-24 | [v3214](https://vndb.org/v3214) | BeF | 6 | 🔒 No keys |
 | Mahou no Shippo na Dai Ni wa | 魔法のしっぽな 第二話 | 2002-09-13 | [v14675](https://vndb.org/v14675) | Sith | 2 | 🔒 No keys |
 | Mahou no Shippo na Dai San wa | 魔法のしっぽな 第三話 | 2003-01-24 | [v14673](https://vndb.org/v14673) | Sith | 2 | 🔒 No keys |
 | EDEN V |  | 2003-07-18 | [v4604](https://vndb.org/v4604) | FORST | 14 | 🔒 No keys |
 | Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | Amanatto | 22 | 🔒 No keys |
-| Nakadashi Hara Maid | なかだし孕メイド | 2007-08-17 | [v2672](https://vndb.org/v2672) | Chain-Reaction | 14 | 🔒 No keys |
 | Sis☆Pon ~Haramase♪ Gochisou-sama!~ | シス☆ぽん～孕ませ♪ご馳走さまっ！～ | 2007-11-30 | [v2858](https://vndb.org/v2858) | Sumomo | 22 | 🔒 No keys |
 | Gakuen Pets ~Houkago no Shiikusha~ | 学園ペッツ ～放課後の飼育舎～ | 2007-12-21 | [v5267](https://vndb.org/v5267) | Goku-Fero | 2 | 🔒 No keys |
 | Stellula Eques ~Shokuzai no Himekishi~ | ステルラエクエス～贖罪の姫騎士～ | 2008-04-25 | [v455](https://vndb.org/v455) | C:drive. | 11 | 🔒 No keys |
-| Nakadashi Hara Maid 2 | なかだし孕メイド2 | 2008-08-16 | [v2673](https://vndb.org/v2673) | Chain-Reaction | 12 | 🔒 No keys |
 | Gakuen Pets 2 ~Pool Side no Shiiku Katsudou~ | 学園ペッツ2 ～プールサイドの飼育活動～ | 2008-10-10 | [v2462](https://vndb.org/v2462) | Goku-Fero | 1 | 🔒 No keys |
 | Cruise☆Cruise ~Shoujo no 10nen to Chiisana Yakusoku~ | くる～ず☆クルーズ～少女の10年とちいさな約束～ | 2009-05-29 | [v1780](https://vndb.org/v1780) | Abelia, Guten Tag | 6 | 🔒 No keys |
 | Gakuen Pets 3 ~Seieki Mamire no Toshokan~ | 学園ペッツ3～精液まみれの図書館～ | 2009-09-11 | [v2564](https://vndb.org/v2564) | Goku-Fero | 2 | 🔒 No keys |
 | 10 nin Yaru! ~Soshite Densetsu e~ | 10人犯る! ～そして伝説へ～ | 2011-08-14 | [v9200](https://vndb.org/v9200) | Circle Lolipop | 7 | 🔒 No keys |
-| Riajuu Saimin ~Real ga Juujitsu Suru Saimin Seikatsu Hajimemashita.~ | リア充催眠～リアルが充実する催眠生活はじめました。～ | 2012-03-30 | [v9750](https://vndb.org/v9750) | C:drive. | 63 | 🔒 No keys |
 | Megane Choukyou ~Megane Shoujo wa Ikan ni Shite Kimoota Kyoushi no Mono ni Natta ka~ | 牝鏡調教 ～メガネ少女は如何にしてキモオタ教師のものになったか～ | 2013-05-24 | [v12626](https://vndb.org/v12626) | Goku-Fero | 7 | 🔒 No keys |
 
 ## Platforms
@@ -673,8 +674,7 @@ thumbnail (856 x 482 from blocks of 2 x 2 of a picture 1920 wide, its rows copie
 32-bit; the English release has the same three, which no sweep reached), its blank S25 (the
 English one's without clearing first) and a count of the set pixels in three squares of 32 x 32,
 each the same bytes as its x86 code on random cases. Swept: 101 scenarios, every one to its end
-but B001.TXT, which shows its last line and then stands at the game's map of routes, where the
-sweep's clicks choose none.
+(B001.TXT shows its last line and then stands at the game's map of routes: "done (end)").
 
 **Gohoushi Nurse ~Mayonaka no Kyousei Call~** (Hot Pink, GHNURSE.exe, engine v2.50, 1280 x 720)
 and **Lovecha ~Tsumasakidachi de, Hitomi o Tojite~** (Tangerine, LOVECHA.EXE, v2.50; its .exe
@@ -696,7 +696,7 @@ end but one, 02_C23.TXT, which runs out of the scripts' memory (1.1 GB in use an
 MB asked for; todo.md).
 
 **Nakadashi Trilogy**: its new game, **Miko Dashi** (巫女だし, Cdrive, MIKODS.EXE, engine v2.47),
-was tried (the trilogy's other two are the earlier Nakadashi Hara Maid games, not installed). Its
+was tried (the trilogy's other two, the earlier Nakadashi Hara Maid games, are KiriKiri games). Its
 .exe went into GameMap; its 7,449 files come out whole. Its START checks its executable twice:
 `03C2` gives this one's checksum (v ^ 306723180 = 228471671), and it reads the .exe whole and
 compares it with X.WAV of MIKODS_D.WAR, a copy of it (its memcmp is an embedded routine, now C#).

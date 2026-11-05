@@ -28,7 +28,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   through; **Tekoire Princess!** (てこいれぷりんせす！, 2004) plays.
 - **New: Love & Piss** (Love＆Piss ～少女のガマンが世界を救う～, 2013) plays through: its keys were
   taken from its executable (decrypted as its start-up stub does it), with its DecodeBin date.
-- 62 games (63 releases) now play through, **Imouto Smile** (妹スマイル, 2009), **S.D.I.-Sadistic
+- 63 games (64 releases) now play through (the Japanese Sorcery Jokers too: its last scenario
+  ends at its map of routes), **Imouto Smile** (妹スマイル, 2009), **S.D.I.-Sadistic
   Daughter Incident-** (2013) and **Sadistic Little** (サディスティックりとる, 2009) among them, their
   keys taken from their executables, and **Yokorenbo** (横恋母, 2008) and **Hana to Otome ni
   Shukufuku o** (花と乙女に祝福を, 2009): ruby text (`{...}`) is drawn now.
