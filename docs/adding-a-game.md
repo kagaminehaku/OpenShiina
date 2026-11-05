@@ -1,6 +1,6 @@
 # Adding a game
 
-How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 59 releases
+How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 61 releases
 that play went through these steps; most of what goes wrong with a new one is in the table of
 symptoms below, with what fixed it before.
 
@@ -33,7 +33,8 @@ written into the game folder; the tests save in their own folders.
 
 The engine version is in RIO.INI's first line (`[椎名里緒 v2.50]`; builds older than 2.4x name
 the .INI after the .exe: Ao no Juuai's aoj.INI). The player picks the opcode table by it (2.33,
-2.34, 2.37, 2.47, 2.49 and 2.50 are known; 2.36 runs with 2.47's; others need a table: todo.md).
+2.34, 2.37, 2.44, 2.47, 2.49 and 2.50 are known; 2.36, 2.45 and 2.46 run with 2.47's; others need a
+table: todo.md).
 
 Never run a game's executable that is not what its maker shipped (a repacked or "fixed" .exe
 can carry anything: Iyashinbo The Motion's was flagged). The archives and the scripts are all the

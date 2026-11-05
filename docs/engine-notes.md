@@ -36,8 +36,8 @@ GARbro build; a merge of its own result gives the same file). Their extra cipher
 GARbro-Mod's, PostAdler / PreAdler / Binbo / Count / AltCount / Ushimitsu / Nukitashi2 / Saimin
 ported for them (not checked against those games' archives: none is here). 102 GameMap entries.
 By engine version: 30 below 2.39, 26 from 2.39 to 2.46, 35 2.47-2.48, 18 2.49, 29 2.50 and
-later. The interpreter knows the opcodes of 2.33, 2.34, 2.37, 2.47, 2.49 and 2.50 (ScnOpcodes picks
-2.47's for 2.36 too): the others need more (todo.md).
+later. The interpreter knows the opcodes of 2.33, 2.34, 2.37, 2.44, 2.47, 2.49 and 2.50 (ScnOpcodes
+picks 2.47's for 2.36, 2.45 and 2.46 too): the others need more (todo.md).
 
 **DecodeBin's date.** The DecodeBins of all schemes are the same but for one dword at 0x1020, a
 date of the engine's build (0x20161012 for Chiccha na Hanayome and Signalist Stars!!, 0x20171006
@@ -277,6 +277,14 @@ operand, a string copied to 722B5C) that the GRAND†CROSS games never use.
 **v2.33** (Cleavage's CLEAVAGE.EXE, 2005; Vanquish's VANQ.EXE is the same build; table
 Data/ScnOps/ops_v233.tsv): laid out as v2.34 (`ScnTools opscan CLEAVAGE.EXE 41e4f0 41e525 0
 41f27c 40d6b0 40cfb0 40d4d0 ...`), 542 opcodes, v2.34's but for 06EC, which it lacks.
+
+**v2.44** (Yokorenbo's YOKOREN.EXE, 2008, not packed; table Data/ScnOps/ops_v244.tsv): laid out
+as v2.45's (`ScnTools opscan YOKOREN.EXE 41cca0 41ccfc 41ccc3 422d96 412630 4120f0 4124a0 <out>
+41cd4e EBX EDI`, the addresses found by matching Chuuchuu Nurse's functions' first bytes): 661
+opcodes, v2.47's operands but for `04EC` (nine, as v2.34's), with nine v2.47 lacks (0576, 0577,
+060E-0610, 0614, 077B, 09F7, 0A01; five of them v2.34's too) and without 52 of v2.47's.
+**v2.46** (Hana to Otome ni Shukufuku o's HANAOTO.EXE, 2009, `.riox` as v2.45's): 687 opcodes,
+every one of them v2.47's with the same operands, so v2.46 uses ops_v247.tsv as v2.45 does.
 
 **v2.37** (Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE, 2006; table Data/ScnOps/ops_v237.tsv):
 encrypted as v2.45's, by a `.riox` stub over `.text` alone (0x57630 bytes at 401000, the key

@@ -259,10 +259,11 @@ public sealed partial class ScnVm
         });
         // Hana to Otome ni Shukufuku o Royal Bouquet 4CAEC: 892,740 dwords at l[1] XORed with a key
         // from l[0], after each the key + 1, rotated left by 3, its bytes reversed; Tekoire
-        // Princess! 2FEBC: 1,734,936 dwords; Imouto Smile 6D5EC: 1,317,920
+        // Princess! 2FEBC: 1,734,936 dwords; Imouto Smile 6D5EC: 1,317,920; Sadistic Little 5AE8C: 433,120
         RegisterNative("B4937B7F8A71BA951426F3E44AC8D0ED313E669A", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0xD9F44));
         RegisterNative("9598BC877F66A2208AD03940D710BD0620B464F4", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x1A7518));
         RegisterNative("A470F7A6AA684E2AF9F1EBF445D60C63C4269657", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x141C20));
+        RegisterNative("6CDD92F21FABE3FBF5353F8D5A210AED96E9EF86", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x69BE0));
         // Raillore EFCLIB 92F0 (Tojita Sekai no Tori Colony EFCLIB 666C, other padding): l[1] dwords at
         // l[0] inverted (XOR FFFFFFFF); a count under 1 runs as x86 code
         RegisterNative(["F79705977D2B17A02E3A733E04EF5BA87A031A92", "C4E79AD74DF00F25B64339C72CF808E9E7627276"], "invert dwords", (vm, c, a) =>

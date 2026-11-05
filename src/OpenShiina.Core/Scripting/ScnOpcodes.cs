@@ -77,8 +77,10 @@ public sealed class ScnOpcodes
     /// from Cleavage's CLEAVAGE.EXE, Vanquish's VANQ.EXE the same build): v2.34's but for 06EC,
     /// which it lacks. v2.37 has its own (read from Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE,
     /// its code decrypted as its .riox stub does it: 568 opcodes, v2.47's operands but for 04EC,
-    /// 055A and 055B, which are v2.34's, and five of v2.34's v2.47 lacks). v2.45 takes v2.47's: the
-    /// 679 opcodes of Chuuchuu Nurse's executable are v2.47's, with the same operands.
+    /// 055A and 055B, which are v2.34's, and five of v2.34's v2.47 lacks). v2.44 has its own (read
+    /// from Yokorenbo's YOKOREN.EXE: 661 opcodes, v2.47's operands but for 04EC, v2.34's, and nine
+    /// v2.47 lacks). v2.45 and v2.46 take v2.47's: the 679 opcodes of Chuuchuu Nurse's executable
+    /// and the 687 of Hana to Otome ni Shukufuku o's are v2.47's, with the same operands.
     /// </summary>
     public static ScnOpcodes ForVersion(string version)
     {
@@ -93,7 +95,8 @@ public sealed class ScnOpcodes
 
     /// <summary>The opcode table an engine version uses ("ops_v247" for "2.45"; see <see cref="ForVersion"/>).</summary>
     public static string TableName(string version) =>
-        version.StartsWith("2.47") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
+        version.StartsWith("2.47") || version.StartsWith("2.46") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
+            : version.StartsWith("2.44") ? "ops_v244"
             : version.StartsWith("2.34") ? "ops_v234"
             : version.StartsWith("2.33") ? "ops_v233"
             : version.StartsWith("2.37") ? "ops_v237"

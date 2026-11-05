@@ -26,10 +26,11 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   through; **Tekoire Princess!** (てこいれぷりんせす！, 2004) plays.
 - **New: Love & Piss** (Love＆Piss ～少女のガマンが世界を救う～, 2013) plays through: its keys were
   taken from its executable (decrypted as its start-up stub does it), with its DecodeBin date.
-- 58 games (59 releases) now play through, **Imouto Smile** (妹スマイル, 2009) among them (its
-  keys from its executable); **S.D.I.-Sadistic
-  Daughter Incident-** and **Sadistic Little** (サディスティックりとる) have keys now, from their
-  executables, and start.
+- 60 games (61 releases) now play through, **Imouto Smile** (妹スマイル, 2009), **S.D.I.-Sadistic
+  Daughter Incident-** (2013) and **Sadistic Little** (サディスティックりとる, 2009) among them, their
+  keys taken from their executables.
+- Engine version 2.44 has its own opcode table (read from Yokorenbo's executable) and 2.46 runs
+  with 2.47's. Vanquish (v2.33) got the opcodes its scripts have; its title stays black.
 - ScnBoot: `SCNBOOT_SWEEP_FROM` starts the sweep's keys and clicks at a frame (a title's START
   clicked with `SCNBOOT_MOUSE` first); a scenario that stands still after a line of its last
   message is "done (end)", not "stuck".

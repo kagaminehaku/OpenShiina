@@ -21,6 +21,9 @@ public sealed partial class ScnVm
     {
         "datapath" => DataPath,
         "instmode" => InstallMode,
+        // the folder the game was installed in (Vanquish's START makes it the current directory):
+        // the game folder, which the player's file names are relative to
+        "instpath" => ".\\",
         _ => null,
     };
 
@@ -78,7 +81,8 @@ public sealed partial class ScnVm
     // (SAIMIN.EXE, v2.47: START 0x00484 wants v ^ 306723180 = -628140931), Doushite Daite Kurenai
     // no!? (DODAKURE.EXE, v2.50: START 0x006A6 wants v ^ 306723180 = -1421357033), Nakadashi
     // Trilogy's Miko Dashi (MIKODS.EXE, v2.47: START 0x0037A wants v ^ 306723180 = 228471671), Imouto
-    // Smile (IMOSMILE.EXE, v2.47: START 0x003C4 wants v ^ 306723180 = 969238634)
+    // Smile (IMOSMILE.EXE, v2.47: START 0x003C4 wants v ^ 306723180 = 969238634), Yokorenbo
+    // (YOKOREN.EXE, v2.44: START 0x00352 wants v ^ 306723180 = -1396214426, 555116478 with f[257] bit 1)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -89,6 +93,7 @@ public sealed partial class ScnVm
         ["Doushite Daite Kurenai no!?"] = 306723180 ^ -1421357033,
         ["Nakadashi Trilogy"] = 306723180 ^ 228471671,
         ["Imouto Smile"] = 306723180 ^ 969238634,
+        ["Yokorenbo ~Immoral Mother~"] = 306723180 ^ -1396214426,
     };
 
     private void RegisterSystem()

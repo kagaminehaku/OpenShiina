@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.33, 2.34, 2.37, 2.45 and 2.47 to 2.50; see
 [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 58 games, 59 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 60 games, 61 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -48,7 +48,7 @@ of those versions it does not list.
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | ⚪ Not tried |  |
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ⚪ Not tried |  |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | 🟢 Plays | 2026-11-04 |
-| Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | ⚪ Not tried |  |
+| Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🔴 Stops | 2026-11-05 |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ⚪ Not tried |  |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.39 | ⚪ Not tried |  |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ✅ Plays through | 2026-11-04 |
@@ -82,7 +82,7 @@ of those versions it does not list.
 | Chikan Densha Otoko 2 | 痴漢電車男2 ～伝説へのライナー～ | 2008-05-30 | [v5861](https://vndb.org/v5861) | v2.43 | ⚪ Not tried |  |
 | Dokodemo Sukishite Itsudemo Sukishite | どこでもすきしていつでもすきして | 2008-06-27 | [v780](https://vndb.org/v780) | v2.44 | ⚪ Not tried |  |
 | Wana II ~Gang Rape~ | 輪罠II ～Gang Rape～ | 2008-06-27 | [v4371](https://vndb.org/v4371) | v2.44 | ⚪ Not tried |  |
-| Yokorenbo ~Immoral Mother~ | 横恋母 ～Immoral Mother～ | 2008-07-18 | [v2970](https://vndb.org/v2970) | v2.44 | ⚪ Not tried |  |
+| Yokorenbo ~Immoral Mother~ | 横恋母 ～Immoral Mother～ | 2008-07-18 | [v2970](https://vndb.org/v2970) | v2.44 | 🟡 Starts | 2026-11-05 |
 | Engage Links | Engage Links | 2008-10-24 | [v1090](https://vndb.org/v1090) | v2.45 | ⚪ Not tried |  |
 | Tsuyoimo x Yowaimo | 強妹×弱妹 | 2008-10-24 | [v2185](https://vndb.org/v2185) | v2.45 | ⚪ Not tried |  |
 | Chuuchuu Nurse | ちゅうちゅうナース | 2008-10-31 | [v1144](https://vndb.org/v1144) | v2.45 | ✅ Plays through | 2026-10-13 |
@@ -105,7 +105,7 @@ of those versions it does not list.
 | Mahou Shoujo no Taisetsu na Koto | 魔法少女の大切なこと。 | 2009-09-25 | [v2616](https://vndb.org/v2616) | v2.47 | ⚪ Not tried |  |
 | Rin x Sen | RIN×SEN～白濁女教師と野郎ども～ | 2009-09-25 | [v2611](https://vndb.org/v2611) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | 🟢 Plays | 2026-11-04 |
-| Sadistic Little | サディスティックりとる | 2009-11-06 | [v2850](https://vndb.org/v2850) | v2.47 | 🟡 Starts | 2026-11-05 |
+| Sadistic Little | サディスティックりとる | 2009-11-06 | [v2850](https://vndb.org/v2850) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Imouto Smile | 妹スマイル | 2009-11-27 | [v2847](https://vndb.org/v2847) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ⚪ Not tried |  |
@@ -154,7 +154,7 @@ of those versions it does not list.
 | Gensou no Idea ~Oratorio Phantasm Historia~ | 幻創のイデア～Oratorio Phantasm Historia～ | 2013-06-28 | [v11881](https://vndb.org/v11881) | v2.49 | ✅ Plays through | 2026-10-21 |
 | Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ✅ Plays through | 2026-10-24 |
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | Love＆Piss ～少女のガマンが世界を救う～ | 2013-08-30 | [v12613](https://vndb.org/v12613) | v2.49 | ✅ Plays through | 2026-11-04 |
-| S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | v2.49 | 🟡 Starts | 2026-11-05 |
+| S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | v2.49 | ✅ Plays through | 2026-11-05 |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | 2014-05-30 | [v14614](https://vndb.org/v14614) | v2.49 | ⚪ Not tried |  |
 | Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ⚪ Not tried |  |
 | Kanojo ga Ore ni Kureta Mono | 彼女が俺にくれたもの。俺が彼女にあげるもの。 | 2014-09-26 | [v14321](https://vndb.org/v14321) | v2.50 | ✅ Plays through | 2026-10-24 |
@@ -758,8 +758,25 @@ as stuck).
 **S.D.I.-Sadistic Daughter Incident-** (Tangerine, SDI.EXE, v2.49) and **Sadistic Little**
 (Tangerine, SLITTLE.EXE, v2.47) had no keys: their schemes came from their executables (S.D.I.'s
 ExtraCrypt is a TestamentCrypt with its plug-in's table and its own DecodeBin date, 20131022).
-Their files come out whole (2,421 and 2,812), opcheck finds nothing missing, and both run from
-the start to their title; their stories were not tried yet.
+Their files come out whole (2,421 and 2,812) and opcheck finds nothing missing. S.D.I. needed
+nothing more (its routines were all known builds): swept, 37 scenarios, every one to its end.
+Sadistic Little's XOR stream got C# (a build of the known one, 433,120 dwords; the same bytes as
+its x86 code on random cases): swept, 96 scenarios, every one to its end.
+
+**Yokorenbo ~Immoral Mother~** (Guilty+, YOKOREN.EXE, engine v2.44) had its scheme. Engine v2.44
+has its own opcode table, read from its executable (engine-notes.md, "Engine builds"); its
+scripts have no opcode the player lacks. `03C2` gives its checksum (v ^ 306723180 =
+-1396214426). It runs from the start to its title; two of its routines (an XOR stream and one
+more) have no C# yet, and its story was not swept yet.
+
+**Vanquish** (forst, VANQ.EXE, engine v2.33: the same build as CLEAVAGE.EXE, the same addresses)
+opens with its scheme and needed handlers for 14 opcodes its scripts have (ScnVm.Engine233.cs):
+`0190` (its START loads Export.dll: answered as loaded; `0191`, the DLL's functions of its menu
+that copies files out, is not run), `039C` (rotate right), `046A`, `073E`, `07C6`, `08CA`,
+`08D4` (cursor, menu bar), `0A29` / `0A2A` (the install path made the current directory; its
+registry value `InstPath`), `06E0` (a stream's volume in DirectSound's units) and `050A` (the
+screen crossfaded from one surface to another, the engine waiting in it). It runs from the start
+without an error to its title's loop, but the window stays black: not found yet.
 
 **Cleavage** (Empress, CLEAVAGE.EXE, engine v2.33): its .exe went into GameMap (its scheme
 existed; Ao no Juuai's keys open it too) and its 2,521 files come out whole. Engine v2.33 got its
@@ -860,6 +877,8 @@ stopped, none stuck.
 | Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 492 | 63.0% (as Ao no Juuai) |
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | 82 | 98.9% |
 | Imouto Smile | 260 | every scenario to its end (EVC15A: Notes) |
+| S.D.I.-Sadistic Daughter Incident- | 37 | 99.5% |
+| Sadistic Little | 96 | 99.5% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

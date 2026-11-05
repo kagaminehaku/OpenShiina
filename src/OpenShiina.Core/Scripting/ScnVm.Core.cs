@@ -446,6 +446,8 @@ public sealed partial class ScnVm
         Register(0x039A, (vm, c, i) => vm.Binary(c, i, (a, b) => (int)((uint)b >> (a & 31))));
         Register(0x039B, (vm, c, i) => vm.Binary(c, i, (a, b) => b << (a & 31)));
         Register(0x039D, (vm, c, i) => vm.Binary(c, i, (a, b) => (int)BitOperations.RotateLeft((uint)b, a)));
+        // 039C n, v: v rotated right n bits (VANQ.EXE 0x416EE0, a bit at a time)
+        Register(0x039C, (vm, c, i) => vm.Binary(c, i, (a, b) => (int)BitOperations.RotateRight((uint)b, a)));
         Register(0x039E, (vm, c, i) => vm.Binary(c, i, (a, b) => b * a));
         Register(0x0399, (vm, c, i) => { vm.Store(c, i.Args[0], -vm.Value(c, i.Args[0])); return 0; });
         // 03A0 divisor, value, remainder: value /= divisor
