@@ -1,5 +1,5 @@
-# OpenShiina native: the player's core in C++ for the Switch (homebrew, libnx) and other devices
-# the .NET player does not run on. The C# player stays the one for PC and Android.
+# OpenShiina native: the player's core in C++ for the Nintendo Switch (homebrew, libnx). The C#
+# player stays the one for PC and Android; the PC build here is to compare with it.
 #
 #   PC (to compare with the C# player):   cmake -S native -B native/build -G Ninja && cmake --build native/build
 #   Switch:                               native/build-switch.sh (devkitPro's Switch.cmake toolchain)

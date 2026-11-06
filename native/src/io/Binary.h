@@ -1,4 +1,4 @@
-// Byte-level helpers (C# IO/Utility.cs): reads in a stated byte order whatever the CPU's, rotations,
+// Byte-level helpers (C# IO/Utility.cs): little- and big-endian reads at any address, rotations,
 // the overlapped copy of LZ back references, and the conversions of doubles to integers as .NET 9+
 // does them (saturating), which C++ leaves undefined out of range.
 #pragma once

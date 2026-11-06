@@ -1,4 +1,4 @@
-// Files and folders by UTF-8 paths on every platform (Windows takes them as UTF-16 underneath),
+// Files and folders by UTF-8 paths on the Switch and on the PC (Windows takes them as UTF-16),
 // and the case-insensitive look-ups the games need: their files are named as on Windows.
 #pragma once
 
@@ -18,6 +18,8 @@ std::FILE* Open(const std::string& path, const char* mode);
 
 bool IsFile(const std::string& path);
 bool IsDirectory(const std::string& path);
+/// The folder and those above it made as needed; false when it is not there afterwards.
+bool CreateDirectories(const std::string& path);
 std::string Combine(const std::string& folder, const std::string& name);
 std::string FileName(const std::string& path);
 std::string DirectoryName(const std::string& path);
@@ -25,9 +27,10 @@ std::string DirectoryName(const std::string& path);
 std::string FileNameWithoutExtension(const std::string& path);
 std::string Extension(const std::string& path);
 
-/// The names (not paths) of a folder's files, or of its folders; none when it cannot be read.
-std::vector<std::string> FileNames(const std::string& folder);
-std::vector<std::string> FolderNames(const std::string& folder);
+/// The names (not paths) of a folder's files, or of its folders; none when it cannot be read
+/// (and why in error, when given).
+std::vector<std::string> FileNames(const std::string& folder, std::string* error = nullptr);
+std::vector<std::string> FolderNames(const std::string& folder, std::string* error = nullptr);
 
 /// The whole file, or false when it cannot be read.
 bool ReadAll(const std::string& path, std::vector<uint8_t>& data);

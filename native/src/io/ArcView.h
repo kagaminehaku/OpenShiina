@@ -1,6 +1,5 @@
 // An archive file read by offset (C# IO/ArcView.cs). The C# player maps the file into memory; here
-// it is read through a cached window of the file, which works on every platform (the Switch's SD
-// card has no mapping) and keeps little memory on small devices.
+// it is read through a cached window of the file, as the Switch's SD card cannot be mapped.
 #pragma once
 
 #include <cstdint>

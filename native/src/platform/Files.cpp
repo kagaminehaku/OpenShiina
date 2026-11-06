@@ -1,6 +1,20 @@
+// On the Switch the folders are read with opendir / readdir / stat: libstdc++'s std::filesystem
+// finds nothing on sdmc:
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "platform/Files.h"
 
+#include <cerrno>
+#include <cstring>
 #include <system_error>
+
+#ifndef _WIN32
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -27,6 +41,8 @@ std::FILE* Open(const std::string& path, const char* mode)
 #endif
 }
 
+#ifdef _WIN32
+
 bool IsFile(const std::string& path)
 {
     std::error_code ec;
@@ -38,6 +54,79 @@ bool IsDirectory(const std::string& path)
     std::error_code ec;
     return fs::is_directory(ToPath(path), ec);
 }
+
+bool CreateDirectories(const std::string& path)
+{
+    std::error_code ec;
+    fs::create_directories(ToPath(path), ec);
+    return IsDirectory(path);
+}
+
+static std::vector<std::string> Names(const std::string& folder, bool folders, std::string* error)
+{
+    std::vector<std::string> names;
+    std::error_code ec;
+    fs::directory_iterator it(ToPath(folder), ec), end;
+    for (; !ec && it != end; it.increment(ec))
+    {
+        std::error_code kind;
+        if (folders ? it->is_directory(kind) : it->is_regular_file(kind))
+            names.push_back(ToUtf8(it->path().filename()));
+    }
+    if (ec && error)
+        *error = ec.message();
+    return names;
+}
+
+#else
+
+bool IsFile(const std::string& path)
+{
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+bool IsDirectory(const std::string& path)
+{
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+bool CreateDirectories(const std::string& path)
+{
+    if (path.empty() || IsDirectory(path))
+        return true;
+    std::string parent = DirectoryName(path);
+    // "sdmc:" and "/" are where the parents end
+    if (!parent.empty() && parent.back() != ':' && !CreateDirectories(parent))
+        return false;
+    return mkdir(path.c_str(), 0777) == 0 || IsDirectory(path);
+}
+
+static std::vector<std::string> Names(const std::string& folder, bool folders, std::string* error)
+{
+    std::vector<std::string> names;
+    DIR* dir = opendir(folder.c_str());
+    if (!dir)
+    {
+        if (error)
+            *error = std::strerror(errno);
+        return names;
+    }
+    while (dirent* item = readdir(dir))
+    {
+        std::string name = item->d_name;
+        if (name == "." || name == "..")
+            continue;
+        std::string path = Combine(folder, name);
+        if (folders ? IsDirectory(path) : IsFile(path))
+            names.push_back(std::move(name));
+    }
+    closedir(dir);
+    return names;
+}
+
+#endif
 
 std::string Combine(const std::string& folder, const std::string& name)
 {
@@ -73,21 +162,8 @@ std::string Extension(const std::string& path)
     return dot == std::string::npos ? std::string() : name.substr(dot);
 }
 
-static std::vector<std::string> Names(const std::string& folder, bool folders)
-{
-    std::vector<std::string> names;
-    std::error_code ec;
-    for (fs::directory_iterator it(ToPath(folder), ec), end; !ec && it != end; it.increment(ec))
-    {
-        std::error_code kind;
-        if (folders ? it->is_directory(kind) : it->is_regular_file(kind))
-            names.push_back(ToUtf8(it->path().filename()));
-    }
-    return names;
-}
-
-std::vector<std::string> FileNames(const std::string& folder) { return Names(folder, false); }
-std::vector<std::string> FolderNames(const std::string& folder) { return Names(folder, true); }
+std::vector<std::string> FileNames(const std::string& folder, std::string* error) { return Names(folder, false, error); }
+std::vector<std::string> FolderNames(const std::string& folder, std::string* error) { return Names(folder, true, error); }
 
 bool ReadAll(const std::string& path, std::vector<uint8_t>& data)
 {

@@ -1,8 +1,6 @@
-// fseeko / ftello with 64-bit offsets (archives over 2 GB on 32-bit devices): POSIX, which a strict
-// C++20 build leaves out unless asked for
+// fseeko / ftello (archives over 2 GB): POSIX, which a strict C++20 build leaves out unless asked for
 #ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
-#define _FILE_OFFSET_BITS 64
 #endif
 
 #include "io/ArcView.h"
