@@ -4,7 +4,7 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.8.1 (2026-11-06)
 
 - The games of the engines before v2.44 save again (Ayakashibito, Ao no Juuai, Vanquish,
   Cleavage, Kateinai Choukyou, Tekoire Princess!, Yoyogi Hitozuma Senmon Gakuin): their engines
