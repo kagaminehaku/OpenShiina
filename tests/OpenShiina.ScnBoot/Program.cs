@@ -565,7 +565,7 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
         long start = System.Diagnostics.Stopwatch.GetTimestamp();
         var bytes = data.Read(name.Replace('/', '\\'));
         if (s_traceFiles)
-            Console.WriteLine($"[file] {name} {bytes?.Length ?? -1} {System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds:F2} ms");
+            Console.WriteLine($"[file] {name} {bytes?.Length ?? -1} {System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds:F2} ms at {Frame}");
         return bytes;
     }
     public long? ArchiveFileSize(string name) => Swap(name) is { } swap ? new FileInfo(swap).Length : data.Size(name.Replace('/', '\\'));
@@ -614,7 +614,11 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     private readonly bool m_sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
     private readonly int m_sweepFrom = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_FROM"), out int from) ? from : 0;
 
-    public bool Sweeping => m_sweep && Frame >= m_sweepFrom;
+    // SCNBOOT_SWEEP_UNTIL=frame: the sweep's keys and clicks stop there (a scene reached, then
+    // SCNBOOT_PRESS / SCNBOOT_MOUSE alone: which key ends a game's opening movie)
+    private readonly int m_sweepUntil = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_UNTIL"), out int until) ? until : int.MaxValue;
+
+    public bool Sweeping => m_sweep && Frame >= m_sweepFrom && Frame < m_sweepUntil;
 
     private bool SweepCtrl => Sweeping && Frame % 48 is < 12 or >= 36;
 
@@ -678,6 +682,8 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     /// <summary>The window messages of this frame: keys and buttons that go down or up.</summary>
     public IEnumerable<(int Message, int WParam)> Messages()
     {
+        if (m_sweep && Frame == m_sweepUntil)
+            yield return (ScnMessage.KeyUp, 0x11);
         if (Sweeping)
         {
             if (Frame == m_sweepFrom || Frame % 48 == 36)

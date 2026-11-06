@@ -782,7 +782,10 @@ public sealed partial class ScnVm
     /// <summary>Engine switch 0x4B3E08, set by op_D382.</summary>
     public int SwitchD382 { get; private set; }
 
-    /// <summary>Engine switch 0x4B3E0C (op_AA82): without it the engine's file writes do nothing.</summary>
+    /// <summary>
+    /// Engine switch 0x4B3E0C (op_AA82): without it the engine's file writes do nothing. The
+    /// engines whose table has no AA82 (before v2.44) write always (set in the constructor).
+    /// </summary>
     public bool FileWritesEnabled { get; private set; }
 
     /// <summary>Engine globals 0x13B5198 / 0x13B519C (op_0048 sets them).</summary>

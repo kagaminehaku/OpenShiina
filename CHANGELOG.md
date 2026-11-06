@@ -4,6 +4,14 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- The games of the engines before v2.44 save again (Ayakashibito, Ao no Juuai, Vanquish,
+  Cleavage, Kateinai Choukyou, Tekoire Princess!, Yoyogi Hitozuma Senmon Gakuin): their engines
+  have no `AA82`, the switch the later ones set before they let their scripts write files, and
+  the player wrote nothing for them: a save slot stayed empty. They write always now, as their
+  engines do.
+
 ## 0.8.0 (2026-11-05)
 
 - A game whose executable is large address aware (Nukitashi 2, Libra of the Vampire Princess,

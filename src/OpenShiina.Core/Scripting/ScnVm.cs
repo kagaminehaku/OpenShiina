@@ -250,6 +250,9 @@ public sealed partial class ScnVm : IDisposable
     {
         m_opcodes = opcodes;
         m_host = host;
+        // An engine without op_AA82 (before v2.44: Ayakashibito, Ao no Juuai, Kateinai Choukyou,
+        // Vanquish, Tekoire...) has no such switch: its file writes always happen
+        FileWritesEnabled = !opcodes.TryGetLayout(0xAA82, out _);
         for (int i = 0; i < Slots; i++)
             m_slots[i] = new ScnContext { Slot = i };
         RegisterCore();

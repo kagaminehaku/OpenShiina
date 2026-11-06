@@ -839,7 +839,8 @@ the functions they call from the decompile. First findings:
 
 - Checks: engine version `03C0` (247), window size `09F6` (RIO.INI 800 x 600), colour depth
   `09E2` (GetDeviceCaps BITSPIXEL >= 16), DirectDraw `06C2` / DirectSound `06A4` ready, no other
-  copy running (`07B2` FindWindow), `D382` / `AA82` switches (AA82 enables file writes).
+  copy running (`07B2` FindWindow), `D382` / `AA82` switches (AA82 enables file writes; the
+  engines before v2.44 have no AA82 and always write, as the player does for a table without it).
 - Azu Plus also checks the executable: `03C2 v` gives 0x13B41BC, a checksum the engine makes at
   start (FUN_004374D0 / FUN_004085C0: checksums of its code, its "riox" section and its version
   resource), and START 0x002F0 stops with "Program Revision Error" unless v ^ 306723180 is
