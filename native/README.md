@@ -10,6 +10,7 @@ as done. It is built for the PC too, only for that comparison.
 | Part | C# | State |
 |---|---|---|
 | Archives: WARC 1.0-1.7, every scheme and ExtraCrypt of Formats.Json | `Archives`, `IO` | Done: on PC the 20,878 files of 15 games (the 11 GRAND†CROSS games, Vanquish, Cleavage, Ao no Juuai, Shojo Mama) the same as the C# player's; on a Switch Lite, Vanquish's the same as on PC (1.1 s) |
+| The scripts' 4 GB of memory, given in 1 MB parts on first use | `Scripting/ScnAddressSpace.cs` | Done on PC (`tools/spacetest`: 100,000 random operations against a model, discards, threads); on the Switch the parts are heap memory mapped with `svcMapProcessCodeMemory`, which works there, the whole not run on one yet |
 
 `tools/arcdump` decodes every file of a game's archives and prints the SHA-256 of each; on the
 Switch it is `arcdump.nro`.

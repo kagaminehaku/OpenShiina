@@ -295,7 +295,7 @@ int main(int argc, char** argv)
     padInitializeDefault(&pad);
 
     std::string self = SelfPath(argc, argv);
-    bool network = false;
+    bool network = false, started = false;
     int udp = -1, tcp = -1;
     if (!envHasNextLoad())
         Log("devhost needs hbmenu's loader (hbloader) to start other programs.\n");
@@ -305,7 +305,9 @@ int main(int argc, char** argv)
         Log("Cannot listen on port %d: %s\n", kServerPort, std::strerror(errno));
     else
     {
-        // No dimming or sleep while waiting: sleep would close the network
+        // No dimming or sleep while waiting, nor while the programs it starts run (they set it again
+        // in DevHostReturn): sleep would close the network, and after a long wait the Switch would
+        // sleep the moment it was allowed to
         appletSetMediaPlaybackState(true);
         in_addr host{};
         host.s_addr = gethostid();
@@ -367,13 +369,15 @@ int main(int argc, char** argv)
             continue;
         }
         Log("Starting %s\n", upload.path.c_str());
+        started = true;
         break;
     }
 
     if (tcp >= 0)
     {
         close(tcp);
-        appletSetMediaPlaybackState(false);
+        if (!started)
+            appletSetMediaPlaybackState(false);
     }
     if (udp >= 0)
         close(udp);

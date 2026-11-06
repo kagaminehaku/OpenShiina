@@ -27,6 +27,7 @@ add_library(openshiina_core STATIC
     src/io/ArcView.cpp
     src/io/Checksum.cpp
     src/platform/Files.cpp
+    src/scripting/ScnAddressSpace.cpp
     src/text/Text.cpp
     src/util/Encoding.cpp
 )
@@ -61,7 +62,20 @@ if(NINTENDO_SWITCH)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../src/OpenShiina.Core/Data/Formats.Json" "${ARCDUMP_ROMFS}/Formats.Json" COPYONLY)
     nx_generate_nacp(arcdump.nacp NAME "OpenShiina arcdump" AUTHOR "kagaminehaku" VERSION "0.1.0")
     nx_create_nro(arcdump NACP arcdump.nacp ROMFS "${ARCDUMP_ROMFS}")
+
+    add_executable(spacetest tools/spacetest/SpaceTest.cpp tools/spacetest/main_switch.cpp tools/devhost/DevHostReturn.cpp)
+    target_include_directories(spacetest PRIVATE tools/devhost)
+    target_link_libraries(spacetest PRIVATE openshiina_core)
+    target_compile_options(spacetest PRIVATE -Wall -Wextra)
+    nx_generate_nacp(spacetest.nacp NAME "OpenShiina spacetest" AUTHOR "kagaminehaku" VERSION "0.1.0")
+    nx_create_nro(spacetest NACP spacetest.nacp)
 else()
     add_executable(arcdump tools/arcdump/ArcDump.cpp tools/arcdump/main.cpp)
     target_link_libraries(arcdump PRIVATE openshiina_core)
+
+    add_executable(spacetest tools/spacetest/SpaceTest.cpp tools/spacetest/main.cpp)
+    target_link_libraries(spacetest PRIVATE openshiina_core)
+    if(MSVC)
+        target_compile_options(spacetest PRIVATE /W4 /utf-8 /permissive-)
+    endif()
 endif()

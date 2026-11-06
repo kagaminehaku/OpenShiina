@@ -20,6 +20,8 @@ bool ReturnAtExit()
     std::string path = __system_argv[__system_argc - 1] + kMarkerLength;
     __system_argc--;
     __system_argv[__system_argc] = nullptr;
+    // Awake while it runs, as devhost is: nobody touches the Switch between builds
+    appletSetMediaPlaybackState(true);
     return envHasNextLoad() && R_SUCCEEDED(envSetNextLoad(path.c_str(), ("\"" + path + "\"").c_str()));
 }
 
