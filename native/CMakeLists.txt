@@ -44,7 +44,15 @@ else()
 endif()
 
 if(NINTENDO_SWITCH)
-    add_executable(arcdump tools/arcdump/ArcDump.cpp tools/arcdump/main_switch.cpp)
+    # devhost.nro: runs the .nro files nxlink sends, and the programs it runs come back to it
+    add_executable(devhost tools/devhost/main.cpp)
+    target_link_libraries(devhost PRIVATE openshiina_core)
+    target_compile_options(devhost PRIVATE -Wall -Wextra)
+    nx_generate_nacp(devhost.nacp NAME "OpenShiina devhost" AUTHOR "kagaminehaku" VERSION "0.1.0")
+    nx_create_nro(devhost NACP devhost.nacp)
+
+    add_executable(arcdump tools/arcdump/ArcDump.cpp tools/arcdump/main_switch.cpp tools/devhost/DevHostReturn.cpp)
+    target_include_directories(arcdump PRIVATE tools/devhost)
     target_link_libraries(arcdump PRIVATE openshiina_core)
     target_compile_options(arcdump PRIVATE -ffp-contract=off)
     # The romfs: Formats.Json from the C# player's data

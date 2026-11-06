@@ -31,6 +31,26 @@ native/build-switch.sh
 The build turns off fused multiply-adds (`-ffp-contract=off`): the archive keys are worked out
 with doubles, and each operation must round as in the C# player.
 
+## Run on the Switch from the PC
+
+`devhost.nro` runs each build nxlink sends, without going back to hbmenu: it takes uploads as
+hbmenu's netloader does, on the same port, and the programs it starts come back to it when they
+exit (`tools/devhost/DevHostReturn.h`, called from `userAppInit`). Send it once with hbmenu's
+netloader on (Y), which starts it:
+
+```
+nxlink -a <Switch IP> -p openshiina/devhost.nro native/build-switch/devhost.nro
+```
+
+then each build, while devhost waits (`-s` shows the program's output on the PC):
+
+```
+nxlink -s -a <Switch IP> -p openshiina/arcdump.nro native/build-switch/arcdump.nro
+```
+
+Later, devhost is opened from hbmenu (`switch/openshiina/devhost.nro`); + goes back to hbmenu. It
+keeps the Switch from dimming and sleeping while it waits.
+
 ## Check against the C# player
 
 ```
@@ -39,7 +59,7 @@ native\tools\arccompare.ps1 -Work <temp folder> <game folder>...
 
 decodes each game with ScnTools (`tools\ScnTools`, built) and with `arcdump`, and compares every
 file. On the Switch: copy game folders to `sdmc:/OpenShiina/Games/<folder>`, run `arcdump.nro`
-(hbmenu, or `nxlink -s -a <Switch IP> arcdump.nro` from the PC with hbmenu's netloader on), and
+(hbmenu, or from the PC with nxlink as above), and
 compare the SHA-256 it prints for each game's dump with that of the file `arcdump` writes on the PC
 for the same game: the C libraries' `acos`, `log`, `exp`, `pow`, `sin` and `cos` may round their
 last bit differently there. The dumps are in `sdmc:/OpenShiina/arcdump/<folder>.txt`, its output in

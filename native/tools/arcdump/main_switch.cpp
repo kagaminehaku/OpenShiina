@@ -1,7 +1,7 @@
 // arcdump.nro: DumpGame for each game folder in sdmc:/OpenShiina/Games, written to
 // sdmc:/OpenShiina/arcdump/<folder>.txt, with Formats.Json from the .nro's romfs. What it prints
 // goes to the screen (stdout), to sdmc:/OpenShiina/arcdump/log.txt and, started by nxlink -s, to
-// the PC (stderr).
+// the PC (stderr). Started by devhost.nro, it goes back to it when done, without waiting for +.
 //
 // The network and nxlink are set up in userAppInit and closed in userAppExit, which libnx runs
 // after the C library has closed stdout and stderr: closed in main, stderr would still name the
@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "ArcDump.h"
+#include "DevHostReturn.h"
 #include "archives/FormatManager.h"
 #include "platform/Files.h"
 #include "util/Encoding.h"
@@ -32,6 +33,7 @@ constexpr const char* kOut = "sdmc:/OpenShiina/arcdump";
 
 std::FILE* s_log = nullptr;
 int s_nxlink = -1;
+bool s_fromDevHost = false;
 
 void Log(const char* format, ...)
 {
@@ -92,6 +94,7 @@ void ListFolder(const char* folder)
 
 extern "C" void userAppInit()
 {
+    s_fromDevHost = devhost::ReturnAtExit();
     if (R_SUCCEEDED(socketInitializeDefault()))
         s_nxlink = nxlinkConnectToHost(false, true);
 }
@@ -159,9 +162,11 @@ int main(int, char**)
         if (Files::ReadAll(outPath, dump))
             Log("  dump %zu bytes, SHA-256 %s\n", dump.size(), Encoding::Sha256::HexOf(dump.data(), dump.size()).c_str());
     }
-    Log("Done in %.1f s. Press + to exit.\n", double(armTicksToNs(armGetSystemTick() - started)) / 1e9);
+    // Started by devhost, it goes back there at once, for the next build
+    Log("Done in %.1f s.%s\n", double(armTicksToNs(armGetSystemTick() - started)) / 1e9,
+        s_fromDevHost ? " Back to devhost." : " Press + to exit.");
 
-    while (appletMainLoop())
+    while (!s_fromDevHost && appletMainLoop())
     {
         padUpdate(&pad);
         if (padGetButtonsDown(&pad) & HidNpadButton_Plus)
