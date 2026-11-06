@@ -32,12 +32,15 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
         m_slots[size_t(i)].Slot = i;
     // In the C# player's order: a later part replaces an earlier one's handler
     RegisterCore();
+    RegisterNativeCall();
     RegisterWindow();
     RegisterFiles();
     RegisterSystem();
     RegisterSurfaces();
     RegisterEvents();
+    RegisterDraw();
     RegisterPictures();
+    RegisterNativeRoutines();
 }
 
 ScnVm::~ScnVm() = default;

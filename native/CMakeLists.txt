@@ -30,11 +30,15 @@ add_library(openshiina_core STATIC
     src/platform/Files.cpp
     src/scripting/ScnAddressSpace.cpp
     src/scripting/ScnOpcodes.cpp
+    src/scripting/ScnFonts.cpp
     src/scripting/ScnVm.cpp
     src/scripting/ScnVm.Calc.cpp
     src/scripting/ScnVm.Core.cpp
+    src/scripting/ScnVm.Draw.cpp
     src/scripting/ScnVm.Events.cpp
     src/scripting/ScnVm.Files.cpp
+    src/scripting/ScnVm.Native.cpp
+    src/scripting/ScnVm.NativeRoutines.cpp
     src/scripting/ScnVm.Paint.cpp
     src/scripting/ScnVm.Pending.cpp
     src/scripting/ScnVm.Pictures.cpp
@@ -93,7 +97,7 @@ else()
     target_link_libraries(spacetest PRIVATE openshiina_core)
 
     # scnrun: a game's scripts on the C++ interpreter, to compare with the C# player's ScnBoot
-    add_executable(scnrun tools/scnrun/main.cpp)
+    add_executable(scnrun tools/scnrun/main.cpp tools/scnrun/GdiFonts.cpp)
     target_link_libraries(scnrun PRIVATE openshiina_core)
     # routinecheck: the x86 routines' signatures against the C# player's (ScnTools routines)
     add_executable(routinecheck tools/routinecheck/main.cpp)

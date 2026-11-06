@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "archives/FormatManager.h"
+#include "GdiFonts.h"
 #include "game/GameData.h"
 #include "platform/Files.h"
 #include "scripting/ScnVm.h"
@@ -120,12 +121,14 @@ public:
     }
 
     uint32_t Milliseconds() override { return Clock; }
+    scripting::IScnFonts* Fonts() override { return &m_fonts; }
     void SetTitle(const std::string& title) override { std::printf("  [title] %s\n", Utf8(title).c_str()); }
     void SetFullScreen(bool) override {}
 
 private:
     game::GameData& m_data;
     std::string m_saveFolder;
+    tools::GdiFonts m_fonts;
 };
 
 std::string Match(const std::string& text, const char* pattern)

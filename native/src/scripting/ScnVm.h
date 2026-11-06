@@ -30,12 +30,24 @@
 #include <unordered_set>
 #include <vector>
 
+#include <functional>
+#include <initializer_list>
+
 #include "scripting/NetDictionary.h"
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnOpcodes.h"
 #include "scripting/ScnTypes.h"
+#include "scripting/X86Routine.h"
 
 namespace openshiina::scripting {
+
+/// What an embedded routine receives: the variable areas and the stack top (l[0]).
+struct ScnNativeArgs
+{
+    int B = 0, A = 0, S = 0, F = 0, Stack = 0;
+};
+
+using NativeRoutine = std::function<void(ScnVm& vm, ScnContext& c, const ScnNativeArgs& a)>;
 
 /// Window events the host passes on to the scripts.
 enum class ScnEvent
@@ -334,6 +346,27 @@ public:
     /// The memory the archives' files the scripts read are kept in, decoded.
     int64_t FileCacheBytes = int64_t(64) << 20;
 
+    // ---- Draw (ScnVm.Draw.cs) ----
+
+    /// FUN_004396F0 with MMX: dst = A * a / (a + b) + B * b / (a + b) byte by byte, for width
+    /// pixels (3 bytes each) on height rows that all have pitch; source2 below 0x100 is a grey level.
+    void BlendRows(int dst, int source, int source2, int a, int b, int width, int height, int pitch);
+    /// FUN_00437B40 with MMX: a rule (mask picture) transition, byte by byte over pixels * 3 / 4 dwords.
+    void RuleBlend(int dst, int a, int b, int rule, int pixels, int t);
+
+    // ---- Embedded routines (ScnVm.Native.cs) ----
+
+    /// Adds a routine by the signature X86Routine gives for its code.
+    void RegisterNative(const std::string& signature, const char* name, NativeRoutine run);
+    /// Adds a routine whose builds differ only in code the C++ version does not depend on.
+    void RegisterNative(std::initializer_list<const char*> signatures, const char* name, const NativeRoutine& run);
+    /// The name of the C++ version registered for a signature, or none.
+    std::optional<std::string> NativeName(const std::string& signature) const;
+    /// The signature of the routine at an address.
+    const std::string& NativeSignature(int address) { return RoutineAt(address).Code.Signature; }
+    /// The l[index] value a routine sees: the dword at the stack top + index.
+    int NativeArg(const ScnNativeArgs& args, int index) { return Read32(args.Stack + 4 * index); }
+
     // ---- Input, Menus, Text (the parts of them the core needs) ----
 
     /// RIO.INI's Background: the game goes on while another window is in front.
@@ -540,7 +573,59 @@ private:
     std::unordered_map<std::string, std::list<std::pair<std::string, openshiina::Bytes>>::iterator> m_fileCache;
     int64_t m_fileCacheSize = 0;
 
-    // ---- Input, Menus, Misc, Text, Native, Warp, GraphMovie, Music (parts the core needs) ----
+    // ---- Draw ----
+    void RegisterDraw();
+    void ShowAtLevel(int source, int level);
+    // op_0500: the brightness the display surface was made with last (0x482D38)
+    int m_screenLevel = -1;
+
+    // ---- Native ----
+    struct NativeEntry
+    {
+        std::string Name;
+        NativeRoutine Run;
+    };
+    struct RoutineInfo
+    {
+        explicit RoutineInfo(ScnVm& vm, int address) : Code(vm, uint32_t(address)) {}
+        X86Routine Code;
+        std::optional<NativeEntry> Native;
+    };
+    void RegisterNativeCall();
+    void RegisterNativeRoutines();
+    RoutineInfo& RoutineAt(int address);
+    std::optional<NativeEntry> NativeByPattern(int address);
+    /// Runs the routine being called as x86 code (the cases a C++ version leaves to it).
+    void RunX86(ScnContext& c, const ScnNativeArgs& args);
+    void SetL(const ScnNativeArgs& args, int index, int value) { Write32(args.Stack + 4 * index, value); }
+    // ScnVm.NativeRoutines.cpp's helpers
+    void TextWidth(ScnContext& c, const ScnNativeArgs& a, int wide);
+    void Mask(ScnContext& c, const ScnNativeArgs& a, int stride);
+    template <typename F> void MapDwords(int dst, int src, int bytes, F f);
+    void EnlargeWhole(ScnContext& c, const ScnNativeArgs& a, int n, int width, int height, int srcBack = 0, int dstBack = 0);
+    void ClearFrame(ScnContext& c, const ScnNativeArgs& a);
+    void EnlargeThreeHalves(ScnContext& c, const ScnNativeArgs& a, int pairs, int pairRows, int srcBack = 0, int dstBack = 0);
+    void CopyRows(ScnContext& c, const ScnNativeArgs& a, int dst, int dstStride, int src, int srcStride, int rows, int rowBytes);
+    void XorStream(ScnContext& c, const ScnNativeArgs& a, int count);
+    void Thumbnail(ScnContext& c, const ScnNativeArgs& a, int block, int columns, int rows, int stride = 2400);
+    void ThumbnailAt(ScnContext& c, const ScnNativeArgs& a, int block, int columns, int rows, int dst, int src, int stride = 2400,
+                     int dstStride = 0);
+    void BlockCopy(ScnContext& c, const ScnNativeArgs& a, int rows, int rowBytes, int stride);
+    void BlankS25(ScnContext& c, const ScnNativeArgs& a, bool clear);
+    void Samples(ScnContext& c, const ScnNativeArgs& a, int n, int stride = 3840);
+    void To32Bits(ScnContext& c, const ScnNativeArgs& a, int width, int height);
+    void Move16(ScnContext& c, const ScnNativeArgs& a);
+    void Saturation(ScnContext& c, const ScnNativeArgs& a, int tableOffset);
+    std::array<uint8_t, 3> SaturationPixel(int tables, int k, int b, int g, int r);
+    void MontageFind(ScnContext& c, const ScnNativeArgs& a);
+    void AddDwords(ScnContext& c, const ScnNativeArgs& a, int value);
+    void MatchRecords(ScnContext& c, const ScnNativeArgs& a);
+    std::unordered_map<std::string, NativeEntry> m_natives;
+    std::unordered_map<int, std::unique_ptr<RoutineInfo>> m_routines;
+    // The routine being called
+    int m_nativeTarget = 0;
+
+    // ---- Input, Menus, Misc, Text, Warp, GraphMovie, Music (parts the core needs) ----
     void MouseWheel(int delta) { EngineGlobals[0x13B52B4] = delta >= 0 ? 1 : -1; }
     std::string RioSection();
     void SetRunsInBackground(bool value);

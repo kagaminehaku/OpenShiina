@@ -61,10 +61,6 @@ void ScnVm::StepTaskText(ScnContext& c)
     throw Error(c, "Task text (0083) is not ported yet");
 }
 
-// ---- ScnVm.Native.cs: no routine was looked at ----
-
-void ScnVm::ForgetRoutines() {}
-
 // ---- ScnVm.Warp.cs: nothing to play from ----
 
 void ScnVm::PlayFromModule(ScnContext&, const std::string&) {}

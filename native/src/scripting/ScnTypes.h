@@ -13,11 +13,11 @@
 #include <vector>
 
 #include "io/Binary.h"
+#include "scripting/ScnFonts.h"
 
 namespace openshiina::scripting {
 
 class ScnVm;
-class IScnFonts;
 class IScnShapes;
 class IScnSound;
 class IScnMusic;
