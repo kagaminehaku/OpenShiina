@@ -1,6 +1,7 @@
 #include "text/Text.h"
 
 #include <algorithm>
+#include <unordered_map>
 
 namespace openshiina::Text {
 
@@ -59,6 +60,57 @@ std::string Cp932ToUtf8(const uint8_t* data, size_t length)
             }
         }
         out += '?';
+    }
+    return out;
+}
+
+std::string Utf8ToCp932(std::string_view utf8)
+{
+    // The code of each character: the tables backwards, NEC's selection of IBM's last
+    static const std::unordered_map<uint32_t, uint16_t> codes = [] {
+        std::unordered_map<uint32_t, uint16_t> map;
+        for (int b = 0; b < 256; b++)
+            if (LeadIndex(uint8_t(b)) < 0 && (kSingle[b] != 0 || b == 0))
+                map.emplace(kSingle[b], uint16_t(b));
+        for (int pass = 0; pass < 2; pass++)
+            for (int lead = 0x81; lead <= 0xFC; lead++)
+            {
+                int index = LeadIndex(uint8_t(lead));
+                if (index < 0 || (pass == 0) == (lead == 0xED || lead == 0xEE))
+                    continue;
+                for (int trail = 0x40; trail <= 0xFC; trail++)
+                    if (uint16_t c = kDouble[index][trail - 0x40]; c != 0)
+                        map.emplace(c, uint16_t(lead << 8 | trail));
+            }
+        return map;
+    }();
+    std::string out;
+    out.reserve(utf8.size());
+    for (size_t i = 0; i < utf8.size();)
+    {
+        uint8_t b = uint8_t(utf8[i]);
+        uint32_t c;
+        int length = b < 0x80 ? 1 : b >= 0xF0 ? 4 : b >= 0xE0 ? 3 : b >= 0xC0 ? 2 : 1;
+        if (i + size_t(length) > utf8.size())
+            length = 1;
+        switch (length)
+        {
+        case 2: c = (b & 0x1Fu) << 6 | (uint8_t(utf8[i + 1]) & 0x3Fu); break;
+        case 3: c = (b & 0x0Fu) << 12 | (uint8_t(utf8[i + 1]) & 0x3Fu) << 6 | (uint8_t(utf8[i + 2]) & 0x3Fu); break;
+        case 4: c = 0x110000; break; // outside the tables
+        default: c = b < 0x80 ? b : 0x110000; break;
+        }
+        i += size_t(length);
+        auto found = codes.find(c);
+        if (found == codes.end())
+            out += '?';
+        else if (found->second > 0xFF)
+        {
+            out += char(found->second >> 8);
+            out += char(found->second & 0xFF);
+        }
+        else
+            out += char(found->second);
     }
     return out;
 }

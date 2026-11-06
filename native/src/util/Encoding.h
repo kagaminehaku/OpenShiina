@@ -34,4 +34,21 @@ private:
     uint64_t m_total = 0;
 };
 
+/// SHA-1 (the signatures of the scripts' x86 routines).
+class Sha1
+{
+public:
+    Sha1();
+    void Append(const uint8_t* data, size_t length);
+    std::array<uint8_t, 20> Finish();
+
+private:
+    void Block(const uint8_t* block);
+
+    uint32_t m_state[5];
+    uint8_t m_buffer[64];
+    size_t m_buffered = 0;
+    uint64_t m_total = 0;
+};
+
 } // namespace openshiina::Encoding

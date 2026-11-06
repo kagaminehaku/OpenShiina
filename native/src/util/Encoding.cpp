@@ -1,5 +1,6 @@
 #include "util/Encoding.h"
 
+#include <bit>
 #include <cstring>
 
 #include "io/Binary.h"
@@ -188,6 +189,86 @@ std::string Sha256::HexOf(const uint8_t* data, size_t length)
     hash.Append(data, length);
     auto digest = hash.Finish();
     return ToHex(digest.data(), digest.size());
+}
+
+Sha1::Sha1() : m_state{0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0} {}
+
+void Sha1::Block(const uint8_t* block)
+{
+    uint32_t w[80];
+    for (int i = 0; i < 16; i++)
+        w[i] = uint32_t(block[4 * i]) << 24 | uint32_t(block[4 * i + 1]) << 16 | uint32_t(block[4 * i + 2]) << 8 | block[4 * i + 3];
+    for (int i = 16; i < 80; i++)
+        w[i] = std::rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+    uint32_t a = m_state[0], b = m_state[1], c = m_state[2], d = m_state[3], e = m_state[4];
+    for (int i = 0; i < 80; i++)
+    {
+        uint32_t f, k;
+        if (i < 20)
+        {
+            f = (b & c) | (~b & d);
+            k = 0x5A827999;
+        }
+        else if (i < 40)
+        {
+            f = b ^ c ^ d;
+            k = 0x6ED9EBA1;
+        }
+        else if (i < 60)
+        {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8F1BBCDC;
+        }
+        else
+        {
+            f = b ^ c ^ d;
+            k = 0xCA62C1D6;
+        }
+        uint32_t t = std::rotl(a, 5) + f + e + k + w[i];
+        e = d;
+        d = c;
+        c = std::rotl(b, 30);
+        b = a;
+        a = t;
+    }
+    m_state[0] += a;
+    m_state[1] += b;
+    m_state[2] += c;
+    m_state[3] += d;
+    m_state[4] += e;
+}
+
+void Sha1::Append(const uint8_t* data, size_t length)
+{
+    m_total += length;
+    while (length > 0)
+    {
+        size_t n = std::min(length, 64 - m_buffered);
+        std::memcpy(m_buffer + m_buffered, data, n);
+        m_buffered += n;
+        data += n;
+        length -= n;
+        if (m_buffered == 64)
+        {
+            Block(m_buffer);
+            m_buffered = 0;
+        }
+    }
+}
+
+std::array<uint8_t, 20> Sha1::Finish()
+{
+    uint64_t bits = m_total * 8;
+    uint8_t pad[72] = {0x80};
+    size_t padLength = (m_buffered < 56 ? 56 : 120) - m_buffered;
+    for (int i = 0; i < 8; i++)
+        pad[padLength + i] = uint8_t(bits >> (56 - 8 * i));
+    Append(pad, padLength + 8);
+    std::array<uint8_t, 20> digest{};
+    for (int i = 0; i < 5; i++)
+        for (int j = 0; j < 4; j++)
+            digest[4 * i + j] = uint8_t(m_state[i] >> (24 - 8 * j));
+    return digest;
 }
 
 } // namespace openshiina::Encoding
