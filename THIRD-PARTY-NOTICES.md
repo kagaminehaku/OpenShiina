@@ -62,3 +62,12 @@ Each under its own license, all of which allow it to be used by GPLv3 software:
 | [Iced](https://github.com/icedland/iced) | MIT |
 | [Silk.NET](https://github.com/dotnet/Silk.NET) | MIT (shaderc: Apache-2.0) |
 | [.NET](https://github.com/dotnet/runtime) | MIT |
+
+The C++ core (`native`, for the Switch) includes these in `native/third_party`, each with its
+license file there:
+
+| Library | License |
+|---|---|
+| [JSON for Modern C++](https://github.com/nlohmann/json) 3.12.0 (Copyright (c) 2013-2025 Niels Lohmann) | MIT |
+| [miniz](https://github.com/richgel999/miniz) 3.1.2 (Copyright 2013-2014 RAD Game Tools and Valve Software, 2010-2014 Rich Geldreich and Tenacious Software LLC) | MIT |
+| [libnx](https://github.com/switchbrew/libnx) (linked into the Switch build) | ISC |
