@@ -8,10 +8,7 @@
 
 namespace openshiina::scripting {
 
-namespace {
-
-// FUN_004396B4: table[v] ~ v * weight / total, stepping a counter that starts at total / 2
-void StepTable(uint8_t* table, int weight, int total)
+void ScnVm::StepTable(uint8_t* table, int weight, int total)
 {
     if (weight == 0)
     {
@@ -33,6 +30,8 @@ void StepTable(uint8_t* table, int weight, int total)
         }
     }
 }
+
+namespace {
 
 // One row of BlendRows into output (its destination at dst): the tables for the bytes up to an
 // 8-byte aligned address and the last 1-3, the MMX blocks between (16-bit lanes). level: a grey

@@ -373,6 +373,21 @@ public:
     /// FUN_00405900: the file as a RIFF WAVE, or none when it is none of the known kinds.
     static std::optional<openshiina::Bytes> SoundToWave(const openshiina::Bytes& data);
 
+    // ---- Sprites (ScnVm.Sprites.cs, ScnVm.SpriteModes.cs) ----
+
+    /// FUN_00439E10: draws count entries at sprites into a 24-bit picture, clipped to clip (left,
+    /// top, right, bottom) or the whole picture.
+    void Compose(int sprites, int count, int pixels, int width, int height, int pitch, const int* clip);
+    /// FUN_004116A0: a frame's rectangle (x, y, x + width, y + height), or none.
+    std::optional<std::array<int, 4>> FrameRect(int slot, int frame);
+    std::optional<std::array<int, 4>> FrameRectOrLast(int slot, int frame);
+    /// FUN_004114B0: the entry under (x, y) gives hit = its word 6.
+    bool HitTest(int sprites, int count, int x, int y, int& hit);
+    /// StretchBlt SRCCOPY: a copy when the sizes match, else nearest pixels.
+    void StretchCopy(int dst, int x, int y, int w, int h, int src, int sx, int sy, int sw, int sh);
+    /// The engine's stretch (051E with bit 31).
+    void SoftStretch(int dst, int dx, int dy, int dw, int dh, int src, int sx, int sy, int sw, int sh);
+
     // ---- Printf (ScnVm.Printf.cs) ----
 
     /// wsprintfA into VM memory; returns the length written (without the NUL).
@@ -609,6 +624,40 @@ private:
     int m_screenLevel = -1;
 
     void RegisterPrintf();
+
+    // ---- Sprites ----
+    static constexpr int SpriteLists = 256;
+    struct SpriteBlend;
+    struct RunHeader
+    {
+        int Method, Count, Data;
+    };
+    /// FUN_004396B4: table[v] ~ v * weight / total, stepping a counter that starts at total / 2.
+    static void StepTable(uint8_t* table, int weight, int total);
+    void RegisterSprites();
+    int SpriteEntry(int list, int index) const;
+    static bool SpriteDrawable(int& flags);
+    void DrawSprite(int entry, int flags, const void* target);
+    RunHeader ReadRun(int p);
+    const uint8_t* ReadRow(int p, int dst, int bytes, int pixels);
+    void DrawRowPlain(int p, int dst, int skip, int visible, const SpriteBlend* blend);
+    static void DrawRun(int method, int n, const uint8_t* src, int s, uint8_t* row, int d, int address, const SpriteBlend* blend);
+    static void DrawRunAlpha(int method, int n, const uint8_t* src, int s, uint8_t* row, int d, int address, const SpriteBlend& blend);
+    static void DrawRunTint(int method, int n, const uint8_t* src, int s, uint8_t* row, int d, int address, const SpriteBlend& blend);
+    static void DrawRunAdd(int method, int n, const uint8_t* src, int s, uint8_t* row, int d, int address, const SpriteBlend& blend);
+    static void DrawRunOpaque(int method, int n, const uint8_t* src, int s, uint8_t* row, int d);
+    static void DrawRunMask(int method, int n, const uint8_t* src, int s, uint8_t* row, int d);
+    void DrawRowSilhouette(int p, int dst, int skip, int visible, const SpriteBlend& blend);
+    static void PaintTint(int method, int n, const uint8_t* src, int s, uint8_t* row, int d, const SpriteBlend& blend);
+    static void PaintPending(int n, uint8_t* row, int d, int address, const SpriteBlend& blend);
+    void CopyPixel24(int dst, int src);
+    std::vector<int> m_spriteCounts = std::vector<int>(SpriteLists);
+    int m_spriteList = 0;
+    // The list 04B8 was given, for 04B7
+    int m_spriteListSet = 0;
+    std::array<int, 4> m_lastFrameRect = {};
+    // The row buffer of the compositor for a frame row drawn over itself
+    openshiina::Bytes m_rowSource;
 
     // ---- Sound ----
     IScnSound* Sound() { return m_host.Sound(); }

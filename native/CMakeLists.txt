@@ -45,6 +45,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Pictures.cpp
     src/scripting/ScnVm.Printf.cpp
     src/scripting/ScnVm.Sound.cpp
+    src/scripting/ScnVm.Sprites.cpp
     src/scripting/ScnVm.Surfaces.cpp
     src/scripting/ScnVm.System.cpp
     src/scripting/ScnVm.Text.cpp
