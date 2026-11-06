@@ -8,29 +8,6 @@
 
 namespace openshiina::scripting {
 
-// ---- ScnVm.Input.cs ----
-
-std::string ScnVm::RioSection()
-{
-    // The first section of RIO.INI ("[椎名里緒 v2.47]"), where the engine's own settings are
-    openshiina::Bytes bytes;
-    if (!m_host.ReadLooseFile("RIO.INI", bytes))
-        return "";
-    std::string text(bytes.begin(), bytes.end());
-    size_t start = 0;
-    while (start <= text.size())
-    {
-        size_t end = text.find('\n', start);
-        std::string t = SjisTrim(text.substr(start, end == std::string::npos ? std::string::npos : end - start));
-        if (!t.empty() && t.front() == '[' && t.back() == ']')
-            return t.substr(1, t.size() - 2);
-        if (end == std::string::npos)
-            break;
-        start = end + 1;
-    }
-    return "";
-}
-
 // ---- ScnVm.Menus.cs ----
 
 bool ScnVm::RunsInBackground()
@@ -54,12 +31,9 @@ std::optional<int> ScnVm::VirtualDiscSize(ScnContext&, const ScnInstruction&, co
     return std::nullopt;
 }
 
-// ---- ScnVm.Text.cs: no task has text to draw (0083) ----
+// ---- ScnVm.Engine250.cs: no glyph picture of 009C ----
 
-void ScnVm::StepTaskText(ScnContext& c)
-{
-    throw Error(c, "Task text (0083) is not ported yet");
-}
+const ScnGlyph* ScnVm::Glyph250For(int, int) { return nullptr; }
 
 // ---- ScnVm.Warp.cs: nothing to play from ----
 

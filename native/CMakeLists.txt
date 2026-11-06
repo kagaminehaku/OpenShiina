@@ -37,13 +37,17 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Draw.cpp
     src/scripting/ScnVm.Events.cpp
     src/scripting/ScnVm.Files.cpp
+    src/scripting/ScnVm.Input.cpp
     src/scripting/ScnVm.Native.cpp
     src/scripting/ScnVm.NativeRoutines.cpp
     src/scripting/ScnVm.Paint.cpp
     src/scripting/ScnVm.Pending.cpp
     src/scripting/ScnVm.Pictures.cpp
+    src/scripting/ScnVm.Printf.cpp
+    src/scripting/ScnVm.Sound.cpp
     src/scripting/ScnVm.Surfaces.cpp
     src/scripting/ScnVm.System.cpp
+    src/scripting/ScnVm.Text.cpp
     src/scripting/ScnVm.Window.cpp
     src/scripting/X86Decoder.cpp
     src/scripting/X86Routine.cpp

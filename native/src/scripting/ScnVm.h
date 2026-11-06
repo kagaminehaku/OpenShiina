@@ -367,14 +367,43 @@ public:
     /// The l[index] value a routine sees: the dword at the stack top + index.
     int NativeArg(const ScnNativeArgs& args, int index) { return Read32(args.Stack + 4 * index); }
 
-    // ---- Input, Menus, Text (the parts of them the core needs) ----
+    // ---- Sound (ScnVm.Sound.cs) ----
 
-    /// RIO.INI's Background: the game goes on while another window is in front.
-    bool RunsInBackground();
+    static constexpr int SoundSlots = 0x101;
+    /// FUN_00405900: the file as a RIFF WAVE, or none when it is none of the known kinds.
+    static std::optional<openshiina::Bytes> SoundToWave(const openshiina::Bytes& data);
+
+    // ---- Printf (ScnVm.Printf.cs) ----
+
+    /// wsprintfA into VM memory; returns the length written (without the NUL).
+    int Wsprintf(int dest, int format, const std::vector<int>& args);
+    /// wvsprintfA: the arguments come one by one from arg.
+    int Wvsprintf(int dest, int format, const std::function<int()>& arg);
+
+    // ---- Text (ScnVm.Text.cs) ----
+
+    static constexpr int TextRecords = 38, ScratchRecords = 18;
+    int RecordAddress(int index) const { return TextRegion + index * RecordSize; }
+    /// BitBlt SRCCOPY between two 24-bit surfaces, clipped to both.
+    void BitBlt(int dst, int x, int y, int width, int height, int src, int sx, int sy);
     /// The surface WM_PAINT shows in the window (0x13B43E4).
     int DisplaySurface() const { return EngineGlobal(0x13B43E4); }
     /// The window's picture changed: the host should present it (and clear this).
     bool ScreenInvalidated = false;
+
+    // ---- Input (ScnVm.Input.cs) ----
+
+    /// Reads joystick 0 whatever RIO.INI says (true), never (false), or as RIO.INI says (none).
+    std::optional<bool> Joypad;
+    /// FUN_00413630: the buttons held now (0 when the window is not in front).
+    int Buttons();
+    /// FUN_00413810: the buttons with key repeat for one caller.
+    int RepeatButtons(int caller, int buttons);
+
+    // ---- Menus (the part of it the core needs) ----
+
+    /// RIO.INI's Background: the game goes on while another window is in front.
+    bool RunsInBackground();
 
 private:
     // Memory regions
@@ -579,6 +608,97 @@ private:
     // op_0500: the brightness the display surface was made with last (0x482D38)
     int m_screenLevel = -1;
 
+    void RegisterPrintf();
+
+    // ---- Sound ----
+    IScnSound* Sound() { return m_host.Sound(); }
+    void RegisterSound();
+    int OggLength(int address);
+    std::optional<openshiina::Bytes> ToWave(const openshiina::Bytes& data);
+    int SoundBuffer(int value) const;
+    int MakeSoundOrSilence(int slot, const std::optional<openshiina::Bytes>& wave);
+    bool MakeSound(int slot, const openshiina::Bytes& wave);
+    std::vector<int> m_sounds = std::vector<int>(SoundSlots);
+    int m_nextSound = 0x10000;
+    // The volume 06A9 last set each buffer to (06AC)
+    std::unordered_map<int, int> m_soundVolumes;
+
+    // ---- Text ----
+    static constexpr int TextRegion = 0x09000000, RecordSize = 0x161C;
+    void RegisterText();
+    int G(int rec, int field);
+    void S(int rec, int field, int value);
+    void ResetRecord(int index);
+    void SetText(int rec, int x, int y, int text);
+    void ClearGlyphs(int rec);
+    bool DeleteFont(int font);
+    void ReleaseFont(int rec);
+    void CreateRecordFont(int rec);
+    void RenewFont(int rec);
+    int SelectedFont(int rec);
+    std::pair<int, int> Extent(int font, const uint8_t* text, size_t length);
+    openshiina::Bytes CharBytes(int rec, int length);
+    int ParseNumber(int rec);
+    int NamedValue(int rec);
+    void ReadField(int rec, int dst, int max);
+    bool PrevIsComma(int rec);
+    bool FindIn(int haystack, const openshiina::Bytes& needle);
+    void SwapRecords(int other, int rec);
+    void ControlCode(int rec, int surface);
+    void FontChanged(int rec);
+    void UseColor(int rec, int offset);
+    void AlignLine(int rec, int surface);
+    void MeasureLine(int rec);
+    void PushMacro(int rec);
+    void DefineMacro(int rec);
+    void Tilde(int rec, int at);
+    int TakeChar(int rec);
+    void RubyStart(int rec);
+    void TextStep(int rec, int surface, bool invalidate);
+    std::pair<int, int> FixedOr(int rec, int font, const openshiina::Bytes& ch, int length);
+    bool DrawChar(int rec, int surface, bool invalidate);
+    void FindIndent(int rec, int font, bool dc);
+    void DrawWithEffects(int rec, int surface, bool invalidate, int font, const openshiina::Bytes& ch, int length);
+    void DrawGlyph(int rec, int surface, int font, int x, int y, const openshiina::Bytes& ch, int length);
+    void DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, int top, uint32_t firstRow, uint32_t endRow, uint32_t firstCol,
+                          uint32_t endCol, int alpha);
+    int CurrentRecord(const ScnContext& c) const { return RecordAddress(c.TextRecord); }
+    /// v2.50: a character of 009C's pictures, before the font's (none).
+    const ScnGlyph* Glyph250For(int record, int code);
+    // The glyphs each record has made (0x4FC550), cleared with its font
+    std::array<std::unordered_map<int, ScnGlyph>, TextRecords> m_glyphs;
+    // Fonts that exist: a deleted handle stays in records and fails as GDI's would
+    std::unordered_set<int> m_liveFonts;
+    // What each live font was made from, and the glyphs and ascents made with such fonts
+    std::unordered_map<int, ScnFontRequest> m_fontRequests;
+    std::map<std::pair<ScnFontRequest, int>, ScnGlyph> m_madeGlyphs;
+    std::map<ScnFontRequest, int> m_madeAscents;
+    // "_(" / "_)" saved positions (0x5E3A68 / 0x5E3AB4)
+    int m_savedX[19] = {}, m_savedY[19] = {};
+    // The record "{" ruby text is laid out with (0x485500, "_u")
+    int m_rubyRecord = 16;
+    // The local buffer of "_i/text/"
+    int m_indentScratch = 0;
+    // 008C's copy of a record (one for all of them, as the engine's)
+    openshiina::Bytes m_savedRecord = openshiina::Bytes(RecordSize);
+    // Each record's character set and pitch and family for CreateFontA ("_C"), by its address
+    std::unordered_map<int, std::pair<int, int>> m_fontCharSets;
+
+    // ---- Input ----
+    struct RepeatState
+    {
+        int Phase = 0, Last = 0;
+        uint32_t Start = 0;
+        int Delay = 0;
+    };
+    void RegisterInput();
+    bool KeyHeld(int virtualKey);
+    bool JoypadOn();
+    int WaitHere(ScnContext& c, int phase);
+    std::unordered_map<int, RepeatState> m_repeat;
+    int m_repeatDelay = -1, m_repeatSpeed = -1, m_joypad = -1;
+    std::unordered_map<int, int> m_buttonWait;
+
     // ---- Native ----
     struct NativeEntry
     {
@@ -632,6 +752,7 @@ private:
     std::optional<bool> m_background;
     std::optional<int> VirtualDiscSize(ScnContext& c, const ScnInstruction& i, const std::string& path);
     void StepTaskText(ScnContext& c);
+    // A task's 0083 text went on in this round without waiting for time
     bool m_textWentOn = false;
     void ForgetRoutines();
     void PlayFromModule(ScnContext& c, const std::string& file);

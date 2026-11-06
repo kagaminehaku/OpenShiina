@@ -39,7 +39,11 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterSurfaces();
     RegisterEvents();
     RegisterDraw();
+    RegisterText();
+    RegisterPrintf();
     RegisterPictures();
+    RegisterSound();
+    RegisterInput();
     RegisterNativeRoutines();
 }
 

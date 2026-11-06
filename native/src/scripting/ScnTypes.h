@@ -19,7 +19,22 @@ namespace openshiina::scripting {
 
 class ScnVm;
 class IScnShapes;
-class IScnSound;
+/// DirectSound buffers of the platform (C# Scripting/ScnVm.Sound.cs).
+class IScnSound
+{
+public:
+    virtual ~IScnSound() = default;
+    /// A buffer of a RIFF WAVE file or an Ogg Vorbis stream; returns its handle (above 0xFFFF), or 0.
+    virtual int CreateBuffer(const Bytes& file) = 0;
+    virtual void Release(int buffer) = 0;
+    /// Stop, SetCurrentPosition(0), Play with DSBPLAY flags (1 = looping).
+    virtual void Play(int buffer, int flags) = 0;
+    virtual void Stop(int buffer) = 0;
+    /// SetVolume in hundredths of a decibel (-10000 silent to 0).
+    virtual void SetVolume(int buffer, int volume) = 0;
+    /// GetStatus: DSBSTATUS bits (1 playing, 4 looping).
+    virtual int Status(int buffer) = 0;
+};
 class IScnMusic;
 
 /// A joystick's position (X and Y from 0 to 65535, 32767 in the middle) and buttons (bit 0 = button 1).
