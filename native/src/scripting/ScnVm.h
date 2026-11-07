@@ -141,6 +141,10 @@ public:
     uint8_t* Bytes(int address, int length);
     /// [address, address + length) does not run past the top of the 4 GB.
     bool IsContiguous(int address, int length) const { return ScnAddressSpace::Contiguous(uint32_t(address), length) >= length; }
+    /// The bytes [address, address + length) to read: in place, or copied into spare (made larger
+    /// when it is short) when they are not one piece of memory or share bytes with [avoid, avoid +
+    /// avoidLength), a block the reader writes.
+    const uint8_t* ReadView(int address, int length, openshiina::Bytes& spare, int avoid = 0, int avoidLength = 0);
     void WriteBytes(int address, const uint8_t* bytes, int length);
     void WriteBytes(int address, const openshiina::Bytes& bytes) { WriteBytes(address, bytes.data(), int(bytes.size())); }
     void ReadBytes(int address, uint8_t* bytes, int length);
@@ -367,6 +371,33 @@ public:
     /// The l[index] value a routine sees: the dword at the stack top + index.
     int NativeArg(const ScnNativeArgs& args, int index) { return Read32(args.Stack + 4 * index); }
 
+    // ---- The zooms and pans of the scripts' x86 code, written out (ScnVm.Subpixel32.cs, ...) ----
+    // Positions and sizes in 1/16 pixels; false where the x86 code would not end or for a case the
+    // C++ version does not take (see each file).
+
+    /// Oreimo START 76388: a rectangle of a 32-bit picture copied at a fraction of a pixel.
+    bool Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, int src, int srcPitch, int stx, int sty, bool v250 = false,
+                    bool averageEdge = false, bool bottomTwo = true);
+    /// Re: Rem Plus START 866A8: the enlarging case.
+    bool Enlarge32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb);
+    /// Oreimo START 78380: the scaling-down case.
+    bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb)
+    {
+        return Scale32(dst, dstPitch, dl, dt, dr, db, src, srcPitch, sl, st, sr, sb, 0, 0, false);
+    }
+    /// Scale32 with its tables written to the work buffers (when given) and Can Fes!'s quirk (lastAlways).
+    bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb, int columnTable,
+                 int rowTable, bool lastAlways);
+    /// The number of Scale32 table entries of an axis from its destination start and end.
+    static int ScaleEntryCount(int start, int end);
+    /// Bitch Nee-chan START C7C70: Scale32's SSE2 build (single floats).
+    bool Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb);
+    /// Ero-On! START 5E2D6: the scaling-down case of the first v2.49 build.
+    bool Scale16(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb);
+    /// Ero-On! START 5DFA5: its enlarging case, with its weight table at table.
+    bool Enlarge16(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb, int table,
+                   int scale = 257, bool opaque = false);
+
     // ---- Sound (ScnVm.Sound.cs) ----
 
     static constexpr int SoundSlots = 0x101;
@@ -387,6 +418,11 @@ public:
     void StretchCopy(int dst, int x, int y, int w, int h, int src, int sx, int sy, int sw, int sh);
     /// The engine's stretch (051E with bit 31).
     void SoftStretch(int dst, int dx, int dy, int dw, int dh, int src, int sx, int sy, int sw, int sh);
+
+    // ---- Layers (ScnVm.Layers.cs) ----
+
+    /// FUN_00411130: draws the sprite entry at entry over a frame of a 32-bit picture.
+    void DrawOnPicture(int picture, int frame, int entry);
 
     // ---- Printf (ScnVm.Printf.cs) ----
 
@@ -872,7 +908,56 @@ private:
         std::optional<NativeEntry> Native;
     };
     void RegisterNativeCall();
+    // ---- Engine234, Engine233: the old engines' opcodes ----
+    void RegisterEngine234();
+    void RegisterEngine233();
+    static int PolledOld(ScnVm& vm, ScnContext& c, const ScnInstruction& i);
+    int SleepOld(ScnContext& c, int ms);
+    void Crossfade(int from, int to, int t);
+    int FadeOld(ScnContext& c, const ScnInstruction& i, int sign);
+    struct Fade234
+    {
+        uint32_t Start;
+        int From, To;
+    };
+    // 0502's fades by task; 0028's waits and 050A's crossfades by task (when they started); the frame
+    // each task last read the mouse or the time in (by task and opcode), and the later engines'
+    // handlers of those opcodes; 03BB's stopwatch
+    std::unordered_map<int, Fade234> m_fades234;
+    std::unordered_map<int, uint32_t> m_sleeps234, m_crossfades;
+    std::map<std::pair<int, int>, int> m_polled234;
+    std::unordered_map<int, OpHandler> m_polledLater;
+    uint32_t m_stopwatch = 0;
+
+    // ---- Misc ----
+    void RegisterMisc();
+    /// A file 00CE loaded, into script memory.
+    void Loaded(const openshiina::Bytes& data);
+    int m_loaded = 0;
+    /// The disc 0A30 found: the root of its drive ("Q:\") and whether it is the player's own.
+    std::optional<std::pair<std::string, bool>> m_disc;
+
+    // ---- Layers ----
+    void RegisterLayers();
+    void DrawSprite32(int entry, int pixels, int targetWidth, int targetHeight, int pitch);
+    void DrawRow32(int p, int dst, int skip, int visible);
+    void DrawRun32(int method, int n, int data, int dst);
+    int PictureFrame(int slot, int frame);
+    void BlendPictures(const int* v);
+    int LayerEntry();
+    // A run's source bytes when they cannot be read in place (they share bytes with the target)
+    openshiina::Bytes m_runSource;
+    int m_layerEntry = 0;
+
+    void RegisterNativeKernels();
     void RegisterNativeRoutines();
+    // ScnVm.NativeKernels.cpp's helpers and the routines it calls
+    void Enlarge16Native(ScnContext& c, const ScnNativeArgs& a, int scale, bool opaque);
+    void RuleAlpha(ScnContext& c, const ScnNativeArgs& a, bool invert);
+    void EnlargeMovie(ScnContext& c, const ScnNativeArgs& a);
+    void ScaleArea(ScnContext& c, const ScnNativeArgs& a, bool opaque);
+    bool Blur32(int dst, int dstStride, int w, int h, int src, int srcStride, int rx, int ry);
+    void BlurColumns(int dst, int stride, int first, int end, int h, int r);
     RoutineInfo& RoutineAt(int address);
     std::optional<NativeEntry> NativeByPattern(int address);
     /// Runs the routine being called as x86 code (the cases a C++ version leaves to it).

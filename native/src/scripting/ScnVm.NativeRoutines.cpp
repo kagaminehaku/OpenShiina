@@ -11,28 +11,13 @@
 #include <algorithm>
 #include <bit>
 
+#include "scripting/NativeHelpers.h"
 #include "text/Text.h"
 
 namespace openshiina::scripting {
 
 namespace {
 
-struct Span64
-{
-    int64_t Start, Length;
-};
-
-/// Two blocks of memory share no byte.
-bool Apart(int64_t a, int64_t aLength, int64_t b, int64_t bLength) { return a + aLength <= b || b + bLength <= a; }
-bool Apart(Span64 a, Span64 b) { return Apart(a.Start, a.Length, b.Start, b.Length); }
-
-/// The bytes rows of rowBytes at start + k * stride (k below rows) lie in.
-Span64 RowsSpan(int start, int stride, int rows, int64_t rowBytes)
-{
-    int64_t first = start, last = start + int64_t(stride) * (rows - 1);
-    int64_t low = std::min(first, last);
-    return {low, std::max(first, last) + rowBytes - low};
-}
 
 uint32_t ByteSwap(uint32_t v) { return v << 24 | (v & 0xFF00) << 8 | (v >> 8 & 0xFF00) | v >> 24; }
 

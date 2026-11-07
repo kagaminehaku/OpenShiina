@@ -27,31 +27,45 @@ add_library(openshiina_core STATIC
     src/game/GameData.cpp
     src/io/ArcView.cpp
     src/io/Checksum.cpp
+    src/platform/DibShapes.cpp
     src/platform/Files.cpp
     src/scripting/ScnAddressSpace.cpp
     src/scripting/ScnOpcodes.cpp
     src/scripting/ScnFonts.cpp
     src/scripting/ScnVm.cpp
+    src/scripting/ScnVm.Blur32.cpp
     src/scripting/ScnVm.Calc.cpp
     src/scripting/ScnVm.Core.cpp
     src/scripting/ScnVm.Draw.cpp
     src/scripting/ScnVm.Effects.cpp
+    src/scripting/ScnVm.Enlarge16.cpp
+    src/scripting/ScnVm.Enlarge32.cpp
+    src/scripting/ScnVm.Engine233.cpp
+    src/scripting/ScnVm.Engine234.cpp
     src/scripting/ScnVm.Engine250.cpp
     src/scripting/ScnVm.Events.cpp
     src/scripting/ScnVm.Files.cpp
     src/scripting/ScnVm.Gdi.cpp
     src/scripting/ScnVm.Input.cpp
+    src/scripting/ScnVm.Layers.cpp
     src/scripting/ScnVm.Menus.cpp
+    src/scripting/ScnVm.Misc.cpp
     src/scripting/ScnVm.Music.cpp
     src/scripting/ScnVm.Native.cpp
+    src/scripting/ScnVm.NativeKernels.cpp
     src/scripting/ScnVm.NativeRoutines.cpp
     src/scripting/ScnVm.Paint.cpp
     src/scripting/ScnVm.Pending.cpp
     src/scripting/ScnVm.Pictures.cpp
     src/scripting/ScnVm.Printf.cpp
     src/scripting/ScnVm.RioSub.cpp
+    src/scripting/ScnVm.Scale16.cpp
+    src/scripting/ScnVm.Scale32.cpp
+    src/scripting/ScnVm.Scale32Sse.cpp
+    src/scripting/ScnVm.ScaleArea.cpp
     src/scripting/ScnVm.Sound.cpp
     src/scripting/ScnVm.Sprites.cpp
+    src/scripting/ScnVm.Subpixel32.cpp
     src/scripting/ScnVm.Surfaces.cpp
     src/scripting/ScnVm.System.cpp
     src/scripting/ScnVm.Text.cpp
@@ -108,13 +122,18 @@ else()
     target_link_libraries(spacetest PRIVATE openshiina_core)
 
     # scnrun: a game's scripts on the C++ interpreter, to compare with the C# player's ScnBoot
-    add_executable(scnrun tools/scnrun/main.cpp tools/scnrun/GdiFonts.cpp)
+    add_executable(scnrun tools/scnrun/main.cpp tools/scnrun/GdiFonts.cpp tools/scnrun/GdiShapes.cpp)
     target_link_libraries(scnrun PRIVATE openshiina_core)
+    # ellipsecheck: DibShapes (the Switch's ellipses) against GDI, the C# GdiEllipseCheck's fixed cases
+    add_executable(ellipsecheck tools/ellipsecheck/main.cpp tools/scnrun/GdiShapes.cpp)
+    target_link_libraries(ellipsecheck PRIVATE openshiina_core)
     # routinecheck: the x86 routines' signatures against the C# player's (ScnTools routines)
     add_executable(routinecheck tools/routinecheck/main.cpp)
     target_link_libraries(routinecheck PRIVATE openshiina_core)
     if(MSVC)
         target_compile_options(scnrun PRIVATE /W4 /utf-8 /permissive-)
+        target_compile_definitions(scnrun PRIVATE _CRT_SECURE_NO_WARNINGS)
+        target_compile_options(ellipsecheck PRIVATE /W4 /utf-8 /permissive-)
         target_compile_options(routinecheck PRIVATE /W4 /utf-8 /permissive-)
     endif()
     if(MSVC)

@@ -46,11 +46,16 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterSprites();
     RegisterInput();
     RegisterMusic();
+    RegisterMisc();
+    RegisterLayers();
+    RegisterNativeKernels();
     RegisterNativeRoutines();
     RegisterEffects();
     RegisterGdi();
     RegisterMenus();
     RegisterEngine250();
+    RegisterEngine234();
+    RegisterEngine233();
 }
 
 ScnVm::~ScnVm() = default;
@@ -100,6 +105,17 @@ void ScnVm::ReadBytes(int address, uint8_t* bytes, int length)
         length -= n;
         address += n;
     }
+}
+
+const uint8_t* ScnVm::ReadView(int address, int length, openshiina::Bytes& spare, int avoid, int avoidLength)
+{
+    bool apart = avoidLength <= 0 || int64_t(address) + length <= avoid || int64_t(avoid) + avoidLength <= address;
+    if (apart && IsContiguous(address, length))
+        return Bytes(address, length);
+    if (spare.size() < size_t(length))
+        spare.resize(size_t(length));
+    ReadBytes(address, spare.data(), length);
+    return spare.data();
 }
 
 openshiina::Bytes ScnVm::ReadBytes(int address, int count)

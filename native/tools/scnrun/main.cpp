@@ -2,12 +2,16 @@
 // OpenShiina.ScnBoot) runs them, to compare the two: the clock moves 1/60 s a frame, the save data
 // goes to the same temporary folder (so that DataPath, which the scripts keep in their memory, is
 // the same), no input. With from:to, every instruction run in those frames is listed as ScnBoot's
-// SCNBOOT_HOT lists it ("  [hot] slot 0 start.scn+00000 001E x1").
+// SCNBOOT_HOT lists it ("  [hot] slot 0 start.scn+00000 001E x1"). SCNRUN_PICTURES=folder saves the
+// window's picture as frame_NNNN.png every SCNRUN_EVERY frames (default 10) and when the run ends, as
+// ScnBoot's picture folder does (screencompare.py compares the two folders pixel for pixel).
 //
 //   scnrun <the C# player's Data folder> <game folder> <frames> [from:to]
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <map>
@@ -15,8 +19,11 @@
 #include <string>
 #include <vector>
 
+#include <miniz.h>
+
 #include "archives/FormatManager.h"
 #include "GdiFonts.h"
+#include "GdiShapes.h"
 #include "game/GameData.h"
 #include "platform/Files.h"
 #include "scripting/ScnVm.h"
@@ -144,6 +151,8 @@ public:
 
     uint32_t Milliseconds() override { return Clock; }
     scripting::IScnFonts* Fonts() override { return &m_fonts; }
+    // GDI's own ellipses, as ScnBoot draws them on Windows (the Switch draws with DibShapes)
+    scripting::IScnShapes* Shapes() override { return &m_shapes; }
     IScnMusic* Music() override { return &m_music; }
     void SetTitle(const std::string& title) override { std::printf("  [title] %s\n", Utf8(title).c_str()); }
     void SetFullScreen(bool) override {}
@@ -152,8 +161,33 @@ private:
     game::GameData& m_data;
     std::string m_saveFolder;
     tools::GdiFonts m_fonts;
+    tools::GdiShapes m_shapes;
     TestMusic m_music;
 };
+
+/// The window's picture (BGR rows) as frame_NNNN.png in folder.
+void SaveScreen(ScnVm& vm, const std::string& folder, int frame)
+{
+    const Bytes& window = vm.Window();
+    int w = vm.ScreenWidth, h = vm.ScreenHeight;
+    Bytes rgb(size_t(w) * size_t(h) * 3);
+    for (size_t i = 0; i + 2 < rgb.size() && i + 2 < window.size(); i += 3)
+    {
+        rgb[i] = window[i + 2];
+        rgb[i + 1] = window[i + 1];
+        rgb[i + 2] = window[i];
+    }
+    size_t length = 0;
+    void* png = tdefl_write_image_to_png_file_in_memory_ex(rgb.data(), w, h, 3, &length, 6, MZ_FALSE);
+    if (!png)
+        return;
+    if (std::FILE* f = Files::Open(Files::Combine(folder, std::format("frame_{:04}.png", frame)), "wb"))
+    {
+        std::fwrite(png, 1, length, f);
+        std::fclose(f);
+    }
+    mz_free(png);
+}
 
 std::string Match(const std::string& text, const char* pattern)
 {
@@ -229,6 +263,13 @@ int Run(int argc, std::string* argv)
         return 1;
     }
 
+    const char* picturesVariable = std::getenv("SCNRUN_PICTURES");
+    std::string pictures = picturesVariable ? picturesVariable : "";
+    const char* everyVariable = std::getenv("SCNRUN_EVERY");
+    int every = everyVariable ? std::max(1, std::atoi(everyVariable)) : 10;
+    if (!pictures.empty())
+        Files::CreateDirectories(pictures);
+
     std::map<ScnVm::HotSpot, int> hot;
     int frame = 0;
     auto started = std::chrono::steady_clock::now();
@@ -254,9 +295,13 @@ int Run(int argc, std::string* argv)
                 std::printf("The scripts quit after %d frames.\n", frame);
                 break;
             }
+            if (!pictures.empty() && frame % every == 0)
+                SaveScreen(vm, pictures, frame);
         }
         if (frame == frames)
             std::printf("Still running after %d frames.\n", frames);
+        if (!pictures.empty())
+            SaveScreen(vm, pictures, frame);
     }
     catch (const ScnException& e)
     {
