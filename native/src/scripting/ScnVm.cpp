@@ -47,6 +47,10 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterInput();
     RegisterMusic();
     RegisterNativeRoutines();
+    RegisterEffects();
+    RegisterGdi();
+    RegisterMenus();
+    RegisterEngine250();
 }
 
 ScnVm::~ScnVm() = default;

@@ -18,7 +18,22 @@
 namespace openshiina::scripting {
 
 class ScnVm;
-class IScnShapes;
+/// A solid pen: style (PS_SOLID 0 ... PS_NULL 5), width and colour (0x00BBGGRR).
+struct ScnPen
+{
+    int Style, Width, Color;
+};
+/// Shapes drawn the way GDI draws them (C# Scripting/ScnVm.Gdi.cs).
+class IScnShapes
+{
+public:
+    virtual ~IScnShapes() = default;
+    /// Ellipse(l, t, r, b) on a top-down picture of 3 or 4 bytes a pixel (32-bit pixels get 0 in
+    /// their fourth byte), filled with a solid brush (0x00BBGGRR) unless none and outlined with the
+    /// pen unless none.
+    virtual void Ellipse(uint8_t* pixels, int width, int height, int stride, int bytesPerPixel, int l, int t, int r, int b,
+                         std::optional<int> brush, std::optional<ScnPen> pen) = 0;
+};
 /// DirectSound buffers of the platform (C# Scripting/ScnVm.Sound.cs).
 class IScnSound
 {

@@ -703,6 +703,86 @@ private:
     NetDictionary<int, MusicStream> m_music;
     int m_nextMusic = 0x20000;
 
+    // ---- Menus ----
+    void RegisterMenus();
+    int Compare16(int x, int y);
+    bool IsCompare16Slot(int slot);
+    void SortElements(int lo, int count, int width, int slot);
+    // Handles of the menus 0898 made
+    int m_nextMenu = 0x00510000;
+
+    // ---- Effects ----
+    static bool ClipRect(int* r, int* follow, int width, int height);
+    void Shown(int surface);
+    void ShownOnWindow(int surface, int l, int t, int r, int b);
+    /// FillRect of a surface with a colour (0x00BBGGRR); 32-bit pixels get 0 in their fourth byte.
+    void FillSurface(int surface, int l, int t, int r, int b, int color);
+    void RegisterEffects();
+    void RippleTables(int surface);
+    int AddSubtract(ScnContext& c, const ScnInstruction& i, bool add);
+    void AddSubtract(int dst, int x, int y, int w, int h, int src, int sx, int sy, int a, bool add);
+    void Mosaic(int dst, int x, int y, int w, int h, int src, int sx, int sy, int size);
+    void Wave(const int* v);
+    void Ripple(int dst, int src, int phase, int frequency, int height);
+    void PictureToPicture(int dstPicture, int dstFrame, int x, int y, int srcPicture, int srcFrame, int sx, int sy, int w, int h);
+    void ConvertInPlace(int to, int from, int line, int srcBytes);
+    void CopyForward(int dst, int src, int count);
+    void RotateZoom(const int* v);
+    // FUN_00419AC0's distance and angle from the centre of each pixel of a quarter of the surface
+    // (0x4C7D10 / 0x4C7D14), made again when the size changes
+    std::vector<int> m_rippleDistance;
+    std::vector<uint8_t> m_rippleAngle;
+    int m_rippleW = -1, m_rippleH = -1;
+
+    // ---- Gdi ----
+    // GDI objects made by the scripts: brushes (colour) and pens, by handle
+    struct GdiObject
+    {
+        bool Pen;
+        int Color, Style, Width;
+    };
+    void RegisterGdi();
+    std::optional<int> DllCall(const std::string& dll, const std::string& function, const std::vector<int>& a);
+    std::pair<openshiina::Bytes, int>* Resource(int handle);
+    std::optional<openshiina::Bytes> ExeResource(int name, int type);
+    void Write64(int address, int64_t value);
+    int NewGdiObject(const GdiObject& o);
+    bool GdiEllipse(int dc, int l, int t, int r, int b);
+    std::unordered_map<int, GdiObject> m_gdiObjects;
+    // What each device context has selected (a new one: the white brush and the black pen)
+    std::unordered_map<int, std::pair<int, int>> m_gdiSelected;
+    int m_nextGdiObject = 0x00060001;
+    // The font files added (AddFontMemResourceEx), for their handles
+    int m_memoryFonts = 0;
+    // SetWindowLongA's values, by window and index
+    std::map<std::pair<int, int>, int> m_windowLongs;
+    // The executable's resources found (FindResourceA), their handles ResourceHandles + 1, + 2...,
+    // and where LockResource copied each
+    std::vector<std::pair<openshiina::Bytes, int>> m_resources;
+
+    // ---- RioSub ----
+    void RioChangeHsl(int pixels, int width, int height, int stride, int saturation, int light);
+    void RioChangeColorBalance(int pixels, int width, int height, int stride, int red, int green, int blue, int mode);
+    void RioChangeCbHsl(int pixels, int width, int height, int stride, int red, int green, int blue, int mode, int saturation, int light);
+
+    // ---- Engine250 ----
+    /// A character drawn from a picture of its own (009C): its code, size and bytes.
+    struct Glyph250
+    {
+        uint16_t Code;
+        int Width, Height;
+        openshiina::Bytes Pixels;
+    };
+    void RegisterEngine250();
+    void BoxBlur250(int dstSlot, int dstFrame, int x, int y, int w, int h, int srcSlot, int srcFrame, int sx, int sy, int rx, int ry);
+    /// 077A w, h (0xD09E30 / 0xD09E34): a size the v2.50 START sets at start (1280 x 720).
+    std::pair<int, int> Size250;
+    // 009C's table: per text record (the task's, ctx+0x1004), by index (0x539D48 + record * 0x9000
+    // + index * 36; the engine keeps its font glyphs in the same table, after index 0x1FF)
+    std::map<std::pair<int, int>, Glyph250> m_glyphs250;
+    // The glyph Glyph250For last gave
+    ScnGlyph m_glyph250;
+
     // ---- Text ----
     static constexpr int TextRegion = 0x09000000, RecordSize = 0x161C;
     void RegisterText();
@@ -743,7 +823,7 @@ private:
     void DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, int top, uint32_t firstRow, uint32_t endRow, uint32_t firstCol,
                           uint32_t endCol, int alpha);
     int CurrentRecord(const ScnContext& c) const { return RecordAddress(c.TextRecord); }
-    /// v2.50: a character of 009C's pictures, before the font's (none).
+    /// v2.50: a character of 009C's pictures, before the font's, or null.
     const ScnGlyph* Glyph250For(int record, int code);
     // The glyphs each record has made (0x4FC550), cleared with its font
     std::array<std::unordered_map<int, ScnGlyph>, TextRecords> m_glyphs;

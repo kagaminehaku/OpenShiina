@@ -35,9 +35,13 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Calc.cpp
     src/scripting/ScnVm.Core.cpp
     src/scripting/ScnVm.Draw.cpp
+    src/scripting/ScnVm.Effects.cpp
+    src/scripting/ScnVm.Engine250.cpp
     src/scripting/ScnVm.Events.cpp
     src/scripting/ScnVm.Files.cpp
+    src/scripting/ScnVm.Gdi.cpp
     src/scripting/ScnVm.Input.cpp
+    src/scripting/ScnVm.Menus.cpp
     src/scripting/ScnVm.Music.cpp
     src/scripting/ScnVm.Native.cpp
     src/scripting/ScnVm.NativeRoutines.cpp
@@ -45,6 +49,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Pending.cpp
     src/scripting/ScnVm.Pictures.cpp
     src/scripting/ScnVm.Printf.cpp
+    src/scripting/ScnVm.RioSub.cpp
     src/scripting/ScnVm.Sound.cpp
     src/scripting/ScnVm.Sprites.cpp
     src/scripting/ScnVm.Surfaces.cpp
