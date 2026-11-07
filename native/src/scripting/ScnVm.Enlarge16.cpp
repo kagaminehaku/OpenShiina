@@ -11,6 +11,7 @@
 // and ((sH - y) << 8) / sH (then the next row, y += dH - sH). Every product keeps its low 16 bits
 // (pmullw), every sum wraps at 16 bits (paddw), and each mix ends with >> 8.
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 
@@ -117,49 +118,52 @@ bool ScnVm::Enlarge16(int dst, int dstPitch, int dl, int dt, int dr, int db, int
 
     int srcBase = src + int(uint32_t(st) >> 4) * srcPitch + int(uint32_t(sl) >> 4) * 4;
     int dstBase = dst + int(uint32_t(dt) >> 4) * dstPitch + int(uint32_t(dl) >> 4) * 4;
-    openshiina::Bytes upper(size_t(width) * 4), lower(size_t(width) * 4), output(size_t(columns) * 4);
-    std::vector<int> mixed(size_t(width) * 4);
-    for (size_t r = 0; r < rows.size(); r++)
-    {
-        const auto& row = rows[r];
-        ReadBytes(srcBase + row.Source * srcPitch, upper.data(), width * 4);
-        if (!row.Mixed)
+    // Rows are independent: bands of them run on all cores
+    ParallelRows::For(int(rows.size()), int64_t(rows.size()) * columns, [&](int first, int last) {
+        openshiina::Bytes upper(size_t(width) * 4), lower(size_t(width) * 4), output(size_t(columns) * 4);
+        std::vector<int> mixed(size_t(width) * 4);
+        for (size_t r = size_t(first); r < size_t(last); r++)
         {
-            // One source row
-            for (size_t i = 0; i < mixed.size(); i++)
-                mixed[i] = upper[i];
-        }
-        else
-        {
-            // Two source rows: (a * wa + b * wb) >> 8 in 16 bits
-            int wa = row.Upper, wb = row.Lower;
-            ReadBytes(srcBase + (row.Source + 1) * srcPitch, lower.data(), width * 4);
-            for (size_t i = 0; i < mixed.size(); i++)
-                mixed[i] = ((((upper[i] * wa) & 0xFFFF) + ((lower[i] * wb) & 0xFFFF)) & 0xFFFF) >> 8;
-        }
-        // The opaque build sets the first byte of what it mixes (a row from two, or two pixels)
-        bool rowMixed = opaque && row.Mixed;
-        for (int c = 0, o = 0; c < columns; c++, o += 4)
-        {
-            int p = from[size_t(c)] * 4;
-            if (mixLeft[size_t(c)] < 0)
+            const auto& row = rows[r];
+            ReadBytes(srcBase + row.Source * srcPitch, upper.data(), width * 4);
+            if (!row.Mixed)
             {
+                // One source row
+                for (size_t i = 0; i < mixed.size(); i++)
+                    mixed[i] = upper[i];
+            }
+            else
+            {
+                // Two source rows: (a * wa + b * wb) >> 8 in 16 bits
+                int wa = row.Upper, wb = row.Lower;
+                ReadBytes(srcBase + (row.Source + 1) * srcPitch, lower.data(), width * 4);
+                for (size_t i = 0; i < mixed.size(); i++)
+                    mixed[i] = ((((upper[i] * wa) & 0xFFFF) + ((lower[i] * wb) & 0xFFFF)) & 0xFFFF) >> 8;
+            }
+            // The opaque build sets the first byte of what it mixes (a row from two, or two pixels)
+            bool rowMixed = opaque && row.Mixed;
+            for (int c = 0, o = 0; c < columns; c++, o += 4)
+            {
+                int p = from[size_t(c)] * 4;
+                if (mixLeft[size_t(c)] < 0)
+                {
+                    for (int k = 0; k < 4; k++)
+                        output[size_t(o + k)] = uint8_t(mixed[size_t(p + k)]);
+                    if (rowMixed)
+                        output[size_t(o)] = 0xFF;
+                    continue;
+                }
                 for (int k = 0; k < 4; k++)
-                    output[size_t(o + k)] = uint8_t(mixed[size_t(p + k)]);
-                if (rowMixed)
+                {
+                    int sum = (((mixed[size_t(p + k)] * left[size_t(o + k)]) & 0xFFFF) + ((mixed[size_t(p + 4 + k)] * right[size_t(o + k)]) & 0xFFFF)) & 0xFFFF;
+                    output[size_t(o + k)] = uint8_t(sum >> 8);
+                }
+                if (opaque)
                     output[size_t(o)] = 0xFF;
-                continue;
             }
-            for (int k = 0; k < 4; k++)
-            {
-                int sum = (((mixed[size_t(p + k)] * left[size_t(o + k)]) & 0xFFFF) + ((mixed[size_t(p + 4 + k)] * right[size_t(o + k)]) & 0xFFFF)) & 0xFFFF;
-                output[size_t(o + k)] = uint8_t(sum >> 8);
-            }
-            if (opaque)
-                output[size_t(o)] = 0xFF;
+            WriteBytes(dstBase + int(r) * dstPitch, output);
         }
-        WriteBytes(dstBase + int(r) * dstPitch, output);
-    }
+    });
     return true;
 }
 

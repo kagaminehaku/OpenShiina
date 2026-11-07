@@ -21,7 +21,11 @@ constexpr int MusicVolumes[101] = {
     -234,   -217,  -200,  -184,  -168,  -152,  -136,  -120,  -104,  -89,   -74,   -58,   -43,   -29,   -14,   0,
 };
 
+} // namespace
+
 int MusicVolume(int volume) { return MusicVolumes[std::clamp(volume, 0, 100)]; }
+
+namespace {
 
 bool IsMusicFile(const openshiina::Bytes& data)
 {

@@ -33,7 +33,9 @@ void UpperAscii(uint8_t* bytes, size_t length)
 
 bool Contains(const openshiina::Bytes& haystack, const std::string& needle)
 {
-    return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end()) != haystack.end();
+    // byte for byte: char is signed, and the text of other code pages has bytes from 0x80 up
+    return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(),
+                       [](uint8_t a, char b) { return a == uint8_t(b); }) != haystack.end();
 }
 
 } // namespace

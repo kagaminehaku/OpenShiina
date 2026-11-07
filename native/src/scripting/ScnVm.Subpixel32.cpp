@@ -13,6 +13,7 @@
 // the edge pixels whose source starts inside a pixel are stored as two unpacked 16-bit lanes (no
 // packuswb), and the left one also adds one of its products unshifted.
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <cstring>
 
@@ -264,16 +265,19 @@ bool ScnVm::Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, in
     int outPixels = (ax != 0 ? 1 : 0) + int(middle) + (tailX != 0 ? 1 : 0);
     int inBytes = (int(middle) + 3) * 4;
     int outBytes = outPixels * 4;
-    // Source rows are read in place (copied when they share bytes with the destination row, which
-    // is written as the row is made, or are not one piece of memory) and the destination row is
-    // written in place
-    openshiina::Bytes spareP, spareQ;
-    for (const auto& [kind, s, d] : rows)
-    {
-        const uint8_t* p = ReadView(s, inBytes, spareP, d, outBytes);
-        const uint8_t* q = TwoRows(kind) ? ReadView(s + srcPitch, inBytes, spareQ, d, outBytes) : nullptr;
-        SubpixelRowPixels(kind, k, p, q, Bytes(d, outBytes), int(middle));
-    }
+    ParallelRows::For(int(rows.size()), int64_t(rows.size()) * outPixels, [&](int from, int to) {
+        // Source rows are read in place (copied when they share bytes with the destination row,
+        // which is written as the row is made, or are not one piece of memory) and the destination
+        // row is written in place
+        openshiina::Bytes spareP, spareQ;
+        for (size_t r = size_t(from); r < size_t(to); r++)
+        {
+            const auto& [kind, s, d] = rows[r];
+            const uint8_t* p = ReadView(s, inBytes, spareP, d, outBytes);
+            const uint8_t* q = TwoRows(kind) ? ReadView(s + srcPitch, inBytes, spareQ, d, outBytes) : nullptr;
+            SubpixelRowPixels(kind, k, p, q, Bytes(d, outBytes), int(middle));
+        }
+    });
     return true;
 }
 

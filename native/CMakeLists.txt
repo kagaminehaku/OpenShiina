@@ -24,12 +24,15 @@ add_library(openshiina_core STATIC
     src/archives/FormatManager.cpp
     src/archives/WarcOpener.cpp
     src/archives/WarcRangeDecoder.cpp
+    src/formats/MpegAudio.cpp
+    src/formats/MpegVideo.cpp
     src/game/GameData.cpp
     src/game/GameSetup.cpp
     src/io/ArcView.cpp
     src/io/Checksum.cpp
     src/platform/DibShapes.cpp
     src/platform/Files.cpp
+    src/scripting/ParallelRows.cpp
     src/scripting/ScnAddressSpace.cpp
     src/scripting/ScnOpcodes.cpp
     src/scripting/ScnFonts.cpp
@@ -89,6 +92,35 @@ else()
     # GCC fuses a * b + c by default on ARM: each operation must round as in the C# player. The
     # scripts' arithmetic wraps as C#'s int does (unchecked)
     target_compile_options(openshiina_core PRIVATE -Wall -Wextra -ffp-contract=off -fwrapv)
+    # The pixel routines' loops vectorised (NEON on the Switch): devkitPro's Release is -O2
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        target_compile_options(openshiina_core PRIVATE -O3)
+    endif()
+endif()
+
+# The sounds of the scripts (C# Audio, Formats/AudioDecoder): the mixer, the sound buffers and the
+# music streams; Ogg Vorbis with stb_vorbis (public domain), MPEG audio with minimp3 (CC0), both
+# built as they come
+add_library(audio_codecs STATIC third_party/stb_vorbis/stb_vorbis.c src/audio/minimp3.c)
+target_include_directories(audio_codecs SYSTEM PRIVATE third_party)
+target_compile_definitions(audio_codecs PRIVATE STB_VORBIS_NO_STDIO)
+if(MSVC)
+    target_compile_options(audio_codecs PRIVATE /w)
+else()
+    target_compile_options(audio_codecs PRIVATE -w -O3)
+endif()
+add_library(openshiina_audio STATIC
+    src/audio/AudioDecoder.cpp
+    src/audio/ScnMixer.cpp
+    src/audio/ScnMusic.cpp
+    src/audio/ScnSound.cpp
+)
+target_include_directories(openshiina_audio SYSTEM PRIVATE third_party)
+target_link_libraries(openshiina_audio PUBLIC openshiina_core PRIVATE audio_codecs)
+if(MSVC)
+    target_compile_options(openshiina_audio PRIVATE /W4 /utf-8 /permissive-)
+else()
+    target_compile_options(openshiina_audio PRIVATE -Wall -Wextra -O3)
 endif()
 
 if(NINTENDO_SWITCH)
@@ -124,7 +156,7 @@ if(NINTENDO_SWITCH)
     pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
     add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp tools/devhost/DevHostReturn.cpp)
     target_include_directories(player PRIVATE tools/devhost)
-    target_link_libraries(player PRIVATE openshiina_core PkgConfig::SDL2 PkgConfig::FREETYPE)
+    target_link_libraries(player PRIVATE openshiina_core openshiina_audio PkgConfig::SDL2 PkgConfig::FREETYPE)
     target_compile_options(player PRIVATE -Wall -Wextra)
     set(PLAYER_ROMFS "${CMAKE_CURRENT_BINARY_DIR}/player-romfs")
     file(MAKE_DIRECTORY "${PLAYER_ROMFS}/Data")
@@ -145,6 +177,9 @@ else()
     # ellipsecheck: DibShapes (the Switch's ellipses) against GDI, the C# GdiEllipseCheck's fixed cases
     add_executable(ellipsecheck tools/ellipsecheck/main.cpp tools/scnrun/GdiShapes.cpp)
     target_link_libraries(ellipsecheck PRIVATE openshiina_core)
+    # moviecheck: each frame of an MPEG-1 movie as the C# player's decoder makes it (SHA-256s)
+    add_executable(moviecheck tools/moviecheck/main.cpp)
+    target_link_libraries(moviecheck PRIVATE openshiina_core)
     # routinecheck: the x86 routines' signatures against the C# player's (ScnTools routines)
     add_executable(routinecheck tools/routinecheck/main.cpp)
     target_link_libraries(routinecheck PRIVATE openshiina_core)

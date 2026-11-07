@@ -28,6 +28,7 @@
 // one for 1 and 3). This build writes its tables into the work buffers as the x86 code does and
 // reads that pair after (lastAlways).
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 #include <optional>
@@ -162,48 +163,48 @@ uint32_t ScaleWeight(uint32_t a, uint32_t b)
 }
 
 /// One kind of source row of a destination row (the partial first row, the sum of the whole rows,
-/// the partial last row) as prefix sums over x: channels 0 and 2 in one 64-bit word, 1 and 3 in the
-/// other (32-bit lanes, values kept modulo 65536), and a count of the pixels that are not opaque.
+/// the partial last row) as each destination column's parts of it: its first source pixel, the sum
+/// of its whole ones and its last one, channels 0 and 2 in one 64-bit word, 1 and 3 in the other
+/// (32-bit lanes; the whole sum kept modulo 65536 a lane), with counts of the pixels that are not
+/// opaque. The columns' pixels follow each other (a column's last pixel is the next one's first),
+/// so a row is read once.
 class ScaleRow
 {
 public:
     static constexpr uint64_t Lanes = 0x0000FFFF0000FFFFull;
 
-    void Resize(int width)
+    struct Part
     {
-        m_lo.assign(size_t(width) + 1, 0);
-        m_hi.assign(size_t(width) + 1, 0);
-        m_clear.assign(size_t(width) + 1, 0);
+        uint64_t FirstLo = 0, FirstHi = 0, WholeLo = 0, WholeHi = 0, LastLo = 0, LastHi = 0;
+        int FirstClear = 0, WholeClear = 0, LastClear = 0;
+    };
+
+    void Resize(size_t columns, int width)
+    {
+        m_parts.resize(columns);
+        m_width = width;
     }
 
-    void Set(const uint8_t* row)
+    /// A source row of bytes.
+    void Set(const uint8_t* row, const std::vector<int>& shape)
     {
-        uint64_t lo = 0, hi = 0;
-        int clear = 0;
-        for (size_t x = 0, i = 0; x + 1 < m_lo.size(); x++, i += 4)
-        {
-            lo += row[i] | uint64_t(row[i + 2]) << 32;
-            hi += row[i + 1] | uint64_t(row[i + 3]) << 32;
-            clear += row[i + 3] == 0xFF ? 0 : 1;
-            m_lo[x + 1] = lo;
-            m_hi[x + 1] = hi;
-            m_clear[x + 1] = clear;
-        }
+        Fill(shape, [row](int x, uint64_t& lo, uint64_t& hi) {
+            const uint8_t* p = row + 4 * x;
+            lo = p[0] | uint64_t(p[2]) << 32;
+            hi = p[1] | uint64_t(p[3]) << 32;
+            return p[3] == 0xFF ? 0 : 1;
+        });
     }
 
-    void Set(const std::vector<uint16_t>& sum, const std::vector<uint8_t>& and_)
+    /// The whole source rows: their 16-bit sums and the AND of their bytes.
+    void Set(const std::vector<uint16_t>& sum, const std::vector<uint8_t>& and_, const std::vector<int>& shape)
     {
-        uint64_t lo = 0, hi = 0;
-        int clear = 0;
-        for (size_t x = 0, i = 0; x + 1 < m_lo.size(); x++, i += 4)
-        {
-            lo += sum[i] | uint64_t(sum[i + 2]) << 32;
-            hi += sum[i + 1] | uint64_t(sum[i + 3]) << 32;
-            clear += and_[i + 3] == 0xFF ? 0 : 1;
-            m_lo[x + 1] = lo;
-            m_hi[x + 1] = hi;
-            m_clear[x + 1] = clear;
-        }
+        Fill(shape, [&sum, &and_](int x, uint64_t& lo, uint64_t& hi) {
+            size_t i = size_t(x) * 4;
+            lo = sum[i] | uint64_t(sum[i + 2]) << 32;
+            hi = sum[i + 1] | uint64_t(sum[i + 3]) << 32;
+            return and_[i + 3] == 0xFF ? 0 : 1;
+        });
     }
 
     /// Every destination column's parts of this row, each times its weight with the row weight
@@ -214,41 +215,39 @@ public:
     void AddTo(uint32_t wy, uint32_t fullCol, const std::vector<uint32_t>& colWx, const std::vector<int>& shape, std::vector<uint64_t>& accLo,
                std::vector<uint64_t>& accHi, std::vector<int>& clear, bool skipShared, const std::optional<std::pair<uint32_t, uint32_t>>& firstLast) const
     {
-        const uint64_t* lo = m_lo.data();
-        const uint64_t* hi = m_hi.data();
-        const int* cl = m_clear.data();
         uint32_t wWhole = ScaleWeight(fullCol, wy);
         for (size_t c = 0, n = accLo.size(); c < n; c++)
         {
-            int f = shape[4 * c], a = shape[4 * c + 1], b = shape[4 * c + 2], flags = shape[4 * c + 3];
+            const Part& p = m_parts[c];
+            int a = shape[4 * c + 1], b = shape[4 * c + 2], flags = shape[4 * c + 3];
             uint64_t l = accLo[c], h = accHi[c];
             int nonOpaque = 0;
             if ((flags & 0x80) != 0)
             {
                 uint32_t w = ScaleWeight(colWx[2 * c], wy);
-                l += (lo[f + 1] - lo[f]) * w;
-                h += (hi[f + 1] - hi[f]) * w;
+                l += p.FirstLo * w;
+                h += p.FirstHi * w;
                 if (!(skipShared && c > 0))
-                    nonOpaque += cl[f + 1] - cl[f];
+                    nonOpaque += p.FirstClear;
             }
             if (b > a)
             {
-                l += ((lo[b] - lo[a]) & Lanes) * wWhole;
-                h += ((hi[b] - hi[a]) & Lanes) * wWhole;
-                nonOpaque += cl[b] - cl[a];
+                l += (p.WholeLo & Lanes) * wWhole;
+                h += (p.WholeHi & Lanes) * wWhole;
+                nonOpaque += p.WholeClear;
             }
             if ((flags & 0x40) != 0)
             {
                 uint32_t w = ScaleWeight(colWx[2 * c + 1], wy);
-                l += (lo[b + 1] - lo[b]) * w;
-                h += (hi[b + 1] - hi[b]) * w;
-                nonOpaque += cl[b + 1] - cl[b];
+                l += p.LastLo * w;
+                h += p.LastHi * w;
+                nonOpaque += p.LastClear;
             }
             if (c == 0 && firstLast)
             {
-                l += (lo[b + 1] - lo[b]) * ScaleWeight(firstLast->first, wy);
-                h += (hi[b + 1] - hi[b]) * ScaleWeight(firstLast->second, wy);
-                nonOpaque += cl[b + 1] - cl[b];
+                l += p.LastLo * ScaleWeight(firstLast->first, wy);
+                h += p.LastHi * ScaleWeight(firstLast->second, wy);
+                nonOpaque += p.LastClear;
             }
             accLo[c] = l & Lanes;
             accHi[c] = h & Lanes;
@@ -257,10 +256,40 @@ public:
     }
 
 private:
-    std::vector<uint64_t> m_lo, m_hi;
-    std::vector<int> m_clear;
-};
+    /// pixel(x, lo, hi) gives source pixel x's lanes and whether it is not opaque.
+    template <typename Pixel>
+    void Fill(const std::vector<int>& shape, Pixel pixel)
+    {
+        for (size_t c = 0, n = m_parts.size(); c < n; c++)
+        {
+            int f = shape[4 * c], a = shape[4 * c + 1], b = shape[4 * c + 2];
+            Part& p = m_parts[c];
+            p.FirstClear = f < m_width ? pixel(f, p.FirstLo, p.FirstHi) : 0;
+            uint64_t lo = 0, hi = 0;
+            int nonOpaque = 0;
+            for (int x = a; x < b; x++)
+            {
+                uint64_t pl, ph;
+                nonOpaque += pixel(x, pl, ph);
+                lo += pl;
+                hi += ph;
+            }
+            p.WholeLo = lo;
+            p.WholeHi = hi;
+            p.WholeClear = nonOpaque;
+            if (b < m_width)
+                p.LastClear = pixel(b, p.LastLo, p.LastHi);
+            else
+            {
+                p.LastLo = p.LastHi = 0;
+                p.LastClear = 0;
+            }
+        }
+    }
 
+    std::vector<Part> m_parts;
+    int m_width = 0;
+};
 /// Adds a row of bytes to 16-bit sums (wrapping) and ANDs it into a mask.
 void AddRow(const uint8_t* row, size_t length, std::vector<uint16_t>& sum, std::vector<uint8_t>& and_)
 {
@@ -271,12 +300,17 @@ void AddRow(const uint8_t* row, size_t length, std::vector<uint16_t>& sum, std::
     }
 }
 
-/// The tables and buffers, kept from call to call (a zoomed scene scales the same rectangles every frame).
+/// The tables, kept from call to call (a zoomed scene scales the same rectangles every frame).
 struct Scale32Work
 {
     std::vector<ScaleEntry> Rows, Columns;
     std::vector<int> ColShape, RowY;
     std::vector<uint32_t> ColWx;
+};
+
+/// The buffers of one thread's rows.
+struct Scale32Rows
+{
     std::vector<uint16_t> Sum;
     std::vector<uint8_t> And;
     ScaleRow First, Whole, Last;
@@ -285,6 +319,7 @@ struct Scale32Work
 };
 
 thread_local Scale32Work t_scale32;
+thread_local Scale32Rows t_scale32Rows;
 
 /// A table as the x86 code leaves it in a work buffer: 24 bytes an entry, the flags and the count,
 /// then each weight twice when its flag is set (the x86 code leaves the others as they were).
@@ -371,57 +406,61 @@ bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
     for (size_t r = 0; r < nr; r++)
         work.RowY[r + 1] = work.RowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
 
-    work.Sum.resize(size_t(bytes));
-    work.And.resize(size_t(bytes));
-    work.First.Resize(width);
-    work.Whole.Resize(width);
-    work.Last.Resize(width);
-    work.AccLo.resize(nc);
-    work.AccHi.resize(nc);
-    work.Clear.resize(nc);
-    for (size_t r = 0; r < nr; r++)
-    {
-        const auto& e = rows[r];
-        bool hasFirst = (e.Flags & 0x80) != 0, hasLast = (e.Flags & 0x40) != 0;
-        int p = work.RowY[r];
-        // The whole source rows of a destination row: sums per channel (16 bits, as the MMX sums
-        // wrap) and the AND of their bytes (byte 3 tells whether every one is opaque); the source
-        // rows are read in place, then the destination row written
-        if (hasFirst)
-            work.First.Set(Bytes(srcX + p++ * srcPitch, bytes));
-        if (e.Count > 0)
+    // Rows are independent: they run on several cores (the result does not depend on it)
+    ParallelRows::For(int(nr), int64_t(nr) * int64_t(nc), [&](int from, int to) {
+        auto& b = t_scale32Rows;
+        b.Sum.resize(size_t(bytes));
+        b.And.resize(size_t(bytes));
+        b.First.Resize(nc, width);
+        b.Whole.Resize(nc, width);
+        b.Last.Resize(nc, width);
+        b.AccLo.resize(nc);
+        b.AccHi.resize(nc);
+        b.Clear.resize(nc);
+        for (size_t r = size_t(from); r < size_t(to); r++)
         {
-            std::fill(work.Sum.begin(), work.Sum.end(), uint16_t(0));
-            std::fill(work.And.begin(), work.And.end(), uint8_t(0xFF));
-            for (int k = 0; k < e.Count; k++)
-                AddRow(Bytes(srcX + p++ * srcPitch, bytes), size_t(bytes), work.Sum, work.And);
-            work.Whole.Set(work.Sum, work.And);
-        }
-        if (hasLast)
-            work.Last.Set(Bytes(srcX + p * srcPitch, bytes));
+            const auto& e = rows[r];
+            bool hasFirst = (e.Flags & 0x80) != 0, hasLast = (e.Flags & 0x40) != 0;
+            int p = work.RowY[r];
+            // The whole source rows of a destination row: sums per channel (16 bits, as the MMX sums
+            // wrap) and the AND of their bytes (byte 3 tells whether every one is opaque); the source
+            // rows are read in place, then the destination row written
+            if (hasFirst)
+                b.First.Set(Bytes(srcX + p++ * srcPitch, bytes), work.ColShape);
+            if (e.Count > 0)
+            {
+                std::fill(b.Sum.begin(), b.Sum.end(), uint16_t(0));
+                std::fill(b.And.begin(), b.And.end(), uint8_t(0xFF));
+                for (int k = 0; k < e.Count; k++)
+                    AddRow(Bytes(srcX + p++ * srcPitch, bytes), size_t(bytes), b.Sum, b.And);
+                b.Whole.Set(b.Sum, b.And, work.ColShape);
+            }
+            if (hasLast)
+                b.Last.Set(Bytes(srcX + p * srcPitch, bytes), work.ColShape);
 
-        // the general loop's register copy of the shared first column (see the top)
-        bool ownLoop = e.Flags == 0xC0 && e.Count <= 1;
-        auto extra = ownLoop ? std::nullopt : firstLast;
-        std::fill(work.AccLo.begin(), work.AccLo.end(), 0);
-        std::fill(work.AccHi.begin(), work.AccHi.end(), 0);
-        std::fill(work.Clear.begin(), work.Clear.end(), 0);
-        if (hasFirst)
-            work.First.AddTo(e.First, fullCol, work.ColWx, work.ColShape, work.AccLo, work.AccHi, work.Clear, !ownLoop, extra);
-        if (e.Count > 0)
-            work.Whole.AddTo(fullRow, fullCol, work.ColWx, work.ColShape, work.AccLo, work.AccHi, work.Clear, false, extra);
-        if (hasLast)
-            work.Last.AddTo(e.Last, fullCol, work.ColWx, work.ColShape, work.AccLo, work.AccHi, work.Clear, !ownLoop, extra);
-        uint8_t* output = Bytes(dstRow + int(r) * dstPitch, int(nc) * 4);
-        for (size_t c = 0; c < nc; c++)
-        {
-            uint64_t lo = work.AccLo[c], hi = work.AccHi[c];
-            output[c * 4] = uint8_t(lo >> 8);
-            output[c * 4 + 1] = uint8_t(hi >> 8);
-            output[c * 4 + 2] = uint8_t(lo >> 40);
-            output[c * 4 + 3] = work.Clear[c] == 0 ? uint8_t(0xFF) : uint8_t(hi >> 40);
+            // the general loop's register copy of the shared first column (see the top)
+            bool ownLoop = e.Flags == 0xC0 && e.Count <= 1;
+            auto extra = ownLoop ? std::nullopt : firstLast;
+            std::fill(b.AccLo.begin(), b.AccLo.end(), 0);
+            std::fill(b.AccHi.begin(), b.AccHi.end(), 0);
+            std::fill(b.Clear.begin(), b.Clear.end(), 0);
+            if (hasFirst)
+                b.First.AddTo(e.First, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, !ownLoop, extra);
+            if (e.Count > 0)
+                b.Whole.AddTo(fullRow, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, false, extra);
+            if (hasLast)
+                b.Last.AddTo(e.Last, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, !ownLoop, extra);
+            uint8_t* output = Bytes(dstRow + int(r) * dstPitch, int(nc) * 4);
+            for (size_t c = 0; c < nc; c++)
+            {
+                uint64_t lo = b.AccLo[c], hi = b.AccHi[c];
+                output[c * 4] = uint8_t(lo >> 8);
+                output[c * 4 + 1] = uint8_t(hi >> 8);
+                output[c * 4 + 2] = uint8_t(lo >> 40);
+                output[c * 4 + 3] = b.Clear[c] == 0 ? uint8_t(0xFF) : uint8_t(hi >> 40);
+            }
         }
-    }
+    });
     return true;
 }
 

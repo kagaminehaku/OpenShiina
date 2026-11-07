@@ -8,6 +8,7 @@
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
+#include <chrono>
 #include <format>
 
 namespace openshiina::scripting {
@@ -82,10 +83,17 @@ void ScnVm::RegisterNativeCall()
         ScnNativeArgs args{vm.BAddress(0), vm.AAddress(0), vm.SAddress(0), vm.FAddress(c.Slot, 0), vm.StackAddress(c.Slot, c.Sp)};
         vm.m_nativeTarget = target;
         auto& info = vm.RoutineAt(target);
+        auto start = std::chrono::steady_clock::now();
         if (info.Native)
             info.Native->Run(vm, c, args);
         else
             vm.RunX86(c, args);
+        if (vm.RoutineTimes != nullptr)
+        {
+            auto& time = (*vm.RoutineTimes)[info.Native ? info.Native->Name : std::string("x86")];
+            time.Milliseconds += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+            time.Calls++;
+        }
         return 0;
     });
 }

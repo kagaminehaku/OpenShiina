@@ -16,6 +16,7 @@
 //   channel = (sum of byte * w, in 16 bits) >> 8; byte 3 = FF when every source pixel has FF.
 // The sums are the same modulo 65536 in any order, so the pixels come out byte for byte.
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 #include <climits>
@@ -216,48 +217,51 @@ bool ScnVm::Scale16(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
     int dstBase = dst + int(uint32_t(dt) >> 4) * dstPitch + int(uint32_t(dl) >> 4) * 4;
     int bytes = width * 4;
 
-    openshiina::Bytes line(size_t(bytes), 0);
-    // A kind of source row of the destination row: per channel the sum of its bytes (the whole rows
-    // share a weight, and the sums only count modulo 65536) and whether every pixel is opaque
-    std::vector<int> sum(static_cast<size_t>(bytes)), acc(nc * 4);
-    std::vector<uint8_t> opaque(static_cast<size_t>(width)), clear(nc);
-    openshiina::Bytes output(nc * 4);
-    for (size_t r = 0; r < nr; r++)
-    {
-        const auto& row = rows[r];
-        std::fill(acc.begin(), acc.end(), 0);
-        std::fill(clear.begin(), clear.end(), uint8_t(0));
-        int y = rowFrom[r];
-        if ((row.Flags & 0x80) != 0)
+    // Rows are independent: bands of them run on all cores (the result does not depend on it)
+    ParallelRows::For(int(nr), int64_t(nr) * int64_t(nc), [&](int from, int to) {
+        openshiina::Bytes line(size_t(bytes), 0);
+        // A kind of source row of the destination row: per channel the sum of its bytes (the whole rows
+        // share a weight, and the sums only count modulo 65536) and whether every pixel is opaque
+        std::vector<int> sum(static_cast<size_t>(bytes)), acc(nc * 4);
+        std::vector<uint8_t> opaque(static_cast<size_t>(width)), clear(nc);
+        openshiina::Bytes output(nc * 4);
+        for (size_t r = size_t(from); r < size_t(to); r++)
         {
-            ReadBytes(srcBase + y++ * srcPitch, line.data(), bytes);
-            Scale16Load(line, sum, opaque, false);
-            Scale16Columns(sum, opaque, row.First, wholeCol, cols, colFrom, acc, clear);
-        }
-        if (row.Count > 0)
-        {
-            for (int k = 0; k < row.Count; k++)
+            const auto& row = rows[r];
+            std::fill(acc.begin(), acc.end(), 0);
+            std::fill(clear.begin(), clear.end(), uint8_t(0));
+            int y = rowFrom[r];
+            if ((row.Flags & 0x80) != 0)
             {
                 ReadBytes(srcBase + y++ * srcPitch, line.data(), bytes);
-                Scale16Load(line, sum, opaque, k > 0);
+                Scale16Load(line, sum, opaque, false);
+                Scale16Columns(sum, opaque, row.First, wholeCol, cols, colFrom, acc, clear);
             }
-            Scale16Columns(sum, opaque, wholeRow, wholeCol, cols, colFrom, acc, clear);
+            if (row.Count > 0)
+            {
+                for (int k = 0; k < row.Count; k++)
+                {
+                    ReadBytes(srcBase + y++ * srcPitch, line.data(), bytes);
+                    Scale16Load(line, sum, opaque, k > 0);
+                }
+                Scale16Columns(sum, opaque, wholeRow, wholeCol, cols, colFrom, acc, clear);
+            }
+            if ((row.Flags & 0x40) != 0)
+            {
+                ReadBytes(srcBase + y * srcPitch, line.data(), bytes);
+                Scale16Load(line, sum, opaque, false);
+                Scale16Columns(sum, opaque, row.Last, wholeCol, cols, colFrom, acc, clear);
+            }
+            for (size_t c = 0, o = 0; c < nc; c++, o += 4)
+            {
+                output[o] = uint8_t(acc[o] >> 8);
+                output[o + 1] = uint8_t(acc[o + 1] >> 8);
+                output[o + 2] = uint8_t(acc[o + 2] >> 8);
+                output[o + 3] = clear[c] ? uint8_t(acc[o + 3] >> 8) : uint8_t(0xFF);
+            }
+            WriteBytes(dstBase + int(r) * dstPitch, output);
         }
-        if ((row.Flags & 0x40) != 0)
-        {
-            ReadBytes(srcBase + y * srcPitch, line.data(), bytes);
-            Scale16Load(line, sum, opaque, false);
-            Scale16Columns(sum, opaque, row.Last, wholeCol, cols, colFrom, acc, clear);
-        }
-        for (size_t c = 0, o = 0; c < nc; c++, o += 4)
-        {
-            output[o] = uint8_t(acc[o] >> 8);
-            output[o + 1] = uint8_t(acc[o + 1] >> 8);
-            output[o + 2] = uint8_t(acc[o + 2] >> 8);
-            output[o + 3] = clear[c] ? uint8_t(acc[o + 3] >> 8) : uint8_t(0xFF);
-        }
-        WriteBytes(dstBase + int(r) * dstPitch, output);
-    }
+    });
     return true;
 }
 

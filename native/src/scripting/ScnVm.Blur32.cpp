@@ -8,6 +8,7 @@
 // The columns run all at once, a row of the picture a step (the sums of every column side by side),
 // in place: a row is read into the sums before it is written.
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 #include <climits>
@@ -107,21 +108,33 @@ bool ScnVm::Blur32(int dst, int dstStride, int w, int h, int src, int srcStride,
     }
     else
     {
-        // A row at a time: its pixels read before it is written (rows that share bytes with other
-        // rows' destinations come out as one after the other makes them)
-        std::vector<int> line(size_t(w) * 4), ring(size_t(2 * rx + 1) * 4);
-        openshiina::Bytes output(size_t(w) * 4);
-        for (int y = 0; y < h; y++)
-        {
-            const uint8_t* row = Bytes(src + y * srcStride, w * 4);
-            for (size_t k = 0; k < line.size(); k++)
-                line[k] = row[k];
-            BlurLine(line, w, rx, output.data(), ring);
-            std::copy(output.begin(), output.end(), Bytes(dst + y * dstStride, w * 4));
-        }
+        // A row at a time: its pixels read before it is written. Rows that share bytes with other
+        // rows' destinations run one after the other (they come out as one after the other makes them)
+        int64_t srcEnd = src + int64_t(h - 1) * srcStride + w * int64_t(4), dstEnd = dst + int64_t(h - 1) * dstStride + w * int64_t(4);
+        bool apart = src >= dstEnd || dst >= srcEnd || (src == dst && srcStride == dstStride);
+        auto runRows = [&](int from, int to) {
+            std::vector<int> line(size_t(w) * 4), ring(size_t(2 * rx + 1) * 4);
+            openshiina::Bytes output(size_t(w) * 4);
+            for (int y = from; y < to; y++)
+            {
+                const uint8_t* row = Bytes(src + y * srcStride, w * 4);
+                for (size_t k = 0; k < line.size(); k++)
+                    line[k] = row[k];
+                BlurLine(line, w, rx, output.data(), ring);
+                std::copy(output.begin(), output.end(), Bytes(dst + y * dstStride, w * 4));
+            }
+        };
+        if (apart && srcStride > 0 && dstStride > 0)
+            ParallelRows::For(h, int64_t(w) * h, runRows);
+        else
+            runRows(0, h);
     }
-    if (ry != 0)
-        BlurColumns(dst, dstStride, 0, w * 4, h, ry);
+    if (ry == 0)
+        return true;
+    // Columns are independent: bands of them (64 bytes, as the C# player's) run on several cores
+    int lanes = w * 4, band = 64;
+    int bands = (lanes + band - 1) / band;
+    ParallelRows::For(bands, int64_t(w) * h, [&](int from, int to) { BlurColumns(dst, dstStride, from * band, std::min(lanes, to * band), h, ry); });
     return true;
 }
 

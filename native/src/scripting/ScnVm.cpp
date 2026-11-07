@@ -2,6 +2,7 @@
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
+#include <chrono>
 #include <format>
 
 #include "archives/FormatManager.h"
@@ -510,7 +511,14 @@ int ScnVm::Execute(ScnContext& c, const ScnInstruction& ins)
     OpHandler handler = ins.Handler ? ins.Handler : HandlerFor(ins.Op);
     if (!handler)
         throw Error(c, std::format("Opcode {:04X} is not supported yet", ins.Op));
-    return handler(*this, c, ins);
+    if (OpTimes == nullptr)
+        return handler(*this, c, ins);
+    auto start = std::chrono::steady_clock::now();
+    int result = handler(*this, c, ins);
+    auto& time = (*OpTimes)[ins.Op];
+    time.Milliseconds += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    time.Calls++;
+    return result;
 }
 
 ScnException ScnVm::Error(const ScnContext& c, const std::string& message)

@@ -36,10 +36,14 @@
 #include "scripting/NetDictionary.h"
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnOpcodes.h"
+#include "formats/MpegVideo.h"
 #include "scripting/ScnTypes.h"
 #include "scripting/X86Routine.h"
 
 namespace openshiina::scripting {
+
+/// The DirectSound volume of a script volume 0-100 (0x4A15E0, ScnVm.Music; the movies' sound too).
+int MusicVolume(int volume);
 
 /// What an embedded routine receives: the variable areas and the stack top (l[0]).
 struct ScnNativeArgs
@@ -444,6 +448,17 @@ public:
     /// The window's picture changed: the host should present it (and clear this).
     bool ScreenInvalidated = false;
 
+    /// The time spent in each embedded routine (by its C++ version's name, "x86" for the others)
+    /// while set: the Switch player's log of what makes frames slow.
+    struct RoutineTime
+    {
+        double Milliseconds = 0;
+        int Calls = 0;
+    };
+    std::unordered_map<std::string, RoutineTime>* RoutineTimes = nullptr;
+    /// The time spent in each opcode (its handler, with the routines it calls) while set.
+    std::unordered_map<int, RoutineTime>* OpTimes = nullptr;
+
     // ---- Input (ScnVm.Input.cs) ----
 
     /// Reads joystick 0 whatever RIO.INI says (true), never (false), or as RIO.INI says (none).
@@ -611,14 +626,30 @@ private:
         int Width = 0, Height = 0;
         /// +0x34: volume 0-100.
         int Volume = 100;
+        std::unique_ptr<formats::IMovieVideo> Video;
+        /// Frames decoded since the start, and the time frame 0 was due.
+        int Decoded = 0;
+        uint32_t Start = 0, PausedAt = 0;
+        /// The movie's sound (its MPEG audio stream; empty when it has none) and its music stream while it plays.
+        openshiina::Bytes Wave;
+        int Sound = 0;
     };
     static constexpr int MovieSlots = 16;
     void RegisterMovie();
     Movie* MovieSlot(int n) { return n >= 0 && n < MovieSlots ? &m_movies[size_t(n)] : nullptr; }
     bool OpenMovie(Movie& movie);
+    bool OpenMovieFile(Movie& movie, const std::string& name);
     bool RunMovie(Movie& movie);
+    void UpdateMovie(Movie& movie);
+    void DrawMovieFrame(const Movie& movie, const formats::MpegFrame& frame);
+    void MovieSoundStart(Movie& movie, int64_t milliseconds = 0);
+    void MovieSoundStop(Movie& movie);
+    void MovieSoundPause(Movie& movie);
+    void MovieSoundResume(Movie& movie);
+    void MovieSoundVolume(Movie& movie, int volume);
     void SurfaceToPicture(int picture, int frame, int x, int y, int w, int h, int surface, int sx, int sy);
     std::array<Movie, MovieSlots> m_movies{};
+    openshiina::Bytes m_movieRows;
 
     // ---- Surfaces ----
     static constexpr int SurfaceRegion = 0x08000000, SurfaceSize = 0x2C;
@@ -717,8 +748,6 @@ private:
     // The list 04B8 was given, for 04B7
     int m_spriteListSet = 0;
     std::array<int, 4> m_lastFrameRect = {};
-    // The row buffer of the compositor for a frame row drawn over itself
-    openshiina::Bytes m_rowSource;
 
     // ---- Sound ----
     IScnSound* Sound() { return m_host.Sound(); }

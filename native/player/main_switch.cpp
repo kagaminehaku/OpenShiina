@@ -17,6 +17,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <format>
 #include <memory>
 #include <new>
 #include <string>
@@ -25,6 +26,9 @@
 #include "DevHostReturn.h"
 #include "FreeTypeFonts.h"
 #include "archives/FormatManager.h"
+#include "audio/ScnMixer.h"
+#include "audio/ScnMusic.h"
+#include "audio/ScnSound.h"
 #include "game/GameData.h"
 #include "game/GameSetup.h"
 #include "platform/DibShapes.h"
@@ -94,7 +98,10 @@ constexpr KeyOf kKeys[] = {
 class SwitchHost : public IScnHost
 {
 public:
-    SwitchHost(game::GameData& data, std::string saves) : m_data(data), m_saves(std::move(saves)) {}
+    SwitchHost(game::GameData& data, std::string saves) : m_data(data), m_saves(std::move(saves)), m_sound(m_mixer), m_music(m_mixer) {}
+
+    /// The mix of the scripts' sounds, read by the sound device's thread.
+    audio::ScnMixer& Mixer() { return m_mixer; }
 
     // Input as the window gives it (held keys by virtual key, the mouse in the game's pixels)
     bool Keys[256] = {};
@@ -141,6 +148,8 @@ public:
     }
 
     IScnShapes* Shapes() override { return &m_shapes; }
+    IScnSound* Sound() override { return &m_sound; }
+    IScnMusic* Music() override { return &m_music; }
     IScnFonts* Fonts() override { return m_fonts.Ready() ? &m_fonts : nullptr; }
     bool KeyDown(int virtualKey) override { return virtualKey >= 0 && virtualKey < 256 && Keys[virtualKey]; }
     int MouseButtons() override { return Buttons; }
@@ -167,6 +176,9 @@ private:
     std::string m_saves;
     platform::DibShapes m_shapes;
     player::FreeTypeFonts m_fonts;
+    audio::ScnMixer m_mixer;
+    audio::ScnSound m_sound;
+    audio::ScnMusic m_music;
 };
 
 /// The game folders, Latin names only (the Switch does not see folders with Japanese names written from Windows).
@@ -245,6 +257,22 @@ void Play(const std::string& folder)
     auto vm = setup.CreateVm(host, kData);
     LogMemory("its first script loaded");
 
+    // The sound device: 44.1 kHz stereo floats, the mixer read on SDL's audio thread
+    SDL_AudioSpec want{}, have{};
+    want.freq = audio::ScnMixer::Rate;
+    want.format = AUDIO_F32SYS;
+    want.channels = 2;
+    want.samples = 1024;
+    want.userdata = &host.Mixer();
+    want.callback = [](void* mixer, Uint8* stream, int length) {
+        static_cast<audio::ScnMixer*>(mixer)->Read(reinterpret_cast<float*>(stream), length / int(2 * sizeof(float)));
+    };
+    SDL_AudioDeviceID sound = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
+    if (sound == 0)
+        Log("No sound device: %s\n", SDL_GetError());
+    else
+        SDL_PauseAudioDevice(sound, 0);
+
     SDL_Window* window = SDL_CreateWindow("OpenShiina", 0, 0, 1280, 720, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
@@ -263,7 +291,13 @@ void Play(const std::string& folder)
         vm->WindowMessage(message, buttons, ScnMessage::Point(host.MouseX, host.MouseY));
     };
 
-    uint64_t frames = 0, started = armGetSystemTick(), slowest = 0;
+    // Every 2 seconds: the frames shown in them and, when they were fewer than 50, where the time
+    // of the scripts went (the embedded routines by name)
+    std::unordered_map<std::string, ScnVm::RoutineTime> routineTimes;
+    std::unordered_map<int, ScnVm::RoutineTime> opTimes;
+    vm->RoutineTimes = &routineTimes;
+    vm->OpTimes = &opTimes;
+    uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
     bool running = true;
     try
     {
@@ -326,8 +360,11 @@ void Play(const std::string& folder)
                 Log("The scripts quit after %llu frames.\n", (unsigned long long)frames);
                 break;
             }
-            slowest = std::max(slowest, armGetSystemTick() - before);
+            uint64_t scripts = armGetSystemTick() - before;
+            slowest = std::max(slowest, scripts);
+            spanScripts += scripts;
             frames++;
+            spanFrames++;
             if (vm->ScreenInvalidated)
             {
                 vm->ScreenInvalidated = false;
@@ -336,6 +373,30 @@ void Play(const std::string& folder)
             SDL_RenderClear(renderer);
             SDL_RenderCopy(renderer, picture, nullptr, &place);
             SDL_RenderPresent(renderer);
+            uint64_t now = armGetSystemTick();
+            if (armTicksToNs(now - spanStart) >= 2000000000ull)
+            {
+                double seconds = double(armTicksToNs(now - spanStart)) / 1e9;
+                if (spanFrames / seconds < 50)
+                {
+                    std::vector<std::pair<std::string, ScnVm::RoutineTime>> top(routineTimes.begin(), routineTimes.end());
+                    std::sort(top.begin(), top.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
+                    std::string names;
+                    for (size_t k = 0; k < top.size() && k < 4; k++)
+                        names += std::format(", {} {:.0f} ms ({} calls)", top[k].first, top[k].second.Milliseconds, top[k].second.Calls);
+                    std::vector<std::pair<int, ScnVm::RoutineTime>> ops(opTimes.begin(), opTimes.end());
+                    std::sort(ops.begin(), ops.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
+                    names += "; opcodes";
+                    for (size_t k = 0; k < ops.size() && k < 5; k++)
+                        names += std::format(" {:04X} {:.0f} ms ({})", ops[k].first, ops[k].second.Milliseconds, ops[k].second.Calls);
+                    Log("frame %llu: %.1f a second, scripts %.0f ms of %.1f s%s\n", (unsigned long long)frames, spanFrames / seconds,
+                        double(armTicksToNs(spanScripts)) / 1e6, seconds, names.c_str());
+                }
+                routineTimes.clear();
+                opTimes.clear();
+                spanStart = now;
+                spanFrames = spanScripts = 0;
+            }
             if (frames % 600 == 0)
             {
                 double seconds = double(armTicksToNs(armGetSystemTick() - started)) / 1e9;
@@ -358,6 +419,8 @@ void Play(const std::string& folder)
     {
         Log("Error at frame %llu: %s\n", (unsigned long long)frames, e.what());
     }
+    if (sound != 0)
+        SDL_CloseAudioDevice(sound);
     if (joystick)
         SDL_JoystickClose(joystick);
     SDL_DestroyTexture(picture);
@@ -409,7 +472,7 @@ int main(int argc, char** argv)
             folder = argv[k];
     if (folder.empty())
         folder = PickGame();
-    if (!folder.empty() && SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) == 0)
+    if (!folder.empty() && SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) == 0)
     {
         try
         {

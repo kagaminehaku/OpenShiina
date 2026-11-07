@@ -2,6 +2,7 @@
 // subtractive copies, mosaic, waves, ripples, rotation and zoom, picture-to-picture copies. Each
 // follows its handler in the executable, quirks included (they are noted where they are).
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 #include <bit>
@@ -674,10 +675,46 @@ void ScnVm::RotateZoom(const int* v)
     double turned = radians + std::numbers::pi / 2;
     int64_t duy = TruncateToLong(std::cos(turned) * 4294967296.0 / zoomX), dvy = TruncateToLong(std::sin(turned) * 4294967296.0 / zoomY);
 
-    // Row by row as the x86 code draws it, reading the source as it goes (a frame turned in place
-    // reads what it has just drawn)
     if (r - l <= 0 || b - t <= 0)
         return;
+    // The x86 code goes row by row reading the source as it goes, so where the source rectangle
+    // shares memory with the destination one (a frame turned in place) the rows are drawn in turn as
+    // it draws them. Otherwise the source rectangle is read once and the rows are shared out
+    // between the cores
+    int64_t sw = int64_t(sxEnd) - sx, sh = int64_t(syEnd) - sy;
+    int64_t dstFrom = dstBase + int64_t(t) * dstStride + l * int64_t(4), dstTo = dstBase + int64_t(b - 1) * dstStride + r * int64_t(4);
+    int64_t srcFrom = srcBase + int64_t(sy) * srcStride + sx * int64_t(4), srcTo = srcBase + int64_t(syEnd - 1) * srcStride + sxEnd * int64_t(4);
+    bool apart = sw > 0 && sh > 0 && sw * sh <= (int64_t(1) << 24) && srcStride > 0 && dstStride > 0 && (srcTo <= dstFrom || dstTo <= srcFrom);
+    if (apart)
+    {
+        std::vector<uint32_t> source(size_t(sw * sh));
+        for (int64_t yy = 0; yy < sh; yy++)
+            ReadBytes(int(srcFrom + yy * srcStride), reinterpret_cast<uint8_t*>(source.data() + yy * sw), int(sw * 4));
+        int width = r - l;
+        ParallelRows::For(b - t, int64_t(width) * (b - t), [&](int first, int last) {
+            std::vector<uint8_t> row(static_cast<size_t>(width * 4));
+            for (int yy = t + first; yy < t + last; yy++)
+            {
+                uint64_t u = mul(yy, duy) + uint64_t(u0), vv = mul(yy, dvy) + uint64_t(v0);
+                int at = dstBase + yy * dstStride + l * 4;
+                ReadBytes(at, row.data(), int(row.size()));
+                for (size_t k = 0; k < row.size(); k += 4)
+                {
+                    int fx = int(int64_t(u) >> 32), fy = int(int64_t(vv) >> 32);
+                    if (fx >= sx && fx < sxEnd && fy >= sy && fy < syEnd)
+                        LittleEndian::Pack(source[size_t(int64_t(fy - sy) * sw + (fx - sx))], &row[k]);
+                    else if (!keep)
+                        LittleEndian::Pack(uint32_t(colour), &row[k]);
+                    u += uint64_t(dux);
+                    vv += uint64_t(dvx);
+                }
+                WriteBytes(at, row.data(), int(row.size()));
+            }
+        });
+        return;
+    }
+    // Row by row as the x86 code draws it, reading the source as it goes (a frame turned in place
+    // reads what it has just drawn)
     std::vector<uint8_t> row(static_cast<size_t>((r - l) * 4));
     for (int yy = t; yy < b; yy++)
     {

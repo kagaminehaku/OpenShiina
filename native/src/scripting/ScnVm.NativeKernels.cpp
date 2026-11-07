@@ -8,6 +8,7 @@
 // blocks with "ret", an SSE2 one, Can Fes!'s): each is registered with its signature. (The C#
 // player's xorstream, found by its bytes, is ScnVm::NativeByPattern in ScnVm.Native.cpp.)
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 #include <cstring>
@@ -349,28 +350,31 @@ void ScnVm::EnlargeMovie(ScnContext& c, const ScnNativeArgs& a)
         RunX86(c, a);
         return;
     }
-    for (int y = 0; y < PairRows; y++)
-    {
-        const uint8_t* top = Bytes(src + 2 * y * Pitch, Pairs * 6);
-        const uint8_t* bottom = Bytes(src + (2 * y + 1) * Pitch, Pairs * 6);
-        uint8_t* r0 = Bytes(dst + 3 * y * Pitch, Pitch);
-        uint8_t* r1 = Bytes(dst + (3 * y + 1) * Pitch, Pitch);
-        uint8_t* r2 = Bytes(dst + (3 * y + 2) * Pitch, Pitch);
-        for (int i = 0, o = 0; i < Pairs * 6; i += 6, o += 9)
-            for (int k = 0; k < 3; k++)
-            {
-                int pa = top[i + k], pb = top[i + 3 + k], pc = bottom[i + k], pd = bottom[i + 3 + k];
-                r0[o + k] = uint8_t(pa);
-                r0[o + 3 + k] = uint8_t((pa + pb) >> 1);
-                r0[o + 6 + k] = uint8_t(pb);
-                r1[o + k] = uint8_t((pa + pc) >> 1);
-                r1[o + 3 + k] = uint8_t((pa + pb + pc + pd) >> 2);
-                r1[o + 6 + k] = uint8_t((pb + pd) >> 1);
-                r2[o + k] = uint8_t(pc);
-                r2[o + 3 + k] = uint8_t((pc + pd) >> 1);
-                r2[o + 6 + k] = uint8_t(pd);
-            }
-    }
+    // Rows of pairs on all cores
+    ParallelRows::For(PairRows, int64_t(1920) * 1080, [&](int from, int to) {
+        for (int y = from; y < to; y++)
+        {
+            const uint8_t* top = Bytes(src + 2 * y * Pitch, Pairs * 6);
+            const uint8_t* bottom = Bytes(src + (2 * y + 1) * Pitch, Pairs * 6);
+            uint8_t* r0 = Bytes(dst + 3 * y * Pitch, Pitch);
+            uint8_t* r1 = Bytes(dst + (3 * y + 1) * Pitch, Pitch);
+            uint8_t* r2 = Bytes(dst + (3 * y + 2) * Pitch, Pitch);
+            for (int i = 0, o = 0; i < Pairs * 6; i += 6, o += 9)
+                for (int k = 0; k < 3; k++)
+                {
+                    int pa = top[i + k], pb = top[i + 3 + k], pc = bottom[i + k], pd = bottom[i + 3 + k];
+                    r0[o + k] = uint8_t(pa);
+                    r0[o + 3 + k] = uint8_t((pa + pb) >> 1);
+                    r0[o + 6 + k] = uint8_t(pb);
+                    r1[o + k] = uint8_t((pa + pc) >> 1);
+                    r1[o + 3 + k] = uint8_t((pa + pb + pc + pd) >> 2);
+                    r1[o + 6 + k] = uint8_t((pb + pd) >> 1);
+                    r2[o + k] = uint8_t(pc);
+                    r2[o + 3 + k] = uint8_t((pc + pd) >> 1);
+                    r2[o + 6 + k] = uint8_t(pd);
+                }
+        }
+    });
     Write32(scratch, 0xFFFFFF);
     Write32(scratch + 4, 0);
     Write32(scratch + 8, 0);

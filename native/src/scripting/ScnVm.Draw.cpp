@@ -3,6 +3,7 @@
 // pixel. The C# player spreads the rows over the cores; here they go one after the other for now
 // (the same bytes: no row reads what another writes).
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 
@@ -100,33 +101,43 @@ void ScnVm::BlendRows(int dst, int source, int source2, int a, int b, int width,
     // read whole before it is written, as the x86 code reads ahead
     auto shifted = [&](int from) { return from != dst && std::abs(int64_t(from) - dst) < rowBytes; };
     bool copyA = shifted(source), copyB = !level && shifted(source2);
-    openshiina::Bytes bufferA(copyA ? size_t(rowBytes) : 0), bufferB(copyB ? size_t(rowBytes) : 0);
-    for (int y = 0; y < height; y++)
-    {
-        int at = dst + y * pitch;
-        const uint8_t* rowA;
-        if (copyA)
+    auto rows = [&](int from, int to) {
+        openshiina::Bytes bufferA(copyA ? size_t(rowBytes) : 0), bufferB(copyB ? size_t(rowBytes) : 0);
+        for (int y = from; y < to; y++)
         {
-            ReadBytes(source + y * pitch, bufferA.data(), rowBytes);
-            rowA = bufferA.data();
-        }
-        else
-            rowA = Bytes(source + y * pitch, rowBytes);
-        const uint8_t* rowB = nullptr;
-        if (!level)
-        {
-            if (copyB)
+            int at = dst + y * pitch;
+            const uint8_t* rowA;
+            if (copyA)
             {
-                ReadBytes(source2 + y * pitch, bufferB.data(), rowBytes);
-                rowB = bufferB.data();
+                ReadBytes(source + y * pitch, bufferA.data(), rowBytes);
+                rowA = bufferA.data();
             }
             else
-                rowB = Bytes(source2 + y * pitch, rowBytes);
+                rowA = Bytes(source + y * pitch, rowBytes);
+            const uint8_t* rowB = nullptr;
+            if (!level)
+            {
+                if (copyB)
+                {
+                    ReadBytes(source2 + y * pitch, bufferB.data(), rowBytes);
+                    rowB = bufferB.data();
+                }
+                else
+                    rowB = Bytes(source2 + y * pitch, rowBytes);
+            }
+            BlendRow(rowA, rowB, Bytes(at, rowBytes), rowBytes, at, tableA, tableB, m, k, level);
         }
-        BlendRow(rowA, rowB, Bytes(at, rowBytes), rowBytes, at, tableA, tableB, m, k, level);
-    }
+    };
+    // The rows go on several cores where no row reads what another writes: a source that is the
+    // destination itself or apart from it (a source a few rows off the destination is read after
+    // the rows above were written, so those are drawn in turn)
+    auto region = [&](int start) { return start + int64_t(height - 1) * pitch + rowBytes; };
+    auto apart = [&](int from) { return from == dst || region(from) <= dst || region(dst) <= from; };
+    if (pitch >= rowBytes && apart(source) && (level || apart(source2)))
+        ParallelRows::For(height, int64_t(width) * height, rows);
+    else
+        rows(0, height);
 }
-
 void ScnVm::ShowAtLevel(int source, int level)
 {
     // Surface 0 = surface source at a brightness 0-255 (0 black, 255 a copy)
@@ -153,28 +164,44 @@ void ScnVm::RuleBlend(int dst, int a, int b, int rule, int pixels, int t)
     bool invert = t < 0, hard = (t & 0x40000000) != 0;
     int value = t & 0x3FFFFFFF;
     int16_t threshold = int16_t(0x100 - value);
+    auto part = [&](int count, const uint8_t* ra, const uint8_t* sa, const uint8_t* sb, uint8_t* out) {
+        for (int i = 0; i < count; i++)
+        {
+            int r = invert ? ra[i] ^ 0xFF : ra[i];
+            if (hard)
+            {
+                bool take = r > threshold;
+                out[i] = take ? sa[i] : b != 0 ? sb[i] : uint8_t(0);
+                continue;
+            }
+            int sum = r + value;
+            int k = std::min(255, std::max(0, (sum & 0xFFFF) - 255));
+            if ((uint32_t(sum) >> 16) != 0)
+                k = 255;
+            out[i] = b == 0 ? uint8_t(std::min(255, sa[i] * k >> 8)) : uint8_t(std::min(255, std::min(0xFFFF, sa[i] * k + sb[i] * (256 - k)) >> 8));
+        }
+    };
+    // Byte i of the output takes byte i of each input only: in parts of 64 KB on all cores, where
+    // every input is the output itself or apart from it (else all is read first, as the engine
+    // reads it)
+    auto apart = [&](int from) { return from == dst || int64_t(from) + bytes <= dst || int64_t(dst) + bytes <= from; };
+    if (apart(rule) && apart(a) && (b == 0 || apart(b)) && IsContiguous(dst, bytes) && IsContiguous(rule, bytes) && IsContiguous(a, bytes)
+        && (b == 0 || IsContiguous(b, bytes)))
+    {
+        // in place (a byte is read before it is written)
+        constexpr int Chunk = 1 << 16;
+        ParallelRows::For((bytes + Chunk - 1) / Chunk, bytes / 4, [&](int first, int last) {
+            int from = first * Chunk, count = std::min(last * Chunk, bytes) - from;
+            part(count, Bytes(rule + from, count), Bytes(a + from, count), b != 0 ? Bytes(b + from, count) : nullptr, Bytes(dst + from, count));
+        });
+        return;
+    }
     auto ra = ReadBytes(rule, bytes), sa = ReadBytes(a, bytes);
     openshiina::Bytes sb = b != 0 ? ReadBytes(b, bytes) : openshiina::Bytes();
     openshiina::Bytes out(static_cast<size_t>(bytes));
-    for (int i = 0; i < bytes; i++)
-    {
-        int r = invert ? ra[size_t(i)] ^ 0xFF : ra[size_t(i)];
-        if (hard)
-        {
-            bool take = r > threshold;
-            out[size_t(i)] = take ? sa[size_t(i)] : b != 0 ? sb[size_t(i)] : uint8_t(0);
-            continue;
-        }
-        int sum = r + value;
-        int k = std::min(255, std::max(0, (sum & 0xFFFF) - 255));
-        if ((uint32_t(sum) >> 16) != 0)
-            k = 255;
-        out[size_t(i)] = b == 0 ? uint8_t(std::min(255, sa[size_t(i)] * k >> 8))
-                                : uint8_t(std::min(255, std::min(0xFFFF, sa[size_t(i)] * k + sb[size_t(i)] * (256 - k)) >> 8));
-    }
+    part(bytes, ra.data(), sa.data(), b != 0 ? sb.data() : nullptr, out.data());
     WriteBytes(dst, out);
 }
-
 void ScnVm::RegisterDraw()
 {
     // 0500 level: surface 0 (the one on screen) = surface 1 at a brightness 0-255 (FUN_00411F10);

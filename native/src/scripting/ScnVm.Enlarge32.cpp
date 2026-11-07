@@ -17,8 +17,10 @@
 // packuswb is a plain narrowing.
 #include "scripting/ScnVm.h"
 
+#include <algorithm>
 #include <cstring>
 
+#include "scripting/ParallelRows.h"
 #include "scripting/ScaleDivider.h"
 #include "scripting/X86Ops.h"
 
@@ -321,15 +323,34 @@ bool ScnVm::Enlarge32(int dst, int dstPitch, int dl, int dt, int dr, int db, int
     // out (unaligned in script memory)
     int sourcePixels = (sW >> 4) + 8;
     int outPixels = (hasLeft ? 1 : 0) + wholeColumns + (hasRight ? 1 : 0);
-    std::vector<uint32_t> upper(static_cast<size_t>(sourcePixels)), lower(static_cast<size_t>(sourcePixels)), output(static_cast<size_t>(outPixels));
-    for (const auto& row : rows)
+    auto runRows = [&](int from, int to) {
+        std::vector<uint32_t> upper(static_cast<size_t>(sourcePixels)), lower(static_cast<size_t>(sourcePixels)), output(static_cast<size_t>(outPixels));
+        for (size_t r = size_t(from); r < size_t(to); r++)
+        {
+            const auto& row = rows[r];
+            ReadBytes(row.Source, reinterpret_cast<uint8_t*>(upper.data()), sourcePixels * 4);
+            if (row.Kind == Enlarge32Row::Two || row.Kind == Enlarge32Row::WholeTwo)
+                ReadBytes(row.Source + srcPitch, reinterpret_cast<uint8_t*>(lower.data()), sourcePixels * 4);
+            Enlarge32Walk(table, row, upper.data(), lower.data(), output.data());
+            WriteBytes(row.Target, reinterpret_cast<const uint8_t*>(output.data()), outPixels * 4);
+        }
+    };
+    // The rows on all cores where no row reads what another writes
+    int64_t srcFrom = 0, srcTo = 0, dstFrom = 0, dstTo = 0;
+    if (!rows.empty())
     {
-        ReadBytes(row.Source, reinterpret_cast<uint8_t*>(upper.data()), sourcePixels * 4);
-        if (row.Kind == Enlarge32Row::Two || row.Kind == Enlarge32Row::WholeTwo)
-            ReadBytes(row.Source + srcPitch, reinterpret_cast<uint8_t*>(lower.data()), sourcePixels * 4);
-        Enlarge32Walk(table, row, upper.data(), lower.data(), output.data());
-        WriteBytes(row.Target, reinterpret_cast<const uint8_t*>(output.data()), outPixels * 4);
+        auto [minS, maxS] = std::minmax_element(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.Source < b.Source; });
+        auto [minT, maxT] = std::minmax_element(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.Target < b.Target; });
+        srcFrom = minS->Source;
+        srcTo = maxS->Source + int64_t(srcPitch) + sourcePixels * int64_t(4);
+        dstFrom = minT->Target;
+        dstTo = maxT->Target + outPixels * int64_t(4);
     }
+    bool apart = srcTo <= dstFrom || dstTo <= srcFrom;
+    if (apart && srcPitch > 0 && dstPitch > 0)
+        ParallelRows::For(int(rows.size()), int64_t(rows.size()) * outPixels, runRows);
+    else
+        runRows(0, int(rows.size()));
     return true;
 }
 

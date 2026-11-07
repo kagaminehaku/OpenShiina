@@ -13,6 +13,7 @@
 // The C# player draws a large frame's rows on all cores and some pixels four at a time with
 // vectors; here they go one at a time for now (the same bytes).
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
 
@@ -278,13 +279,27 @@ void ScnVm::DrawSprite(int entry, int flags, const void* targetPointer)
             break;
         }
     const SpriteBlend* mode = blend ? &*blend : nullptr;
-    for (; rows > 0; rows--, row += 4, dst += target.Pitch)
-    {
+    auto drawRow = [&](int pointer, int at) {
         if (mode && mode->Mode == SpriteBlend::Silhouette)
-            DrawRowSilhouette(Read32(row), dst, skip, visible, *mode);
+            DrawRowSilhouette(pointer, at, skip, visible, *mode);
         else
-            DrawRowPlain(Read32(row), dst, skip, visible, mode);
+            DrawRowPlain(pointer, at, skip, visible, mode);
+    };
+    // Each row of a frame goes into its own destination row, so a large frame's rows are shared
+    // out between the cores (the sprites themselves stay in order)
+    if (visible > 0 && target.Pitch >= visible * 3 && ParallelRows::Parts(rows, int64_t(rows) * visible) > 1)
+    {
+        std::vector<int> pointers(static_cast<size_t>(rows));
+        for (int i = 0; i < rows; i++)
+            pointers[size_t(i)] = Read32(row + i * 4);
+        ParallelRows::For(rows, int64_t(rows) * visible, [&](int first, int last) {
+            for (int i = first; i < last; i++)
+                drawRow(pointers[size_t(i)], dst + i * target.Pitch);
+        });
+        return;
     }
+    for (; rows > 0; rows--, row += 4, dst += target.Pitch)
+        drawRow(Read32(row), dst);
 }
 
 ScnVm::RunHeader ScnVm::ReadRun(int p)
@@ -324,10 +339,12 @@ const uint8_t* ScnVm::ReadRow(int p, int dst, int bytes, int pixels)
     }
     if ((int64_t(p) + n <= dst || int64_t(dst) + bytes <= p) && IsContiguous(p, n))
         return Bytes(p, n);
-    if (m_rowSource.size() < size_t(n))
-        m_rowSource.resize(std::max<size_t>(size_t(n), 0x4000));
-    ReadBytes(p, m_rowSource.data(), n);
-    return m_rowSource.data();
+    // the thread's own copy: a frame's rows may be drawn on several cores
+    thread_local openshiina::Bytes rowSource;
+    if (rowSource.size() < size_t(n))
+        rowSource.resize(std::max<size_t>(size_t(n), 0x4000));
+    ReadBytes(p, rowSource.data(), n);
+    return rowSource.data();
 }
 
 void ScnVm::DrawRowPlain(int p, int dst, int skip, int visible, const SpriteBlend* blend)
