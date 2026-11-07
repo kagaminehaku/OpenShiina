@@ -7,7 +7,9 @@
 // It speaks hbmenu's netloader protocol on the same port (and answers nxlink's search without -a):
 // the .nro is saved under sdmc:/switch (-p gives the path there) and started through hbloader with
 // its arguments, then "_DEVHOST_=<this .nro>" and the PC's address for nxlink -s, as hbmenu passes
-// it. A connection that sends something else is closed and the next one waited for. + goes back to
+// it. A path that starts with '@' is a file for sdmc:/OpenShiina (a game's files sent over the
+// network: -p @Games/<folder>/<file>): it is saved there and the next upload waited for.
+// A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
 
 // gethostid and timeval: BSD and POSIX, which a strict C++20 build leaves out unless asked for
@@ -40,6 +42,7 @@ namespace {
 constexpr uint16_t kServerPort = 28280; // where nxlink sends (NXLINK_SERVER_PORT)
 constexpr uint16_t kClientPort = 28771; // where nxlink waits for the answer to its search
 constexpr const char* kRoot = "sdmc:/switch";
+constexpr const char* kDataRoot = "sdmc:/OpenShiina";
 constexpr const char* kSelf = "sdmc:/switch/openshiina/devhost.nro";
 constexpr size_t kChunk = 16 * 1024; // the largest compressed chunk nxlink sends
 
@@ -93,12 +96,13 @@ bool EndsWithNro(const std::string& path)
     return extension == ".nro";
 }
 
-/// The file under sdmc:/switch for the path nxlink sends; empty when it would be outside that folder
-/// or is not an .nro.
+/// The file under sdmc:/switch for the path nxlink sends, or under sdmc:/OpenShiina for one that starts
+/// with '@' (a data file); empty when it would be outside that folder or a program is not an .nro.
 std::string TargetPath(const std::string& sent)
 {
-    std::string path = kRoot;
-    size_t start = 0;
+    bool data = !sent.empty() && sent[0] == '@';
+    std::string path = data ? kDataRoot : kRoot;
+    size_t start = data ? 1 : 0;
     while (start <= sent.size())
     {
         size_t end = sent.find_first_of("/\\", start);
@@ -111,12 +115,17 @@ std::string TargetPath(const std::string& sent)
             path += "/" + part;
         start = end + 1;
     }
+    // a data file names a file under sdmc:/OpenShiina/<folder>, not the folder itself
+    if (data)
+        return path.size() > std::string(kDataRoot).size() + 1 ? path : std::string();
     return EndsWithNro(path) ? path : std::string();
 }
 
 struct Upload
 {
     std::string path;
+    /// A data file (a path with '@'): saved, not started.
+    bool data = false;
     std::vector<std::string> arguments;
 };
 
@@ -193,10 +202,11 @@ bool Receive(int sock, Upload& upload, std::string& error)
         return false;
     }
     upload.path = TargetPath(name);
+    upload.data = !name.empty() && name[0] == '@';
     std::string part = upload.path + ".part";
     std::FILE* file = nullptr;
     if (upload.path.empty())
-        error = "not an .nro under sdmc:/switch: " + name;
+        error = "not an .nro under sdmc:/switch, nor a file under sdmc:/OpenShiina: " + name;
     else if (!Files::CreateDirectories(Files::DirectoryName(upload.path)) || !(file = Files::Open(part, "wb")))
         error = "cannot write " + part + ": " + std::strerror(errno);
     if (!SendInt(sock, file ? 0 : -1) || !file)
@@ -354,6 +364,11 @@ int main(int argc, char** argv)
         if (!received)
         {
             Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
+            continue;
+        }
+        if (upload.data)
+        {
+            Log("Saved %s\n", upload.path.c_str());
             continue;
         }
         std::string line = Quoted(upload.path);

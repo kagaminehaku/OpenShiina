@@ -46,6 +46,7 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterSprites();
     RegisterInput();
     RegisterMusic();
+    RegisterMovie();
     RegisterMisc();
     RegisterLayers();
     RegisterNativeKernels();

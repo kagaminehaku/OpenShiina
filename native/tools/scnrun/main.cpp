@@ -320,7 +320,7 @@ int Run(int argc, std::string* argv)
         return 1;
     }
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-    std::printf("%d frames in %.2f s\n", frame, seconds);
+    std::printf("%d frames in %.2f s, script memory %lld MB\n", frame, seconds, (long long)(vm.ScriptMemoryBytes() >> 20));
     // As ScnBoot ends its output: each opcode run, how often
     std::string counts;
     int kinds = 0;
@@ -333,6 +333,52 @@ int Run(int argc, std::string* argv)
     std::printf("Opcodes run (%d kinds):%s\n", kinds, counts.c_str());
     return 0;
 }
+
+#ifdef _WIN32
+#include <dbghelp.h>
+#pragma comment(lib, "dbghelp.lib")
+
+// SCNRUN_BIG=<MB>: every allocation of that much or more is printed with where it was made (the
+// Switch's applet mode has little memory: what takes it)
+static size_t BigAllocation()
+{
+    static const size_t big = [] {
+        const char* v = std::getenv("SCNRUN_BIG");
+        return v ? size_t(std::atoi(v)) << 20 : size_t(0);
+    }();
+    return big;
+}
+
+void* operator new(size_t size)
+{
+    static thread_local bool inside = false;
+    if (size_t big = BigAllocation(); big != 0 && size >= big && !inside)
+    {
+        inside = true;
+        void* frames[24];
+        USHORT n = CaptureStackBackTrace(1, 24, frames, nullptr);
+        HANDLE process = GetCurrentProcess();
+        static bool symbols = SymInitialize(process, nullptr, TRUE);
+        std::printf("  [big] %zu bytes\n", size);
+        alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 256];
+        auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer);
+        for (USHORT k = 0; k < n && symbols; k++)
+        {
+            symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+            symbol->MaxNameLen = 255;
+            if (SymFromAddr(process, DWORD64(frames[k]), nullptr, symbol))
+                std::printf("    %s\n", symbol->Name);
+        }
+        inside = false;
+    }
+    if (void* p = std::malloc(size ? size : 1))
+        return p;
+    throw std::bad_alloc();
+}
+
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, size_t) noexcept { std::free(p); }
+#endif
 
 // The arguments as UTF-8: on Windows from the UTF-16 command line (main's are in the ANSI code
 // page, which has no Japanese on most PCs)

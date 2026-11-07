@@ -25,6 +25,7 @@ add_library(openshiina_core STATIC
     src/archives/WarcOpener.cpp
     src/archives/WarcRangeDecoder.cpp
     src/game/GameData.cpp
+    src/game/GameSetup.cpp
     src/io/ArcView.cpp
     src/io/Checksum.cpp
     src/platform/DibShapes.cpp
@@ -50,6 +51,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Layers.cpp
     src/scripting/ScnVm.Menus.cpp
     src/scripting/ScnVm.Misc.cpp
+    src/scripting/ScnVm.Movie.cpp
     src/scripting/ScnVm.Music.cpp
     src/scripting/ScnVm.Native.cpp
     src/scripting/ScnVm.NativeKernels.cpp
@@ -114,6 +116,22 @@ if(NINTENDO_SWITCH)
     target_compile_options(spacetest PRIVATE -Wall -Wextra)
     nx_generate_nacp(spacetest.nacp NAME "OpenShiina spacetest" AUTHOR "kagaminehaku" VERSION "0.1.0")
     nx_create_nro(spacetest NACP spacetest.nacp)
+
+    # OpenShiina.nro: the player (SDL2 from devkitPro's portlibs); the romfs holds the C# player's
+    # Data: Formats.Json and the opcode tables
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
+    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp tools/devhost/DevHostReturn.cpp)
+    target_include_directories(player PRIVATE tools/devhost)
+    target_link_libraries(player PRIVATE openshiina_core PkgConfig::SDL2 PkgConfig::FREETYPE)
+    target_compile_options(player PRIVATE -Wall -Wextra)
+    set(PLAYER_ROMFS "${CMAKE_CURRENT_BINARY_DIR}/player-romfs")
+    file(MAKE_DIRECTORY "${PLAYER_ROMFS}/Data")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../src/OpenShiina.Core/Data/Formats.Json" "${PLAYER_ROMFS}/Data/Formats.Json" COPYONLY)
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../src/OpenShiina.Core/Data/ScnOps" DESTINATION "${PLAYER_ROMFS}/Data")
+    nx_generate_nacp(player.nacp NAME "OpenShiina" AUTHOR "kagaminehaku" VERSION "0.1.0")
+    nx_create_nro(player NACP player.nacp ROMFS "${PLAYER_ROMFS}" OUTPUT OpenShiina.nro)
 else()
     add_executable(arcdump tools/arcdump/ArcDump.cpp tools/arcdump/main.cpp)
     target_link_libraries(arcdump PRIVATE openshiina_core)

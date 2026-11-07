@@ -139,6 +139,8 @@ public:
 
     /// The bytes [address, address + length) in place; they must not run past the top of the 4 GB.
     uint8_t* Bytes(int address, int length);
+    /// The memory the scripts' parts of the 4 GB have been given, in bytes.
+    int64_t ScriptMemoryBytes() const { return m_memory->CommittedBytes(); }
     /// [address, address + length) does not run past the top of the 4 GB.
     bool IsContiguous(int address, int length) const { return ScnAddressSpace::Contiguous(uint32_t(address), length) >= length; }
     /// The bytes [address, address + length) to read: in place, or copied into spare (made larger
@@ -594,6 +596,29 @@ private:
     openshiina::Bytes m_window;
     std::vector<std::array<int, 4>> m_invalid;
     ScreenArea m_changed{0, 0, 0x7FFFFFFF, 0x7FFFFFFF};
+
+    // ---- Movie ----
+    struct Movie
+    {
+        /// +0: 0 none, 1 stopped, 2 paused, 3 running.
+        int State = 0;
+        std::string Name;
+        /// +0x10: the movie starts again at its end.
+        int Loop = 0;
+        /// +0x18: how many times it started again (-1 after a stop).
+        int LoopCount = 0;
+        int Surface = 0;
+        int Width = 0, Height = 0;
+        /// +0x34: volume 0-100.
+        int Volume = 100;
+    };
+    static constexpr int MovieSlots = 16;
+    void RegisterMovie();
+    Movie* MovieSlot(int n) { return n >= 0 && n < MovieSlots ? &m_movies[size_t(n)] : nullptr; }
+    bool OpenMovie(Movie& movie);
+    bool RunMovie(Movie& movie);
+    void SurfaceToPicture(int picture, int frame, int x, int y, int w, int h, int surface, int sx, int sy);
+    std::array<Movie, MovieSlots> m_movies{};
 
     // ---- Surfaces ----
     static constexpr int SurfaceRegion = 0x08000000, SurfaceSize = 0x2C;

@@ -16,6 +16,9 @@ as done. It is built for the PC too, only for that comparison.
 | A game's archives as the scripts name their files | `Game/GameData.cs` | Done (used by scnrun) |
 | The embedded x86 routines' signatures (what their C++ versions are found by) | `Scripting/X86Routine.cs` | Done: `tools/routinecheck`, 361 routines of 21 games the same as the C# player's (signature, instructions, calls, loops) |
 | The scripts' 4 GB of memory, given in 1 MB parts on first use | `Scripting/ScnAddressSpace.cs` | Done on PC (`tools/spacetest`: 100,000 random operations against a model, discards, threads); on the Switch the parts are heap memory mapped with `svcMapProcessCodeMemory`: the same checks pass on a Switch Lite |
+| A game's RIO.INI: its engine version, first script, screen size and save folder | `Game/GameSetup.cs` | Done (used by the Switch player) |
+| Movies (05B5-05C3, 0514, 0516, 055E) | `Scripting/ScnVm.Movie.cs` | The opcodes, without the decoders: every movie plays as one the C# player cannot decode (as if it had played to its end) |
+| The Switch player: SDL2 window and input, the Switch's shared fonts through FreeType, saves in `sdmc:/OpenShiina/Saves/<game>` | `Platform`, `Rendering` | In progress (`player/main_switch.cpp`): Azu Plus plays on a Switch Lite at 50-54 frames a second, its first route to its end |
 
 `tools/arcdump` decodes every file of a game's archives and prints the SHA-256 of each; on the
 Switch it is `arcdump.nro`.
@@ -56,6 +59,21 @@ nxlink -s -a <Switch IP> -p openshiina/arcdump.nro native/build-switch/arcdump.n
 
 Later, devhost is opened from hbmenu (`switch/openshiina/devhost.nro`); + goes back to hbmenu. It
 keeps the Switch from dimming and sleeping while it waits.
+
+A path that starts with `@` is a data upload: `-p @Games/<folder>/<file>` saves the file in
+`sdmc:/OpenShiina/Games/<folder>` and devhost waits for the next one. The player takes the game
+folder's name as its argument:
+
+```
+nxlink -s -a <Switch IP> -p openshiina/OpenShiina.nro native/build-switch/OpenShiina.nro <folder>
+```
+
+hbmenu opened from the album runs as an applet, with about 394 MB of memory: too little for the
+player (SDL and the GPU driver alone take most of it). Opened from an installed title that starts
+hbmenu (nx-hbloader built as an application), it has the console's memory, about 3 GB. Such a
+title's npdm needs `application_type` 1 (an application: as an applet hbmenu cannot open the
+applet service, 2345-0031) and the debug flag `force_debug_prod` (on 19.0.0 and later the kernel
+refuses `force_debug` on a retail console).
 
 ## Check against the C# player
 
