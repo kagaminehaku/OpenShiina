@@ -13,7 +13,7 @@ as done. It is built for the PC too, only for that comparison.
 | The SCN interpreter: memory, heap, stack, modules, the main loop, decoding, operands; the core opcodes, the calculator, system, events, window, paint, surfaces, pictures, files | `Scripting/ScnVm*.cs`, `ScnOpcodes.cs` | In progress, also text, input, printf, sound, draw and the embedded routines' C++ versions: `tools/scnrun` runs Azu Plus's first frame as ScnBoot does (the same 705 instructions, each as often); sprites and the rest next (`ScnVm.Pending.cpp` holds what they give the core meanwhile) |
 | A game's archives as the scripts name their files | `Game/GameData.cs` | Done (used by scnrun) |
 | The embedded x86 routines' signatures (what their C++ versions are found by) | `Scripting/X86Routine.cs` | Done: `tools/routinecheck`, 361 routines of 21 games the same as the C# player's (signature, instructions, calls, loops) |
-| The scripts' 4 GB of memory, given in 1 MB parts on first use | `Scripting/ScnAddressSpace.cs` | Done on PC (`tools/spacetest`: 100,000 random operations against a model, discards, threads); on the Switch the parts are heap memory mapped with `svcMapProcessCodeMemory`, which works there, the whole not run on one yet |
+| The scripts' 4 GB of memory, given in 1 MB parts on first use | `Scripting/ScnAddressSpace.cs` | Done on PC (`tools/spacetest`: 100,000 random operations against a model, discards, threads); on the Switch the parts are heap memory mapped with `svcMapProcessCodeMemory`: the same checks pass on a Switch Lite |
 
 `tools/arcdump` decodes every file of a game's archives and prints the SHA-256 of each; on the
 Switch it is `arcdump.nro`.
