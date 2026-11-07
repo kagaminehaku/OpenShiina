@@ -64,6 +64,15 @@ public:
     /// Bytes of zeros after the stream, so that peeking past its end reads zeros.
     static constexpr int Padding = 8;
 
+    /// The inverse DCT of the C# player (doubles, its results to the bit), or a fast one in fixed
+    /// point (within IEEE 1180, a pixel off by one here and there): the Switch takes the fast one,
+    /// its cores being too slow for a 1280 x 720 movie at 30 frames a second with the other.
+#ifdef __SWITCH__
+    static inline bool ExactIdct = false;
+#else
+    static inline bool ExactIdct = true;
+#endif
+
     /// A video stream alone (copied, with the padding after it).
     explicit Mpeg1Video(const Bytes& stream);
     /// The video stream of a system stream (taken from it).

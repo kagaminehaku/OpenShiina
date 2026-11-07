@@ -2,6 +2,7 @@
 #include "formats/MpegVideo.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
@@ -156,22 +157,24 @@ const std::vector<int> kDctCoefficients = BuildVlc(16, {
     {"0000 0000 0001 1100", 0x1E01}, {"0000 0000 0001 1011", 0x1F01},
 });
 
-// kIdct[x * 8 + u] = C(u) / 2 * cos((2x + 1) u pi / 16)
+// kIdct.T[x * 8 + u] = C(u) / 2 * cos((2x + 1) u pi / 16), and the same transposed (Across[u * 8 + x])
 struct IdctTable
 {
-    double T[64];
+    double T[64], Across[64];
     IdctTable()
     {
         for (int x = 0; x < 8; x++)
             for (int u = 0; u < 8; u++)
-                T[x * 8 + u] = (u == 0 ? std::sqrt(0.5) : 1) / 2 * std::cos((2 * x + 1) * u * 3.14159265358979323846 / 16);
+                T[x * 8 + u] = Across[u * 8 + x] = (u == 0 ? std::sqrt(0.5) : 1) / 2 * std::cos((2 * x + 1) * u * 3.14159265358979323846 / 16);
     }
 };
 const IdctTable kIdct;
 
 /// The inverse DCT of an 8 x 8 block in place, rounded to the nearest integer. Each output is the
 /// sum of the same products in the same order as the C# player's (sum over u, then over v), with
-/// no fused multiply-add, so the rounding is the same.
+/// no fused multiply-add, so the rounding is the same. A zero coefficient (or a row of them) is
+/// passed over: adding its product, a zero, changes no sum. The eight outputs of a row are summed
+/// side by side, which the compiler puts on vectors.
 void Idct(int* block)
 {
     bool dcOnly = true;
@@ -183,33 +186,145 @@ void Idct(int* block)
         std::fill(block, block + 64, v);
         return;
     }
-    const double* c = kIdct.T;
     // Rows: tmp[v][x] = sum_u F[v][u] c(x, u)
-    double tmp[64];
+    alignas(16) double tmp[64];
+    bool rowUsed[8];
     for (int v = 0; v < 8; v++)
     {
         const int* row = block + v * 8;
-        bool zero = true;
-        for (int u = 0; u < 8 && zero; u++)
-            zero = row[u] == 0;
-        for (int x = 0; x < 8; x++)
+        alignas(16) double s[8] = {};
+        bool used = false;
+        for (int u = 0; u < 8; u++)
         {
-            double s = 0;
-            if (!zero)
-                for (int u = 0; u < 8; u++)
-                    s += double(row[u]) * c[x * 8 + u];
-            tmp[v * 8 + x] = s;
+            if (row[u] == 0)
+                continue;
+            used = true;
+            double f = double(row[u]);
+            const double* c = kIdct.Across + u * 8;
+            for (int x = 0; x < 8; x++)
+                s[x] += f * c[x];
         }
+        rowUsed[v] = used;
+        std::memcpy(tmp + v * 8, s, sizeof s);
     }
     // Columns: f[y][x] = sum_v tmp[v][x] c(y, v)
     for (int y = 0; y < 8; y++)
-        for (int x = 0; x < 8; x++)
+    {
+        alignas(16) double s[8] = {};
+        for (int v = 0; v < 8; v++)
         {
-            double s = 0;
-            for (int v = 0; v < 8; v++)
-                s += tmp[v * 8 + x] * c[y * 8 + v];
-            block[y * 8 + x] = int(std::floor(s + 0.5));
+            if (!rowUsed[v])
+                continue;
+            double c = kIdct.T[y * 8 + v];
+            const double* t = tmp + v * 8;
+            for (int x = 0; x < 8; x++)
+                s[x] += t[x] * c;
         }
+        for (int x = 0; x < 8; x++)
+            block[y * 8 + x] = int(std::floor(s[x] + 0.5));
+    }
+}
+// The fast inverse DCT: Chen and Wang's factorisation in fixed point (the weights are
+// 2048 * sqrt(2) * cos(k pi / 16)), rows with 11 fraction bits and columns with 8 more, each output
+// rounded and clamped to -256..255. It meets IEEE 1180's accuracy (as the reference decoders' does)
+// but its results are not the C# player's to the bit: a pixel may differ by one, which the I
+// pictures of a movie (twice a second) wipe out again. tools/moviecheck --fast measures it.
+constexpr int W1 = 2841, W2 = 2676, W3 = 2408, W5 = 1609, W6 = 1108, W7 = 565;
+
+int ClampResidual(int v) { return v < -256 ? -256 : v > 255 ? 255 : v; }
+
+void FastIdctRow(int* b)
+{
+    int x1 = b[4] << 11, x2 = b[6], x3 = b[2], x4 = b[1], x5 = b[7], x6 = b[5], x7 = b[3];
+    if ((x1 | x2 | x3 | x4 | x5 | x6 | x7) == 0)
+    {
+        int dc = b[0] * 8;
+        for (int i = 0; i < 8; i++)
+            b[i] = dc;
+        return;
+    }
+    int x0 = (b[0] << 11) + 128;
+    // the odd part: x4 x5 from coefficients 1 and 7, x6 x7 from 5 and 3
+    int x8 = W7 * (x4 + x5);
+    x4 = x8 + (W1 - W7) * x4;
+    x5 = x8 - (W1 + W7) * x5;
+    x8 = W3 * (x6 + x7);
+    x6 = x8 - (W3 - W5) * x6;
+    x7 = x8 - (W3 + W5) * x7;
+    // the even part
+    x8 = x0 + x1;
+    x0 -= x1;
+    x1 = W6 * (x3 + x2);
+    x2 = x1 - (W2 + W6) * x2;
+    x3 = x1 + (W2 - W6) * x3;
+    x1 = x4 + x6;
+    x4 -= x6;
+    x6 = x5 + x7;
+    x5 -= x7;
+    x7 = x8 + x3;
+    x8 -= x3;
+    x3 = x0 + x2;
+    x0 -= x2;
+    x2 = (181 * (x4 + x5) + 128) >> 8;
+    x4 = (181 * (x4 - x5) + 128) >> 8;
+    b[0] = (x7 + x1) >> 8;
+    b[1] = (x3 + x2) >> 8;
+    b[2] = (x0 + x4) >> 8;
+    b[3] = (x8 + x6) >> 8;
+    b[4] = (x8 - x6) >> 8;
+    b[5] = (x0 - x4) >> 8;
+    b[6] = (x3 - x2) >> 8;
+    b[7] = (x7 - x1) >> 8;
+}
+
+void FastIdctColumn(int* b)
+{
+    int x1 = b[8 * 4] << 8, x2 = b[8 * 6], x3 = b[8 * 2], x4 = b[8 * 1], x5 = b[8 * 7], x6 = b[8 * 5], x7 = b[8 * 3];
+    if ((x1 | x2 | x3 | x4 | x5 | x6 | x7) == 0)
+    {
+        int v = ClampResidual((b[0] + 32) >> 6);
+        for (int i = 0; i < 8; i++)
+            b[8 * i] = v;
+        return;
+    }
+    int x0 = (b[0] << 8) + 8192;
+    int x8 = W7 * (x4 + x5) + 4;
+    x4 = (x8 + (W1 - W7) * x4) >> 3;
+    x5 = (x8 - (W1 + W7) * x5) >> 3;
+    x8 = W3 * (x6 + x7) + 4;
+    x6 = (x8 - (W3 - W5) * x6) >> 3;
+    x7 = (x8 - (W3 + W5) * x7) >> 3;
+    x8 = x0 + x1;
+    x0 -= x1;
+    x1 = W6 * (x3 + x2) + 4;
+    x2 = (x1 - (W2 + W6) * x2) >> 3;
+    x3 = (x1 + (W2 - W6) * x3) >> 3;
+    x1 = x4 + x6;
+    x4 -= x6;
+    x6 = x5 + x7;
+    x5 -= x7;
+    x7 = x8 + x3;
+    x8 -= x3;
+    x3 = x0 + x2;
+    x0 -= x2;
+    x2 = (181 * (x4 + x5) + 128) >> 8;
+    x4 = (181 * (x4 - x5) + 128) >> 8;
+    b[8 * 0] = ClampResidual((x7 + x1) >> 14);
+    b[8 * 1] = ClampResidual((x3 + x2) >> 14);
+    b[8 * 2] = ClampResidual((x0 + x4) >> 14);
+    b[8 * 3] = ClampResidual((x8 + x6) >> 14);
+    b[8 * 4] = ClampResidual((x8 - x6) >> 14);
+    b[8 * 5] = ClampResidual((x0 - x4) >> 14);
+    b[8 * 6] = ClampResidual((x3 - x2) >> 14);
+    b[8 * 7] = ClampResidual((x7 - x1) >> 14);
+}
+
+void FastIdct(int* block)
+{
+    for (int i = 0; i < 8; i++)
+        FastIdctRow(block + 8 * i);
+    for (int i = 0; i < 8; i++)
+        FastIdctColumn(block + i);
 }
 
 uint8_t Clamp255(int v) { return uint8_t(v < 0 ? 0 : v > 255 ? 255 : v); }
@@ -329,23 +444,38 @@ void MpegFrame::ToBgr24(uint8_t* dst, int pitch, int width, int height) const
     height = std::min(height, Height);
     if (width <= 0 || height <= 0)
         return;
+    // The formula a pixel: l = (Y - 16) * 76309; B = (l + 132201 cb + 32768) >> 16, G = (l - 25675 cb
+    // - 53279 cr + 32768) >> 16, R = (l + 104597 cr + 32768) >> 16, clamped. l from a table, the
+    // chroma's parts once for the two pixels of a row that share them: the same sums
+    static const auto luma = [] {
+        std::array<int, 256> t{};
+        for (int v = 0; v < 256; v++)
+            t[size_t(v)] = (v - 16) * 76309;
+        return t;
+    }();
     auto rows = [&](int from, int to) {
         for (int y = from; y < to; y++)
         {
             uint8_t* row = dst + int64_t(y) * pitch;
-            int yi = y * Stride, ci = (y >> 1) * ChromaStride;
-            for (int x = 0; x < width; x++)
+            const uint8_t* ys = Y.data() + y * Stride;
+            const uint8_t* cbs = Cb.data() + (y >> 1) * ChromaStride;
+            const uint8_t* crs = Cr.data() + (y >> 1) * ChromaStride;
+            for (int x = 0; x < width; x += 2)
             {
-                int c = ci + (x >> 1);
-                int l = (Y[size_t(yi + x)] - 16) * 76309;
-                int cb = Cb[size_t(c)] - 128, cr = Cr[size_t(c)] - 128;
-                row[x * 3] = Clamp255((l + 132201 * cb + 32768) >> 16);
-                row[x * 3 + 1] = Clamp255((l - 25675 * cb - 53279 * cr + 32768) >> 16);
-                row[x * 3 + 2] = Clamp255((l + 104597 * cr + 32768) >> 16);
+                int cb = cbs[x >> 1] - 128, cr = crs[x >> 1] - 128;
+                int b = 132201 * cb + 32768, g = -25675 * cb - 53279 * cr + 32768, r = 104597 * cr + 32768;
+                int pair = std::min(2, width - x);
+                for (int k = 0; k < pair; k++)
+                {
+                    int l = luma[ys[x + k]];
+                    uint8_t* p = row + (x + k) * 3;
+                    p[0] = Clamp255((l + b) >> 16);
+                    p[1] = Clamp255((l + g) >> 16);
+                    p[2] = Clamp255((l + r) >> 16);
+                }
             }
         }
-    };
-    // The rows on several cores (half of a 1280 x 720 movie's time on one)
+    };    // The rows on several cores (half of a 1280 x 720 movie's time on one)
     if (pitch >= width * 3)
         ParallelRows::For(height, int64_t(width) * height, rows);
     else
@@ -725,7 +855,10 @@ private:
             stride = cur.ChromaStride;
             offset = m_mbRow * 8 * stride + m_mbCol * 8;
         }
-        Idct(block);
+        if (Mpeg1Video::ExactIdct)
+            Idct(block);
+        else
+            FastIdct(block);
         for (int y = 0; y < 8; y++, offset += stride)
         {
             uint8_t* row = plane + offset;

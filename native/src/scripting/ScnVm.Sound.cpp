@@ -4,8 +4,10 @@
 // 0xFFFF in place of a table index is a buffer itself. The platform plays the buffers (IScnSound);
 // without one the buffers only keep their state, and they never report themselves playing.
 //
-// Not here yet: the decoders of PAD, Ogg Vorbis and OGV (C# Formats/AudioDecoder.cs). With a
-// platform's sound a RIFF WAVE is played and the others are left silent.
+// The platform's sound (src/audio) decodes PAD, Ogg Vorbis and OGV as it plays them, so those go to
+// it as they are (the C# player decodes PAD and OGV into a WAVE first and keeps Ogg Vorbis as it is,
+// decoded as it plays); only the headers of an Ogg Vorbis stream are read here, so that one that
+// does not decode is still left out.
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
@@ -20,6 +22,20 @@ std::optional<openshiina::Bytes> ScnVm::SoundToWave(const openshiina::Bytes& dat
     uint32_t magic = LittleEndian::ToUInt32(data.data());
     if (magic == 0x46464952 && LittleEndian::ToUInt32(&data[8]) == 0x45564157)     // RIFF....WAVE
         return data;
+    if ((magic & 0xFFFFFF) == 0x444150 && data.size() >= 0x2c)                      // PAD
+        return data;
+    if ((magic & 0xFFFFFF) == 0x56474F && data.size() >= 24)                        // OGV
+        return data;
+    if (magic == 0x5367674F)                                                        // OggS
+    {
+        // The Vorbis identification header of the first page: its channels and sample rate
+        static const uint8_t vorbis[] = {1, 'v', 'o', 'r', 'b', 'i', 's'};
+        auto end = data.begin() + std::min<ptrdiff_t>(ptrdiff_t(data.size()), 4096);
+        auto found = std::search(data.begin(), end, std::begin(vorbis), std::end(vorbis));
+        size_t at = size_t(found - data.begin());
+        if (found != end && at + 16 <= data.size() && data[at + 11] > 0 && LittleEndian::ToUInt32(&data[at + 12]) > 0)
+            return data;
+    }
     return std::nullopt;
 }
 

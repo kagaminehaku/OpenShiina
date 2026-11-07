@@ -1,0 +1,49 @@
+﻿diff --git a/source/main.c b/source/main.c
+index 78e4502..ecd9758 100644
+--- a/source/main.c
++++ b/source/main.c
+@@ -4,6 +4,9 @@
+ #include <unistd.h>
+ 
+ #define DEFAULT_NRO "sdmc:/hbmenu.nro"
++// OpenShiina Loader: the first program is the player (when it is there), hbmenu after it
++#define FIRST_NRO "sdmc:/switch/openshiina/OpenShiina.nro"
++static bool g_first = true;
+ 
+ const char g_noticeText[] =
+     "nx-hbloader " VERSION "\0"
+@@ -351,6 +354,23 @@ void loadNro(void)
+         g_nroAddr = g_nroSize = 0;
+     }
+ 
++    // The SD card first: the player is looked for on it
++    rc = fsdevMountSdmc();
++    if (R_FAILED(rc))
++        diagAbortWithResult(MAKERESULT(Module_HomebrewLoader, 404));
++
++    if (g_nextNroPath[0] == '\0' && g_first)
++    {
++        int first = open(FIRST_NRO, O_RDONLY);
++        if (first >= 0)
++        {
++            close(first);
++            memcpy(g_nextNroPath, FIRST_NRO, sizeof(FIRST_NRO));
++            memcpy(g_nextArgv,    FIRST_NRO, sizeof(FIRST_NRO));
++        }
++    }
++    g_first = false;
++
+     if (g_nextNroPath[0] == '\0')
+     {
+         memcpy(g_nextNroPath, DEFAULT_NRO, sizeof(DEFAULT_NRO));
+@@ -367,10 +387,6 @@ void loadNro(void)
+     header = (NroHeader*) (nrobuf + sizeof(NroStart));
+     uint8_t*   rest   = (uint8_t*)   (nrobuf + sizeof(NroStart) + sizeof(NroHeader));
+ 
+-    rc = fsdevMountSdmc();
+-    if (R_FAILED(rc))
+-        diagAbortWithResult(MAKERESULT(Module_HomebrewLoader, 404));
+-
+     int fd = open(g_nextNroPath, O_RDONLY);
+     if (fd < 0)
+         diagAbortWithResult(MAKERESULT(Module_HomebrewLoader, 3));

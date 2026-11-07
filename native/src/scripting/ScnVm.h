@@ -36,7 +36,7 @@
 #include "scripting/NetDictionary.h"
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnOpcodes.h"
-#include "formats/MpegVideo.h"
+#include "formats/MovieAhead.h"
 #include "scripting/ScnTypes.h"
 #include "scripting/X86Routine.h"
 
@@ -626,7 +626,7 @@ private:
         int Width = 0, Height = 0;
         /// +0x34: volume 0-100.
         int Volume = 100;
-        std::unique_ptr<formats::IMovieVideo> Video;
+        std::unique_ptr<formats::MovieAhead> Video;
         /// Frames decoded since the start, and the time frame 0 was due.
         int Decoded = 0;
         uint32_t Start = 0, PausedAt = 0;
@@ -641,7 +641,7 @@ private:
     bool OpenMovieFile(Movie& movie, const std::string& name);
     bool RunMovie(Movie& movie);
     void UpdateMovie(Movie& movie);
-    void DrawMovieFrame(const Movie& movie, const formats::MpegFrame& frame);
+    void DrawMovieFrame(const Movie& movie, const openshiina::Bytes& frame);
     void MovieSoundStart(Movie& movie, int64_t milliseconds = 0);
     void MovieSoundStop(Movie& movie);
     void MovieSoundPause(Movie& movie);
@@ -649,7 +649,6 @@ private:
     void MovieSoundVolume(Movie& movie, int volume);
     void SurfaceToPicture(int picture, int frame, int x, int y, int w, int h, int surface, int sx, int sy);
     std::array<Movie, MovieSlots> m_movies{};
-    openshiina::Bytes m_movieRows;
 
     // ---- Surfaces ----
     static constexpr int SurfaceRegion = 0x08000000, SurfaceSize = 0x2C;

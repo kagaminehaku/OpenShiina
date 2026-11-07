@@ -17,7 +17,7 @@ as done. It is built for the PC too, only for that comparison.
 | The embedded x86 routines' signatures (what their C++ versions are found by) | `Scripting/X86Routine.cs` | Done: `tools/routinecheck`, 361 routines of 21 games the same as the C# player's (signature, instructions, calls, loops) |
 | The scripts' 4 GB of memory, given in 1 MB parts on first use | `Scripting/ScnAddressSpace.cs` | Done on PC (`tools/spacetest`: 100,000 random operations against a model, discards, threads); on the Switch the parts are heap memory mapped with `svcMapProcessCodeMemory`: the same checks pass on a Switch Lite |
 | A game's RIO.INI: its engine version, first script, screen size and save folder | `Game/GameSetup.cs` | Done (used by the Switch player) |
-| Movies (05B5-05C3, 0514, 0516, 055E): MPEG-1 system streams, their Layer II sound | `Scripting/ScnVm.Movie.cs`, `Formats/MpegVideo.cs`, `Formats/MpegAudio.cs` | MPEG-1 done: `tools/moviecheck` gives the same SHA-256 for every frame as the C# decoder (Bitch Gakuen's opening, 2,818 frames of 1280 x 720). Windows Media (VC-1, WMA) not yet: a .wmv with an .mpg beside it plays as that one, as in the C# player |
+| Movies (05B5-05C3, 0514, 0516, 055E): MPEG-1 system streams, their Layer II sound | `Scripting/ScnVm.Movie.cs`, `Formats/MpegVideo.cs`, `Formats/MpegAudio.cs` | MPEG-1 done: `tools/moviecheck` gives the same SHA-256 for every frame as the C# decoder (Bitch Gakuen's opening, 2,818 frames of 1280 x 720). On the Switch a fast fixed-point inverse DCT (within IEEE 1180; `moviecheck --fast`: PSNR 59 dB at worst against the C# decoder) and the frames decoded ahead on a thread of their own (`formats/MovieAhead`): the movies have one slice a picture. Windows Media (VC-1, WMA) not yet: a .wmv with an .mpg beside it plays as that one, as in the C# player |
 | The sounds: sound buffers, music streams, their mixer (Ogg Vorbis, OGV, PAD, WAVE; a movie's MPEG audio) | `Audio/*.cs`, `Formats/AudioDecoder.cs` | In progress (`src/audio`, the Switch player only): stb_vorbis and minimp3 where the C# player has NVorbis and NLayer; other rates resampled linearly |
 | The pixel routines' rows on several cores | `Scripting/ParallelRows.cs` | Done: the same pieces as the C# player's, on a pool of its own (on the Switch cores 1 and 2 besides the interpreter's 0); the 11 games' pictures the same |
 | The Switch player: SDL2 window and input, the Switch's shared fonts through FreeType, saves in `sdmc:/OpenShiina/Saves/<game>` | `Platform`, `Rendering` | In progress (`player/main_switch.cpp`): Azu Plus plays on a Switch Lite at 50-54 frames a second, its first route to its end |
@@ -71,11 +71,10 @@ nxlink -s -a <Switch IP> -p openshiina/OpenShiina.nro native/build-switch/OpenSh
 ```
 
 hbmenu opened from the album runs as an applet, with about 394 MB of memory: too little for the
-player (SDL and the GPU driver alone take most of it). Opened from an installed title that starts
-hbmenu (nx-hbloader built as an application), it has the console's memory, about 3 GB. Such a
-title's npdm needs `application_type` 1 (an application: as an applet hbmenu cannot open the
-applet service, 2345-0031) and the debug flag `force_debug_prod` (on 19.0.0 and later the kernel
-refuses `force_debug` on a retail console).
+player (SDL and the GPU driver alone take most of it). Opened from an installed title (nx-hbloader built as an
+application) it has the console's memory, about 3 GB: `tools/forwarder` builds that title,
+OpenShiina Loader, which starts the player first; the player's game list opens hbmenu with −, and
+HOME pauses the game, its clock and its sound.
 
 ## Check against the C# player
 

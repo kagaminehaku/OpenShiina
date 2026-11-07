@@ -6,9 +6,9 @@
 // movie. START uses this path when RIO.INI MovieMode is 0 or 1; MovieMode 2 selects the other
 // player (05C9-05D8, C# ScnVm.GraphMovie.cs).
 //
-// Here the movie is decoded by formats/MpegVideo (MPEG-1) and frame n is due n / rate seconds
-// after the start; 05C0 draws the latest frame that is due. The sound (MPEG-1 Layer II) plays
-// through the music streams (IScnMusic), started, paused and stopped with the picture, at the
+// Here the movie is decoded by formats/MpegVideo (MPEG-1), on a thread of its own a few frames
+// ahead (formats/MovieAhead), and frame n is due n / rate seconds after the start; 05C0 draws the
+// latest frame that is due. The sound (MPEG-1 Layer II) plays through the music streams (IScnMusic), started, paused and stopped with the picture, at the
 // volume of the music streams' table. The C# player also decodes Windows Media (WMV3 / VC-1 in an
 // ASF file, Formats/Vc1Video); not ported yet: such a movie with an MPEG-1 one beside it plays as
 // that one, as the C# player does too, and one without is a movie that cannot be decoded (05B5
@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <array>
 
+#include "formats/MovieAhead.h"
 #include "formats/MpegAudio.h"
 #include "platform/Files.h"
 #include "text/Text.h"
@@ -58,7 +59,7 @@ bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
         {
             // An MPEG-1 video stream alone, from its sequence header: the animations of Iyashinbo
             // The Motion (a\*.a, 800 x 600), which have no sound
-            movie.Video = std::make_unique<formats::Mpeg1Video>(data);
+            movie.Video = std::make_unique<formats::MovieAhead>(std::make_unique<formats::Mpeg1Video>(data));
             movie.Wave.clear();
         }
         else
@@ -67,7 +68,7 @@ bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
             data.clear();
             data.shrink_to_fit();
             movie.Wave = std::move(stream.Audio);
-            movie.Video = std::make_unique<formats::Mpeg1Video>(std::move(stream));
+            movie.Video = std::make_unique<formats::MovieAhead>(std::make_unique<formats::Mpeg1Video>(std::move(stream)));
         }
     }
     catch (const InvalidDataError&)
@@ -164,10 +165,10 @@ void ScnVm::UpdateMovie(Movie& movie)
 {
     if (movie.State != 3 || !movie.Video)
         return;
-    formats::IMovieVideo& video = *movie.Video;
+    formats::MovieAhead& video = *movie.Video;
     uint32_t now = Clock();
     int64_t due = int64_t(double(now - movie.Start) * video.FrameRate() / 1000);
-    const formats::MpegFrame* frame = nullptr;
+    const openshiina::Bytes* frame = nullptr;
     while (movie.Decoded <= due)
     {
         frame = video.Next();
@@ -196,23 +197,22 @@ void ScnVm::UpdateMovie(Movie& movie)
     }
 }
 
-void ScnVm::DrawMovieFrame(const Movie& movie, const formats::MpegFrame& frame)
+void ScnVm::DrawMovieFrame(const Movie& movie, const openshiina::Bytes& frame)
 {
+    // frame: the picture as BGR, made on the movie's own thread (formats/MovieAhead)
     int s = movie.Surface;
     int pixels = SurfaceField(s, 2);
     if (pixels == 0)
         return;
-    int w = std::min(frame.Width, SurfaceField(s, 7)), h = std::min(frame.Height, SurfaceField(s, 8));
+    int frameWidth = movie.Video->Width();
+    int w = std::min(frameWidth, SurfaceField(s, 7)), h = std::min(movie.Video->Height(), SurfaceField(s, 8));
     int pitch = SurfaceField(s, 10), bpp = SurfaceField(s, 9);
     if (w <= 0 || h <= 0)
         return;
-    if (m_movieRows.size() < size_t(w) * 3 * size_t(h))
-        m_movieRows.resize(size_t(w) * 3 * size_t(h));
-    frame.ToBgr24(m_movieRows.data(), w * 3, w, h);
     if (bpp == 24)
     {
         for (int y = 0; y < h; y++)
-            WriteBytes(pixels + y * pitch, m_movieRows.data() + size_t(y) * size_t(w) * 3, w * 3);
+            WriteBytes(pixels + y * pitch, frame.data() + size_t(y) * size_t(frameWidth) * 3, w * 3);
         return;
     }
     if (bpp != 32)
@@ -220,7 +220,7 @@ void ScnVm::DrawMovieFrame(const Movie& movie, const formats::MpegFrame& frame)
     std::vector<uint8_t> line(size_t(w) * 4);
     for (int y = 0; y < h; y++)
     {
-        const uint8_t* row = m_movieRows.data() + size_t(y) * size_t(w) * 3;
+        const uint8_t* row = frame.data() + size_t(y) * size_t(frameWidth) * 3;
         for (int x = 0; x < w; x++)
         {
             line[size_t(x) * 4] = row[x * 3];

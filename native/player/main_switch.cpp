@@ -149,6 +149,7 @@ public:
 
     IScnShapes* Shapes() override { return &m_shapes; }
     IScnSound* Sound() override { return &m_sound; }
+    void PauseSound(bool paused) override { m_mixer.Paused = paused; }
     IScnMusic* Music() override { return &m_music; }
     IScnFonts* Fonts() override { return m_fonts.Ready() ? &m_fonts : nullptr; }
     bool KeyDown(int virtualKey) override { return virtualKey >= 0 && virtualKey < 256 && Keys[virtualKey]; }
@@ -181,13 +182,14 @@ private:
     audio::ScnMusic m_music;
 };
 
+/// What PickGame gives for - : the homebrew menu next, in place of a game.
+constexpr const char* kToHbmenu = "\x01hbmenu";
+
 /// The game folders, Latin names only (the Switch does not see folders with Japanese names written from Windows).
 std::string PickGame()
 {
     auto folders = Files::FolderNames(kGames);
     std::sort(folders.begin(), folders.end());
-    if (folders.size() == 1)
-        return folders[0];
     consoleInit(nullptr);
     PadState pad;
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
@@ -196,7 +198,7 @@ std::string PickGame()
     std::string picked;
     while (appletMainLoop())
     {
-        std::printf("\x1b[1;1H\x1b[2JOpenShiina - pick a game (A starts, + leaves)\n\n");
+        std::printf("\x1b[1;1H\x1b[2JOpenShiina - pick a game (A starts, - opens hbmenu, + leaves)\n\n");
         if (folders.empty())
             std::printf("No game folder in %s\n", kGames);
         for (size_t k = 0; k < folders.size(); k++)
@@ -206,6 +208,11 @@ std::string PickGame()
         u64 down = padGetButtonsDown(&pad);
         if (down & HidNpadButton_Plus)
             break;
+        if ((down & HidNpadButton_Minus) && envHasNextLoad())
+        {
+            picked = kToHbmenu;
+            break;
+        }
         if (!folders.empty() && (down & HidNpadButton_A))
         {
             picked = folders[choice];
@@ -255,6 +262,9 @@ void Play(const std::string& folder)
         setup.StartScript.c_str());
     SwitchHost host(*data, setup.SaveFolder);
     auto vm = setup.CreateVm(host, kData);
+    // HOME (or the console asleep) stops the game where it is, its clock and its sound too, whatever
+    // RIO.INI's Background says (on Windows a game may go on behind other windows)
+    vm->SetPauseInBackground(true);
     LogMemory("its first script loaded");
 
     // The sound device: 44.1 kHz stereo floats, the mixer read on SDL's audio thread
@@ -298,7 +308,7 @@ void Play(const std::string& folder)
     vm->RoutineTimes = &routineTimes;
     vm->OpTimes = &opTimes;
     uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
-    bool running = true;
+    bool running = true, focused = true;
     try
     {
         while (running && appletMainLoop())
@@ -352,6 +362,21 @@ void Play(const std::string& folder)
                     host.MouseX = std::clamp(host.MouseX + ax / 4096, 0, setup.Width - 1);
                     host.MouseY = std::clamp(host.MouseY + ay / 4096, 0, setup.Height - 1);
                 }
+            }
+
+            // Out of focus (HOME, a dialog of the system): the game as a window in the background
+            bool inFocus = appletGetFocusState() == AppletFocusState_InFocus;
+            if (inFocus != focused)
+            {
+                focused = inFocus;
+                vm->Notify(focused ? ScnEvent::Activate : ScnEvent::Deactivate);
+                spanStart = armGetSystemTick();
+                spanFrames = spanScripts = 0;
+            }
+            if (!focused)
+            {
+                svcSleepThread(50000000);
+                continue;
             }
 
             uint64_t before = armGetSystemTick();
@@ -470,10 +495,19 @@ int main(int argc, char** argv)
     for (int k = 1; k < argc && folder.empty(); k++)
         if (argv[k] && argv[k][0] != '_')
             folder = argv[k];
-    if (folder.empty())
-        folder = PickGame();
-    if (!folder.empty() && SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) == 0)
+    // Else the list of games, back to it after each one (the title on the HOME menu starts here)
+    bool named = !folder.empty();
+    for (;;)
     {
+        if (!named)
+            folder = PickGame();
+        if (folder == kToHbmenu)
+        {
+            envSetNextLoad("sdmc:/hbmenu.nro", "sdmc:/hbmenu.nro");
+            break;
+        }
+        if (folder.empty() || SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) != 0)
+            break;
         try
         {
             Play(folder);
@@ -483,6 +517,8 @@ int main(int argc, char** argv)
             Log("%s: %s\n", folder.c_str(), e.what());
         }
         SDL_Quit();
+        if (named)
+            break;
     }
     if (s_log)
         std::fclose(s_log);

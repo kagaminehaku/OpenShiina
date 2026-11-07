@@ -24,6 +24,7 @@ add_library(openshiina_core STATIC
     src/archives/FormatManager.cpp
     src/archives/WarcOpener.cpp
     src/archives/WarcRangeDecoder.cpp
+    src/formats/MovieAhead.cpp
     src/formats/MpegAudio.cpp
     src/formats/MpegVideo.cpp
     src/game/GameData.cpp
