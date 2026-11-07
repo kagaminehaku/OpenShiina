@@ -38,6 +38,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Events.cpp
     src/scripting/ScnVm.Files.cpp
     src/scripting/ScnVm.Input.cpp
+    src/scripting/ScnVm.Music.cpp
     src/scripting/ScnVm.Native.cpp
     src/scripting/ScnVm.NativeRoutines.cpp
     src/scripting/ScnVm.Paint.cpp

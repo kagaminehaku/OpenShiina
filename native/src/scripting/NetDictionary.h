@@ -101,6 +101,13 @@ public:
                 f(entry.Key, entry.Value);
     }
 
+    template <typename F> void ForEach(F f)
+    {
+        for (auto& entry : m_entries)
+            if (entry.Used)
+                f(entry.Key, entry.Value);
+    }
+
 private:
     std::vector<Entry> m_entries;
     std::vector<size_t> m_free;

@@ -672,6 +672,37 @@ private:
     // The volume 06A9 last set each buffer to (06AC)
     std::unordered_map<int, int> m_soundVolumes;
 
+    // ---- Music ----
+    struct MusicStream
+    {
+        int Handle = 0;
+        int Status = 0;
+        int Volume = 100;
+        int LoopCount = 0;
+        bool Looping = false;
+        bool Compressed = false;
+        int StartMs = 0, LoopMs = -1;
+        int SampleRate = 0;
+        // The whole stream in ms (06F0)
+        int LengthMs = 0;
+        // 06EC's fade: a step of Delta every StepMs up to Target (the stream stops there when
+        // StopAtEnd and it went down), the time the last step was due; StepMs 0: none
+        int FadeStepMs = 0, FadeDelta = 0, FadeTarget = 0;
+        bool FadeStopAtEnd = false;
+        /// v2.33's fade (06DD / 06DE): no target, it ends past 100 or 0.
+        bool FadeOld = false;
+        uint32_t FadeDue = 0;
+    };
+    static constexpr int MusicSlots = 256;
+    IScnMusic* Music() { return m_host.Music(); }
+    void RegisterMusic();
+    MusicStream* Stream(int handle) { return m_music.Find(handle); }
+    void FadeTo(MusicStream* s, int ms, int delta, int target);
+    int MusicLength(int address);
+    std::vector<int> m_musicTable = std::vector<int>(MusicSlots);
+    NetDictionary<int, MusicStream> m_music;
+    int m_nextMusic = 0x20000;
+
     // ---- Text ----
     static constexpr int TextRegion = 0x09000000, RecordSize = 0x161C;
     void RegisterText();

@@ -1,5 +1,5 @@
 // The parts of ScnVm the core calls whose C# files are not ported yet. Each does what the C# player
-// does as long as the opcodes of its file are not there (no graph movie, no music, no task text,
+// does as long as the opcodes of its file are not there (no graph movie, no task text,
 // no disc, no "Play from here" can have started without them); each goes to its own
 // ScnVm.<Part>.cpp when that file is ported.
 #include "scripting/ScnVm.h"
@@ -43,8 +43,5 @@ void ScnVm::PlayFromModule(ScnContext&, const std::string&) {}
 
 void ScnVm::PumpGraphMovies() {}
 
-// ---- ScnVm.Music.cs: no music ----
-
-void ScnVm::StepMusicFades() {}
 
 } // namespace openshiina::scripting

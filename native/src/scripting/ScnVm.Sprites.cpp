@@ -447,7 +447,7 @@ void ScnVm::DrawRunAlpha(int method, int n, const uint8_t* src, int s, uint8_t* 
         // two sources: the run's pixels at a, the picture at 256 - a
         int a = blend.AlphaValue, b = 256 - a;
         auto table = [&](int i) { return uint8_t(blend.T1[src[s + i]] + blend.T2[row[d + i]]); };
-        auto block = [&](int i) { return uint8_t(std::min(255, (src[s + i] * a + row[d + i] * b & 0xFFFF) >> 8)); };
+        auto block = [&](int i) { return uint8_t(std::min(255, ((src[s + i] * a + row[d + i] * b) & 0xFFFF) >> 8)); };
         int left = n * 3, at = 0, head = -address & 7;
         if (head != 0)
         {

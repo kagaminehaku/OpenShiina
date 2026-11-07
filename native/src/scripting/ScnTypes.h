@@ -35,7 +35,24 @@ public:
     /// GetStatus: DSBSTATUS bits (1 playing, 4 looping).
     virtual int Status(int buffer) = 0;
 };
-class IScnMusic;
+/// Music streams of the platform (C# Scripting/ScnVm.Music.cs).
+class IScnMusic
+{
+public:
+    virtual ~IScnMusic() = default;
+    /// A stream of a sound file (OGV, Ogg Vorbis, PAD or RIFF WAVE); 0 when it cannot be played.
+    virtual int Open(const Bytes& file) = 0;
+    virtual void Close(int stream) = 0;
+    /// Plays from the start, looping when loop is set.
+    virtual void Play(int stream, bool loop) = 0;
+    virtual void Stop(int stream) = 0;
+    virtual void Pause(int stream) = 0;
+    virtual void Resume(int stream) = 0;
+    /// Volume in hundredths of a decibel (-10000 silent to 0).
+    virtual void SetVolume(int stream, int volume) = 0;
+    /// The stream is still sounding (false once a stream without a loop has ended).
+    virtual bool IsPlaying(int stream) = 0;
+};
 
 /// A joystick's position (X and Y from 0 to 65535, 32767 in the middle) and buttons (bit 0 = button 1).
 struct ScnJoystick

@@ -1702,7 +1702,7 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
             uint32_t index = (d & 0xFF) | a16;
             uint32_t t = tables.Share[index];
             uint32_t rb = (d >> 8) & 0xFF00FF;
-            uint32_t value = (((((r << 16 | b) - rb) * t >> 8) + rb & 0xFF00FF) * 0x100)
+            uint32_t value = ((((((r << 16 | b) - rb) * t >> 8) + rb) & 0xFF00FF) * 0x100)
                            + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
             Write32(p, int(value));
         }

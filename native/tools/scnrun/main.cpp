@@ -55,6 +55,28 @@ std::string FolderName(const std::string& game)
     return name;
 }
 
+// Music that only says what the scripts do with it, as ScnBoot's TestMusic (without decoding)
+class TestMusic : public IScnMusic
+{
+public:
+    int Open(const Bytes& file) override
+    {
+        std::printf("  [music] %zu bytes\n", file.size());
+        return m_next++;
+    }
+
+    void Close(int stream) override { std::printf("  [music] close %d\n", stream); }
+    void Play(int stream, bool loop) override { std::printf("  [music] play %d%s\n", stream, loop ? " looping" : ""); }
+    void Stop(int) override {}
+    void Pause(int stream) override { std::printf("  [music] pause %d\n", stream); }
+    void Resume(int stream) override { std::printf("  [music] resume %d\n", stream); }
+    void SetVolume(int stream, int volume) override { std::printf("  [music] volume %d %d\n", stream, volume); }
+    bool IsPlaying(int) override { return true; }
+
+private:
+    int m_next = 1;
+};
+
 class Host : public IScnHost
 {
 public:
@@ -122,6 +144,7 @@ public:
 
     uint32_t Milliseconds() override { return Clock; }
     scripting::IScnFonts* Fonts() override { return &m_fonts; }
+    IScnMusic* Music() override { return &m_music; }
     void SetTitle(const std::string& title) override { std::printf("  [title] %s\n", Utf8(title).c_str()); }
     void SetFullScreen(bool) override {}
 
@@ -129,6 +152,7 @@ private:
     game::GameData& m_data;
     std::string m_saveFolder;
     tools::GdiFonts m_fonts;
+    TestMusic m_music;
 };
 
 std::string Match(const std::string& text, const char* pattern)
@@ -252,6 +276,16 @@ int Run(int argc, std::string* argv)
     }
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
     std::printf("%d frames in %.2f s\n", frame, seconds);
+    // As ScnBoot ends its output: each opcode run, how often
+    std::string counts;
+    int kinds = 0;
+    for (size_t op = 0; op < vm.OpCounts.size(); op++)
+        if (vm.OpCounts[op] != 0)
+        {
+            counts += std::format(" {:04X}x{}", op, vm.OpCounts[op]);
+            kinds++;
+        }
+    std::printf("Opcodes run (%d kinds):%s\n", kinds, counts.c_str());
     return 0;
 }
 

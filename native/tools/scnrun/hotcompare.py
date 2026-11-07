@@ -1,7 +1,9 @@
 # The "[hot]" lists of a run of the C# player's ScnBoot (SCNBOOT_HOT) and of scnrun compared:
 # the instructions one ran that the other did not, and those run a different number of times. With
 # --partial (scnrun stopped on an opcode it does not have yet: its "[hot so far]" list), only the
-# instructions scnrun ran that ScnBoot did not, and those it ran more often.
+# instructions scnrun ran that ScnBoot did not, and those it ran more often. When the two runs
+# ended, their "Opcodes run" lines too: how often each opcode ran (ScnBoot keeps no "[hot]" list
+# of a long run).
 #
 #   python hotcompare.py <ScnBoot output> <scnrun output> [--partial]
 import re
@@ -9,17 +11,19 @@ import sys
 
 
 def read(path):
-    hot = {}
+    hot, ops = {}, None
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             m = re.match(r"\s*\[hot(?: so far)?\] slot (\d+) (\S+) ([0-9A-F]{4}) x(\d+)", line)
             if m:
                 hot[(int(m[1]), m[2].lower(), m[3])] = int(m[4])
-    return hot
+            elif line.startswith("Opcodes run"):
+                ops = {op: int(n) for op, n in re.findall(r"([0-9A-F]{4})x(\d+)", line)}
+    return hot, ops
 
 
 def main():
-    cs, cpp = read(sys.argv[1]), read(sys.argv[2])
+    (cs, csOps), (cpp, cppOps) = read(sys.argv[1]), read(sys.argv[2])
     partial = "--partial" in sys.argv
     differ = 0
     for key in sorted(set(cs) | set(cpp), key=lambda k: (k[1], k[0])):
@@ -31,6 +35,15 @@ def main():
             if differ <= 40:
                 print(f"  slot {key[0]} {key[1]} {key[2]}: C# {a}, C++ {b}")
     print(f"{len(cpp)} instructions of C++, {len(cs)} of C#: {differ} different")
+    if csOps is not None and cppOps is not None:
+        opsDiffer = 0
+        for op in sorted(set(csOps) | set(cppOps)):
+            a, b = csOps.get(op), cppOps.get(op)
+            if a != b:
+                opsDiffer += 1
+                print(f"  opcode {op}: C# {a}, C++ {b}")
+        print(f"{len(cppOps)} opcodes of C++, {len(csOps)} of C#: {opsDiffer} run a different number of times")
+        differ += opsDiffer
     return 1 if differ else 0
 
 

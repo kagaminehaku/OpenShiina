@@ -45,6 +45,7 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterSound();
     RegisterSprites();
     RegisterInput();
+    RegisterMusic();
     RegisterNativeRoutines();
 }
 
