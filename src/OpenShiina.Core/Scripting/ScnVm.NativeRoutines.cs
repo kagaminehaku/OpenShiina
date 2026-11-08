@@ -70,8 +70,10 @@ public sealed partial class ScnVm
         // Saimin Seikatsu START 72760: 76 x 56 from blocks of 10 x 10
         RegisterNative("B51FD501F22CF51D019EF26160C1C35D6154CB2C", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 9, 84, 63));
         RegisterNative("13CE585B31BB34E5FA674268BD852030B126B3E6", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 76, 56));
-        // Imouto Smile START 6D500: 80 x 60 from blocks of 10 x 10
-        RegisterNative("98EF46C517E4F797E130C2D3003A186ACE788B2F", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 80, 60));
+        // Imouto Smile START 6D500: 80 x 60 from blocks of 10 x 10 (Kateinai Choukyou 2DE91, v2.31:
+        // the same with the old engine's way into the routine)
+        RegisterNative(["98EF46C517E4F797E130C2D3003A186ACE788B2F", "44620AFA82F065FFCECAB61D7549DFB59A7AAB00"], "thumbnail",
+                       (vm, c, a) => vm.Thumbnail(c, a, 10, 80, 60));
         // Shojo Mama START 6DF9F (v2.49; Miko Dashi's 63DD0, v2.47, "ret 4"): 104 x 78 from blocks
         // of 7 x 7; Bloody Rondo START A224F (v2.48): 244 x 183 from blocks of 3 x 3
         RegisterNative(["406D794CB83B2D60453AF6F8308F363D17998154", "E911B635E098CED69A383DEBA48A1FED4FFDA179"], "thumbnail",
@@ -375,7 +377,9 @@ public sealed partial class ScnVm
                        (vm, c, a) => vm.BlockCopy(c, a, 75, 300, 2400));
         RegisterNative("9721452713208958DEE71DA51F85540180359028", "block", (vm, c, a) => vm.BlockCopy(c, a, 12, 48, 2400));
         RegisterNative("C4839FCEF4CF13538D043A595B66E1D7B9B04E21", "block", (vm, c, a) => vm.BlockCopy(c, a, 90, 480, 3840));
-        RegisterNative("0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "block", (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
+        // (Pure Love! 59BB0 the same code ending in "ret 4")
+        RegisterNative(["0D838E63CAFB1E7CC81D190CFCDE10611E8598BA", "B196C3BFA5281E1934E8752151BE07DFDE20AF69"], "block",
+                       (vm, c, a) => vm.BlockCopy(c, a, 75, 300, vm.NativeArg(a, 2)));
         // Imouto Smile START 6D8C0: 60 rows of 240 bytes, l[2] apart
         RegisterNative("BEEA1D31822C5C23C3EACC3DBE9424F89897724B", "block", (vm, c, a) => vm.BlockCopy(c, a, 60, 240, vm.NativeArg(a, 2)));
         // Chiccha na Hanayome B9224 / B9270: 75 rows of 396 bytes, 3840 apart / l[2] apart;
@@ -392,6 +396,34 @@ public sealed partial class ScnVm
         // C3724: 128 rows of 681 bytes (0xAA dwords and a byte), 3840 apart (every frame of text)
         RegisterNative("796FFAA089B4BBA15CDDB190D35F8529B95949A7", "block", (vm, c, a) => vm.BlockCopy(c, a, 128, 684, 3840));
         RegisterNative("EC35C823FB602E8AA31C44D28AE1C1FD15808C7B", "block", (vm, c, a) => vm.BlockCopy(c, a, 128, 681, 3840));
+        // Gensou no Idea START A424E: 108 rows of 576 bytes, l[2] apart; Ren'ai Saimin 86923: 63
+        // rows of 252 bytes, 2400 apart; Saimin Seikatsu 72AD3: 56 rows of 228 bytes, 2400 apart
+        RegisterNative("1A6A7DF7ED1D7E7ADA9CBD9D73D5BCD182FBD18A", "block", (vm, c, a) => vm.BlockCopy(c, a, 108, 576, vm.NativeArg(a, 2)));
+        RegisterNative("D67830C1D9986B4B4F9D222727844E17DD9FA26F", "block", (vm, c, a) => vm.BlockCopy(c, a, 63, 252, 2400));
+        RegisterNative("2B2980447A2FE263CC8F761EF89A62EEEAD146AA", "block", (vm, c, a) => vm.BlockCopy(c, a, 56, 228, 2400));
+        // Chuuchuu Nurse START 36E63: 120 rows of 480 bytes, 2400 apart; Chuuni Hime no Teikoku
+        // B5CA0: 113 rows of 600 bytes, l[2] apart; Hin wa Bokura no Fuku no Kami 79483: 135 rows of
+        // 540 bytes, 2400 apart (its thumbnail 791EF: 180 x 135 from blocks of 4 x 4)
+        RegisterNative("CCB25767FDC61D58E6DF8CCFAF6F3DC307507A6E", "block", (vm, c, a) => vm.BlockCopy(c, a, 120, 480, 2400));
+        RegisterNative("18B40ED593BA0D8694F9D9AC84B0447B111C1E90", "block", (vm, c, a) => vm.BlockCopy(c, a, 113, 600, vm.NativeArg(a, 2)));
+        RegisterNative("1D24D30FA945DE31800DBFF3BD65302D927C5BF3", "block", (vm, c, a) => vm.BlockCopy(c, a, 135, 540, 2400));
+        RegisterNative("785A46B3591A9D74328538693E78796F8A4FAA4E", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 4, 180, 135));
+        // Ren'ai Saimin TOPMENU 1737E: 300 rows of 400 BGR pixels from l[1] (one after the other) to
+        // l[0], rows 1204 bytes apart, each made grey: (B * 114478 + G * 586611 + R * 298912) /
+        // 1000000 in its three bytes (a pixel at a time, as the x86 code reads and writes them)
+        RegisterNative("700B6D61EFA1B749640268CFDD48907F02D7B86F", "grey 400x300", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
+            using var verify = vm.VerifyRegion(c, a, dst, 299 * 1204 + 1200);
+            for (int y = 0; y < 300; y++, dst += 4)
+                for (int x = 0; x < 400; x++, src += 3, dst += 3)
+                {
+                    uint v = ((uint)vm.ReadByte(src) * 114478 + (uint)vm.ReadByte(src + 1) * 586611 + (uint)vm.ReadByte(src + 2) * 298912) / 1000000;
+                    vm.WriteByte(dst, (byte)v);
+                    vm.WriteByte(dst + 1, (byte)v);
+                    vm.WriteByte(dst + 2, (byte)v);
+                }
+        });
 
         // Bitch Nee-chan C7C2C (Bitch Gakuen CA19C, Bitch Shimai C9D6C; once at the start): 25 x 25
         // samples of the first byte of 24-bit pixels from l[0] (rows 3840 bytes apart) to l[1],
@@ -606,7 +638,10 @@ public sealed partial class ScnVm
         // + p01 (16 - fx) fy + p11 fx fy) >> 8 in 16 bits, the products whose weight is 0 left
         // out (fx = fy = 0 copies). l[0] dst, l[1] src, l[2] / l[3] their strides, l[4] width,
         // l[5] height, l[6] fx, l[7] fy
-        RegisterNative("1AFA154B046DABF3E9E3ECE7BCD4562FCCFE18D5", "move16", (vm, c, a) => vm.Move16(c, a));
+        // Gakushoku no Oba-san The Motion START 60920 (v2.48) mixes all four pixels always: those of
+        // weight 0 change nothing, so the bytes are the same
+        RegisterNative(["1AFA154B046DABF3E9E3ECE7BCD4562FCCFE18D5", "1334F00910E6058676ED3C1D5B6CA7CB30C90737"], "move16",
+                       (vm, c, a) => vm.Move16(c, a));
 
         // Re: Rem Plus START 85774: BGR to 32-bit pixels (bytes FF, B, G, R). l[0] src (rows one
         // after the other), l[1] dst, l[2] width, l[3] height, l[4] dst stride
