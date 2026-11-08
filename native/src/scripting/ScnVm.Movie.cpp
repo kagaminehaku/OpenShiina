@@ -176,7 +176,9 @@ void ScnVm::UpdateMovie(Movie& movie)
             break;
         movie.Decoded++;
     }
-    if (frame != nullptr)
+    if (frame != nullptr && movie.Window)
+        DrawMovieToWindow(*frame, video.Width(), video.Height(), *movie.Window);
+    else if (frame != nullptr)
         DrawMovieFrame(movie, *frame);
     else if (movie.Decoded <= due)
     {

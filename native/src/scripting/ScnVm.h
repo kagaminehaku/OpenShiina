@@ -633,6 +633,8 @@ private:
         /// The movie's sound (its MPEG audio stream; empty when it has none) and its music stream while it plays.
         openshiina::Bytes Wave;
         int Sound = 0;
+        /// v2.33's movie window (0579): its frames are drawn into the game window there, not into a surface.
+        std::optional<ScreenArea> Window;
     };
     static constexpr int MovieSlots = 16;
     void RegisterMovie();
@@ -649,6 +651,10 @@ private:
     void MovieSoundVolume(Movie& movie, int volume);
     void SurfaceToPicture(int picture, int frame, int x, int y, int w, int h, int surface, int sx, int sy);
     std::array<Movie, MovieSlots> m_movies{};
+    // v2.33: the movie of 0579 and the rectangle of 0578
+    Movie m_windowMovie;
+    ScreenArea m_windowMovieArea;
+    void DrawMovieToWindow(const openshiina::Bytes& rows, int w, int h, const ScreenArea& area);
 
     // ---- Surfaces ----
     static constexpr int SurfaceRegion = 0x08000000, SurfaceSize = 0x2C;

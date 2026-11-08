@@ -3,11 +3,14 @@
 // scripts use that Ao no Juuai's (v2.34) do not. Registered for the engines before 2.40 only
 // (Register234); the handlers named are CLEAVAGE.EXE's.
 //
-// Its movie window (0578-057F: RIO.INI's MovieMode 0 and 1 play movies in a window of their own over
-// the game's, which the C# player draws into the game window's picture) comes with ScnVm.Movie.
+// Its movies: RIO.INI's MovieMode 2 plays them with DirectDraw and DirectShow streams (05B5,
+// ScnVm.Movie), 0 and 1 in a window of their own over the game's (MCI or DirectShow, 0578-057F, the
+// engine's records at 0x48DA40 / 0x48C740, 09CF switching between the two). Here that window is
+// drawn into the game window's picture, the movie stretched to its rectangle.
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
+#include <string>
 
 namespace openshiina::scripting {
 
@@ -137,6 +140,81 @@ void ScnVm::RegisterEngine233()
         vm.Value(c, i.Args[0]);
         return 0;
     });
+    // 0578 x, y, w, h (0x413A10): the movie window's rectangle
+    Register234(0x0578, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
+        int w = vm.Value(c, i.Args[2]), h = vm.Value(c, i.Args[3]);
+        vm.m_windowMovieArea = ScreenArea{x, y, x + w, y + h};
+        return 0;
+    });
+    // 0579 file, v (0x413C40): open the movie (a file of the game folder) and play it in the window
+    // (FUN_00413AD0 0, 1); v is kept with it (0 in Cleavage's scripts). A movie that cannot be played
+    // here is as one played to its end
+    Register234(0x0579, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        std::string name = vm.ReadString(vm.Value(c, i.Args[0]));
+        vm.Value(c, i.Args[1]);
+        Movie& movie = vm.m_windowMovie;
+        vm.MovieSoundStop(movie);
+        movie.Name = name;
+        movie.Loop = 0;
+        movie.LoopCount = 0;
+        movie.Video.reset();
+        movie.Window = vm.m_windowMovieArea;
+        if (!vm.OpenMovie(movie))
+        {
+            movie.State = 1;
+            return 0;
+        }
+        vm.RunMovie(movie);
+        vm.UpdateMovie(movie);
+        return 0;
+    });
+    // 057A (0x413CF0): stop the movie and close it
+    Register234(0x057A, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
+        Movie& movie = vm.m_windowMovie;
+        vm.MovieSoundStop(movie);
+        movie.State = movie.Video || movie.State != 0 ? 1 : 0;
+        movie.Video.reset();
+        return 0;
+    });
+    // 057E v (0x413DC0): v = the movie's mode, MCI's 0x20E playing, else 0x20D stopped
+    Register234(0x057E, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.UpdateMovie(vm.m_windowMovie);
+        vm.Store(c, i.Args[0], vm.m_windowMovie.State == 3 ? 0x20E : 0x20D);
+        return 0;
+    });
+    // 057F v (0x413E00): v = its position (ms here), 0 before it plays; START waits until it is not 0
+    Register234(0x057F, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        Movie& movie = vm.m_windowMovie;
+        vm.UpdateMovie(movie);
+        int position = movie.State == 3 ? std::max(1, int(vm.Clock() - movie.Start)) : movie.State == 0 ? 0 : 1;
+        vm.Store(c, i.Args[0], position);
+        return 0;
+    });
+}
+
+void ScnVm::DrawMovieToWindow(const openshiina::Bytes& rows, int w, int h, const ScreenArea& area)
+{
+    // v2.33's movie window drawn into the game window's picture, the movie stretched to its rectangle
+    if (w <= 0 || h <= 0 || area.IsEmpty())
+        return;
+    if (m_window.size() < size_t(ScreenWidth) * size_t(ScreenHeight) * 3)
+        m_window.resize(size_t(ScreenWidth) * size_t(ScreenHeight) * 3);
+    m_changed = m_changed.Union(area.Clip(ScreenWidth, ScreenHeight));
+    for (int y = std::max(area.T, 0); y < std::min(area.B, ScreenHeight); y++)
+    {
+        int fy = int(int64_t(y - area.T) * h / area.Height());
+        for (int x = std::max(area.L, 0); x < std::min(area.R, ScreenWidth); x++)
+        {
+            int fx = int(int64_t(x - area.L) * w / area.Width());
+            size_t s = (size_t(fy) * size_t(w) + size_t(fx)) * 3, d = (size_t(y) * size_t(ScreenWidth) + size_t(x)) * 3;
+            m_window[d] = rows[s];
+            m_window[d + 1] = rows[s + 1];
+            m_window[d + 2] = rows[s + 2];
+        }
+    }
+    ScreenInvalidated = true;
+    FrameShown = true;
 }
 
 void ScnVm::Crossfade(int from, int to, int t)
