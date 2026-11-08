@@ -27,5 +27,6 @@ What the title must have, found the hard way:
 - The NACP: no startup account, no save data; a logo section and a romfs, as forwarders that work
   have them.
 
-`npdm.json` is nx-hbloader's `hbl.json` with those changes; `icon.jpg`, `NintendoLogo.png` and
-`StartupMovie.gif` are the title's own pictures (no Nintendo logo).
+`npdm.json` is nx-hbloader's `hbl.json` with those changes. The title is named OpenShiina on the
+HOME menu; `icon.jpg`, `NintendoLogo.png` and `StartupMovie.gif` are made from `docs/logo` (the
+book, the wordmark for dark grounds), as `player/icon.jpg` is for the player's .nro.

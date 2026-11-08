@@ -1,14 +1,15 @@
-// OpenShiina.nro: the player on the Switch. A game folder of sdmc:/OpenShiina/Games is picked on the
-// console (one alone, or one named as the first argument, starts at once), then it runs in an SDL2 window of the whole screen, its picture
-// scaled to fit. Its saves go to sdmc:/OpenShiina/Saves/<game>; Formats.Json and the opcode tables
-// are in the romfs. What it prints goes to sdmc:/OpenShiina/player.log and, started by nxlink -s, to
-// the PC.
+// OpenShiina.nro: the player on the Switch. It shows its logo at once (ui/Renderer, deko3d), then the
+// game folders of sdmc:/OpenShiina/Games to pick from (one named as the first argument starts at
+// once); the game's picture fills the screen as the setting "Scaling" says (Sharp for now). Its
+// saves go to sdmc:/OpenShiina/Saves/<game>; Formats.Json, the opcode tables, the shaders and the
+// logo are in the romfs. What it prints goes to sdmc:/OpenShiina/player.log and, started by
+// nxlink -s, to the PC.
 //
 // Input, as the C# player's touch bar and joystick give it: a touch is the mouse (moved there, the
 // left button held while touching); A is Return, B the right button, X Escape, Y Space, R / ZR
-// Control (held: skip), L Page Up, the D-pad the arrow keys, the left stick moves the pointer;
-// + leaves the game. Text is drawn with the Switch's own Japanese font (FreeTypeFonts). Not here yet:
-// sound and music, movies.
+// Control (held: skip), L Page Up, the D-pad the arrow keys, the left stick moves the pointer (shown
+// while it moves); + leaves the game. Text is drawn with the Switch's own Japanese font
+// (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
 #include <SDL.h>
 #include <switch.h>
 #include <unistd.h>
@@ -35,9 +36,12 @@
 #include "platform/Files.h"
 #include "scripting/ScnVm.h"
 #include "text/Text.h"
+#include "ui/Renderer.h"
+#include "ui/UiText.h"
 
 using namespace openshiina;
 using namespace openshiina::scripting;
+using player::Rect;
 
 namespace {
 
@@ -71,7 +75,7 @@ void Log(const char* format, ...)
 size_t s_failedSize = 0;
 
 /// How much memory the program has and uses (applet mode, from the Album, gives it far less than a
-/// game's: started over a game - R held - it has all of it).
+/// game's: started from the OpenShiina title it has all of it).
 void LogMemory(const char* when)
 {
     u64 total = 0, used = 0;
@@ -80,18 +84,72 @@ void LogMemory(const char* when)
     Log("[memory] %s: %llu MB used of %llu MB\n", when, (unsigned long long)(used >> 20), (unsigned long long)(total >> 20));
 }
 
-// SDL2's Switch joystick: the buttons by index
-enum Button { A = 0, B = 1, X = 2, Y = 3, L = 6, R = 7, ZL = 8, ZR = 9, Plus = 10, Minus = 11, Left = 12, Up = 13, Right = 14, Down = 15 };
+/// A colour as the Renderer takes it, 0xAABBGGRR.
+constexpr uint32_t Rgb(uint32_t r, uint32_t g, uint32_t b, uint32_t a = 255) { return a << 24 | b << 16 | g << 8 | r; }
+
+// The logo's colours (C# PlayerTheme's Shiina theme)
+constexpr uint32_t kBackground = Rgb(26, 10, 16), kPanel = Rgb(44, 20, 28), kAccent = Rgb(200, 30, 58), kText = Rgb(242, 230, 201),
+                   kDim = Rgb(170, 150, 140);
+
+// The buttons' symbols of the Switch's font (Nintendo's extension)
+constexpr const char* kButtonA = "\xEE\x83\xA0";
+constexpr const char* kButtonPlus = "\xEE\x83\xAF";
+constexpr const char* kButtonMinus = "\xEE\x83\xB0";
 
 /// A button as a key: its virtual key and scan code.
 struct KeyOf
 {
-    int Button, VirtualKey, ScanCode;
+    u64 Button;
+    int VirtualKey, ScanCode;
 };
 
 constexpr KeyOf kKeys[] = {
-    {A, 0x0D, 0x1C},    {X, 0x1B, 0x01},     {Y, 0x20, 0x39},    {R, 0x11, 0x1D},   {ZR, 0x11, 0x1D},
-    {L, 0x21, 0x49},    {Left, 0x25, 0x4B},  {Up, 0x26, 0x48},   {Right, 0x27, 0x4D}, {Down, 0x28, 0x50},
+    {HidNpadButton_A, 0x0D, 0x1C},     {HidNpadButton_X, 0x1B, 0x01},    {HidNpadButton_Y, 0x20, 0x39},  {HidNpadButton_R, 0x11, 0x1D},
+    {HidNpadButton_ZR, 0x11, 0x1D},    {HidNpadButton_L, 0x21, 0x49},    {HidNpadButton_Left, 0x25, 0x4B}, {HidNpadButton_Up, 0x26, 0x48},
+    {HidNpadButton_Right, 0x27, 0x4D}, {HidNpadButton_Down, 0x28, 0x50},
+};
+
+/// The player's screen, text, logo and controls.
+struct Ui
+{
+    player::Renderer Screen;
+    player::UiText Text{Screen};
+    player::Texture Logo = Screen.LoadImage("romfs:/ui/logo.rgba");
+    player::Texture Wordmark = Screen.LoadImage("romfs:/ui/wordmark.rgba");
+    PadState Pad{};
+
+    Ui()
+    {
+        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+        padInitializeDefault(&Pad);
+        hidInitializeTouchScreen();
+    }
+
+    /// The first touch on the screen, if any (in screen pixels).
+    bool Touch(float& x, float& y)
+    {
+        HidTouchScreenState state{};
+        if (hidGetTouchScreenStates(&state, 1) == 0 || state.count == 0)
+            return false;
+        x = float(state.touches[0].x);
+        y = float(state.touches[0].y);
+        return true;
+    }
+
+    /// The logo in the middle, a line under it: while something loads.
+    void Splash(const std::string& line = {})
+    {
+        Screen.Begin(kBackground);
+        Screen.Image(Logo, {(1280 - 200) / 2.0f, 170, 200, 200});
+        float w = 480, h = Wordmark.Valid() ? w * float(Wordmark.Height) / float(Wordmark.Width) : 0;
+        Screen.Image(Wordmark, {(1280 - w) / 2, 400, w, h});
+        if (!line.empty())
+        {
+            float tw = Text.Measure(line, 24);
+            Text.Draw(line, (1280 - tw) / 2, 520, 24, kDim);
+        }
+        Screen.End();
+    }
 };
 
 /// The platform for the interpreter: files of the game, saves on the SD card, the clock, input.
@@ -185,61 +243,94 @@ private:
 /// What PickGame gives for - : the homebrew menu next, in place of a game.
 constexpr const char* kToHbmenu = "\x01hbmenu";
 
-/// The game folders, Latin names only (the Switch does not see folders with Japanese names written from Windows).
-std::string PickGame()
+/// The game folders, Latin names only (the Switch does not see folders with Japanese names written
+/// from Windows): A plays the one chosen (a tap chooses, a tap on the chosen one plays), - opens
+/// hbmenu, + leaves.
+std::string PickGame(Ui& ui)
 {
     auto folders = Files::FolderNames(kGames);
     std::sort(folders.begin(), folders.end());
-    consoleInit(nullptr);
-    PadState pad;
-    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
-    padInitializeDefault(&pad);
-    size_t choice = 0;
-    std::string picked;
+    constexpr float RowHeight = 60, ListX = 380, ListY = 110, ListW = 860;
+    constexpr int Rows = 9;
+    size_t choice = 0, top = 0;
+    bool touching = false;
     while (appletMainLoop())
     {
-        std::printf("\x1b[1;1H\x1b[2JOpenShiina - pick a game (A starts, - opens hbmenu, + leaves)\n\n");
-        if (folders.empty())
-            std::printf("No game folder in %s\n", kGames);
-        for (size_t k = 0; k < folders.size(); k++)
-            std::printf("%s %s\n", k == choice ? ">" : " ", folders[k].c_str());
-        consoleUpdate(nullptr);
-        padUpdate(&pad);
-        u64 down = padGetButtonsDown(&pad);
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
         if (down & HidNpadButton_Plus)
-            break;
+            return {};
         if ((down & HidNpadButton_Minus) && envHasNextLoad())
-        {
-            picked = kToHbmenu;
-            break;
-        }
+            return kToHbmenu;
         if (!folders.empty() && (down & HidNpadButton_A))
-        {
-            picked = folders[choice];
-            break;
-        }
-        if ((down & HidNpadButton_AnyDown) && choice + 1 < folders.size())
+            return folders[choice];
+        if ((down & (HidNpadButton_AnyDown)) && choice + 1 < folders.size())
             choice++;
-        if ((down & HidNpadButton_AnyUp) && choice > 0)
+        if ((down & (HidNpadButton_AnyUp)) && choice > 0)
             choice--;
+        float tx, ty;
+        bool touch = ui.Touch(tx, ty);
+        if (touch && !touching && tx >= ListX && tx < ListX + ListW && ty >= ListY)
+        {
+            size_t row = top + size_t((ty - ListY) / RowHeight);
+            if (row < folders.size() && row < top + Rows)
+            {
+                if (row == choice)
+                    return folders[choice];
+                choice = row;
+            }
+        }
+        touching = touch;
+        if (choice < top)
+            top = choice;
+        if (choice >= top + Rows)
+            top = choice - Rows + 1;
+
+        player::Renderer& s = ui.Screen;
+        s.Begin(kBackground);
+        // the rail: the logo, the wordmark
+        s.Fill({0, 0, 340, 720}, kPanel);
+        s.Image(ui.Logo, {90, 60, 160, 160});
+        float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
+        s.Image(ui.Wordmark, {30, 240, ww, wh});
+        // the games
+        ui.Text.Draw("Games", ListX, 48, 34, kText);
+        if (folders.empty())
+            ui.Text.Draw(std::string("No game folder in ") + kGames, ListX, ListY + 10, 24, kDim);
+        for (size_t k = top; k < folders.size() && k < top + Rows; k++)
+        {
+            float y = ListY + float(k - top) * RowHeight;
+            if (k == choice)
+                s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kAccent, 12);
+            ui.Text.Draw(ui.Text.Fit(folders[k], 28, ListW - 40), ListX + 8, y + 10, 28, kText);
+        }
+        // the buttons
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonA) + " Play     " + kButtonMinus + " hbmenu     " + kButtonPlus + " Quit";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
     }
-    consoleExit(nullptr);
-    return picked;
+    return {};
 }
 
-/// Where the game's picture goes on the screen: as large as it fits, its shape kept.
-SDL_Rect Fit(int width, int height, int screenWidth, int screenHeight)
+/// The game's window picture (BGR rows) into an RGBA texture.
+void CopyPicture(const Bytes& window, int width, int height, player::Texture& t)
 {
-    int w = screenWidth, h = int(int64_t(screenWidth) * height / width);
-    if (h > screenHeight)
+    for (int y = 0; y < height; y++)
     {
-        h = screenHeight;
-        w = int(int64_t(screenHeight) * width / height);
+        const uint8_t* src = window.data() + size_t(y) * size_t(width) * 3;
+        uint8_t* dst = t.Pixels + size_t(y) * t.Stride;
+        for (int x = 0; x < width; x++, src += 3, dst += 4)
+        {
+            dst[0] = src[2];
+            dst[1] = src[1];
+            dst[2] = src[0];
+            dst[3] = 0xFF;
+        }
     }
-    return {(screenWidth - w) / 2, (screenHeight - h) / 2, w, h};
 }
 
-void Play(const std::string& folder)
+void Play(Ui& ui, const std::string& folder)
 {
     std::string path = Files::Combine(kGames, folder);
     auto archive = game::GameData::FindArchive(path);
@@ -255,6 +346,7 @@ void Play(const std::string& folder)
             Log("    %s\n", name.c_str());
         return;
     }
+    ui.Splash(folder);
     LogMemory("before the game");
     auto data = game::GameData::Open(path, scheme);
     auto setup = game::GameSetup::Read(*data, kSaves);
@@ -283,18 +375,13 @@ void Play(const std::string& folder)
     else
         SDL_PauseAudioDevice(sound, 0);
 
-    SDL_Window* window = SDL_CreateWindow("OpenShiina", 0, 0, 1280, 720, 0);
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-    SDL_Texture* picture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR24, SDL_TEXTUREACCESS_STREAMING, setup.Width, setup.Height);
-    SDL_Joystick* joystick = SDL_JoystickOpen(0);
-    SDL_Rect place = Fit(setup.Width, setup.Height, 1280, 720);
-    LogMemory("the window made");
+    player::Scaling scaling = player::Scaling::Sharp;
+    Rect place = player::Renderer::Placement(scaling, setup.Width, setup.Height);
+    LogMemory("the screen made");
 
-    auto toGame = [&](float fx, float fy) {
-        int x = int((fx * 1280 - place.x) * setup.Width / place.w), y = int((fy * 720 - place.y) * setup.Height / place.h);
-        host.MouseX = std::clamp(x, 0, setup.Width - 1);
-        host.MouseY = std::clamp(y, 0, setup.Height - 1);
+    auto toGame = [&](float x, float y) {
+        host.MouseX = std::clamp(int((x - place.X) * float(setup.Width) / place.W), 0, setup.Width - 1);
+        host.MouseY = std::clamp(int((y - place.Y) * float(setup.Height) / place.H), 0, setup.Height - 1);
     };
     auto mouse = [&](int message, int buttons) {
         host.Buttons = buttons;
@@ -302,66 +389,50 @@ void Play(const std::string& folder)
     };
 
     // Every 2 seconds: the frames shown in them and, when they were fewer than 50, where the time
-    // of the scripts went (the embedded routines by name)
+    // of the scripts went (the embedded routines by name, the opcodes)
     std::unordered_map<std::string, ScnVm::RoutineTime> routineTimes;
     std::unordered_map<int, ScnVm::RoutineTime> opTimes;
     vm->RoutineTimes = &routineTimes;
     vm->OpTimes = &opTimes;
     uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
-    bool running = true, focused = true;
+    uint64_t pictureVersion = 1, pointerShownUntil = 0;
+    bool running = true, focused = true, touching = false;
     try
     {
         while (running && appletMainLoop())
         {
-            SDL_Event e;
-            while (SDL_PollEvent(&e))
+            padUpdate(&ui.Pad);
+            u64 down = padGetButtonsDown(&ui.Pad), up = padGetButtonsUp(&ui.Pad);
+            if (down & HidNpadButton_Plus)
+                running = false;
+            if (down & HidNpadButton_B)
+                mouse(ScnMessage::RButtonDown, host.Buttons | 2);
+            if (up & HidNpadButton_B)
+                mouse(ScnMessage::RButtonUp, host.Buttons & ~2);
+            for (const auto& k : kKeys)
+                if ((down | up) & k.Button)
+                {
+                    bool pressed = (down & k.Button) != 0;
+                    host.Keys[k.VirtualKey] = pressed;
+                    vm->WindowMessage(pressed ? ScnMessage::KeyDown : ScnMessage::KeyUp, k.VirtualKey, ScnMessage::Key(k.ScanCode, pressed, false));
+                }
+            // a touch: the mouse there, the left button held
+            float tx, ty;
+            bool touch = ui.Touch(tx, ty);
+            if (touch)
+                toGame(tx, ty);
+            if (touch && !touching)
+                mouse(ScnMessage::LButtonDown, host.Buttons | 1);
+            else if (!touch && touching)
+                mouse(ScnMessage::LButtonUp, host.Buttons & ~1);
+            touching = touch;
+            // the left stick moves the pointer, faster the further it is pushed
+            HidAnalogStickState stick = padGetStickPos(&ui.Pad, 0);
+            if (std::abs(stick.x) > 6000 || std::abs(stick.y) > 6000)
             {
-                switch (e.type)
-                {
-                case SDL_QUIT:
-                    running = false;
-                    break;
-                case SDL_FINGERDOWN:
-                    toGame(e.tfinger.x, e.tfinger.y);
-                    mouse(ScnMessage::LButtonDown, host.Buttons | 1);
-                    break;
-                case SDL_FINGERMOTION:
-                    toGame(e.tfinger.x, e.tfinger.y);
-                    break;
-                case SDL_FINGERUP:
-                    toGame(e.tfinger.x, e.tfinger.y);
-                    mouse(ScnMessage::LButtonUp, host.Buttons & ~1);
-                    break;
-                case SDL_JOYBUTTONDOWN:
-                case SDL_JOYBUTTONUP:
-                {
-                    bool down = e.type == SDL_JOYBUTTONDOWN;
-                    int button = e.jbutton.button;
-                    if (button == Plus && down)
-                        running = false;
-                    else if (button == B)
-                        mouse(down ? ScnMessage::RButtonDown : ScnMessage::RButtonUp, down ? host.Buttons | 2 : host.Buttons & ~2);
-                    for (const auto& k : kKeys)
-                        if (k.Button == button)
-                        {
-                            host.Keys[k.VirtualKey] = down;
-                            vm->WindowMessage(down ? ScnMessage::KeyDown : ScnMessage::KeyUp, k.VirtualKey, ScnMessage::Key(k.ScanCode, down, false));
-                        }
-                    break;
-                }
-                default:
-                    break;
-                }
-            }
-            // The left stick moves the pointer, faster the further it is pushed
-            if (joystick)
-            {
-                int ax = SDL_JoystickGetAxis(joystick, 0), ay = SDL_JoystickGetAxis(joystick, 1);
-                if (std::abs(ax) > 6000 || std::abs(ay) > 6000)
-                {
-                    host.MouseX = std::clamp(host.MouseX + ax / 4096, 0, setup.Width - 1);
-                    host.MouseY = std::clamp(host.MouseY + ay / 4096, 0, setup.Height - 1);
-                }
+                host.MouseX = std::clamp(host.MouseX + stick.x / 4096, 0, setup.Width - 1);
+                host.MouseY = std::clamp(host.MouseY - stick.y / 4096, 0, setup.Height - 1);
+                pointerShownUntil = armGetSystemTick() + armNsToTicks(2000000000ull);
             }
 
             // Out of focus (HOME, a dialog of the system): the game as a window in the background
@@ -393,11 +464,27 @@ void Play(const std::string& folder)
             if (vm->ScreenInvalidated)
             {
                 vm->ScreenInvalidated = false;
-                SDL_UpdateTexture(picture, nullptr, vm->Window().data(), setup.Width * 3);
+                pictureVersion++;
             }
-            SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, picture, nullptr, &place);
-            SDL_RenderPresent(renderer);
+
+            // The picture: each of the two textures takes it again when it is behind
+            ui.Screen.Begin(0xFF000000);
+            player::Texture& picture = ui.Screen.PictureTexture(setup.Width, setup.Height);
+            if (picture.Version != pictureVersion)
+            {
+                CopyPicture(vm->Window(), setup.Width, setup.Height, picture);
+                picture.Version = pictureVersion;
+            }
+            ui.Screen.Picture(picture, place, scaling);
+            if (armGetSystemTick() < pointerShownUntil)
+            {
+                float px = place.X + (float(host.MouseX) + 0.5f) * place.W / float(setup.Width);
+                float py = place.Y + (float(host.MouseY) + 0.5f) * place.H / float(setup.Height);
+                ui.Screen.Fill({px - 9, py - 9, 18, 18}, Rgb(0, 0, 0, 160), 9);
+                ui.Screen.Fill({px - 6, py - 6, 12, 12}, kText, 6);
+            }
+            ui.Screen.End();
+
             uint64_t now = armGetSystemTick();
             if (armTicksToNs(now - spanStart) >= 2000000000ull)
             {
@@ -446,11 +533,6 @@ void Play(const std::string& folder)
     }
     if (sound != 0)
         SDL_CloseAudioDevice(sound);
-    if (joystick)
-        SDL_JoystickClose(joystick);
-    SDL_DestroyTexture(picture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
 }
 
 } // namespace
@@ -464,8 +546,12 @@ void* operator new(size_t size)
     throw std::bad_alloc();
 }
 
+// (operator new above takes its memory from malloc: GCC cannot see that freeing it is right)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
 void operator delete(void* p) noexcept { std::free(p); }
 void operator delete(void* p, size_t) noexcept { std::free(p); }
+#pragma GCC diagnostic pop
 
 extern "C" void userAppInit()
 {
@@ -486,40 +572,54 @@ int main(int argc, char** argv)
     romfsInit();
     Files::CreateDirectories(kSaves);
     s_log = Files::Open(kLog, "wb");
+    std::unique_ptr<Ui> ui;
+    try
+    {
+        // the logo first, then the formats (a moment to read)
+        ui = std::make_unique<Ui>();
+        ui->Splash();
+    }
+    catch (const std::exception& e)
+    {
+        Log("The screen: %s\n", e.what());
+    }
     archives::FormatManager::SetInstance(std::make_unique<archives::FormatManager>(Files::Combine(kData, "Formats.Json")));
     for (const auto& error : archives::FormatManager::Instance()->LoadErrors())
         Log("%s\n", error.c_str());
+    if (SDL_Init(SDL_INIT_AUDIO) != 0)
+        Log("SDL audio: %s\n", SDL_GetError());
 
-    // A game folder named on the command line (nxlink ... OpenShiina.nro <folder>) starts at once
+    // A game folder named on the command line (nxlink ... OpenShiina.nro <folder>) starts at once;
+    // else the list of games, back to it after each one (the title on the HOME menu starts here)
     std::string folder;
     for (int k = 1; k < argc && folder.empty(); k++)
         if (argv[k] && argv[k][0] != '_')
             folder = argv[k];
-    // Else the list of games, back to it after each one (the title on the HOME menu starts here)
     bool named = !folder.empty();
-    for (;;)
+    while (ui)
     {
         if (!named)
-            folder = PickGame();
+            folder = PickGame(*ui);
         if (folder == kToHbmenu)
         {
             envSetNextLoad("sdmc:/hbmenu.nro", "sdmc:/hbmenu.nro");
             break;
         }
-        if (folder.empty() || SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) != 0)
+        if (folder.empty())
             break;
         try
         {
-            Play(folder);
+            Play(*ui, folder);
         }
         catch (const std::exception& e)
         {
             Log("%s: %s\n", folder.c_str(), e.what());
         }
-        SDL_Quit();
         if (named)
             break;
     }
+    ui.reset();
+    SDL_Quit();
     if (s_log)
         std::fclose(s_log);
     romfsExit();

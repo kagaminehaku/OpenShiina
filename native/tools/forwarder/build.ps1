@@ -29,7 +29,7 @@ try {
     Copy-Item nx-hbloader\hbl.nso exefs\main -Force
     Copy-Item nx-hbloader\hbl.npdm exefs\main.npdm -Force
     # the NACP: no startup account and no save data (as forwarders have them)
-    & C:\msys64\opt\devkitpro\tools\bin\nacptool.exe --create 'OpenShiina Loader' 'OpenShiina' '1.0.0' control\control.nacp --titleid=$TitleId
+    & C:\msys64\opt\devkitpro\tools\bin\nacptool.exe --create 'OpenShiina' 'OpenShiina' '1.0.0' control\control.nacp --titleid=$TitleId
     $nacp = [IO.File]::ReadAllBytes("$Work\control\control.nacp")
     $nacp[0x3025] = 0
     for ($i = 0x3080; $i -lt 0x318A; $i++) { $nacp[$i] = 0 }
