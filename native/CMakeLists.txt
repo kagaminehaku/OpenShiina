@@ -39,6 +39,7 @@ add_library(openshiina_core STATIC
     src/formats/WmaProAudio.cpp
     src/game/GameData.cpp
     src/game/GameSetup.cpp
+    src/game/TranslationTables.cpp
     src/io/ArcView.cpp
     src/io/Checksum.cpp
     src/platform/DibShapes.cpp
@@ -47,6 +48,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnAddressSpace.cpp
     src/scripting/ScnOpcodes.cpp
     src/scripting/ScnFonts.cpp
+    src/scripting/ScnGaiji.cpp
     src/scripting/ScnVm.cpp
     src/scripting/ScnVm.Blur32.cpp
     src/scripting/ScnVm.Calc.cpp
@@ -90,6 +92,7 @@ add_library(openshiina_core STATIC
     src/scripting/X86Decoder.cpp
     src/scripting/X86Routine.cpp
     src/text/Text.cpp
+    src/text/Unicode.cpp
     src/util/Encoding.cpp
 )
 target_include_directories(openshiina_core PUBLIC src)
@@ -192,6 +195,9 @@ else()
     # moviecheck: each frame of an MPEG-1 or Windows Media movie as the C# player's decoders make it (SHA-256s)
     add_executable(moviecheck tools/moviecheck/main.cpp)
     target_link_libraries(moviecheck PRIVATE openshiina_core)
+    # gaijicheck: the translation code on test data, as the C# player's makes it
+    add_executable(gaijicheck tools/gaijicheck/main.cpp)
+    target_link_libraries(gaijicheck PRIVATE openshiina_core)
     # routinecheck: the x86 routines' signatures against the C# player's (ScnTools routines)
     add_executable(routinecheck tools/routinecheck/main.cpp)
     target_link_libraries(routinecheck PRIVATE openshiina_core)

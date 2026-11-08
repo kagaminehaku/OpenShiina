@@ -38,6 +38,9 @@ private:
     Font& Get(int font);
     /// The glyph of a character code with a font (its own face, or one that has it).
     scripting::ScnGlyph Render(Font& f, int code);
+    /// The glyph of a character: with its own advance (proportional), or centred in the MS Gothic
+    /// cell of the character code.
+    scripting::ScnGlyph Render(Font& f, uint32_t ch, bool proportional, int code = 0);
     /// A stand-in's advance for a character code: MS Gothic's.
     int Advance(Font& f, int code);
 

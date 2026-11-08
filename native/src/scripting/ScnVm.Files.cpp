@@ -234,8 +234,48 @@ void ScnVm::MountArchive(const std::string& archive, bool mounted)
     ForgetKept();
 }
 
-void ScnVm::Kept(const std::string& name, const openshiina::Bytes& data)
+game::TranslationTables* ScnVm::Tables()
 {
+    if (!m_translationTablesRead)
+    {
+        m_translationTablesRead = true;
+        auto tables = game::TranslationTables::Read([this](const std::string& file) -> std::optional<openshiina::Bytes> {
+            openshiina::Bytes data;
+            if (!m_host.ReadLooseFile(TranslationFolder + file, data))
+                return std::nullopt;
+            return data;
+        });
+        if (tables.Lines.size() + tables.Names.size() + tables.Strings.size() > 0)
+            m_translationTables = std::move(tables);
+    }
+    return m_translationTables ? &*m_translationTables : nullptr;
+}
+
+void ScnVm::Translate(const std::string& name, openshiina::Bytes& data)
+{
+    // A file of the archives as the scripts read it: a scenario translated by text.tsv, a translated
+    // scenario in Shift-JIS and gaiji
+    if (!EndsWithTxt(name))
+        return;
+    if (!ScnGaiji::IsUtf8(data))
+        if (auto* tables = Tables())
+        {
+            size_t at = LastSeparator(name);
+            if (auto translated = tables->Apply(at == std::string::npos ? name : name.substr(at + 1), data))
+                data = std::move(*translated);
+        }
+    if (ScnGaiji::IsUtf8(data))
+    {
+        data = m_gaiji.Scenario(data);
+        if (IScnFonts* fonts = m_host.Fonts())
+            fonts->Gaiji = &m_gaiji.Texts();
+    }
+}
+
+void ScnVm::Kept(const std::string& name, openshiina::Bytes& data)
+{
+    // A file of the archives read: translated (Translate), then kept
+    Translate(name, data);
     std::string key = Upper(name);
     if (int64_t(data.size()) > FileCacheBytes / 2 || m_fileCache.count(key))
         return;

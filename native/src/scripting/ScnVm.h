@@ -37,6 +37,8 @@
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnOpcodes.h"
 #include "formats/MovieAhead.h"
+#include "game/TranslationTables.h"
+#include "scripting/ScnGaiji.h"
 #include "scripting/ScnTypes.h"
 #include "scripting/X86Routine.h"
 
@@ -709,7 +711,14 @@ private:
     std::optional<int64_t> TranslationFileSize(const std::string& name);
     void ForgetKept();
     void MountArchive(const std::string& archive, bool mounted);
-    void Kept(const std::string& name, const openshiina::Bytes& data);
+    void Kept(const std::string& name, openshiina::Bytes& data);
+    void Translate(const std::string& name, openshiina::Bytes& data);
+    // The translation folder's tables (text.tsv, names.tsv, strings.tsv: OpenShiina Tools), read on
+    // the first scenario or string that may need them; none when there are none
+    game::TranslationTables* Tables();
+    std::optional<game::TranslationTables> m_translationTables;
+    bool m_translationTablesRead = false;
+    ScnGaiji m_gaiji;
     bool IsSaveFolder(const std::string& path);
     bool ReadSave(const std::string& name, openshiina::Bytes& data) { return m_host.ReadSaveFile(name, data); }
     void WriteSave(const std::string& name, const openshiina::Bytes& data) { m_host.WriteSaveFile(name, data); }
@@ -924,6 +933,26 @@ private:
     void RubyStart(int rec);
     void TextStep(int rec, int surface, bool invalidate);
     std::pair<int, int> FixedOr(int rec, int font, const openshiina::Bytes& ch, int length);
+    // ---- Translations (ScnGaiji): what each record's last character was to a translation (its soft
+    // "_r" and its words). START breaks its lines after so many characters: how many since its last
+    // break, and how many it puts on a line (learned from its first soft break), which tells the
+    // right edge of a translated line (the record's own right edge can be the screen's) ----
+    std::array<ScnGaiji::Kind, TextRecords> m_lastKind{};
+    std::array<int, TextRecords> m_cellsOnLine{}, m_lineCells{};
+    std::tuple<ScnGaiji::Kind, int, int> m_savedRecordState{};
+    // strings.txt, names.tsv and strings.tsv: the original's Shift-JIS bytes -> the translation and
+    // where its copy is in script memory (0 until first drawn)
+    std::optional<std::unordered_map<std::string, std::pair<openshiina::Bytes, int>>> m_strings;
+    int TranslationRight(int rec, int font);
+    int Translated(int text);
+    void ReadStrings(const openshiina::Bytes& file);
+    void AddString(const std::string& original, const std::string& translation);
+    bool IsGaiji(const openshiina::Bytes& ch, int length) const { return KindOf(ch, length) != ScnGaiji::Kind::None; }
+    ScnGaiji::Kind KindOf(const openshiina::Bytes& ch, int length) const
+    {
+        return length == 2 && ch.size() >= 2 ? m_gaiji.KindOf(ch[0] << 8 | ch[1]) : ScnGaiji::Kind::None;
+    }
+    int WordWidth(int rec, int font, const openshiina::Bytes& ch);
     bool DrawChar(int rec, int surface, bool invalidate);
     void FindIndent(int rec, int font, bool dc);
     void DrawWithEffects(int rec, int surface, bool invalidate, int font, const openshiina::Bytes& ch, int length);

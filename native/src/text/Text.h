@@ -17,6 +17,10 @@ inline std::string Cp932ToUtf8(std::string_view raw) { return Cp932ToUtf8(reinte
 /// outside NEC's selection of IBM's characters (lead bytes ED / EE), one with none "?".
 std::string Utf8ToCp932(std::string_view utf8);
 
+/// The code page 932 code of a character as .NET's encoder gives it (a byte, or lead * 256 + trail),
+/// or -1 when it has none.
+int Cp932Code(char32_t c);
+
 /// The text up to its first 0 byte (or all of it), from code page 932.
 std::string CString(const uint8_t* data, size_t length);
 

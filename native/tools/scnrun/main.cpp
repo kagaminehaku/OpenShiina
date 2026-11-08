@@ -84,13 +84,118 @@ private:
     int m_next = 1;
 };
 
+/// A comma- or semicolon-separated environment variable's items.
+std::vector<std::string> Items(const char* variable, char separator)
+{
+    std::vector<std::string> items;
+    const char* value = std::getenv(variable);
+    std::string text = value ? value : "";
+    for (size_t start = 0; start < text.size();)
+    {
+        size_t end = text.find(separator, start);
+        if (end == std::string::npos)
+            end = text.size();
+        if (end > start)
+            items.push_back(text.substr(start, end - start));
+        start = end + 1;
+    }
+    return items;
+}
+
 class Host : public IScnHost
 {
 public:
-    Host(game::GameData& data, std::string saveFolder) : m_data(data), m_saveFolder(std::move(saveFolder)) {}
+    Host(game::GameData& data, std::string saveFolder) : m_data(data), m_saveFolder(std::move(saveFolder))
+    {
+        // SCNRUN_PRESS (ScnBoot's SCNBOOT_PRESS): "frame:key[:frames],..." keys held from that frame
+        for (const std::string& item : Items("SCNRUN_PRESS", ','))
+        {
+            size_t a = item.find(':'), b = item.find(':', a + 1);
+            if (a == std::string::npos)
+                continue;
+            int from = std::stoi(item.substr(0, a));
+            std::string key = item.substr(a + 1, b == std::string::npos ? std::string::npos : b - a - 1);
+            int frames = b == std::string::npos ? 3 : std::stoi(item.substr(b + 1));
+            int code = key.rfind("0x", 0) == 0 || key.rfind("0X", 0) == 0 ? std::stoi(key.substr(2), nullptr, 16) : std::stoi(key);
+            m_presses.push_back({from, from + frames - 1, code});
+        }
+        // SCNRUN_FILE (SCNBOOT_FILE): "name=file;..." a file of the archives read from a file of the
+        // disk instead (a test scenario in place of one of the game's); the game folder is not touched
+        for (const std::string& item : Items("SCNRUN_FILE", ';'))
+            if (size_t eq = item.find('='); eq != std::string::npos)
+                m_swaps.emplace_back(item.substr(0, eq), item.substr(eq + 1));
+        // SCNRUN_MOUSE (SCNBOOT_MOUSE): "frame:x,y[:buttons[:frames]];..." the mouse there from that
+        // frame, the buttons held so many frames
+        for (const std::string& item : Items("SCNRUN_MOUSE", ';'))
+        {
+            size_t a = item.find(':'), comma = item.find(',', a + 1), b = item.find(':', a + 1), c = b == std::string::npos ? b : item.find(':', b + 1);
+            if (a == std::string::npos || comma == std::string::npos)
+                continue;
+            Click m{};
+            m.From = std::stoi(item.substr(0, a));
+            m.X = std::stoi(item.substr(a + 1, comma - a - 1));
+            m.Y = std::stoi(item.substr(comma + 1, b == std::string::npos ? std::string::npos : b - comma - 1));
+            m.Buttons = b == std::string::npos ? 0 : std::stoi(item.substr(b + 1, c == std::string::npos ? std::string::npos : c - b - 1));
+            m.To = m.From + (c == std::string::npos ? 3 : std::stoi(item.substr(c + 1))) - 1;
+            m_mouse.push_back(m);
+        }
+        std::stable_sort(m_mouse.begin(), m_mouse.end(), [](const Click& p, const Click& q) { return p.From < q.From; });
+    }
+
+    std::pair<int, int> MousePosition() override
+    {
+        std::pair<int, int> at{0, 0};
+        for (const Click& m : m_mouse)
+            if (m.From <= Frame)
+                at = {m.X, m.Y};
+        return at;
+    }
+
+    int MouseButtons() override
+    {
+        for (const Click& m : m_mouse)
+            if (m.From <= Frame && Frame <= m.To)
+                return m.Buttons;
+        return 0;
+    }
 
     uint32_t Clock = 0;
     int Frame = 0;
+
+    bool KeyDown(int key) override
+    {
+        for (const auto& p : m_presses)
+            if (p.Key == key && Frame >= p.From && Frame <= p.To)
+                return true;
+        return false;
+    }
+
+    /// The window messages of this frame: the keys of SCNRUN_PRESS that go down or up.
+    std::vector<std::pair<int, int>> Messages() const
+    {
+        std::vector<std::pair<int, int>> messages;
+        for (const auto& p : m_presses)
+        {
+            if (p.From == Frame)
+                messages.emplace_back(ScnMessage::KeyDown, p.Key);
+            if (p.To + 1 == Frame)
+                messages.emplace_back(ScnMessage::KeyUp, p.Key);
+        }
+        const std::tuple<int, int, int> buttons[] = {{1, ScnMessage::LButtonDown, ScnMessage::LButtonUp},
+                                                     {2, ScnMessage::RButtonDown, ScnMessage::RButtonUp},
+                                                     {4, ScnMessage::MButtonDown, ScnMessage::MButtonUp}};
+        for (const Click& m : m_mouse)
+            for (const auto& [bit, down, up] : buttons)
+            {
+                if ((m.Buttons & bit) == 0)
+                    continue;
+                if (m.From == Frame)
+                    messages.emplace_back(down, bit);
+                if (m.To + 1 == Frame)
+                    messages.emplace_back(up, 0);
+            }
+        return messages;
+    }
 
     std::string SaveFolder() override { return m_saveFolder; }
 
@@ -121,8 +226,21 @@ public:
         return (type & 0xF) == 4 || (type & 0xF) == 3 ? 6 : 1;    // yes / OK
     }
 
-    bool ReadFile(const std::string& name, Bytes& data) override { return m_data.Read(Slashes(Utf8(name)), data); }
-    std::optional<int64_t> ArchiveFileSize(const std::string& name) override { return m_data.Size(Slashes(Utf8(name))); }
+    bool ReadFile(const std::string& name, Bytes& data) override
+    {
+        if (auto swap = Swap(name))
+            return Files::ReadAll(*swap, data);
+        return m_data.Read(Slashes(Utf8(name)), data);
+    }
+    std::optional<int64_t> ArchiveFileSize(const std::string& name) override
+    {
+        if (auto swap = Swap(name))
+        {
+            Bytes data;
+            return Files::ReadAll(*swap, data) ? std::optional<int64_t>(int64_t(data.size())) : std::nullopt;
+        }
+        return m_data.Size(Slashes(Utf8(name)));
+    }
     std::optional<int64_t> ArchiveFileSize(const std::string& archive, const std::string& name) override
     {
         return m_data.Size(Utf8(archive), Slashes(Utf8(name)));
@@ -158,6 +276,27 @@ public:
     void SetFullScreen(bool) override {}
 
 private:
+    struct Press
+    {
+        int From, To, Key;
+    };
+    std::vector<Press> m_presses;
+    struct Click
+    {
+        int From, X, Y, Buttons, To;
+    };
+    std::vector<Click> m_mouse;
+    std::vector<std::pair<std::string, std::string>> m_swaps;
+
+    std::optional<std::string> Swap(const std::string& name) const
+    {
+        std::string utf8 = Utf8(name);
+        for (const auto& [end, file] : m_swaps)
+            if (utf8.size() >= end.size() && Text::EqualsIgnoreCase(utf8.substr(utf8.size() - end.size()), end))
+                return file;
+        return std::nullopt;
+    }
+
     game::GameData& m_data;
     std::string m_saveFolder;
     tools::GdiFonts m_fonts;
@@ -289,6 +428,12 @@ int Run(int argc, std::string* argv)
                     auto [slot, codeBase, offset, op] = spot;
                     std::printf("  [hot] slot %d %s %04X x%d\n", slot, vm.DescribeAddress(codeBase + offset).c_str(), op, times);
                 }
+            }
+            for (const auto& [message, wParam] : host.Messages())
+            {
+                bool mouse = message >= ScnMessage::LButtonDown && message <= ScnMessage::MButtonUp;
+                auto [mx, my] = host.MousePosition();
+                vm.WindowMessage(message, wParam, mouse ? ScnMessage::Point(mx, my) : ScnMessage::Key(0, message == ScnMessage::KeyDown, false));
             }
             if (!vm.RunFrame())
             {

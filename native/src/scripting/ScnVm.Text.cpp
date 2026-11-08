@@ -12,15 +12,18 @@
 // 00A1 snapshot and redraw incrementally, 0066 read a character, 0078 / 0079 position, 00B4 /
 // 00B6 layer and offset.
 //
-// Not here yet: translations (strings.txt, the gaiji of translated scenarios and their word
-// wrapping). Without a translation folder no character is a gaiji, and the text is drawn as in
-// the C# player.
+// Translations: a translated scenario's characters Shift-JIS lacks are gaiji (ScnGaiji), drawn
+// with their own advances; START's breaks after so many characters inside a translated message
+// are left out and the lines broken by their widths. Texts the scripts draw from their own code
+// are drawn translated when strings.txt or the tables have the whole of them (Translated).
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
+#include "text/Text.h"
+#include "text/Unicode.h"
 #include "util/Encoding.h"
 
 namespace openshiina::scripting {
@@ -153,9 +156,82 @@ void ScnVm::ResetRecord(int index)
     S(rec, RLayer, -1);
 }
 
+int ScnVm::Translated(int text)
+{
+    // The text to draw for text: its translation in strings.txt (one original a line:
+    // "original<tab>translation", UTF-8) or the tables' names.tsv and strings.tsv when the whole of
+    // it is there, else itself
+    if (!m_strings)
+    {
+        m_strings.emplace();
+        openshiina::Bytes file;
+        if (m_host.ReadLooseFile("translation\\strings.txt", file))
+            ReadStrings(file);
+        if (auto* tables = Tables())
+            for (const auto& [original, translation] : tables->TranslatedStrings())
+                AddString(original, translation);
+        if (!m_strings->empty())
+            if (IScnFonts* fonts = m_host.Fonts())
+                fonts->Gaiji = &m_gaiji.Texts();
+    }
+    if (m_strings->empty() || text == 0)
+        return text;
+    int length = StringLength(text);
+    if (length == 0 || length > 4096)
+        return text;
+    auto bytes = ReadBytes(text, length);
+    auto found = m_strings->find(std::string(bytes.begin(), bytes.end()));
+    if (found == m_strings->end())
+        return text;
+    if (found->second.second == 0)
+    {
+        openshiina::Bytes copy = found->second.first;
+        copy.push_back(0);
+        found->second.second = AllocateCopy(copy);
+    }
+    return found->second.second;
+}
+
+void ScnVm::ReadStrings(const openshiina::Bytes& file)
+{
+    size_t skip = ScnGaiji::IsUtf8(file) ? 3 : 0;
+    std::string text = Text::CodePointsToUtf8(Text::Utf8ToCodePoints(std::string_view(reinterpret_cast<const char*>(file.data()) + skip, file.size() - skip)));
+    for (size_t start = 0; start <= text.size();)
+    {
+        size_t end = text.find('\n', start);
+        if (end == std::string::npos)
+            end = text.size();
+        std::string raw = text.substr(start, end - start);
+        while (!raw.empty() && raw.back() == '\r')
+            raw.pop_back();
+        size_t tab = raw.find('\t');
+        if (tab != std::string::npos && tab > 0 && raw[0] != '#')
+            AddString(raw.substr(0, tab), raw.substr(tab + 1));
+        start = end + 1;
+    }
+}
+
+void ScnVm::AddString(const std::string& original, const std::string& translation)
+{
+    // A text the scripts may draw and its translation (left out when Shift-JIS cannot write the original)
+    std::string bytes;
+    for (char32_t c : Text::Utf8ToCodePoints(original))
+    {
+        int code = Text::Cp932Code(c);
+        if (code < 0)
+            return;
+        if (code > 0xFF)
+            bytes += char(code >> 8);
+        bytes += char(code & 0xFF);
+    }
+    (*m_strings)[bytes] = {m_gaiji.Text(translation), 0};
+}
+
 void ScnVm::SetText(int rec, int x, int y, int text)
 {
     // FUN_00431730: the record's text, optionally with a new position
+    m_lastKind[size_t(G(rec, RIndex) % TextRecords)] = ScnGaiji::Kind::None;
+    m_cellsOnLine[size_t(G(rec, RIndex) % TextRecords)] = 0;
     if (x != -1)
     {
         S(rec, RX, x);
@@ -421,6 +497,9 @@ void ScnVm::SwapRecords(int other, int rec)
         return;
     size_t a = size_t(G(other, RIndex) % TextRecords), b = size_t(G(rec, RIndex) % TextRecords);
     std::swap(m_glyphs[a], m_glyphs[b]);
+    std::swap(m_lastKind[a], m_lastKind[b]);
+    std::swap(m_cellsOnLine[a], m_cellsOnLine[b]);
+    std::swap(m_lineCells[a], m_lineCells[b]);
     auto bytesOther = ReadBytes(other, RecordSize);
     auto bytesRec = ReadBytes(rec, RecordSize);
     WriteBytes(other, bytesRec);
@@ -722,11 +801,24 @@ void ScnVm::ControlCode(int rec, int surface)
         FontChanged(rec);
         return;
     case 'r':
+    {
         if (G(rec, RMeasuring) != 0)
         {
             S(rec, RMeasuring, 0);
             return;
         }
+        // START's break after so many characters inside a translated message (not after its End):
+        // the text system breaks those lines by their widths
+        size_t index = size_t(G(rec, RIndex) % TextRecords);
+        if (m_lastKind[index] == ScnGaiji::Kind::Letters || m_lastKind[index] == ScnGaiji::Kind::Space)
+        {
+            m_lineCells[index] = std::max(m_lineCells[index], m_cellsOnLine[index]);
+            m_cellsOnLine[index] = 0;
+            if (next == '!')
+                S(rec, RPtr, code + 2);
+            return;
+        }
+        m_cellsOnLine[index] = 0;
         if (next == '!')
         {
             S(rec, RPtr, code + 2);
@@ -741,6 +833,7 @@ void ScnVm::ControlCode(int rec, int surface)
         S(rec, RAligned, 0);
         AlignLine(rec, surface);
         return;
+    }
     case 's':
         S(rec, RSkipKeys, ParseNumber(rec) & 0xFF);
         return;
@@ -952,9 +1045,11 @@ void ScnVm::MeasureLine(int rec)
         int length = TakeChar(rec);
         int pitch = G(rec, RPitch);
         auto taken = CharBytes(rec, length);
-        if (pitch == -1)
+        m_lastKind[size_t(G(rec, RIndex) % TextRecords)] = KindOf(taken, length);
+        m_cellsOnLine[size_t(G(rec, RIndex) % TextRecords)]++;
+        if (pitch == -1 || IsGaiji(taken, length))
         {
-            int w = G(rec, RFixedW) != 0 ? G(rec, RFixedW) : Extent(SelectedFont(rec), taken.data(), taken.size()).first;
+            int w = G(rec, RFixedW) != 0 && !IsGaiji(taken, length) ? G(rec, RFixedW) : Extent(SelectedFont(rec), taken.data(), taken.size()).first;
             S(rec, RX, G(rec, RX) + w);
         }
         else
@@ -1205,7 +1300,35 @@ std::pair<int, int> ScnVm::FixedOr(int rec, int font, const openshiina::Bytes& c
 {
     if (G(rec, RFixedW) == 0)
         return Extent(font, ch.data(), size_t(length));
-    return {G(rec, RFixedW), G(rec, RFixedH)};
+    if (!IsGaiji(ch, length))
+        return {G(rec, RFixedW), G(rec, RFixedH)};
+    // a translation's character takes its own width, in the fixed height
+    return {Extent(font, ch.data(), size_t(length)).first, G(rec, RFixedH)};
+}
+
+int ScnVm::WordWidth(int rec, int font, const openshiina::Bytes& ch)
+{
+    // The width of the translated word that starts with ch: its letters up to a space, End or anything else
+    int width = Extent(font, ch.data(), 2).first;
+    for (int p = G(rec, RPtr);; p += 2)
+    {
+        auto next = ReadBytes(p, 2);
+        if (KindOf(next, 2) != ScnGaiji::Kind::Letters)
+            return width;
+        width += Extent(font, next.data(), 2).first;
+    }
+}
+
+int ScnVm::TranslationRight(int rec, int font)
+{
+    // The right edge of a translated line: START's characters a line (learned) times a full-width
+    // character from the left, when that is inside the record's own edge
+    static const uint8_t fullWidthSpace[] = {0x81, 0x40};
+    int right = G(rec, RRight), cells = m_lineCells[size_t(G(rec, RIndex) % TextRecords)];
+    if (cells <= 0)
+        return right;
+    int cell = G(rec, RFixedW) != 0 ? G(rec, RFixedW) : G(rec, RPitch) != -1 ? G(rec, RWidePitch) : Extent(font, fullWidthSpace, 2).first;
+    return cell > 0 ? std::min(right, G(rec, RLeft) + cells * cell) : right;
 }
 
 bool ScnVm::DrawChar(int rec, int surface, bool invalidate)
@@ -1235,11 +1358,26 @@ bool ScnVm::DrawChar(int rec, int surface, bool invalidate)
     int length = TakeChar(rec);
     openshiina::Bytes ch = CharBytes(rec, 4);
     std::pair<int, int> ext{0, 0};
+    size_t kindAt = size_t(G(rec, RIndex) % TextRecords);
+    ScnGaiji::Kind kind = KindOf(ch, length);
+    m_cellsOnLine[kindAt]++;
+    if (kind == ScnGaiji::Kind::Letters && m_lastKind[kindAt] != ScnGaiji::Kind::Letters && dc && G(rec, RX) > G(rec, RLeft) + G(rec, RIndent)
+        && uint32_t(G(rec, RX) + WordWidth(rec, font, ch)) > uint32_t(TranslationRight(rec, font)))
+    {
+        int oldX = G(rec, RX);
+        S(rec, RX, G(rec, RLeft));
+        S(rec, RPrevY, G(rec, RY));
+        S(rec, RPrevX, oldX);
+        S(rec, RY, G(rec, RY) + G(rec, RLineHeight));
+        S(rec, RX, G(rec, RX) + G(rec, RIndent));
+        S(rec, RLineStart, 1);
+    }
+    m_lastKind[kindAt] = kind;
 
     // Wrap before a character that would cross the right edge and may not end a line
     int x = G(rec, RX), pitch = G(rec, RPitch);
     uint32_t end;
-    if (pitch == -1 && dc)
+    if ((pitch == -1 && dc) || IsGaiji(ch, length))
     {
         ext = FixedOr(rec, font, ch, length);
         end = uint32_t(x + ext.first);
@@ -1298,7 +1436,7 @@ bool ScnVm::DrawChar(int rec, int surface, bool invalidate)
 
     // Advance
     pitch = G(rec, RPitch);
-    if (pitch == -1 && dc)
+    if ((pitch == -1 && dc) || IsGaiji(ch, length))
     {
         ext = FixedOr(rec, font, ch, length);
         S(rec, RX, G(rec, RX) + ext.first);
@@ -1746,7 +1884,7 @@ void ScnVm::RegisterText()
     });
     // 0084 surface, text: lay out and draw the whole text now (-1: control codes only)
     Register(0x0084, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        int surface = vm.Value(c, i.Args[0]), text = vm.Value(c, i.Args[1]);
+        int surface = vm.Value(c, i.Args[0]), text = vm.Translated(vm.Value(c, i.Args[1]));
         int rec = vm.CurrentRecord(c);
         vm.SetText(rec, -1, -1, text);
         bool invalidate = surface == vm.DisplaySurface();
@@ -1760,7 +1898,7 @@ void ScnVm::RegisterText()
     // 0083 surface, text: draw the text over the next frames; the task waits (flag 8)
     Register(0x0083, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         c.TextSurface = vm.Value(c, i.Args[0]);
-        int text = vm.Value(c, i.Args[1]);
+        int text = vm.Translated(vm.Value(c, i.Args[1]));
         int rec = vm.CurrentRecord(c);
         vm.SetText(rec, -1, -1, text);
         c.Flags |= 8;
@@ -1815,7 +1953,9 @@ void ScnVm::RegisterText()
         if (vm.EngineVersion < 248)
             throw vm.Error(c, "op_008C of v2.47 is not done");
         int rec = vm.CurrentRecord(c);
+        size_t index = size_t(vm.G(rec, RIndex) % TextRecords);
         vm.ReadBytes(rec, vm.m_savedRecord.data(), RecordSize);
+        vm.m_savedRecordState = {vm.m_lastKind[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]};
         return 0;
     });
     Register(0x008D, [](ScnVm& vm, ScnContext& c, const ScnInstruction&) {
@@ -1823,13 +1963,15 @@ void ScnVm::RegisterText()
             throw vm.Error(c, "op_008D of v2.47 is not done");
         int rec = vm.CurrentRecord(c);
         vm.WriteBytes(rec, vm.m_savedRecord);
+        size_t index = size_t(vm.G(rec, RIndex) % TextRecords);
+        std::tie(vm.m_lastKind[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]) = vm.m_savedRecordState;
         // the record's font is back without going through its setting: no glyph of the other one stays
         vm.ClearGlyphs(rec);
         return 0;
     });
     // 00A0 text: set the text and keep a snapshot of the record to redraw from
     Register(0x00A0, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        int text = vm.Value(c, i.Args[0]);
+        int text = vm.Translated(vm.Value(c, i.Args[0]));
         int rec = vm.CurrentRecord(c);
         vm.SetText(rec, -1, -1, text);
         int snapshot = SnapshotRegion + c.TextRecord * SnapshotSize;
@@ -1844,6 +1986,8 @@ void ScnVm::RegisterText()
         int rec = vm.CurrentRecord(c);
         int snapshot = SnapshotRegion + c.TextRecord * SnapshotSize;
         vm.CopyMemory(rec, snapshot, RecordSize);
+        vm.m_lastKind[size_t(vm.G(rec, RIndex) % TextRecords)] = ScnGaiji::Kind::None;
+        vm.m_cellsOnLine[size_t(vm.G(rec, RIndex) % TextRecords)] = 0;
         int waits = vm.G(rec, RWaits);
         vm.S(rec, RContext, c.Slot);
         int surface = owner >= 0 && owner < Slots ? vm.m_slots[size_t(owner)].TextSurface : -1;

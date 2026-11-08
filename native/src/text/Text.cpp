@@ -64,9 +64,11 @@ std::string Cp932ToUtf8(const uint8_t* data, size_t length)
     return out;
 }
 
-std::string Utf8ToCp932(std::string_view utf8)
+namespace {
+
+/// The code of each character: the tables backwards, NEC's selection of IBM's last.
+const std::unordered_map<uint32_t, uint16_t>& Cp932Codes()
 {
-    // The code of each character: the tables backwards, NEC's selection of IBM's last
     static const std::unordered_map<uint32_t, uint16_t> codes = [] {
         std::unordered_map<uint32_t, uint16_t> map;
         for (int b = 0; b < 256; b++)
@@ -84,6 +86,20 @@ std::string Utf8ToCp932(std::string_view utf8)
             }
         return map;
     }();
+    return codes;
+}
+
+} // namespace
+
+int Cp932Code(char32_t c)
+{
+    auto found = Cp932Codes().find(uint32_t(c));
+    return found == Cp932Codes().end() ? -1 : found->second;
+}
+
+std::string Utf8ToCp932(std::string_view utf8)
+{
+    const auto& codes = Cp932Codes();
     std::string out;
     out.reserve(utf8.size());
     for (size_t i = 0; i < utf8.size();)

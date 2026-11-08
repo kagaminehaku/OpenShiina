@@ -7,7 +7,8 @@
 // double-byte character, half an em a single-byte one, each glyph centred in its cell - since the
 // games lay their text out for it. Fonts the scripts add from their archives (AddFontMemResourceEx:
 // Libra of the Vampire Princess's Noto Serif, Roboto...) are found by their family name first, and
-// measured by their own metrics.
+// measured by their own metrics. The gaiji of translated scenarios (ScnGaiji) are drawn with the
+// system's faces too, each letter with its own advance (the C# player's SkiaFonts: a Latin face).
 //
 // GDI's terms, as the engine uses them: a font's height > 0 is the cell height (ascent + descent), < 0
 // the em height; a width other than 0 stretches the font to that average character width. A glyph is
@@ -25,6 +26,7 @@
 #include <switch.h>
 
 #include "text/Text.h"
+#include "text/Unicode.h"
 
 namespace openshiina::player {
 
@@ -206,7 +208,8 @@ std::pair<int, int> FreeTypeFonts::TextExtent(int font, const uint8_t* text, siz
         int code = text[i];
         if (IsLead(code) && i + 1 < length)
             code = code << 8 | text[++i];
-        width += f.Own ? Glyph(font, code).CellIncX : Advance(f, code);
+        bool gaiji = Gaiji != nullptr && Gaiji->count(code) != 0;
+        width += f.Own || gaiji ? Glyph(font, code).CellIncX : Advance(f, code);
     }
     return {width, f.Ascent + f.Descent};
 }
@@ -219,12 +222,25 @@ ScnGlyph FreeTypeFonts::Glyph(int font, int code)
     auto cached = f.Glyphs.find(code);
     if (cached != f.Glyphs.end())
         return cached->second;
+    if (Gaiji != nullptr)
+        if (auto found = Gaiji->find(code); found != Gaiji->end())
+        {
+            // a translation's letters (none, one or two), each with its own advance
+            std::vector<ScnGlyph> letters;
+            for (char32_t c : Text::Utf8ToCodePoints(found->second))
+                letters.push_back(Render(f, uint32_t(c), true));
+            return f.Glyphs[code] = letters.size() == 1 ? letters[0] : ScnGlyph::Compose(letters);
+        }
     return f.Glyphs[code] = Render(f, code);
 }
 
 ScnGlyph FreeTypeFonts::Render(Font& f, int code)
 {
-    uint32_t ch = Decode(code);
+    return Render(f, Decode(code), f.Own != nullptr, code);
+}
+
+ScnGlyph FreeTypeFonts::Render(Font& f, uint32_t ch, bool proportional, int code)
+{
     // The face to draw with: the font's own, or the first of the system's that has the character
     FT_Face face = nullptr;
     FT_UInt index = 0;
@@ -233,7 +249,7 @@ ScnGlyph FreeTypeFonts::Render(Font& f, int code)
     for (size_t k = 0; !face && k < m_faces.size(); k++)
         if ((index = FT_Get_Char_Index(m_faces[k]->Ft, ch)) != 0)
             face = m_faces[k]->Ft;
-    int cell = f.Own ? 0 : Advance(f, code);
+    int cell = proportional ? 0 : Advance(f, code);
     if (!face)
         return ScnGlyph::Blank(cell);
     FT_Set_Pixel_Sizes(face, 0, FT_UInt(std::max(1L, std::lround(f.Size))));
@@ -245,7 +261,7 @@ ScnGlyph FreeTypeFonts::Render(Font& f, int code)
     if (f.Bold && !(face->style_flags & FT_STYLE_FLAG_BOLD))
         FT_GlyphSlot_Embolden(face->glyph);
     int ownAdvance = int(std::lround(face->glyph->advance.x / 64.0));
-    int advance = f.Own ? ownAdvance : cell;
+    int advance = proportional ? ownAdvance : cell;
     if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) != 0)
         return ScnGlyph::Blank(advance);
     const FT_Bitmap& bitmap = face->glyph->bitmap;
@@ -272,7 +288,7 @@ ScnGlyph FreeTypeFonts::Render(Font& f, int code)
             glyph.Bits[size_t(y * glyph.Pitch + x)] = uint8_t((bitmap.buffer[(y0 + y) * bitmap.pitch + x0 + x] * 64 + 127) / 255);
     // Origin: the box's left from the pen (a stand-in's glyph centred in its MS Gothic cell), its top
     // above the baseline
-    glyph.OriginX = face->glyph->bitmap_left + x0 + (f.Own ? 0 : (cell - ownAdvance) / 2);
+    glyph.OriginX = face->glyph->bitmap_left + x0 + (proportional ? 0 : (cell - ownAdvance) / 2);
     glyph.OriginY = face->glyph->bitmap_top - y0;
     glyph.CellIncX = int16_t(advance);
     glyph.CellIncY = 0;
