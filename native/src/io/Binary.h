@@ -59,6 +59,7 @@ inline uint32_t ToUInt32(const Bytes& d, size_t i)
 namespace BigEndian {
 
 inline uint32_t ToUInt32(const uint8_t* p) { return uint32_t(p[0]) << 24 | uint32_t(p[1]) << 16 | uint32_t(p[2]) << 8 | uint32_t(p[3]); }
+inline uint64_t ToUInt64(const uint8_t* p) { return uint64_t(ToUInt32(p)) << 32 | ToUInt32(p + 4); }
 
 } // namespace BigEndian
 

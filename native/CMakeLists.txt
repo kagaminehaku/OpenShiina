@@ -24,10 +24,19 @@ add_library(openshiina_core STATIC
     src/archives/FormatManager.cpp
     src/archives/WarcOpener.cpp
     src/archives/WarcRangeDecoder.cpp
+    src/formats/AsfAudio.cpp
     src/formats/AsfFile.cpp
+    src/formats/Mdct.cpp
     src/formats/MovieAhead.cpp
     src/formats/MpegAudio.cpp
     src/formats/MpegVideo.cpp
+    src/formats/Vc1Video.Blocks.cpp
+    src/formats/Vc1Video.cpp
+    src/formats/Vc1Video.Filters.cpp
+    src/formats/Vc1Video.Motion.cpp
+    src/formats/VlcTable.cpp
+    src/formats/WmaAudio.cpp
+    src/formats/WmaProAudio.cpp
     src/game/GameData.cpp
     src/game/GameSetup.cpp
     src/io/ArcView.cpp
@@ -180,7 +189,7 @@ else()
     # ellipsecheck: DibShapes (the Switch's ellipses) against GDI, the C# GdiEllipseCheck's fixed cases
     add_executable(ellipsecheck tools/ellipsecheck/main.cpp tools/scnrun/GdiShapes.cpp)
     target_link_libraries(ellipsecheck PRIVATE openshiina_core)
-    # moviecheck: each frame of an MPEG-1 movie as the C# player's decoder makes it (SHA-256s)
+    # moviecheck: each frame of an MPEG-1 or Windows Media movie as the C# player's decoders make it (SHA-256s)
     add_executable(moviecheck tools/moviecheck/main.cpp)
     target_link_libraries(moviecheck PRIVATE openshiina_core)
     # routinecheck: the x86 routines' signatures against the C# player's (ScnTools routines)

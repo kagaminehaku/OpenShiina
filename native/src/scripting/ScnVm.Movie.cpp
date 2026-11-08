@@ -6,26 +6,52 @@
 // movie. START uses this path when RIO.INI MovieMode is 0 or 1; MovieMode 2 selects the other
 // player (05C9-05D8, ScnVm.GraphMovie).
 //
-// Here the movie is decoded by formats/MpegVideo (MPEG-1), on a thread of its own a few frames
-// ahead (formats/MovieAhead), and frame n is due n / rate seconds after the start; 05C0 draws the
-// latest frame that is due. The sound (MPEG-1 Layer II) plays through the music streams (IScnMusic), started, paused and stopped with the picture, at the
-// volume of the music streams' table. The C# player also decodes Windows Media (WMV3 / VC-1 in an
-// ASF file, Formats/Vc1Video); not ported yet: such a movie with an MPEG-1 one beside it plays as
-// that one, as the C# player does too, and one without is a movie that cannot be decoded (05B5
-// leaves it as if it had played to its end).
+// Here the movie is decoded by formats/MpegVideo (MPEG-1) or formats/Vc1Video (Windows Media: WMV3
+// / VC-1 in an ASF file), on a thread of its own a few frames ahead (formats/MovieAhead), and frame
+// n is due n / rate seconds after the start; 05C0 draws the latest frame that is due. The sound
+// (MPEG-1 Layer II, or WMA from formats/AsfAudio) plays through the music streams (IScnMusic),
+// started, paused and stopped with the picture, at the volume of the music streams' table. A
+// Windows Media movie with an MPEG-1 one beside it plays as that one, as the C# player does.
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
 #include <array>
 
+#include "formats/AsfAudio.h"
+#include "formats/AsfFile.h"
 #include "formats/MovieAhead.h"
 #include "formats/MpegAudio.h"
+#include "formats/Vc1Video.h"
 #include "platform/Files.h"
 #include "text/Text.h"
 
 namespace openshiina::scripting {
 
 namespace {
+
+/// The video of an ASF file, the file's streams kept while it is read.
+class AsfMovie final : public formats::IMovieVideo
+{
+public:
+    explicit AsfMovie(std::unique_ptr<formats::AsfFile> file) : m_file(std::move(file))
+    {
+        if (!m_file->Video)
+            throw InvalidDataError("No video stream");
+        m_video = std::make_unique<formats::Vc1Video>(*m_file->Video);
+        // the sound goes to the music streams packed apart (formats/AsfAudio)
+        m_file->Audio.reset();
+    }
+
+    int Width() const override { return m_video->Width(); }
+    int Height() const override { return m_video->Height(); }
+    double FrameRate() const override { return m_video->FrameRate(); }
+    const formats::MpegFrame* Next() override { return m_video->Next(); }
+    void Rewind() override { m_video->Rewind(); }
+
+private:
+    std::unique_ptr<formats::AsfFile> m_file;
+    std::unique_ptr<formats::Vc1Video> m_video;
+};
 
 bool EndsWithIgnoreCase(const std::string& text, const char* end)
 {
@@ -52,10 +78,15 @@ bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
     MovieSoundStop(movie);
     try
     {
-        // Windows Media (an ASF file): not decoded here yet
-        if (data.size() >= 4 && data[0] == 0x30 && data[1] == 0x26 && data[2] == 0xB2 && data[3] == 0x75)
-            return false;
-        if (data.size() >= 4 && data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0xB3)
+        if (formats::AsfFile::IsAsf(data))
+        {
+            auto file = std::make_unique<formats::AsfFile>(data);
+            data.clear();
+            data.shrink_to_fit();
+            movie.Wave = Music() != nullptr ? formats::AsfAudio::Pack(*file) : openshiina::Bytes();
+            movie.Video = std::make_unique<formats::MovieAhead>(std::make_unique<AsfMovie>(std::move(file)));
+        }
+        else if (data.size() >= 4 && data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0xB3)
         {
             // An MPEG-1 video stream alone, from its sequence header: the animations of Iyashinbo
             // The Motion (a\*.a, 800 x 600), which have no sound
@@ -76,7 +107,7 @@ bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
         movie.Video.reset();
         return false;
     }
-    if (Music() == nullptr || !formats::MpegAudio::IsMpegAudio(movie.Wave))
+    if (Music() == nullptr || !(formats::MpegAudio::IsMpegAudio(movie.Wave) || formats::AsfAudio::IsPacked(movie.Wave)))
         movie.Wave.clear();
     movie.Width = movie.Video->Width();
     movie.Height = movie.Video->Height();
@@ -114,7 +145,11 @@ void ScnVm::MovieSoundStart(Movie& movie, int64_t milliseconds)
     IScnMusic* music = Music();
     if (movie.Wave.empty() || music == nullptr)
         return;
-    movie.Sound = music->Open(milliseconds > 0 ? formats::MpegAudio::From(movie.Wave, milliseconds) : movie.Wave);
+    if (milliseconds <= 0)
+        movie.Sound = music->Open(movie.Wave);
+    else
+        movie.Sound = music->Open(formats::AsfAudio::IsPacked(movie.Wave) ? formats::AsfAudio::From(movie.Wave, milliseconds)
+                                                                          : formats::MpegAudio::From(movie.Wave, milliseconds));
     if (movie.Sound == 0)
         return;
     music->SetVolume(movie.Sound, MusicVolume(movie.Volume));

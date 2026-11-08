@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "audio/AudioDecoder.h"
+#include "formats/AsfAudio.h"
 #include "formats/MpegAudio.h"
 #include "minimp3/minimp3.h"
 
@@ -253,6 +254,39 @@ private:
     int m_channels = 0, m_rate = 0;
 };
 
+/// A Windows Media movie's sound (formats/AsfAudio's packed stream) decoded as it is read (C#: into
+/// a WAVE first).
+class WmaSource final : public SampleSource
+{
+public:
+    WmaSource(Bytes packed, bool loop) : m_packed(std::move(packed)), m_loop(loop), m_reader(std::make_unique<formats::AsfAudio::Reader>(m_packed)) {}
+
+    int Channels() const override { return m_reader->Channels(); }
+    int Rate() const override { return m_reader->Rate(); }
+
+    int Read(float* buffer, int count) override
+    {
+        int total = 0;
+        while (total < count)
+        {
+            int n = m_reader->Read(buffer + total, count - total);
+            total += n;
+            if (n > 0)
+                continue;
+            if (!m_loop || (total == 0 && ++m_emptyRewinds > 2))
+                break;
+            m_reader = std::make_unique<formats::AsfAudio::Reader>(m_packed);
+        }
+        return total;
+    }
+
+private:
+    Bytes m_packed;
+    bool m_loop;
+    std::unique_ptr<formats::AsfAudio::Reader> m_reader;
+    int m_emptyRewinds = 0;
+};
+
 } // namespace
 
 std::unique_ptr<SampleSource> OpenSource(const Bytes& file, bool loop)
@@ -270,6 +304,8 @@ std::unique_ptr<SampleSource> OpenSource(const Bytes& file, bool loop)
     if ((magic & 0xFFFFFF) == 0x444150)
         if (auto wave = AudioDecoder::DecodePad(file))
             return std::make_unique<WaveSource>(std::move(*wave), loop);
+    if (formats::AsfAudio::IsPacked(file))
+        return std::make_unique<WmaSource>(file, loop);
     if (magic != 0x46464952 && formats::MpegAudio::IsMpegAudio(file))
         return std::make_unique<MpegAudioSource>(file, loop);
     return std::make_unique<WaveSource>(file, loop);

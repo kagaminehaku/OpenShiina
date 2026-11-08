@@ -1,8 +1,11 @@
-// moviecheck <movie> [frames] [--fast]: decodes an MPEG-1 movie (a system stream, or a video stream
-// alone) with formats/MpegVideo and prints, for each frame in display order, the SHA-256 of its
+// moviecheck <movie> [frames] [--fast | --sound]: decodes an MPEG-1 movie (a system stream, or a video stream
+// alone) with formats/MpegVideo, or a Windows Media one (ASF) with formats/Vc1Video, and prints, for each frame in display order, the SHA-256 of its
 // picture as 24-bit BGR, and the frames' count and the decoding errors at the end. The C# player's
-// decoder gives the same lines for the same movie (Formats/MpegVideo.cs): compare them. The times
+// decoder gives the same lines for the same movie (Formats/MpegVideo.cs, Vc1Video.cs): compare them. The times
 // of the decoding and of the BGR pictures are given apart from that of the hashes.
+//
+// --sound: the sound of a Windows Media movie instead (formats/AsfAudio): its format, the SHA-256 of
+// its 16-bit samples and their count; the C# player's AsfAudio.StartWave gives the same.
 //
 // --fast: the fast inverse DCT (the Switch's) against the C# player's, frame by frame: the largest
 // difference of a byte, how many bytes differ, and the PSNR of each frame (the lowest and the mean).
@@ -13,11 +16,23 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <memory>
+#include <string>
+#include <vector>
 
+#include "formats/AsfAudio.h"
+#include "formats/AsfFile.h"
 #include "formats/MpegVideo.h"
+#include "formats/Vc1Video.h"
 #include "platform/Files.h"
 #include "util/Encoding.h"
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 using namespace openshiina;
 
@@ -73,33 +88,99 @@ int CompareFast(const Bytes& data, int limit)
     return 0;
 }
 
+/// A movie of either kind, the ASF file kept while its video stream is read.
+struct AnyMovie
+{
+    std::unique_ptr<formats::AsfFile> Asf;
+    std::unique_ptr<formats::IMovieVideo> Video;
+    int Errors() const
+    {
+        if (auto* vc1 = dynamic_cast<formats::Vc1Video*>(Video.get()))
+            return vc1->Errors();
+        return static_cast<formats::Mpeg1Video*>(Video.get())->Errors();
+    }
+};
+
+AnyMovie OpenAny(const Bytes& data)
+{
+    AnyMovie movie;
+    if (formats::AsfFile::IsAsf(data))
+    {
+        movie.Asf = std::make_unique<formats::AsfFile>(data);
+        if (!movie.Asf->Video)
+            throw InvalidDataError("No video stream");
+        movie.Video = std::make_unique<formats::Vc1Video>(*movie.Asf->Video);
+    }
+    else
+        movie.Video = Open(data);
+    return movie;
+}
+
+int CheckSound(const Bytes& data)
+{
+    formats::AsfFile file(data);
+    if (!file.Audio)
+    {
+        std::printf("no sound\n");
+        return 0;
+    }
+    std::printf("sound: format %X, %d channels, %d Hz, block %d\n", file.Audio->FormatTag, file.Audio->Channels, file.Audio->SampleRate, file.Audio->BlockAlign);
+    Bytes packed = formats::AsfAudio::Pack(file);
+    if (packed.empty())
+    {
+        std::printf("not decoded\n");
+        return 0;
+    }
+    auto start = std::chrono::steady_clock::now();
+    formats::AsfAudio::Reader reader(packed);
+    std::vector<float> buffer(4096);
+    Bytes pcm;
+    int n;
+    while ((n = reader.Read(buffer.data(), int(buffer.size()))) > 0)
+        for (int i = 0; i < n; i++)
+        {
+            int16_t s = int16_t(std::lround(buffer[size_t(i)] * 32768.0f));
+            pcm.push_back(uint8_t(s));
+            pcm.push_back(uint8_t(uint16_t(s) >> 8));
+        }
+    double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::printf("%d channels, %d Hz, %zu samples, %s, %.2f s\n", reader.Channels(), reader.Rate(), pcm.size() / 2,
+                Encoding::Sha256::HexOf(pcm.data(), pcm.size()).c_str(), seconds);
+    return 0;
+}
+
 } // namespace
 
-int main(int argc, char** argv)
+int Run(int argc, std::string* argv)
 {
     if (argc < 2)
     {
-        std::fprintf(stderr, "moviecheck <movie> [frames] [--fast]\n");
+        std::fprintf(stderr, "moviecheck <movie> [frames] [--fast | --sound]\n");
         return 2;
     }
-    bool compareFast = false;
+    bool compareFast = false, sound = false;
     int limit = 1 << 30;
     for (int k = 2; k < argc; k++)
-        if (std::strcmp(argv[k], "--fast") == 0)
+        if (argv[k] == "--fast")
             compareFast = true;
+        else if (argv[k] == "--sound")
+            sound = true;
         else
-            limit = std::atoi(argv[k]);
+            limit = std::atoi(argv[k].c_str());
     Bytes data;
     if (!Files::ReadAll(argv[1], data))
     {
-        std::fprintf(stderr, "Cannot read %s\n", argv[1]);
+        std::fprintf(stderr, "Cannot read %s\n", argv[1].c_str());
         return 1;
     }
     try
     {
         if (compareFast)
             return CompareFast(data, limit);
-        auto video = Open(data);
+        if (sound)
+            return CheckSound(data);
+        AnyMovie movie = OpenAny(data);
+        formats::IMovieVideo* video = movie.Video.get();
         std::printf("%dx%d, %.3f frames a second\n", video->Width(), video->Height(), video->FrameRate());
         Bytes bgr(size_t(video->Width()) * 3 * size_t(video->Height()));
         auto start = std::chrono::steady_clock::now();
@@ -118,7 +199,7 @@ int main(int argc, char** argv)
             std::printf("%d %s\n", n, Encoding::Sha256::HexOf(bgr.data(), bgr.size()).c_str());
         }
         double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-        std::printf("%d frames, %d errors, %.2f s (%.2f s decoding, %.2f s making the pictures)\n", n, video->Errors(), seconds, decoding, pictures);
+        std::printf("%d frames, %d errors, %.2f s (%.2f s decoding, %.2f s making the pictures)\n", n, movie.Errors(), seconds, decoding, pictures);
     }
     catch (const std::exception& e)
     {
@@ -127,3 +208,22 @@ int main(int argc, char** argv)
     }
     return 0;
 }
+
+// The arguments as UTF-8: on Windows from the UTF-16 command line (main's are in the ANSI code
+// page, which has no Japanese on most PCs)
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv)
+{
+    SetConsoleOutputCP(CP_UTF8);
+    std::vector<std::string> args;
+    for (int i = 0; i < argc; i++)
+        args.push_back(Files::ToUtf8(std::filesystem::path(argv[i])));
+    return Run(argc, args.data());
+}
+#else
+int main(int argc, char** argv)
+{
+    std::vector<std::string> args(argv, argv + argc);
+    return Run(argc, args.data());
+}
+#endif
