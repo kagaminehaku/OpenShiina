@@ -349,21 +349,23 @@ public sealed partial class ScnVm
         });
 
         // START 75E25 / 76273 (Ero-On! 5DA73): 600 rows of 2400 bytes from l[1] (one after the
-        // other) to l[0], rows 2404 bytes apart
-        RegisterNative(["F1057FFC43DC4027C0B8A90D039081D9AB4A4FF0", "87545B986579B5F66308666715D8D25592FF6D1D"], "rows600", (vm, c, a) =>
+        // other) to l[0], rows 2404 bytes apart; Vanquish START 05A48 (v2.33): 480 rows of 1920
+        static void RowsApart(ScnVm vm, ScnContext c, ScnNativeArgs a, int rows, int bytes)
         {
-            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
-            const int Rows = 600, Bytes = 2400, Stride = 2404;
-            var dstSpan = RowsSpan(dst, Stride, Rows, Bytes);
-            if (!Apart(dstSpan, (src, (long)Rows * Bytes)))
+            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1), stride = bytes + 4;
+            var dstSpan = RowsSpan(dst, stride, rows, bytes);
+            if (!Apart(dstSpan, (src, (long)rows * bytes)))
             {
                 vm.RunX86(c, a);
                 return;
             }
             using var verify = vm.VerifyRegion(c, a, dst, (int)dstSpan.Length);
-            for (int y = 0; y < Rows; y++)
-                vm.MoveMemory(dst + y * Stride, src + y * Bytes, Bytes);
-        });
+            for (int y = 0; y < rows; y++)
+                vm.MoveMemory(dst + y * stride, src + y * bytes, bytes);
+        }
+        RegisterNative(["F1057FFC43DC4027C0B8A90D039081D9AB4A4FF0", "87545B986579B5F66308666715D8D25592FF6D1D"], "rows600",
+            (vm, c, a) => RowsApart(vm, c, a, 600, 2400));
+        RegisterNative("E51CCAE189F93155F5E0562C60F9A57E317E5E36", "rows480", (vm, c, a) => RowsApart(vm, c, a, 480, 1920));
 
         // START 75EC3 / 76311: 75 rows of 300 bytes from l[0] (one after the other) to l[1], rows
         // 2400 bytes apart (a thumbnail into a picture); Ero-On! 5DB11: 12 rows of 48 bytes;
@@ -1058,13 +1060,13 @@ public sealed partial class ScnVm
         // B's, between them t = ((m - l[4]) * q >> 8) & 255 (16-bit words) mixes
         // (A * ((-t) & 255) + B * t) >> 8. q is the dword 0x10000 / l[5] put in both halves of a
         // dword (when it is 0x10000 the words alternate 0 and 1)
-        // Cleavage START 290D0 (v2.33) is the same code with other padding
-        RegisterNative(["5A3FAD758A876FE96A7F5B31B97E9D27CEF8C1D4", "0493BD7B4F8D747B0470A7B98BCF1DF1F15FB3DE"], "rule wipe", (vm, c, a) =>
+        // Cleavage START 290D0 (v2.33) is the same code with other padding; Vanquish START 058A0
+        // (v2.33) is Cleavage's for 230,400 pixels
+        static void RuleWipe(ScnVm vm, ScnContext c, ScnNativeArgs a, int pixels)
         {
-            const int Pixels = 360000;
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2), pm = vm.NativeArg(a, 3);
             int from = vm.NativeArg(a, 4), span = vm.NativeArg(a, 5);
-            if (span == 0 || !Apart(dst, Pixels * 4L, pa, Pixels * 4L) || !Apart(dst, Pixels * 4L, pb, Pixels * 4L) || !Apart(dst, Pixels * 4L, pm, Pixels * 4L))
+            if (span == 0 || !Apart(dst, pixels * 4L, pa, pixels * 4L) || !Apart(dst, pixels * 4L, pb, pixels * 4L) || !Apart(dst, pixels * 4L, pm, pixels * 4L))
             {
                 vm.RunX86(c, a);
                 return;
@@ -1073,9 +1075,9 @@ public sealed partial class ScnVm
             ushort start = (ushort)from;
             uint quotient = 0x10000u / (uint)span, packed = quotient << 16 | quotient;
             Span<ushort> q = [(ushort)packed, (ushort)(packed >> 16)];
-            using var verify = vm.VerifyRegion(c, a, dst, Pixels * 4);
-            byte[] bytesA = vm.ReadBytes(pa, Pixels * 4), bytesB = vm.ReadBytes(pb, Pixels * 4), mask = vm.ReadBytes(pm, Pixels * 4);
-            var output = new byte[Pixels * 4];
+            using var verify = vm.VerifyRegion(c, a, dst, pixels * 4);
+            byte[] bytesA = vm.ReadBytes(pa, pixels * 4), bytesB = vm.ReadBytes(pb, pixels * 4), mask = vm.ReadBytes(pm, pixels * 4);
+            var output = new byte[pixels * 4];
             for (int i = 0; i < output.Length; i++)
             {
                 short m = mask[i];
@@ -1086,7 +1088,10 @@ public sealed partial class ScnVm
                 output[i] = (byte)((ushort)(bytesA[i] * rest + bytesB[i] * t) >> 8 | outside);
             }
             vm.WriteBytes(dst, output);
-        });
+        }
+        RegisterNative(["5A3FAD758A876FE96A7F5B31B97E9D27CEF8C1D4", "0493BD7B4F8D747B0470A7B98BCF1DF1F15FB3DE"], "rule wipe",
+            (vm, c, a) => RuleWipe(vm, c, a, 360000));
+        RegisterNative("CA6F1073A660B138FD4FF36D3D5EDA9DB3200DCE", "rule wipe", (vm, c, a) => RuleWipe(vm, c, a, 230400));
         // Miko Dashi START 0086D (v2.47): l[3] = 0 when the l[2] bytes at l[0] and l[1] are the
         // same (or l[2] is 0), else 1
         RegisterNative("8FB1D89A2807A081E0BB98462D2D0323A39C10E3", "memcmp", (vm, c, a) =>
@@ -1103,7 +1108,8 @@ public sealed partial class ScnVm
         // The Japanese Sorcery Jokers' START 0406D: in three squares of 32 x 32 side by side of a
         // picture 1920 wide at l[0] (none when it is 0), how many pixels' first byte is not 0, into
         // l[1], l[2], l[3]
-        RegisterNative("865BD2B3A91252B3DE759CEDB32B5D7BAC091417", "count 32x32", (vm, c, a) =>
+        // Chiccha na Hanayome START 02184 (v2.50): the same in a picture 1280 wide
+        static void Count32(ScnVm vm, ScnContext c, ScnNativeArgs a, int stride)
         {
             int src = vm.NativeArg(a, 0);
             using var verify = vm.VerifyRegion(c, a, a.Stack + 4, 12);
@@ -1113,11 +1119,13 @@ public sealed partial class ScnVm
                 if (src != 0)
                     for (int y = 0; y < 32; y++)
                         for (int x = 0; x < 32; x++)
-                            if (vm.ReadByte(src + k * 96 + y * 5760 + x * 3) != 0)
+                            if (vm.ReadByte(src + k * 96 + y * stride + x * 3) != 0)
                                 count++;
                 vm.SetL(a, 1 + k, count);
             }
-        });
+        }
+        RegisterNative("865BD2B3A91252B3DE759CEDB32B5D7BAC091417", "count 32x32", (vm, c, a) => Count32(vm, c, a, 5760));
+        RegisterNative("95504B1B7498BA815BAA8D51A1C93CB297717C8B", "count 32x32", (vm, c, a) => Count32(vm, c, a, 3840));
 
         // Sorcery Jokers START 211A07: 482 rows of 856 BGR pixels from l[4] (a picture 1920
         // wide) to l[0], one after the other (a byte at a time: blocks that share bytes run as x86)
