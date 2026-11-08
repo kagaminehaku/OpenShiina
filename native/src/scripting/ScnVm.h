@@ -633,6 +633,11 @@ private:
         /// The movie's sound (its MPEG audio stream; empty when it has none) and its music stream while it plays.
         openshiina::Bytes Wave;
         int Sound = 0;
+        /// The other player: where op_05D4 draws (surface, x, y), the latest frame, and v2.49's surface of op_05C9.
+        bool Target = false;
+        int X = 0, Y = 0;
+        int DirectSurface = -1;
+        openshiina::Bytes LastRows;
         /// v2.33's movie window (0579): its frames are drawn into the game window there, not into a surface.
         std::optional<ScreenArea> Window;
     };
@@ -655,6 +660,14 @@ private:
     Movie m_windowMovie;
     ScreenArea m_windowMovieArea;
     void DrawMovieToWindow(const openshiina::Bytes& rows, int w, int h, const ScreenArea& area);
+    // The other player (ScnVm.GraphMovie)
+    std::array<Movie, MovieSlots> m_graphMovies{};
+    Movie* GraphMovie(int n) { return n >= 0 && n < MovieSlots ? &m_graphMovies[size_t(n)] : nullptr; }
+    bool Version249() const { return EngineVersion >= 249; }
+    void RegisterGraphMovie();
+    void CloseGraphMovie(Movie& movie);
+    bool AdvanceGraphMovie(Movie& movie);
+    void DrawGraphMovie(Movie& movie);
 
     // ---- Surfaces ----
     static constexpr int SurfaceRegion = 0x08000000, SurfaceSize = 0x2C;

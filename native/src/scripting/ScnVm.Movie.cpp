@@ -4,7 +4,7 @@
 // wants it (0514 to the screen, 055E into a picture). IStreamSample::Update (op 05C0) waits for the
 // next frame and draws it; at the end of the stream it starts again (looping movies) or stops the
 // movie. START uses this path when RIO.INI MovieMode is 0 or 1; MovieMode 2 selects the other
-// player (05C9-05D8, C# ScnVm.GraphMovie.cs).
+// player (05C9-05D8, ScnVm.GraphMovie).
 //
 // Here the movie is decoded by formats/MpegVideo (MPEG-1), on a thread of its own a few frames
 // ahead (formats/MovieAhead), and frame n is due n / rate seconds after the start; 05C0 draws the
