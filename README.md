@@ -22,7 +22,8 @@ The ShiinaRio engine runs only on 32-bit Windows, through old Windows APIs, and 
 ask for their disc. OpenShiina keeps these games playable:
 
 - **On today's machines and on phones:** Windows, Linux and Android, from the same game files,
-  with no Windows layer or emulator in between.
+  with no Windows layer or emulator in between; and, as homebrew, the Nintendo Switch
+  ([docs/switch.md](docs/switch.md)).
 - **As the games were made:** it runs their own scripts rather than retelling the story, so the
   effects, menus and saves are the original ones.
 - **In other languages:** translations sit beside the game and are read as it plays, without

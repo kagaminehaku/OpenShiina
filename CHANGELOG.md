@@ -4,6 +4,19 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.8.2 (2026-11-08)
+
+- **OpenShiina on the Nintendo Switch**, as homebrew: `OpenShiina-0.8.2-switch.nro`, the same engine
+  written again in C++ (`native/`), with its own game list drawn with deko3d. Azu Plus and Bitch
+  Gakuen ga Seijun na Hazu ga Nai!!? were played on a Switch Lite (sound, voices, movies); the other
+  games run the same way on PC but were not tried on the console yet. How to install it and play:
+  [docs/switch.md](docs/switch.md).
+- Native versions of the x86 routines that the players still translated, checked against the x86
+  code: Vanquish's rule wipe, Chiccha na Hanayome's square count, and the block copies, thumbnails
+  and enlarge / move / scale builds of Gensou no Idea, Ren'ai Saimin, Saimin Seikatsu, Kateinai
+  Choukyou, Tanetsuke Mura, Gakushoku no Oba-san The Motion, Pure Love!, Chuuchuu Nurse, Chuuni
+  Hime no Teikoku and Hin wa Bokura no Fuku no Kami.
+
 ## 0.8.1 (2026-11-06)
 
 - The games of the engines before v2.44 save again (Ayakashibito, Ao no Juuai, Vanquish,
