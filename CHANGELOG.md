@@ -4,6 +4,28 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.8.2.1 (2026-11-10)
+
+A hotfix of 0.8.2 for the Switch player (`OpenShiina-0.8.2.1-switch.nsp` / `.nro`); the Windows,
+Linux and Android players are 0.8.2's.
+
+- Sorcery Jokers plays: the player read its 1.8 GB archives whole to learn their sizes and ran out of
+  memory at the first frame.
+- The installed title (.nsp) starts its games: it now gets the process handle the scripts' memory
+  needs by itself, as the homebrew loader does.
+- The list of games shows each game's own name and its icon, remembers the folders it has
+  recognised (Y looks at them all again), and lists the games copied to the console's own storage
+  (`OpenShiina/Games` in DBI's "Nand USER") too.
+- Settings (X in the list): "Scaling" (Sharp, Whole numbers, Smooth, Nearest, and now FSR 1) and
+  "FSR sharpness", kept in `OpenShiina/settings.json` as the PC player keeps them.
+- + while a game plays opens a menu over it, the game standing still: back to the game, the
+  scaling, leave the game.
+- As the PC player: sounds of other rates resampled the same way (WDL), the pictures and sounds of
+  a scenario read ahead on other threads and the engine's background loader working in the
+  background, Shift-JIS text decoded the same way.
+- An experimental GPU mode for the heaviest pixel routines (the PC player's compute shaders), off
+  unless `OpenShiina/gpu` on the SD card holds "1": not tried on a console yet.
+
 ## 0.8.2 (2026-11-08)
 
 - **OpenShiina on the Nintendo Switch**, as homebrew: `OpenShiina-0.8.2-switch.nsp` (installed once,
