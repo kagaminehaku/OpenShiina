@@ -559,9 +559,18 @@ void Play(Ui& ui, const std::string& folder)
 
 } // namespace
 
-// The program's start (the .nro's or the title's code), which addresses in the log count from:
-// aarch64-none-elf-addr2line -f -C -e player.elf <offsets>
-extern "C" char __start__[];
+// Where the program's code starts (the .nro's or the title's), which addresses in the log count
+// from: aarch64-none-elf-addr2line -f -C -e player.elf <offsets>
+uintptr_t CodeStart()
+{
+    static const uintptr_t start = [] {
+        MemoryInfo info{};
+        u32 page = 0;
+        svcQueryMemory(&info, &page, reinterpret_cast<uintptr_t>(&CodeStart));
+        return uintptr_t(info.addr);
+    }();
+    return start;
+}
 
 // Allocations through malloc, the size of one that fails kept for the log; one of 1 GB or more
 // logs where it was made from (a size gone wrong, mostly)
@@ -578,7 +587,7 @@ void* operator new(size_t size)
             [](_Unwind_Context* context, void* argument) {
                 auto* t = static_cast<Trace*>(argument);
                 char offset[24];
-                std::snprintf(offset, sizeof offset, " 0x%lx", (unsigned long)(_Unwind_GetIP(context) - uintptr_t(__start__)));
+                std::snprintf(offset, sizeof offset, " 0x%lx", (unsigned long)(_Unwind_GetIP(context) - CodeStart()));
                 t->text += offset;
                 return ++t->frames < 16 ? _URC_NO_REASON : _URC_END_OF_STACK;
             },
