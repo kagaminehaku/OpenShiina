@@ -20,7 +20,9 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <format>
+#include <map>
 #include <memory>
 #include <new>
 #include <optional>
@@ -29,10 +31,12 @@
 
 #include "DevHostReturn.h"
 #include "FreeTypeFonts.h"
+#include "GameList.h"
 #include "archives/FormatManager.h"
 #include "audio/ScnMixer.h"
 #include "audio/ScnMusic.h"
 #include "audio/ScnSound.h"
+#include "formats/ExeIcon.h"
 #include "game/GameData.h"
 #include "game/GameSetup.h"
 #include "platform/DibShapes.h"
@@ -50,6 +54,9 @@ using player::Rect;
 namespace {
 
 constexpr const char* kGames = "sdmc:/OpenShiina/Games";
+// The console's own storage (DBI's "Nand USER"), mounted as user: (read only) when it can be
+constexpr const char* kInternalGames = "user:/OpenShiina/Games";
+constexpr const char* kLibrary = "sdmc:/OpenShiina/library.tsv";
 constexpr const char* kSaves = "sdmc:/OpenShiina/Saves";
 constexpr const char* kLog = "sdmc:/OpenShiina/player.log";
 constexpr const char* kData = "romfs:/Data";
@@ -97,6 +104,7 @@ constexpr uint32_t kBackground = Rgb(26, 10, 16), kPanel = Rgb(44, 20, 28), kAcc
 
 // The buttons' symbols of the Switch's font (Nintendo's extension)
 constexpr const char* kButtonA = "\xEE\x83\xA0";
+constexpr const char* kButtonY = "\xEE\x83\xA3";
 constexpr const char* kButtonPlus = "\xEE\x83\xAF";
 constexpr const char* kButtonMinus = "\xEE\x83\xB0";
 
@@ -261,14 +269,43 @@ private:
 /// What PickGame gives for - : the homebrew menu next, in place of a game.
 constexpr const char* kToHbmenu = "\x01hbmenu";
 
-/// The game folders, Latin names only (the Switch does not see folders with Japanese names written
-/// from Windows): A plays the one chosen (a tap chooses, a tap on the chosen one plays), - opens
-/// hbmenu, + leaves.
-std::string PickGame(Ui& ui)
+/// The icons of the games' .exe files, read once each (by the .exe's path), none for one without
+std::map<std::string, player::Texture> s_icons;
+
+/// The icon of a game for the list, read the first time it is asked for (one a frame: reading an
+/// .exe from the card takes a moment); false when it is not read yet.
+bool IconOf(Ui& ui, const player::GameEntry& game, bool& readOne, player::Texture& icon)
 {
-    auto folders = Files::FolderNames(kGames);
-    std::sort(folders.begin(), folders.end());
-    constexpr float RowHeight = 60, ListX = 380, ListY = 110, ListW = 860;
+    if (game.Exe.empty())
+        return true;
+    auto found = s_icons.find(game.Exe);
+    if (found == s_icons.end())
+    {
+        if (readOne)
+            return false;
+        readOne = true;
+        player::Texture t;
+        if (auto image = formats::ExeIcon::Read(game.Exe, 48))
+        {
+            t = ui.Screen.CreateTexture(image->Width, image->Height);
+            for (int y = 0; y < image->Height; y++)
+                std::memcpy(t.Pixels + size_t(y) * t.Stride, image->Rgba.data() + size_t(y) * size_t(image->Width) * 4, size_t(image->Width) * 4);
+        }
+        found = s_icons.emplace(game.Exe, t).first;
+    }
+    icon = found->second;
+    return true;
+}
+
+/// The game to play from the list (its folder), kToHbmenu for −, or nothing for + (leave). Y looks
+/// at every folder again.
+std::string PickGame(Ui& ui, bool internal)
+{
+    std::vector<std::pair<std::string, bool>> roots = {{kGames, false}};
+    if (internal)
+        roots.emplace_back(kInternalGames, true);
+    auto games = player::ListGames(roots, kLibrary, false);
+    constexpr float RowHeight = 60, ListX = 380, ListY = 110, ListW = 860, IconSize = 44;
     constexpr int Rows = 9;
     size_t choice = 0, top = 0;
     bool touching = false;
@@ -280,9 +317,15 @@ std::string PickGame(Ui& ui)
             return {};
         if ((down & HidNpadButton_Minus) && envHasNextLoad())
             return kToHbmenu;
-        if (!folders.empty() && (down & HidNpadButton_A))
-            return folders[choice];
-        if ((down & (HidNpadButton_AnyDown)) && choice + 1 < folders.size())
+        if (!games.empty() && (down & HidNpadButton_A))
+            return games[choice].Path;
+        if (down & HidNpadButton_Y)
+        {
+            ui.Splash("Looking at the games...");
+            games = player::ListGames(roots, kLibrary, true);
+            choice = top = 0;
+        }
+        if ((down & (HidNpadButton_AnyDown)) && choice + 1 < games.size())
             choice++;
         if ((down & (HidNpadButton_AnyUp)) && choice > 0)
             choice--;
@@ -291,10 +334,10 @@ std::string PickGame(Ui& ui)
         if (touch && !touching && tx >= ListX && tx < ListX + ListW && ty >= ListY)
         {
             size_t row = top + size_t((ty - ListY) / RowHeight);
-            if (row < folders.size() && row < top + Rows)
+            if (row < games.size() && row < top + Rows)
             {
                 if (row == choice)
-                    return folders[choice];
+                    return games[choice].Path;
                 choice = row;
             }
         }
@@ -311,21 +354,31 @@ std::string PickGame(Ui& ui)
         s.Image(ui.Logo, {90, 60, 160, 160});
         float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
         s.Image(ui.Wordmark, {30, 240, ww, wh});
-        // the games
+        // the games: the icon, the name (dim for a folder no scheme opens)
         ui.Text.Draw("Games", ListX, 48, 34, kText);
-        if (folders.empty())
+        if (games.empty())
             ui.Text.Draw(std::string("No game folder in ") + kGames, ListX, ListY + 10, 24, kDim);
-        for (size_t k = top; k < folders.size() && k < top + Rows; k++)
+        bool readOne = false;
+        for (size_t k = top; k < games.size() && k < top + Rows; k++)
         {
+            const auto& game = games[k];
             float y = ListY + float(k - top) * RowHeight;
             if (k == choice)
                 s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kAccent, 12);
-            ui.Text.Draw(ui.Text.Fit(folders[k], 28, ListW - 40), ListX + 8, y + 10, 28, kText);
+            player::Texture icon;
+            if (IconOf(ui, game, readOne, icon) && icon.Valid())
+                s.Image(icon, {ListX, y + (RowHeight - 8 - IconSize) / 2, IconSize, IconSize});
+            std::string name = game.Known ? game.Name : game.Name + "  (not recognised)";
+            if (game.Internal)
+                name += "  - console";
+            float textX = ListX + IconSize + 16;
+            ui.Text.Draw(ui.Text.Fit(name, 28, ListX + ListW - 24 - textX), textX, y + 10, 28, game.Known ? kText : kDim);
         }
         // the buttons
         s.Fill({0, 672, 1280, 48}, kPanel);
         // (− only when a loader started the player: installed as its own title, there is no hbmenu to go to)
-        std::string hints = std::string(kButtonA) + " Play     " + (envHasNextLoad() ? std::string(kButtonMinus) + " hbmenu     " : "") + kButtonPlus + " Quit";
+        std::string hints = std::string(kButtonA) + " Play     " + kButtonY + " Look again     "
+                            + (envHasNextLoad() ? std::string(kButtonMinus) + " hbmenu     " : "") + kButtonPlus + " Quit";
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
         s.End();
     }
@@ -349,9 +402,9 @@ void CopyPicture(const Bytes& window, int width, int height, player::Texture& t)
     }
 }
 
-void Play(Ui& ui, const std::string& folder)
+void Play(Ui& ui, const std::string& path)
 {
-    std::string path = Files::Combine(kGames, folder);
+    std::string folder = Files::FileName(path);
     auto archive = game::GameData::FindArchive(path);
     auto scheme = archive ? archives::FormatManager::Instance()->SchemeForArchive(*archive) : nullptr;
     if (!scheme)
@@ -665,10 +718,20 @@ int main(int argc, char** argv)
         if (argv[k] && argv[k][0] != '_')
             folder = argv[k];
     bool named = !folder.empty();
+    if (named)
+        folder = Files::Combine(kGames, folder);
+    // The console's own storage, read only, for games put there over DBI's MTP ("Nand USER")
+    FsFileSystem userFs;
+    bool internal = R_SUCCEEDED(fsOpenBisFileSystem(&userFs, FsBisPartitionId_User, ""));
+    if (internal && fsdevMountDevice("user", userFs) < 0)
+    {
+        fsFsClose(&userFs);
+        internal = false;
+    }
     while (ui)
     {
         if (!named)
-            folder = PickGame(*ui);
+            folder = PickGame(*ui, internal);
         if (folder == kToHbmenu)
         {
             envSetNextLoad("sdmc:/hbmenu.nro", "sdmc:/hbmenu.nro");
@@ -688,6 +751,8 @@ int main(int argc, char** argv)
             break;
     }
     ui.reset();
+    if (internal)
+        fsdevUnmountDevice("user");
     SDL_Quit();
     if (s_log)
         std::fclose(s_log);

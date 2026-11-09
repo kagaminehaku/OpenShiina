@@ -26,6 +26,7 @@ add_library(openshiina_core STATIC
     src/archives/WarcRangeDecoder.cpp
     src/formats/AsfAudio.cpp
     src/formats/AsfFile.cpp
+    src/formats/ExeIcon.cpp
     src/formats/Mdct.cpp
     src/formats/MovieAhead.cpp
     src/formats/MpegAudio.cpp
@@ -172,7 +173,7 @@ if(NINTENDO_SWITCH)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
     pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
     # The player draws with deko3d (player/ui); SDL is only its sound out
-    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp player/ui/Renderer.cpp player/ui/UiText.cpp
+    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp player/GameList.cpp player/ui/Renderer.cpp player/ui/UiText.cpp
                           tools/devhost/DevHostReturn.cpp)
     target_include_directories(player PRIVATE player tools/devhost)
     target_link_libraries(player PRIVATE openshiina_core openshiina_audio deko3d PkgConfig::SDL2 PkgConfig::FREETYPE)
