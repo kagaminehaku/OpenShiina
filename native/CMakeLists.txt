@@ -129,6 +129,7 @@ add_library(openshiina_audio STATIC
     src/audio/ScnMixer.cpp
     src/audio/ScnMusic.cpp
     src/audio/ScnSound.cpp
+    src/audio/WdlResampler.cpp
 )
 target_include_directories(openshiina_audio SYSTEM PRIVATE third_party)
 target_link_libraries(openshiina_audio PUBLIC openshiina_core PRIVATE audio_codecs)

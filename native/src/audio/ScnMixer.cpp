@@ -7,29 +7,36 @@ namespace openshiina::audio {
 
 ScnVoice::ScnVoice(std::unique_ptr<SampleSource> source, float gain) : Gain(gain), m_source(std::move(source))
 {
-    m_step = double(m_source->Rate()) / ScnMixer::Rate;
-    m_buffer.resize(size_t(1024) * size_t(std::max(1, m_source->Channels())));
+    if (m_source->Rate() != ScnMixer::Rate)
+        m_resampler = std::make_unique<WdlResampler>(m_source->Rate(), ScnMixer::Rate);
 }
 
-bool ScnVoice::NextFrame(float& left, float& right)
+int ScnVoice::ReadStereo(float* buffer, int count)
 {
-    int channels = m_source->Channels();
-    if (m_at >= m_buffered)
+    if (m_source->Channels() == 2)
+        return m_source->Read(buffer, count);
+    // (more channels: the C# player's mixer takes none of them)
+    if (m_source->Channels() != 1)
+        return 0;
+    m_mono.resize(size_t(count / 2));
+    int read = m_source->Read(m_mono.data(), count / 2);
+    for (int i = 0; i < read; i++)
     {
-        if (m_sourceEnded)
-            return false;
-        int want = int(m_buffer.size()) / channels * channels;
-        m_buffered = m_source->Read(m_buffer.data(), want);
-        m_at = 0;
-        if (m_buffered < want)
-            m_sourceEnded = true;
-        if (m_buffered <= 0)
-            return false;
+        buffer[2 * i] = m_mono[size_t(i)] * 1.0f;
+        buffer[2 * i + 1] = m_mono[size_t(i)] * 1.0f;
     }
-    left = m_buffer[size_t(m_at)];
-    right = channels >= 2 ? m_buffer[size_t(m_at) + 1] : left;
-    m_at += channels;
-    return true;
+    return read * 2;
+}
+
+int ScnVoice::Read(float* buffer, int count)
+{
+    if (!m_resampler)
+        return ReadStereo(buffer, count);
+    int frames = count / 2;
+    float* in = nullptr;
+    int wanted = m_resampler->ResamplePrepare(frames, 2, in);
+    int got = ReadStereo(in, wanted * 2) / 2;
+    return m_resampler->ResampleOut(buffer, got, frames, 2) * 2;
 }
 
 void ScnVoice::Finish()
@@ -38,6 +45,7 @@ void ScnVoice::Finish()
         return;
     m_ended = true;
     m_source.reset();
+    m_resampler.reset();
 }
 
 bool ScnVoice::MixInto(float* mix, int frames)
@@ -49,51 +57,19 @@ bool ScnVoice::MixInto(float* mix, int frames)
     }
     if (Paused)
         return true;
-    if (!m_started)
-    {
-        m_started = true;
-        if (!NextFrame(m_l0, m_r0))
-        {
-            Finish();
-            return false;
-        }
-        if (!NextFrame(m_l1, m_r1))
-        {
-            m_l1 = m_l0;
-            m_r1 = m_r0;
-        }
-    }
+    int count = frames * 2;
+    m_samples.resize(size_t(count));
+    int read = Read(m_samples.data(), count);
     float gain = Gain;
-    bool exact = m_source->Rate() == ScnMixer::Rate;
-    for (int i = 0; i < frames; i++)
+    if (gain != 1)
+        for (int i = 0; i < read; i++)
+            m_samples[size_t(i)] *= gain;
+    for (int i = 0; i < read; i++)
+        mix[i] += m_samples[size_t(i)];
+    if (read < count)
     {
-        float left, right;
-        if (exact)
-        {
-            left = m_l0;
-            right = m_r0;
-        }
-        else
-        {
-            float t = float(m_position);
-            left = m_l0 + (m_l1 - m_l0) * t;
-            right = m_r0 + (m_r1 - m_r0) * t;
-        }
-        mix[2 * i] += left * gain;
-        mix[2 * i + 1] += right * gain;
-        m_position += exact ? 1.0 : m_step;
-        while (m_position >= 1)
-        {
-            m_position -= 1;
-            m_l0 = m_l1;
-            m_r0 = m_r1;
-            // the end of the source: the voice ends after this frame
-            if (!NextFrame(m_l1, m_r1))
-            {
-                Finish();
-                return false;
-            }
-        }
+        Finish();
+        return false;
     }
     return true;
 }

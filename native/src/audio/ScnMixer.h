@@ -4,13 +4,16 @@
 // calling it on its own thread.
 //
 // The C# player's mixer is NAudio's (MixingSampleProvider, MonoToStereoSampleProvider,
-// WdlResamplingSampleProvider); here a sound of another rate is resampled linearly.
+// WdlResamplingSampleProvider), and so is this one's: a mono sound made stereo, then one of another
+// rate resampled by WDL's resampler (WdlResampler), gain applied, the voices added.
 #pragma once
 
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <vector>
+
+#include "audio/WdlResampler.h"
 
 namespace openshiina::audio {
 
@@ -44,18 +47,16 @@ public:
     bool MixInto(float* mix, int frames);
 
 private:
-    /// The next frame of the source as stereo; false at its end.
-    bool NextFrame(float& left, float& right);
+    /// Up to count samples (whole stereo frames) of the source as stereo (MonoToStereoSampleProvider).
+    int ReadStereo(float* buffer, int count);
+    /// Up to count samples at 44.1 kHz stereo (WdlResamplingSampleProvider for another rate).
+    int Read(float* buffer, int count);
     void Finish();
 
     std::unique_ptr<SampleSource> m_source;
+    std::unique_ptr<WdlResampler> m_resampler;
     std::atomic<bool> m_stopped{false}, m_ended{false};
-    std::vector<float> m_buffer;
-    int m_buffered = 0, m_at = 0;
-    // the linear resampling: the two source frames around the position, and the position in between
-    float m_l0 = 0, m_r0 = 0, m_l1 = 0, m_r1 = 0;
-    double m_position = 0, m_step = 1;
-    bool m_started = false, m_sourceEnded = false;
+    std::vector<float> m_mono, m_samples;
 };
 
 class ScnMixer
