@@ -49,17 +49,16 @@ std::string Cp932ToUtf8(const uint8_t* data, size_t length)
             AppendUtf8(out, c != 0 || b == 0 ? c : '?');
             continue;
         }
-        if (i + 1 < length && data[i + 1] >= 0x40 && data[i + 1] <= 0xFC)
+        // As .NET's code page 932: a lead byte takes the next byte, whatever it is, and a pair with
+        // no character (or a lead byte at the end) is U+30FB, the katakana middle dot
+        uint16_t c = 0;
+        if (i + 1 < length)
         {
-            uint16_t c = kDouble[lead][data[i + 1] - 0x40];
-            if (c != 0)
-            {
-                AppendUtf8(out, c);
-                i++;
-                continue;
-            }
+            uint8_t trail = data[++i];
+            if (trail >= 0x40 && trail <= 0xFC)
+                c = kDouble[lead][trail - 0x40];
         }
-        out += '?';
+        AppendUtf8(out, c != 0 ? c : 0x30FB);
     }
     return out;
 }
