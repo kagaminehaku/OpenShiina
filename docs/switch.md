@@ -46,8 +46,11 @@ There − does nothing in the list of games (there is no Homebrew Menu to go bac
    gets only about 370 MB of memory and the games run out of it; started from a game it has all of
    the console's.
 
-OpenShiina shows the games of `OpenShiina/Games` to pick from; A plays the chosen one, − goes back
-to hbmenu, + quits.
+OpenShiina shows the games of `OpenShiina/Games` to pick from, each with its name and its icon
+(games copied to the console's own storage, DBI's "Nand USER", in `OpenShiina/Games` there, are
+listed too). A plays the chosen one, X opens the settings (how the picture is scaled: Sharp, Whole
+numbers, Smooth, Nearest or FSR 1, and FSR's sharpness), Y looks at the game folders again, − goes
+back to hbmenu, + quits.
 
 ## Playing
 
@@ -62,7 +65,7 @@ to hbmenu, + quits.
 | R / ZR (held) | Control: skip |
 | L | Page Up (the text history) |
 | D-pad | the arrow keys |
-| + | leave the game |
+| + | the menu: back to the game, the scaling, leave the game |
 | HOME | pauses the game |
 
 The saves go to `OpenShiina/Saves/<game>` on the card, and what the player prints to

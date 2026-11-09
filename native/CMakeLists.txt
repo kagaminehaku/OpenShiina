@@ -173,7 +173,7 @@ if(NINTENDO_SWITCH)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
     pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
     # The player draws with deko3d (player/ui); SDL is only its sound out
-    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp player/GameList.cpp player/ui/Renderer.cpp player/ui/UiText.cpp
+    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp player/GameList.cpp player/Settings.cpp player/ui/Renderer.cpp player/ui/UiText.cpp
                           tools/devhost/DevHostReturn.cpp)
     target_include_directories(player PRIVATE player tools/devhost)
     target_link_libraries(player PRIVATE openshiina_core openshiina_audio deko3d PkgConfig::SDL2 PkgConfig::FREETYPE)
@@ -185,7 +185,7 @@ if(NINTENDO_SWITCH)
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/player/romfs/ui" DESTINATION "${PLAYER_ROMFS}")
     # The shaders, compiled for the Tegra X1 when the player is built (uam), into the romfs
     set(PLAYER_SHADERS)
-    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag)
+    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag)
         string(REPLACE ":" ";" parts "${shader}")
         list(GET parts 0 name)
         list(GET parts 1 stage)

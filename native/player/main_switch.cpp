@@ -1,6 +1,7 @@
 // OpenShiina.nro: the player on the Switch. It shows its logo at once (ui/Renderer, deko3d), then the
-// game folders of sdmc:/OpenShiina/Games to pick from (one named as the first argument starts at
-// once); the game's picture fills the screen as the setting "Scaling" says (Sharp for now). Its
+// games of sdmc:/OpenShiina/Games and of the console's storage to pick from (GameList; a folder
+// named as the first argument starts at once); X opens the settings (settings.json), and the game's
+// picture fills the screen as the setting "Scaling" says. Its
 // saves go to sdmc:/OpenShiina/Saves/<game>; Formats.Json, the opcode tables, the shaders and the
 // logo are in the romfs. What it prints goes to sdmc:/OpenShiina/player.log and, started by
 // nxlink -s, to the PC.
@@ -8,7 +9,8 @@
 // Input, as the C# player's touch bar and joystick give it: a touch is the mouse (moved there, the
 // left button held while touching); A is Return, B the right button, X Escape, Y Space, R / ZR
 // Control (held: skip), L Page Up, the D-pad the arrow keys, the left stick moves the pointer (shown
-// while it moves); + leaves the game. Text is drawn with the Switch's own Japanese font
+// while it moves); + opens the menu (GameMenu: back, the scaling, leave the game). Text is drawn
+// with the Switch's own Japanese font
 // (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
 #include <SDL.h>
 #include <switch.h>
@@ -22,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
+#include <functional>
 #include <map>
 #include <memory>
 #include <new>
@@ -32,6 +35,7 @@
 #include "DevHostReturn.h"
 #include "FreeTypeFonts.h"
 #include "GameList.h"
+#include "Settings.h"
 #include "archives/FormatManager.h"
 #include "audio/ScnMixer.h"
 #include "audio/ScnMusic.h"
@@ -57,6 +61,7 @@ constexpr const char* kGames = "sdmc:/OpenShiina/Games";
 // The console's own storage (DBI's "Nand USER"), mounted as user: (read only) when it can be
 constexpr const char* kInternalGames = "user:/OpenShiina/Games";
 constexpr const char* kLibrary = "sdmc:/OpenShiina/library.tsv";
+constexpr const char* kSettings = "sdmc:/OpenShiina/settings.json";
 constexpr const char* kSaves = "sdmc:/OpenShiina/Saves";
 constexpr const char* kLog = "sdmc:/OpenShiina/player.log";
 constexpr const char* kData = "romfs:/Data";
@@ -104,7 +109,11 @@ constexpr uint32_t kBackground = Rgb(26, 10, 16), kPanel = Rgb(44, 20, 28), kAcc
 
 // The buttons' symbols of the Switch's font (Nintendo's extension)
 constexpr const char* kButtonA = "\xEE\x83\xA0";
+constexpr const char* kButtonB = "\xEE\x83\xA1";
+constexpr const char* kButtonX = "\xEE\x83\xA2";
 constexpr const char* kButtonY = "\xEE\x83\xA3";
+// (arrows of the Japanese font: left, right)
+constexpr const char* kButtonLeftRight = "\xE2\x86\x90\xE2\x86\x92";
 constexpr const char* kButtonPlus = "\xEE\x83\xAF";
 constexpr const char* kButtonMinus = "\xEE\x83\xB0";
 
@@ -269,6 +278,9 @@ private:
 /// What PickGame gives for - : the homebrew menu next, in place of a game.
 constexpr const char* kToHbmenu = "\x01hbmenu";
 
+/// The settings (settings.json), read at the start
+player::Settings s_settings;
+
 /// The icons of the games' .exe files, read once each (by the .exe's path), none for one without
 std::map<std::string, player::Texture> s_icons;
 
@@ -297,6 +309,83 @@ bool IconOf(Ui& ui, const player::GameEntry& game, bool& readOne, player::Textur
     return true;
 }
 
+/// The settings, as the C# player has them (its Graphics page's "Scaling" and "FSR sharpness"):
+/// up / down choose a row, left / right (or A, or a touch on the row's two halves) change it; B or
+/// X goes back, and the file is written if anything changed.
+void SettingsScreen(Ui& ui)
+{
+    constexpr int Rows = 2;
+    constexpr float RowHeight = 76, ListX = 380, ListY = 130, ListW = 860;
+    constexpr int ScalingCount = int(std::size(player::kScalingChoices));
+    player::Settings before = s_settings;
+    int row = 0;
+    bool touching = false;
+    auto scalingIndex = [] {
+        for (int k = 0; k < ScalingCount; k++)
+            if (player::kScalingChoices[k].Value == s_settings.PictureScaling)
+                return k;
+        return 0;
+    };
+    auto change = [&](int r, int step) {
+        if (r == 0)
+            s_settings.PictureScaling = player::kScalingChoices[(scalingIndex() + step + ScalingCount) % ScalingCount].Value;
+        else
+            s_settings.FsrSharpness = std::clamp(s_settings.FsrSharpness + step, 1, 10);
+    };
+    while (appletMainLoop())
+    {
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
+        if (down & (HidNpadButton_B | HidNpadButton_X | HidNpadButton_Plus))
+            break;
+        if ((down & HidNpadButton_AnyDown) && row + 1 < Rows)
+            row++;
+        if ((down & HidNpadButton_AnyUp) && row > 0)
+            row--;
+        if (down & (HidNpadButton_AnyRight | HidNpadButton_A))
+            change(row, 1);
+        if (down & HidNpadButton_AnyLeft)
+            change(row, -1);
+        float tx, ty;
+        bool touch = ui.Touch(tx, ty);
+        if (touch && !touching && tx >= ListX && tx < ListX + ListW && ty >= ListY && ty < ListY + Rows * RowHeight)
+        {
+            row = int((ty - ListY) / RowHeight);
+            change(row, tx < ListX + ListW / 2 ? -1 : 1);
+        }
+        touching = touch;
+
+        player::Renderer& s = ui.Screen;
+        s.Begin(kBackground);
+        s.Fill({0, 0, 340, 720}, kPanel);
+        s.Image(ui.Logo, {90, 60, 160, 160});
+        float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
+        s.Image(ui.Wordmark, {30, 240, ww, wh});
+        ui.Text.Draw("Settings", ListX, 48, 34, kText);
+        const auto& scaling = player::kScalingChoices[scalingIndex()];
+        std::string values[Rows] = {scaling.Label, std::to_string(s_settings.FsrSharpness)};
+        const char* names[Rows] = {"Scaling", "FSR sharpness"};
+        for (int r = 0; r < Rows; r++)
+        {
+            float y = ListY + float(r) * RowHeight;
+            if (r == row)
+                s.Fill({ListX - 12, y, ListW, RowHeight - 12}, kAccent, 12);
+            ui.Text.Draw(names[r], ListX + 8, y + 16, 28, kText);
+            std::string value = std::string("<  ") + values[r] + "  >";
+            ui.Text.Draw(value, ListX + ListW - 40 - ui.Text.Measure(value, 28), y + 16, 28, kText);
+        }
+        // what the scaling chosen does
+        ui.Text.Draw(ui.Text.Fit(scaling.Help, 24, ListW - 20), ListX + 8, ListY + Rows * RowHeight + 20, 24, kDim);
+        ui.Text.Draw("FSR sharpness: 1 mild ... 10 strongest (for FSR 1 only).", ListX + 8, ListY + Rows * RowHeight + 56, 24, kDim);
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonLeftRight) + " Change     " + kButtonB + " Back";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+    }
+    if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness)
+        s_settings.Save(kSettings);
+}
+
 /// The game to play from the list (its folder), kToHbmenu for −, or nothing for + (leave). Y looks
 /// at every folder again.
 std::string PickGame(Ui& ui, bool internal)
@@ -319,6 +408,8 @@ std::string PickGame(Ui& ui, bool internal)
             return kToHbmenu;
         if (!games.empty() && (down & HidNpadButton_A))
             return games[choice].Path;
+        if (down & HidNpadButton_X)
+            SettingsScreen(ui);
         if (down & HidNpadButton_Y)
         {
             ui.Splash("Looking at the games...");
@@ -377,7 +468,7 @@ std::string PickGame(Ui& ui, bool internal)
         // the buttons
         s.Fill({0, 672, 1280, 48}, kPanel);
         // (− only when a loader started the player: installed as its own title, there is no hbmenu to go to)
-        std::string hints = std::string(kButtonA) + " Play     " + kButtonY + " Look again     "
+        std::string hints = std::string(kButtonA) + " Play     " + kButtonY + " Look again     " + kButtonX + " Settings     "
                             + (envHasNextLoad() ? std::string(kButtonMinus) + " hbmenu     " : "") + kButtonPlus + " Quit";
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
         s.End();
@@ -400,6 +491,96 @@ void CopyPicture(const Bytes& window, int width, int height, player::Texture& t)
             dst[3] = 0xFF;
         }
     }
+}
+
+/// The menu + opens while a game plays, over its picture (the game stands still meanwhile): back
+/// to the game, the scaling and FSR's sharpness (the settings, written when they changed), or
+/// leave the game. True: leave.
+bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
+{
+    // the rows
+    constexpr int Back = 0, ScalingRow = 1, Sharpness = 2, Leave = 3, Rows = 4;
+    constexpr float RowHeight = 64, MenuW = 620, MenuX = (1280 - MenuW) / 2, MenuY = 170;
+    constexpr int ScalingCount = int(std::size(player::kScalingChoices));
+    player::Settings before = s_settings;
+    int row = Back;
+    bool touching = false, leave = false;
+    auto scalingIndex = [] {
+        for (int k = 0; k < ScalingCount; k++)
+            if (player::kScalingChoices[k].Value == s_settings.PictureScaling)
+                return k;
+        return 0;
+    };
+    auto change = [&](int r, int step) {
+        if (r == ScalingRow)
+            s_settings.PictureScaling = player::kScalingChoices[(scalingIndex() + step + ScalingCount) % ScalingCount].Value;
+        else if (r == Sharpness)
+            s_settings.FsrSharpness = std::clamp(s_settings.FsrSharpness + step, 1, 10);
+    };
+    while (appletMainLoop())
+    {
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
+        if (down & (HidNpadButton_B | HidNpadButton_Plus))
+            break;
+        if ((down & HidNpadButton_AnyDown) && row + 1 < Rows)
+            row++;
+        if ((down & HidNpadButton_AnyUp) && row > 0)
+            row--;
+        bool chosen = (down & HidNpadButton_A) != 0;
+        if (down & HidNpadButton_AnyRight)
+            change(row, 1);
+        if (down & HidNpadButton_AnyLeft)
+            change(row, -1);
+        float tx, ty;
+        bool touch = ui.Touch(tx, ty);
+        if (touch && !touching && tx >= MenuX && tx < MenuX + MenuW && ty >= MenuY && ty < MenuY + Rows * RowHeight)
+        {
+            int r = int((ty - MenuY) / RowHeight);
+            if (r == ScalingRow || r == Sharpness)
+                change(r, tx < MenuX + MenuW / 2 ? -1 : 1);
+            else
+                chosen = r == row;
+            row = r;
+        }
+        touching = touch;
+        if (chosen && row == Back)
+            break;
+        if (chosen && row == Leave)
+        {
+            leave = true;
+            break;
+        }
+        if (chosen)
+            change(row, 1);
+
+        player::Renderer& s = ui.Screen;
+        s.Begin(0xFF000000);
+        drawGame();
+        s.Fill({0, 0, 1280, 720}, Rgb(0, 0, 0, 150));
+        s.Fill({MenuX - 24, MenuY - 70, MenuW + 48, Rows * RowHeight + 110}, kPanel, 18);
+        ui.Text.Draw("Paused", MenuX, MenuY - 56, 30, kText);
+        const auto& scaling = player::kScalingChoices[scalingIndex()];
+        std::string labels[Rows] = {"Back to the game", std::string("Scaling: ") + scaling.Label,
+                                    "FSR sharpness: " + std::to_string(s_settings.FsrSharpness), "Leave the game"};
+        for (int r = 0; r < Rows; r++)
+        {
+            float y = MenuY + float(r) * RowHeight;
+            if (r == row)
+                s.Fill({MenuX - 12, y, MenuW + 24, RowHeight - 10}, kAccent, 12);
+            std::string text = labels[r];
+            if (r == ScalingRow || r == Sharpness)
+                text = std::string("<  ") + text + "  >";
+            ui.Text.Draw(text, MenuX + 8, y + 12, 28, kText);
+        }
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonA) + " OK     " + kButtonLeftRight + " Change     " + kButtonB + " Back to the game";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+    }
+    if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness)
+        s_settings.Save(kSettings);
+    return leave;
 }
 
 void Play(Ui& ui, const std::string& path)
@@ -447,7 +628,7 @@ void Play(Ui& ui, const std::string& path)
     else
         SDL_PauseAudioDevice(sound, 0);
 
-    player::Scaling scaling = player::Scaling::Sharp;
+    player::Scaling scaling = s_settings.PictureScaling;
     Rect place = player::Renderer::Placement(scaling, setup.Width, setup.Height);
     LogMemory("the screen made");
 
@@ -469,6 +650,16 @@ void Play(Ui& ui, const std::string& path)
     uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
     uint64_t pictureVersion = 1, pointerShownUntil = 0;
     bool running = true, focused = true, touching = false;
+    // The game's picture: each of the two textures takes it again when it is behind
+    auto drawGame = [&] {
+        player::Texture& picture = ui.Screen.PictureTexture(setup.Width, setup.Height);
+        if (picture.Version != pictureVersion)
+        {
+            CopyPicture(vm->Window(), setup.Width, setup.Height, picture);
+            picture.Version = pictureVersion;
+        }
+        ui.Screen.Picture(picture, place, scaling, s_settings.FsrSharpness);
+    };
     try
     {
         while (running && appletMainLoop())
@@ -476,7 +667,19 @@ void Play(Ui& ui, const std::string& path)
             padUpdate(&ui.Pad);
             u64 down = padGetButtonsDown(&ui.Pad), up = padGetButtonsUp(&ui.Pad);
             if (down & HidNpadButton_Plus)
-                running = false;
+            {
+                // The menu, the game standing still behind it as when HOME is pressed
+                vm->Notify(ScnEvent::Deactivate);
+                bool leave = GameMenu(ui, drawGame);
+                scaling = s_settings.PictureScaling;
+                place = player::Renderer::Placement(scaling, setup.Width, setup.Height);
+                if (leave)
+                    break;
+                vm->Notify(ScnEvent::Activate);
+                spanStart = armGetSystemTick();
+                spanFrames = spanScripts = 0;
+                continue;
+            }
             if (down & HidNpadButton_B)
                 mouse(ScnMessage::RButtonDown, host.Buttons | 2);
             if (up & HidNpadButton_B)
@@ -539,15 +742,8 @@ void Play(Ui& ui, const std::string& path)
                 pictureVersion++;
             }
 
-            // The picture: each of the two textures takes it again when it is behind
             ui.Screen.Begin(0xFF000000);
-            player::Texture& picture = ui.Screen.PictureTexture(setup.Width, setup.Height);
-            if (picture.Version != pictureVersion)
-            {
-                CopyPicture(vm->Window(), setup.Width, setup.Height, picture);
-                picture.Version = pictureVersion;
-            }
-            ui.Screen.Picture(picture, place, scaling);
+            drawGame();
             if (armGetSystemTick() < pointerShownUntil)
             {
                 float px = place.X + (float(host.MouseX) + 0.5f) * place.W / float(setup.Width);
@@ -691,6 +887,7 @@ int main(int argc, char** argv)
     }
     romfsInit();
     Files::CreateDirectories(kSaves);
+    s_settings = player::Settings::Load(kSettings);
     s_log = Files::Open(kLog, "wb");
     if (!prepared.empty())
         Log("At the start: %s\n", prepared.c_str());

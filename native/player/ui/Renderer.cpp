@@ -96,6 +96,8 @@ Renderer::Renderer()
     LoadShader(m_vertexShader, "romfs:/shaders/ui_vsh.dksh");
     LoadShader(m_uiShader, "romfs:/shaders/ui_fsh.dksh");
     LoadShader(m_pictureShader, "romfs:/shaders/picture_fsh.dksh");
+    LoadShader(m_easuShader, "romfs:/shaders/easu_fsh.dksh");
+    LoadShader(m_rcasShader, "romfs:/shaders/rcas_fsh.dksh");
 
     m_cmd = dk::CmdBufMaker{m_device}.create();
 
@@ -142,7 +144,8 @@ uint32_t Renderer::Allocate(uint32_t size, uint32_t alignment)
 
 Texture Renderer::CreateTexture(int width, int height, bool coverage)
 {
-    if (m_nextSlot >= MaxTextures)
+    // (the last slot is FSR's picture)
+    if (m_nextSlot >= MaxTextures - 1)
         throw std::runtime_error("Too many textures");
     uint32_t bytes = coverage ? 1 : 4;
     uint32_t stride = Align(uint32_t(width) * bytes, DK_IMAGE_LINEAR_STRIDE_ALIGNMENT);
@@ -229,12 +232,42 @@ void Renderer::Begin(uint32_t clear)
     m_cmd.bindVtxAttribState(kAttributes);
     m_cmd.bindVtxBufferState({DkVtxBufferState{sizeof(Vertex), 0}});
 
-    // the screen's scale (pixels to -1..1), for the vertex shader
-    float screen[4] = {2.0f / Width, 2.0f / Height, 0, 0};
     m_cmd.bindUniformBuffer(DkStage_Vertex, 0, base + m_uniforms, DK_UNIFORM_BUF_ALIGNMENT);
-    m_cmd.pushConstants(base + m_uniforms, DK_UNIFORM_BUF_ALIGNMENT, 0, sizeof screen, screen);
+    ScreenSize(Width, Height);
     m_cmd.bindUniformBuffer(DkStage_Fragment, 0, base + m_uniforms + DK_UNIFORM_BUF_ALIGNMENT, DK_UNIFORM_BUF_ALIGNMENT);
     m_cmd.bindShaders(DkStageFlag_GraphicsMask, {&m_vertexShader, &m_uiShader});
+}
+
+void Renderer::ScreenSize(int width, int height)
+{
+    // the target's scale (pixels to -1..1), for the vertex shader
+    float screen[4] = {2.0f / float(width), 2.0f / float(height), 0, 0};
+    m_cmd.pushConstants(m_dataMem.getGpuAddr() + m_uniforms, DK_UNIFORM_BUF_ALIGNMENT, 0, sizeof screen, screen);
+}
+
+void Renderer::FsrTarget(int width, int height)
+{
+    if (m_fsrMem && width == m_fsrWidth && height == m_fsrHeight)
+        return;
+    // the old one may still be read by a frame in flight
+    m_queue.waitIdle();
+    dk::ImageLayout layout;
+    dk::ImageLayoutMaker{m_device}
+        .setFlags(DkImageFlags_UsageRender)
+        .setFormat(DkImageFormat_RGBA8_Unorm)
+        .setDimensions(uint32_t(width), uint32_t(height))
+        .initialize(layout);
+    m_fsrMem = dk::MemBlockMaker{m_device, Align(uint32_t(layout.getSize()), DK_MEMBLOCK_ALIGNMENT)}
+                   .setFlags(DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image)
+                   .create();
+    m_fsrImage.initialize(layout, m_fsrMem, 0);
+    dk::ImageView view{m_fsrImage};
+    dk::ImageDescriptor descriptor;
+    descriptor.initialize(view);
+    auto* data = static_cast<uint8_t*>(m_dataMem.getCpuAddr());
+    std::memcpy(data + m_imageDescriptors + size_t(MaxTextures - 1) * sizeof(DkImageDescriptor), &descriptor, sizeof(DkImageDescriptor));
+    m_fsrWidth = width;
+    m_fsrHeight = height;
 }
 
 void Renderer::End()
@@ -318,11 +351,46 @@ Rect Renderer::Placement(Scaling scaling, int width, int height)
     return {std::round((float(Width) - w) / 2), std::round((float(Height) - h) / 2), w, h};
 }
 
-void Renderer::Picture(const Texture& picture, const Rect& dst, Scaling scaling)
+void Renderer::Picture(const Texture& picture, const Rect& dst, Scaling scaling, int fsrSharpness)
 {
     if (!picture.Valid())
         return;
     Flush();
+    if (scaling == Scaling::Fsr)
+    {
+        // EASU: the picture to the size it has on the screen, into FSR's picture
+        int w = std::max(1, int(std::lround(dst.W))), h = std::max(1, int(std::lround(dst.H)));
+        FsrTarget(w, h);
+        dk::ImageView target{m_fsrImage};
+        m_cmd.bindRenderTargets(&target);
+        m_cmd.setViewports(0, {{0.0f, 0.0f, float(w), float(h), 0.0f, 1.0f}});
+        m_cmd.setScissors(0, {{0, 0, uint32_t(w), uint32_t(h)}});
+        ScreenSize(w, h);
+        float easu[8] = {float(picture.Width), float(picture.Height), 1.0f / float(picture.Width), 1.0f / float(picture.Height), float(w), float(h), 0, 0};
+        DkGpuAddr fragment = m_dataMem.getGpuAddr() + m_uniforms + DK_UNIFORM_BUF_ALIGNMENT;
+        m_cmd.pushConstants(fragment, DK_UNIFORM_BUF_ALIGNMENT, 0, sizeof easu, easu);
+        m_cmd.bindShaders(DkStageFlag_GraphicsMask, {&m_vertexShader, &m_easuShader});
+        m_batchTexture = picture.Slot;
+        Quad(picture.Slot, {0, 0, float(w), float(h)}, 0, 0, 1, 1, 0xFFFFFFFF, Textured, 0);
+        Flush();
+        // RCAS (sharpness 0: EASU's picture as it is) to the screen, once EASU's is written
+        m_cmd.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image | DkInvalidateFlags_L2Cache);
+        dk::ImageView framebuffer{m_framebuffers[size_t(m_framebuffer)]};
+        m_cmd.bindRenderTargets(&framebuffer);
+        m_cmd.setViewports(0, {{0.0f, 0.0f, float(Width), float(Height), 0.0f, 1.0f}});
+        m_cmd.setScissors(0, {{0, 0, uint32_t(Width), uint32_t(Height)}});
+        ScreenSize(Width, Height);
+        // 1 -> 1.8 stops (mild) ... 10 -> 0 stops (AMD's strongest), as the C# player
+        float sharpness = fsrSharpness > 0 ? std::pow(2.0f, -float(10 - std::clamp(fsrSharpness, 1, 10)) / 5.0f) : 0.0f;
+        float rcas[8] = {float(w), float(h), 1.0f / float(w), 1.0f / float(h), dst.W, dst.H, 0, sharpness};
+        m_cmd.pushConstants(fragment, DK_UNIFORM_BUF_ALIGNMENT, 0, sizeof rcas, rcas);
+        m_cmd.bindShaders(DkStageFlag_GraphicsMask, {&m_vertexShader, &m_rcasShader});
+        m_batchTexture = MaxTextures - 1;
+        Quad(MaxTextures - 1, dst, 0, 0, 1, 1, 0xFFFFFFFF, Textured, 0);
+        Flush();
+        m_cmd.bindShaders(DkStageFlag_GraphicsMask, {&m_vertexShader, &m_uiShader});
+        return;
+    }
     // the fragment shader's uniforms: the picture's size, the size on the screen, the mode
     // (0 nearest, 1 bicubic, 2 sharp bilinear)
     float mode = scaling == Scaling::Smooth ? 1 : scaling == Scaling::Sharp ? 2 : 0;

@@ -4,7 +4,8 @@
 // GPU as they are. The screens are drawn as quads in one vertex format: textured, a glyph's
 // coverage, or a rounded rectangle worked out in the fragment shader; the game's picture has a
 // shader of its own for the scalings of the C# player (Game/PictureScaling.cs): Sharp, whole
-// numbers, Smooth, Nearest. The shaders are compiled when the player is built (uam), into the romfs.
+// numbers, Smooth, Nearest, and FSR 1 in two passes (EASU into a picture of the screen size, then
+// RCAS to the screen). The shaders are compiled when the player is built (uam), into the romfs.
 #pragma once
 
 #include <deko3d.hpp>
@@ -16,7 +17,7 @@
 
 namespace openshiina::player {
 
-/// The C# player's setting "Scaling" (Game/PictureScaling.cs), without its shader upscalers yet.
+/// The C# player's setting "Scaling" (Game/PictureScaling.cs), without Anime4K yet.
 enum class Scaling
 {
     /// Whole game pixels as far as they fit, the rest bilinear: even and sharp (the default).
@@ -27,6 +28,8 @@ enum class Scaling
     Smooth,
     /// Nearest-neighbour to the screen's size: uneven at scales that are not whole numbers.
     Nearest,
+    /// AMD FidelityFX Super Resolution 1: edge-adaptive upscaling (EASU), then sharpening (RCAS).
+    Fsr,
 };
 
 /// An image the CPU writes and the GPU reads: rows Stride bytes apart at Pixels, 4 bytes a pixel
@@ -72,8 +75,9 @@ public:
     /// The texture of the game's picture for this frame (one of two, made the first time with the
     /// game's size): written by the caller between Begin and Picture.
     Texture& PictureTexture(int width, int height);
-    /// The game's picture into dst with a scaling.
-    void Picture(const Texture& picture, const Rect& dst, Scaling scaling);
+    /// The game's picture into dst with a scaling; fsrSharpness: FSR's sharpening, 1 (mild) to 10
+    /// (AMD's strongest), 0 none (the C# player's setting "FSR sharpness").
+    void Picture(const Texture& picture, const Rect& dst, Scaling scaling, int fsrSharpness = 8);
     /// Where a picture of width x height goes on the screen with a scaling (C# PictureScaling.Placement).
     static Rect Placement(Scaling scaling, int width, int height);
 
@@ -97,6 +101,10 @@ private:
     static constexpr uint32_t VertexBytes = 2u << 20, CommandBytes = 512u << 10;
 
     void CreateSwapchain();
+    /// FSR's picture of width x height (EASU draws into it, RCAS reads it), made again when the size changes.
+    void FsrTarget(int width, int height);
+    /// The vertex shader's screen: pixels of a target of width x height to -1..1.
+    void ScreenSize(int width, int height);
     void LoadShader(dk::Shader& shader, const char* path);
     void Quad(int textureSlot, const Rect& dst, float u0, float v0, float u1, float v1, uint32_t color, Kind kind, float radius);
     void Flush();
@@ -109,7 +117,11 @@ private:
     dk::UniqueSwapchain m_swapchain;
     std::array<dk::Image, Frames> m_framebuffers;
     std::array<dk::Fence, Frames> m_fences;
-    dk::Shader m_vertexShader, m_uiShader, m_pictureShader;
+    dk::Shader m_vertexShader, m_uiShader, m_pictureShader, m_easuShader, m_rcasShader;
+    // FSR's picture: its memory, the image, its size (its descriptor is the last slot)
+    dk::UniqueMemBlock m_fsrMem;
+    dk::Image m_fsrImage;
+    int m_fsrWidth = 0, m_fsrHeight = 0;
 
     // m_dataMem: image descriptors, sampler descriptors, the uniforms, then a part a frame of
     // vertices and of command memory
