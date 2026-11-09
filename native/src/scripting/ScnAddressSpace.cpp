@@ -131,23 +131,28 @@ Handle OwnProcess()
 
 // Heap memory at `place` of this process, writable there; the heap's own pages cannot be used
 // until it is unmapped
+// The blocks mapped now (each part, the guard), for a failure's message
+int s_mapped = 0;
+
 void MapAt(uint8_t* place, void* source, uint64_t size)
 {
     Handle self = OwnProcess();
     Result rc = svcMapProcessCodeMemory(self, uint64_t(place), uint64_t(source), size);
     if (R_FAILED(rc))
-        throw MapFailure("svcMapProcessCodeMemory", rc);
+        throw MapFailure(("svcMapProcessCodeMemory with " + std::to_string(s_mapped) + " blocks mapped").c_str(), rc);
     rc = svcSetProcessMemoryPermission(self, uint64_t(place), size, Perm_Rw);
     if (R_FAILED(rc))
     {
         svcUnmapProcessCodeMemory(self, uint64_t(place), uint64_t(source), size);
-        throw MapFailure("svcSetProcessMemoryPermission", rc);
+        throw MapFailure(("svcSetProcessMemoryPermission with " + std::to_string(s_mapped) + " blocks mapped").c_str(), rc);
     }
+    s_mapped++;
 }
 
 void UnmapAt(uint8_t* place, void* source, uint64_t size)
 {
-    svcUnmapProcessCodeMemory(OwnProcess(), uint64_t(place), uint64_t(source), size);
+    if (R_SUCCEEDED(svcUnmapProcessCodeMemory(OwnProcess(), uint64_t(place), uint64_t(source), size)))
+        s_mapped--;
 }
 
 } // namespace
@@ -203,7 +208,7 @@ void ScnAddressSpace::CommitPart(int part)
     // Zeroed while it is still the heap's: mapped, it is only reached through the window
     void* source = std::aligned_alloc(0x1000, kPartSize);
     if (!source)
-        throw std::bad_alloc();
+        throw MapFailure(("the heap, for a part, with " + std::to_string(s_mapped) + " blocks mapped").c_str(), 0);
     std::memset(source, 0, kPartSize);
     try
     {

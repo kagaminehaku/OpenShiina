@@ -12,7 +12,9 @@
 // (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
 #include <SDL.h>
 #include <switch.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <unwind.h>
 
 #include <algorithm>
 #include <cstdarg>
@@ -21,6 +23,7 @@
 #include <format>
 #include <memory>
 #include <new>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -180,6 +183,20 @@ public:
     {
         auto path = m_data.LooseFile(Text::Cp932ToUtf8(name));
         return path && Files::ReadAll(*path, data);
+    }
+
+    // The file's size from the file system, as scnrun's: read whole it is too much for the Switch
+    // (the install check asks for the archives', 1.8 GB for Sorcery Jokers' SJSe_G1.WAR)
+    std::optional<int64_t> LooseFileSize(const std::string& name) override
+    {
+        Bytes bytes;
+        if (Text::EqualsIgnoreCase(Text::Cp932ToUtf8(name), "RIO.INI"))
+            return ReadLooseFile(name, bytes) ? std::optional<int64_t>(int64_t(bytes.size())) : std::nullopt;
+        auto path = m_data.LooseFile(Text::Cp932ToUtf8(name));
+        struct stat info;
+        if (!path || stat(path->c_str(), &info) != 0)
+            return std::nullopt;
+        return int64_t(info.st_size);
     }
 
     uint32_t Milliseconds() override { return uint32_t(armTicksToNs(armGetSystemTick()) / 1000000); }
@@ -524,9 +541,12 @@ void Play(Ui& ui, const std::string& folder)
     {
         Log("Script error at frame %llu: %s\n  at %s, opcode %04X\n", (unsigned long long)frames, e.what(), vm->DescribeAddress(e.Address).c_str(), e.Op);
     }
-    catch (const std::bad_alloc&)
+    catch (const std::bad_alloc& e)
     {
-        Log("Out of memory at frame %llu (an allocation of %zu bytes)\n", (unsigned long long)frames, s_failedSize);
+        // (what() tells when the scripts' memory could not be mapped; the size is that of the last
+        // operator new that failed, which may be one a library tried and did without)
+        Log("Out of memory at frame %llu: %s (the last allocation that failed: %zu bytes)\n", (unsigned long long)frames, e.what(),
+            s_failedSize);
         LogMemory("then");
     }
     catch (const std::exception& e)
@@ -539,9 +559,32 @@ void Play(Ui& ui, const std::string& folder)
 
 } // namespace
 
-// Allocations through malloc, the size of one that fails kept for the log
+// The program's start (the .nro's or the title's code), which addresses in the log count from:
+// aarch64-none-elf-addr2line -f -C -e player.elf <offsets>
+extern "C" char __start__[];
+
+// Allocations through malloc, the size of one that fails kept for the log; one of 1 GB or more
+// logs where it was made from (a size gone wrong, mostly)
 void* operator new(size_t size)
 {
+    if (size >= (size_t(1) << 30))
+    {
+        struct Trace
+        {
+            std::string text;
+            int frames = 0;
+        } trace;
+        _Unwind_Backtrace(
+            [](_Unwind_Context* context, void* argument) {
+                auto* t = static_cast<Trace*>(argument);
+                char offset[24];
+                std::snprintf(offset, sizeof offset, " 0x%lx", (unsigned long)(_Unwind_GetIP(context) - uintptr_t(__start__)));
+                t->text += offset;
+                return ++t->frames < 16 ? _URC_NO_REASON : _URC_END_OF_STACK;
+            },
+            &trace);
+        Log("An allocation of %zu bytes, from%s\n", size, trace.text.c_str());
+    }
     if (void* p = std::malloc(size ? size : 1))
         return p;
     s_failedSize = size;
