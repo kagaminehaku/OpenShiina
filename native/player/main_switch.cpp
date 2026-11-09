@@ -34,6 +34,7 @@
 #include "game/GameSetup.h"
 #include "platform/DibShapes.h"
 #include "platform/Files.h"
+#include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnVm.h"
 #include "text/Text.h"
 #include "ui/Renderer.h"
@@ -306,7 +307,8 @@ std::string PickGame(Ui& ui)
         }
         // the buttons
         s.Fill({0, 672, 1280, 48}, kPanel);
-        std::string hints = std::string(kButtonA) + " Play     " + kButtonMinus + " hbmenu     " + kButtonPlus + " Quit";
+        // (− only when a loader started the player: installed as its own title, there is no hbmenu to go to)
+        std::string hints = std::string(kButtonA) + " Play     " + (envHasNextLoad() ? std::string(kButtonMinus) + " hbmenu     " : "") + kButtonPlus + " Quit";
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
         s.End();
     }
@@ -556,7 +558,9 @@ void operator delete(void* p, size_t) noexcept { std::free(p); }
 extern "C" void userAppInit()
 {
     devhost::ReturnAtExit();
-    if (R_SUCCEEDED(socketInitializeDefault()))
+    // (nxlink and devhost start the player only through a loader: installed as a title of its
+    // own, it has no sockets to open)
+    if (!envIsNso() && R_SUCCEEDED(socketInitializeDefault()))
         s_nxlink = nxlinkConnectToHost(false, true);
 }
 
@@ -564,14 +568,27 @@ extern "C" void userAppExit()
 {
     if (s_nxlink >= 0)
         close(s_nxlink);
-    socketExit();
+    if (!envIsNso())
+        socketExit();
 }
 
 int main(int argc, char** argv)
 {
+    // What the scripts' memory needs of the system, first, while the process has taken little
+    std::string prepared;
+    try
+    {
+        scripting::ScnAddressSpace::Prepare();
+    }
+    catch (const std::exception& e)
+    {
+        prepared = e.what();
+    }
     romfsInit();
     Files::CreateDirectories(kSaves);
     s_log = Files::Open(kLog, "wb");
+    if (!prepared.empty())
+        Log("At the start: %s\n", prepared.c_str());
     std::unique_ptr<Ui> ui;
     try
     {

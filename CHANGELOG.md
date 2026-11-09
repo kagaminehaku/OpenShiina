@@ -6,7 +6,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 
 ## 0.8.2 (2026-11-08)
 
-- **OpenShiina on the Nintendo Switch**, as homebrew: `OpenShiina-0.8.2-switch.nro`, the same engine
+- **OpenShiina on the Nintendo Switch**, as homebrew: `OpenShiina-0.8.2-switch.nsp` (installed once,
+  OpenShiina on the HOME menu) or `OpenShiina-0.8.2-switch.nro` (from the Homebrew Menu), the same engine
   written again in C++ (`native/`), with its own game list drawn with deko3d. Azu Plus and Bitch
   Gakuen ga Seijun na Hazu ga Nai!!? were played on a Switch Lite (sound, voices, movies); the other
   games run the same way on PC but were not tried on the console yet. How to install it and play:

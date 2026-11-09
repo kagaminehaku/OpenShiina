@@ -1,7 +1,9 @@
 # OpenShiina on the Nintendo Switch
 
-`OpenShiina-<version>-switch.nro` is the player as homebrew for the Switch: the same engine as the
-PC and Android players, written again in C++ (the `native/` folder), drawing with deko3d. It is
+OpenShiina for the Switch is homebrew: the same engine as the PC and Android players, written
+again in C++ (the `native/` folder), drawing with deko3d. It comes two ways:
+`OpenShiina-<version>-switch.nsp`, installed once as a title of its own on the HOME menu, and
+`OpenShiina-<version>-switch.nro`, started from the Homebrew Menu. It is
 new: Azu Plus and Bitch Gakuen ga Seijun na Hazu ga Nai!!? were played on a Switch Lite; the other
 games run the same way on PC but were not tried on the console yet.
 
@@ -11,7 +13,20 @@ games run the same way on PC but were not tried on the console yet.
   microSD card.
 - Your own installed copy of the game, from a Windows PC. OpenShiina contains no game data.
 
-## Installing
+## Installing the title (.nsp)
+
+One install, and OpenShiina on the HOME menu opens the list of games at once, with all of the
+console's memory. It needs signature patches (for example sys-patch) on the system it is installed
+on, as every homebrew title does, and DBI to install it.
+
+1. Copy `OpenShiina-<version>-switch.nsp` to the microSD card and install it with DBI ("Browse SD
+   card", the file, Install). A newer version installs over it.
+2. Copy the games to `OpenShiina/Games/` as in step 2 below.
+3. Start OpenShiina from the HOME menu.
+
+There − does nothing in the list of games (there is no Homebrew Menu to go back to); + quits.
+
+## Installing the homebrew (.nro)
 
 1. Copy `OpenShiina-<version>-switch.nro` to the microSD card as
    `switch/openshiina/OpenShiina.nro` (any folder under `switch/` works).

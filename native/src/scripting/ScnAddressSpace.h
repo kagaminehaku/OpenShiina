@@ -29,6 +29,11 @@ public:
     /// Reserves the 4 GB; throws std::bad_alloc when they cannot be.
     ScnAddressSpace();
     ~ScnAddressSpace();
+    /// On the Switch, gets what the mapping needs of the system (this process's own handle,
+    /// installed as a title of its own) while the process is new; throws as the constructor does.
+    /// Nothing elsewhere.
+    static void Prepare();
+
     ScnAddressSpace(const ScnAddressSpace&) = delete;
     ScnAddressSpace& operator=(const ScnAddressSpace&) = delete;
 
