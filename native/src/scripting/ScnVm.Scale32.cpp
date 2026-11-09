@@ -406,6 +406,22 @@ bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
     for (size_t r = 0; r < nr; r++)
         work.RowY[r + 1] = work.RowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
 
+    if (!firstLast && UseGpu("scale32", int64_t(nr) * int64_t(nc)))
+    {
+        std::vector<std::array<int, 4>> rowEntries, columnEntries;
+        std::vector<int> rowFrom(work.RowY.begin(), work.RowY.begin() + ptrdiff_t(nr)), columnFrom(nc);
+        for (const auto& e : rows)
+            rowEntries.push_back({e.Flags, e.Count, int(e.First), int(e.Last)});
+        for (size_t c = 0; c < nc; c++)
+        {
+            columnEntries.push_back({cols[c].Flags, cols[c].Count, int(cols[c].First), int(cols[c].Last)});
+            columnFrom[c] = work.ColShape[4 * c];
+        }
+        if (!ScaleOnGpu(0, rowEntries, rowFrom, columnEntries, columnFrom, width, srcX, srcPitch, dstRow, dstPitch, fullRow, fullCol))
+            GpuFailed("scale32");
+        else if (!GpuCheck)
+            return true;
+    }
     // Rows are independent: they run on several cores (the result does not depend on it)
     ParallelRows::For(int(nr), int64_t(nr) * int64_t(nc), [&](int from, int to) {
         auto& b = t_scale32Rows;
@@ -461,6 +477,7 @@ bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
             }
         }
     });
+    GpuDone("scale32");
     return true;
 }
 

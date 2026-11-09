@@ -217,6 +217,18 @@ bool ScnVm::Scale16(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
     int dstBase = dst + int(uint32_t(dt) >> 4) * dstPitch + int(uint32_t(dl) >> 4) * 4;
     int bytes = width * 4;
 
+    if (UseGpu("scale16", int64_t(nr) * int64_t(nc)))
+    {
+        std::vector<std::array<int, 4>> rowEntries, columnEntries;
+        for (const auto& e : rows)
+            rowEntries.push_back({e.Flags, e.Count, int(e.First), int(e.Last)});
+        for (const auto& e : cols)
+            columnEntries.push_back({e.Flags, e.Count, int(e.First), int(e.Last)});
+        if (!ScaleOnGpu(1, rowEntries, rowFrom, columnEntries, colFrom, width, srcBase, srcPitch, dstBase, dstPitch, wholeRow, wholeCol))
+            GpuFailed("scale16");
+        else if (!GpuCheck)
+            return true;
+    }
     // Rows are independent: bands of them run on all cores (the result does not depend on it)
     ParallelRows::For(int(nr), int64_t(nr) * int64_t(nc), [&](int from, int to) {
         openshiina::Bytes line(size_t(bytes), 0);
@@ -262,6 +274,7 @@ bool ScnVm::Scale16(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
             WriteBytes(dstBase + int(r) * dstPitch, output);
         }
     });
+    GpuDone("scale16");
     return true;
 }
 

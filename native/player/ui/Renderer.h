@@ -62,6 +62,9 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
+    /// The deko3d device (the GPU mode's compute queue is made on it too).
+    dk::Device Device() { return m_device; }
+
     /// A texture of width x height, RGBA (or one byte a pixel: a glyph's coverage); zeroed.
     Texture CreateTexture(int width, int height, bool coverage = false);
     /// A texture from the player's raw images (romfs ui/*.rgba: width, height, then RGBA rows).

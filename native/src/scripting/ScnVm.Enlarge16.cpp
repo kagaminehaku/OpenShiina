@@ -118,6 +118,29 @@ bool ScnVm::Enlarge16(int dst, int dstPitch, int dl, int dt, int dr, int db, int
 
     int srcBase = src + int(uint32_t(st) >> 4) * srcPitch + int(uint32_t(sl) >> 4) * 4;
     int dstBase = dst + int(uint32_t(dt) >> 4) * dstPitch + int(uint32_t(dl) >> 4) * 4;
+    // (the GPU's kernel is the other build's)
+    if (!opaque && UseGpu("enlarge16", int64_t(rows.size()) * columns))
+    {
+        std::vector<std::array<int, 4>> rowEntries;
+        for (const auto& row : rows)
+            rowEntries.push_back({row.Source, row.Mixed ? 1 : 0, row.Upper, row.Lower});
+        std::vector<std::array<int, 10>> columnEntries(static_cast<size_t>(columns));
+        for (size_t c = 0; c < size_t(columns); c++)
+        {
+            auto& e = columnEntries[c];
+            e[0] = from[c];
+            e[1] = mixLeft[c] >= 0 ? 1 : 0;
+            for (size_t k = 0; k < 4; k++)
+            {
+                e[2 + k] = left[c * 4 + k];
+                e[6 + k] = right[c * 4 + k];
+            }
+        }
+        if (!Enlarge16OnGpu(rowEntries, columnEntries, width, srcBase, srcPitch, dstBase, dstPitch))
+            GpuFailed("enlarge16");
+        else if (!GpuCheck)
+            return true;
+    }
     // Rows are independent: bands of them run on all cores
     ParallelRows::For(int(rows.size()), int64_t(rows.size()) * columns, [&](int first, int last) {
         openshiina::Bytes upper(size_t(width) * 4), lower(size_t(width) * 4), output(size_t(columns) * 4);
@@ -164,6 +187,7 @@ bool ScnVm::Enlarge16(int dst, int dstPitch, int dl, int dt, int dr, int db, int
             WriteBytes(dstBase + int(r) * dstPitch, output);
         }
     });
+    GpuDone("enlarge16");
     return true;
 }
 

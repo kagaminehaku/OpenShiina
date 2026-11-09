@@ -34,6 +34,7 @@
 #include <initializer_list>
 
 #include "scripting/BackgroundReader.h"
+#include "scripting/ScnAccelerator.h"
 #include "scripting/NetDictionary.h"
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnOpcodes.h"
@@ -366,6 +367,27 @@ public:
     bool ReadAhead = true;
     /// Files read ahead, and of those the scripts then read.
     std::pair<int, int> ReadAheadCounts() const { return {m_aheadRead, m_aheadUsed}; }
+
+    // ---- Accelerator (ScnVm.Accelerator.cs) ----
+
+    /// The GPU (null: everything on the CPU). Set before the game starts.
+    IScnAccelerator* Accelerator = nullptr;
+    /// Every call the GPU can take goes to it, faster or not (tests).
+    bool GpuAlways = false;
+    /// Every call the GPU can take runs on the GPU and on the CPU, the CPU's bytes kept and the
+    /// GPU's compared with them, both timed (GpuChecks, GpuCheckCounts): the Switch's check of its
+    /// kernels, and how the size from which a call goes to the GPU was chosen.
+    bool GpuCheck = false;
+    /// GpuCheck: the first call of each routine and the calls whose bytes differed; the reader may clear it.
+    std::vector<std::string> GpuChecks;
+    /// GpuCheck: per routine the calls compared, how many of them differed, the pixels, and the
+    /// milliseconds on the GPU and on the CPU.
+    struct GpuCheckCount
+    {
+        int64_t Calls = 0, Differed = 0, Pixels = 0;
+        double GpuMs = 0, CpuMs = 0;
+    };
+    std::map<std::string, GpuCheckCount> GpuCheckCounts;
 
     // ---- Draw (ScnVm.Draw.cs) ----
 
@@ -1138,6 +1160,41 @@ private:
     std::unordered_map<std::string, int> m_soundsPassed;
     std::string m_scenarioName;
     int m_aheadRead = 0, m_aheadUsed = 0;
+    // ---- Accelerator ----
+public:
+    // The kernels' parameters, as their uniform blocks lay them out (ints and uints, 4 bytes each)
+    struct SubpixelGpuParameters
+    {
+        int32_t RowCount, OutPixels, InPixels, Middle;
+        uint32_t AX, BX, TailX, SrcTailX, AY, BY, TailY, SrcTailY;
+        uint32_t D0, D4, D8, DC;
+        int32_t CopyAcross;
+    };
+
+private:
+    /// Whether this call of the routine goes to the GPU (pixels: the pixels it draws).
+    bool UseGpu(const char* routine, int64_t pixels);
+    /// The routine is done (with GpuCheck: the GPU's bytes compared with the CPU's).
+    void GpuDone(const char* routine);
+    /// The GPU failed the routine: it stays on the CPU from now on.
+    void GpuFailed(const char* routine);
+    std::set<std::string> m_gpuFailed;
+    // GpuCheck: the pixels of the call, when it started on the GPU and when the GPU's part ended
+    int64_t m_gpuPixels = 0, m_gpuStarted = 0, m_gpuEnded = 0;
+    /// The GPU's bytes into the scripts' memory, or with GpuCheck kept to compare with the CPU's.
+    void GpuWrite(int address, const uint8_t* bytes, int length);
+    std::vector<std::pair<int, openshiina::Bytes>> m_gpuPending;
+    /// Rows: kind (0-5, as SubpixelRow), source, target.
+    bool SubpixelOnGpu(const std::vector<std::array<int, 3>>& rows, int srcPitch, int inPixels, int outPixels, SubpixelGpuParameters parameters);
+    bool RotateZoomOnGpu(const std::vector<uint32_t>& source, int sw, int sh, int l, int t, int r, int b, int sx, int sy, int sxEnd, int syEnd,
+                         bool keep, int colour, int64_t u0, int64_t v0, int64_t dux, int64_t dvx, int64_t duy, int64_t dvy, int dstBase, int dstStride);
+    /// Entries: flags, count, first, last (ScaleEntry) of rows and of columns.
+    bool ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, const std::vector<int>& rowFrom, const std::vector<std::array<int, 4>>& columns,
+                    const std::vector<int>& columnFrom, int width, int src, int srcPitch, int dst, int dstPitch, uint32_t fullRow, uint32_t fullColumn);
+    /// Rows: source, mixed, upper, lower; columns: source pixel, mixed, the four words left, the four right.
+    bool Enlarge16OnGpu(const std::vector<std::array<int, 4>>& rows, const std::vector<std::array<int, 10>>& columns, int width, int src, int srcPitch,
+                        int dst, int dstPitch);
+
     // The reader threads, made on the first read (the last member: they stop first)
     std::unique_ptr<BackgroundReader> m_reader;
 };

@@ -51,6 +51,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnFonts.cpp
     src/scripting/ScnGaiji.cpp
     src/scripting/ScnVm.cpp
+    src/scripting/ScnVm.Accelerator.cpp
     src/scripting/ScnVm.Blur32.cpp
     src/scripting/ScnVm.Calc.cpp
     src/scripting/ScnVm.Core.cpp
@@ -173,7 +174,7 @@ if(NINTENDO_SWITCH)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
     pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
     # The player draws with deko3d (player/ui); SDL is only its sound out
-    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp player/GameList.cpp player/Settings.cpp player/ui/Renderer.cpp player/ui/UiText.cpp
+    add_executable(player player/main_switch.cpp player/FreeTypeFonts.cpp player/GameList.cpp player/Settings.cpp player/ui/DekoAccelerator.cpp player/ui/Renderer.cpp player/ui/UiText.cpp
                           tools/devhost/DevHostReturn.cpp)
     target_include_directories(player PRIVATE player tools/devhost)
     target_link_libraries(player PRIVATE openshiina_core openshiina_audio deko3d PkgConfig::SDL2 PkgConfig::FREETYPE)
@@ -194,6 +195,24 @@ if(NINTENDO_SWITCH)
             COMMAND "$ENV{DEVKITPRO}/tools/bin/uam" -s ${stage} -o "${output}" "${CMAKE_CURRENT_SOURCE_DIR}/player/shaders/${name}.glsl"
             DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/player/shaders/${name}.glsl"
             COMMENT "uam ${name}.glsl")
+        list(APPEND PLAYER_SHADERS "${output}")
+    endforeach()
+    # The GPU mode's compute shaders are the C# player's (src/OpenShiina.Gpu/Shaders, Vulkan GLSL): its
+    # push constants become a uniform block (every parameter a 4-byte scalar, the same layout), and
+    # "packed", a word mesa's GLSL keeps for itself, another name
+    foreach(name subpixel32 rotatezoom scale enlarge16)
+        set(source "${CMAKE_CURRENT_SOURCE_DIR}/../src/OpenShiina.Gpu/Shaders/${name}.comp")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
+        file(READ "${source}" text)
+        string(REPLACE "layout(push_constant) uniform" "layout(std140, binding = 0) uniform" text "${text}")
+        string(REGEX REPLACE "([^A-Za-z_])packed\\(" "\\1packedLanes(" text "${text}")
+        set(glsl "${CMAKE_CURRENT_BINARY_DIR}/gpu/${name}.glsl")
+        file(WRITE "${glsl}" "${text}")
+        set(output "${PLAYER_ROMFS}/shaders/${name}.dksh")
+        add_custom_command(OUTPUT "${output}"
+            COMMAND "$ENV{DEVKITPRO}/tools/bin/uam" -s comp -o "${output}" "${glsl}"
+            DEPENDS "${glsl}"
+            COMMENT "uam ${name}.comp")
         list(APPEND PLAYER_SHADERS "${output}")
     endforeach()
     add_custom_target(player_shaders DEPENDS ${PLAYER_SHADERS})

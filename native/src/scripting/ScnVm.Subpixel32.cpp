@@ -265,6 +265,19 @@ bool ScnVm::Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, in
     int outPixels = (ax != 0 ? 1 : 0) + int(middle) + (tailX != 0 ? 1 : 0);
     int inBytes = (int(middle) + 3) * 4;
     int outBytes = outPixels * 4;
+    // (the GPU's kernel is the other builds')
+    if (!averageEdge && UseGpu("subpixel32", int64_t(rows.size()) * outPixels))
+    {
+        std::vector<std::array<int, 3>> gpuRows;
+        gpuRows.reserve(rows.size());
+        for (const auto& [kind, s, d] : rows)
+            gpuRows.push_back({int(kind), s, d});
+        SubpixelGpuParameters parameters{0, 0, 0, int(middle), ax, bx, tailX, srcTailX, ay, by, tailY, srcTailY, d0, d4, d8, dc, d0 == 0 ? 1 : 0};
+        if (!SubpixelOnGpu(gpuRows, srcPitch, int(middle) + 3, outPixels, parameters))
+            GpuFailed("subpixel32");
+        else if (!GpuCheck)
+            return true;
+    }
     ParallelRows::For(int(rows.size()), int64_t(rows.size()) * outPixels, [&](int from, int to) {
         // Source rows are read in place (copied when they share bytes with the destination row,
         // which is written as the row is made, or are not one piece of memory) and the destination
@@ -278,6 +291,7 @@ bool ScnVm::Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, in
             SubpixelRowPixels(kind, k, p, q, Bytes(d, outBytes), int(middle));
         }
     });
+    GpuDone("subpixel32");
     return true;
 }
 

@@ -36,6 +36,7 @@
 #include "FreeTypeFonts.h"
 #include "GameList.h"
 #include "Settings.h"
+#include "ui/DekoAccelerator.h"
 #include "archives/FormatManager.h"
 #include "audio/ScnMixer.h"
 #include "audio/ScnMusic.h"
@@ -62,6 +63,19 @@ constexpr const char* kGames = "sdmc:/OpenShiina/Games";
 constexpr const char* kInternalGames = "user:/OpenShiina/Games";
 constexpr const char* kLibrary = "sdmc:/OpenShiina/library.tsv";
 constexpr const char* kSettings = "sdmc:/OpenShiina/settings.json";
+constexpr const char* kGpuCheck = "sdmc:/OpenShiina/gpu-check";
+constexpr const char* kGpuOn = "sdmc:/OpenShiina/gpu";
+
+/// A switch file of the SD card: there and not starting with '0' (devhost can write one, not delete it).
+bool SwitchOn(const char* path)
+{
+    std::FILE* f = Files::Open(path, "rb");
+    if (!f)
+        return false;
+    int c = std::fgetc(f);
+    std::fclose(f);
+    return c != '0';
+}
 constexpr const char* kSaves = "sdmc:/OpenShiina/Saves";
 constexpr const char* kLog = "sdmc:/OpenShiina/player.log";
 constexpr const char* kData = "romfs:/Data";
@@ -583,7 +597,8 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
     return leave;
 }
 
-void Play(Ui& ui, const std::string& path)
+/// frameLimit: leave after that many frames (0: when the player leaves; for tests over nxlink).
+void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
 {
     std::string folder = Files::FileName(path);
     auto archive = game::GameData::FindArchive(path);
@@ -610,6 +625,17 @@ void Play(Ui& ui, const std::string& path)
     // HOME (or the console asleep) stops the game where it is, its clock and its sound too, whatever
     // RIO.INI's Background says (on Windows a game may go on behind other windows)
     vm->SetPauseInBackground(true);
+    // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, only with
+    // sdmc:/OpenShiina/gpu ("1") until it has been tried on the console; with gpu-check as well
+    // every call of them runs on both and the bytes are compared (the log tells)
+    static std::unique_ptr<player::DekoAccelerator> s_gpu;
+    if (SwitchOn(kGpuOn))
+    {
+        if (!s_gpu)
+            s_gpu = std::make_unique<player::DekoAccelerator>(ui.Screen.Device());
+        vm->Accelerator = s_gpu.get();
+        vm->GpuCheck = SwitchOn(kGpuCheck);
+    }
     LogMemory("its first script loaded");
 
     // The sound device: 44.1 kHz stereo floats, the mixer read on SDL's audio thread
@@ -726,12 +752,17 @@ void Play(Ui& ui, const std::string& path)
             }
 
             uint64_t before = armGetSystemTick();
+            if (frameLimit != 0 && frames >= frameLimit)
+                break;
             if (!vm->RunFrame())
             {
                 Log("The scripts quit after %llu frames.\n", (unsigned long long)frames);
                 break;
             }
             uint64_t scripts = armGetSystemTick() - before;
+            for (const auto& check : vm->GpuChecks)
+                Log("[gpu] %s\n", check.c_str());
+            vm->GpuChecks.clear();
             slowest = std::max(slowest, scripts);
             spanScripts += scripts;
             frames++;
@@ -802,6 +833,10 @@ void Play(Ui& ui, const std::string& path)
     {
         Log("Error at frame %llu: %s\n", (unsigned long long)frames, e.what());
     }
+    for (const auto& [routine, c] : vm->GpuCheckCounts)
+        Log("[gpu] %s: %lld calls compared, %lld differed; %.2f ms on the GPU against %.2f on the CPU a 100,000 pixels\n", routine.c_str(),
+            (long long)c.Calls, (long long)c.Differed, c.GpuMs * 100000 / double(std::max<int64_t>(c.Pixels, 1)),
+            c.CpuMs * 100000 / double(std::max<int64_t>(c.Pixels, 1)));
     if (sound != 0)
         SDL_CloseAudioDevice(sound);
 }
@@ -911,9 +946,16 @@ int main(int argc, char** argv)
     // A game folder named on the command line (nxlink ... OpenShiina.nro <folder>) starts at once;
     // else the list of games, back to it after each one (the title on the HOME menu starts here)
     std::string folder;
-    for (int k = 1; k < argc && folder.empty(); k++)
+    // (and a number after it: leave after that many frames, for tests)
+    uint64_t frameLimit = 0;
+    for (int k = 1; k < argc; k++)
         if (argv[k] && argv[k][0] != '_')
-            folder = argv[k];
+        {
+            if (folder.empty())
+                folder = argv[k];
+            else if (frameLimit == 0)
+                frameLimit = std::strtoull(argv[k], nullptr, 10);
+        }
     bool named = !folder.empty();
     if (named)
         folder = Files::Combine(kGames, folder);
@@ -938,7 +980,7 @@ int main(int argc, char** argv)
             break;
         try
         {
-            Play(*ui, folder);
+            Play(*ui, folder, frameLimit);
         }
         catch (const std::exception& e)
         {

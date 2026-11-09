@@ -691,6 +691,13 @@ void ScnVm::RotateZoom(const int* v)
         for (int64_t yy = 0; yy < sh; yy++)
             ReadBytes(int(srcFrom + yy * srcStride), reinterpret_cast<uint8_t*>(source.data() + yy * sw), int(sw * 4));
         int width = r - l;
+        if (UseGpu("rotatezoom", int64_t(width) * (b - t)))
+        {
+            if (!RotateZoomOnGpu(source, int(sw), int(sh), l, t, r, b, sx, sy, sxEnd, syEnd, keep, colour, u0, v0, dux, dvx, duy, dvy, dstBase, dstStride))
+                GpuFailed("rotatezoom");
+            else if (!GpuCheck)
+                return;
+        }
         ParallelRows::For(b - t, int64_t(width) * (b - t), [&](int first, int last) {
             std::vector<uint8_t> row(static_cast<size_t>(width * 4));
             for (int yy = t + first; yy < t + last; yy++)
@@ -711,6 +718,7 @@ void ScnVm::RotateZoom(const int* v)
                 WriteBytes(at, row.data(), int(row.size()));
             }
         });
+        GpuDone("rotatezoom");
         return;
     }
     // Row by row as the x86 code draws it, reading the source as it goes (a frame turned in place
