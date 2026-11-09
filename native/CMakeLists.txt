@@ -77,6 +77,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Pending.cpp
     src/scripting/ScnVm.Pictures.cpp
     src/scripting/ScnVm.Printf.cpp
+    src/scripting/ScnVm.ReadAhead.cpp
     src/scripting/ScnVm.RioSub.cpp
     src/scripting/ScnVm.Scale16.cpp
     src/scripting/ScnVm.Scale32.cpp

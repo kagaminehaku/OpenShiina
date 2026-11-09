@@ -396,6 +396,11 @@ int Run(int argc, std::string* argv)
         vm.ScreenWidth = std::stoi(w);
     if (auto h = Match(ini, R"((?:^|\n)WindowHeight=(\d+))"); !h.empty())
         vm.ScreenHeight = std::stoi(h);
+    // As ScnBoot's SCNBOOT_BGLOAD / SCNBOOT_AHEAD: the background loader and the reads ahead
+    const char* bgload = std::getenv("SCNRUN_BGLOAD");
+    const char* ahead = std::getenv("SCNRUN_AHEAD");
+    vm.LoadInBackground = bgload && std::string(bgload) == "1";
+    vm.ReadAhead = !(ahead && std::string(ahead) == "0");
     if (!vm.LoadModule(0, Text::Utf8ToCp932(start), true))
     {
         std::printf("%s is missing.\n", start.c_str());
@@ -466,6 +471,8 @@ int Run(int argc, std::string* argv)
     }
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
     std::printf("%d frames in %.2f s, script memory %lld MB\n", frame, seconds, (long long)(vm.ScriptMemoryBytes() >> 20));
+    if (vm.LoadInBackground)
+        std::printf("  read ahead: %d files, %d of them used\n", vm.ReadAheadCounts().first, vm.ReadAheadCounts().second);
     // As ScnBoot ends its output: each opcode run, how often
     std::string counts;
     int kinds = 0;

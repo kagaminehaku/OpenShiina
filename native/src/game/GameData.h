@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -78,6 +79,8 @@ private:
     std::unordered_map<std::string, std::vector<Candidate>> m_byStem;
     std::vector<std::string> m_stems;
     std::vector<archives::WarcArchive*> m_mounted;
+    // (00DD / 00DF change it on the scripts' thread while a read ahead may look in it)
+    std::mutex m_mountedLock;
     std::set<archives::WarcArchive*> m_shared;
     bool m_executableSearched = false, m_executableFound = false;
     Bytes m_executableCopy;
@@ -87,6 +90,8 @@ private:
         std::map<std::string, std::string> Files, Folders;
     };
     std::map<std::string, std::optional<Listing>> m_listings;
+    // (the scripts' thread and the reads ahead look in them)
+    std::mutex m_listingsLock;
 };
 
 } // namespace openshiina::game

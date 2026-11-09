@@ -1,9 +1,9 @@
 // C# Scripting/ScnVm.Misc.cs: small system opcodes met on the way into the game: memory status,
 // DirectInput keys, the background file loader, the disc check and the extra data folder.
 //
-// The background loader (the C# player's LoadInBackground, reading on another thread while the
-// scripts go on) comes with ScnVm.ReadAhead: until then 00CE reads at once, as the C# player's tests
-// run it. The disc 0A30 looks for: the C# player looks in Windows' CD / DVD drives first; the Switch
+// The background loader: with LoadInBackground (the player) 00CE reads on a reader thread while the
+// scripts go on (START polls 00CF and draws its frames meanwhile), as the engine does; without it
+// (tests) at once. The disc 0A30 looks for: the C# player looks in Windows' CD / DVD drives first; the Switch
 // has none, so the player always answers for a disc of its own.
 #include "scripting/ScnVm.h"
 
@@ -111,6 +111,25 @@ void ScnVm::Loaded(const openshiina::Bytes& data)
     EngineGlobals[0x4C4514] = int(data.size());
 }
 
+void ScnVm::FinishLoading()
+{
+    if (!m_loading)
+        return;
+    auto [name, read] = std::move(*m_loading);
+    m_loading.reset();
+    openshiina::Bytes data;
+    if (!read->Wait(data))
+    {
+        m_loaded = 0;
+        return;
+    }
+    Kept(name, data);
+    ReadAheadAfter(name);
+    if (SjisEndsWithIgnoreCase(name, ".txt"))
+        LearnScenario(name, data);
+    Loaded(data);
+}
+
 void ScnVm::RegisterMisc()
 {
     // 02C1 n, v: field n of GlobalMemoryStatus (3 = available physical memory); a current PC has
@@ -133,11 +152,22 @@ void ScnVm::RegisterMisc()
         vm.Store(c, i.Args[1], vm.RepeatButtons(key, held));
         return 0;
     });
-    // 00CE file: load a file (the background loader, here at once); 00CF v: still loading (0 when
-    // done); 00D0 v: the data; 00D1: wait for the loader. (The C# player's "Play from here" puts
-    // its scenario in place of the one asked for here: that comes with ScnVm.Warp.)
+    // 00CE file: load a file in the background (at once without LoadInBackground, or when it is
+    // kept already); 00CF v: still loading (0 when done); 00D0 v: the data; 00D1: wait for the
+    // loader. (The C# player's "Play from here" puts its scenario in place of the one asked for
+    // here: a Tools feature, not on the Switch.)
     Register(0x00CE, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         std::string file = vm.ReadString(vm.Value(c, i.Args[0]));
+        vm.FinishLoading();
+        if (vm.LoadInBackground)
+            if (auto p = vm.ResolvePath(file); p && !p->Save && !vm.m_fileCache.count(SjisFold(p->Name))
+                                               && vm.m_host.ArchiveFileSize(p->Name))
+            {
+                vm.m_loaded = 0;
+                auto read = vm.TakeAheadRead(p->Name);
+                vm.m_loading = {p->Name, read ? read : vm.ReadInBackground(p->Name, true)};
+                return 0;
+            }
         openshiina::Bytes data;
         if (!vm.ReadScriptFile(file, data))
             return 2;
@@ -145,14 +175,18 @@ void ScnVm::RegisterMisc()
         return 0;
     });
     Register(0x00CF, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        vm.Store(c, i.Args[0], 0);
+        vm.Store(c, i.Args[0], vm.m_loading && !vm.m_loading->second->Done() ? 1 : 0);
         return 0;
     });
     Register(0x00D0, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.FinishLoading();
         vm.Store(c, i.Args[0], vm.m_loaded);
         return 0;
     });
-    Register(0x00D1, [](ScnVm&, ScnContext&, const ScnInstruction&) { return 0; });
+    Register(0x00D1, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
+        vm.FinishLoading();
+        return 0;
+    });
     // 06C3: release the movie player's DirectShow objects
     Register(0x06C3, [](ScnVm&, ScnContext&, const ScnInstruction&) { return 0; });
     // 0140 program, arguments (Sena Plus 0x429D00, FUN_00406C60): CreateProcess of a program of the

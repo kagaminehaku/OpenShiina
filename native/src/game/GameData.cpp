@@ -226,6 +226,7 @@ bool GameData::Mount(const std::string& archive, bool mounted)
         }
     if (!warc)
         return false;
+    std::lock_guard lock(m_mountedLock);
     bool there = std::find(m_mounted.begin(), m_mounted.end(), warc) != m_mounted.end();
     if (there == mounted)
         return false;
@@ -238,6 +239,7 @@ bool GameData::Mount(const std::string& archive, bool mounted)
 
 template <typename F> std::optional<GameData::Candidate> GameData::Pick(const std::vector<Candidate>& list, F match)
 {
+    std::lock_guard lock(m_mountedLock);
     std::optional<Candidate> best;
     size_t bestOrder = SIZE_MAX;
     for (const auto& candidate : list)
@@ -371,6 +373,7 @@ std::optional<std::string> GameData::LooseFile(const std::string& path)
 
 std::optional<std::string> GameData::ResolveListed(const std::string& path)
 {
+    std::lock_guard lock(m_listingsLock);
     std::string current = m_folder;
     auto parts = Parts(path);
     for (size_t i = 0; i < parts.size(); i++)

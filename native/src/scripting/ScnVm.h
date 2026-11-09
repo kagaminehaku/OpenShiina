@@ -33,6 +33,7 @@
 #include <functional>
 #include <initializer_list>
 
+#include "scripting/BackgroundReader.h"
 #include "scripting/NetDictionary.h"
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnOpcodes.h"
@@ -357,6 +358,14 @@ public:
     bool WriteScriptFile(const std::string& path, const openshiina::Bytes& data);
     /// The memory the archives' files the scripts read are kept in, decoded.
     int64_t FileCacheBytes = int64_t(64) << 20;
+    /// The background loader (00CE) reads on another thread, as the engine's does, and the files a
+    /// scenario names are read ahead (ScnVm.ReadAhead). The player sets it; tests keep the frames
+    /// the same from run to run without it (scnrun: SCNRUN_BGLOAD=1).
+    bool LoadInBackground = false;
+    /// Whether files are read ahead (with LoadInBackground; scnrun: SCNRUN_AHEAD=0 turns it off).
+    bool ReadAhead = true;
+    /// Files read ahead, and of those the scripts then read.
+    std::pair<int, int> ReadAheadCounts() const { return {m_aheadRead, m_aheadUsed}; }
 
     // ---- Draw (ScnVm.Draw.cs) ----
 
@@ -1035,6 +1044,10 @@ private:
     /// A file 00CE loaded, into script memory.
     void Loaded(const openshiina::Bytes& data);
     int m_loaded = 0;
+    /// The loading file (00CE with LoadInBackground), waited for and taken into script memory (0
+    /// when it could not be read).
+    void FinishLoading();
+    std::optional<std::pair<std::string, std::shared_ptr<BackgroundRead>>> m_loading;
     /// The disc 0A30 found: the root of its drive ("Q:\") and whether it is the player's own.
     std::optional<std::pair<std::string, bool>> m_disc;
 
@@ -1104,6 +1117,29 @@ private:
     void PlayFromModule(ScnContext& c, const std::string& file);
     void PumpGraphMovies();
     void StepMusicFades();
+
+    // ---- ReadAhead ----
+    /// The file read on a reader thread (ReadArchiveFile); first: before the reads ahead.
+    std::shared_ptr<BackgroundRead> ReadInBackground(const std::string& name, bool first);
+    /// The read of the file if it was read ahead (done or not), else none.
+    std::shared_ptr<BackgroundRead> TakeAheadRead(const std::string& name);
+    /// The file if it was read ahead (waiting for the read when it is not done yet).
+    bool TakeAhead(const std::string& name, openshiina::Bytes& data);
+    void LearnScenario(const std::string& name, const openshiina::Bytes& text);
+    void ReadAheadAfter(const std::string& name);
+    void StartAhead(int from);
+    bool Skipped(const std::string& name);
+    // Reads ahead not taken yet, by folded name, with the file's size
+    std::unordered_map<std::string, std::pair<std::shared_ptr<BackgroundRead>, int64_t>> m_ahead;
+    // The last scenario's files in the order they first come, and each one's place (folded)
+    std::vector<std::string> m_scenarioFiles;
+    std::unordered_map<std::string, int> m_scenarioOrder;
+    // By folder (folded), the sounds read ahead and passed by unread since the scripts last read one
+    std::unordered_map<std::string, int> m_soundsPassed;
+    std::string m_scenarioName;
+    int m_aheadRead = 0, m_aheadUsed = 0;
+    // The reader threads, made on the first read (the last member: they stop first)
+    std::unique_ptr<BackgroundReader> m_reader;
 };
 
 /// Shift-JIS text compared as the C# player's OrdinalIgnoreCase compares it decoded.

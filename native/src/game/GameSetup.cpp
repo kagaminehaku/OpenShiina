@@ -74,6 +74,7 @@ std::unique_ptr<scripting::ScnVm> GameSetup::CreateVm(scripting::IScnHost& host,
     vm->EngineVersion = int(std::lround(std::stod(Version) * 100));
     vm->ScreenWidth = Width;
     vm->ScreenHeight = Height;
+    vm->LoadInBackground = true;
     if (!vm->LoadModule(0, Text::Utf8ToCp932(StartScript), true))
         throw InvalidDataError(StartScript + " is missing.");
     return vm;

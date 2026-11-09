@@ -2,10 +2,8 @@
 // GetPrivateProfile* calls on RIO.INI (op_0104 chooses the file, op_0107 reads a number), read
 // here from the bytes the host gives for a loose file - and the files the scripts open.
 //
-// Not here yet: a translation's tables and gaiji (translation\text.tsv, a scenario in UTF-8), the
-// files read ahead on another thread, "Play from here". Without a translation folder and without
-// "Play from here" the scripts read the same bytes as in the C# player; reading ahead changes only
-// when a file is read.
+// Not here: "Play from here" (a Tools feature). The files a scenario names are read ahead on other
+// threads (ScnVm.ReadAhead), which changes only when a file is read, never its bytes.
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
@@ -184,14 +182,22 @@ bool ScnVm::ReadScriptFile(const std::string& path, openshiina::Bytes& data, boo
     {
         m_fileCacheOrder.splice(m_fileCacheOrder.begin(), m_fileCacheOrder, kept->second);
         data = kept->second->second;
+        ReadAheadAfter(p->Name);
+        if (EndsWithTxt(p->Name))
+            LearnScenario(p->Name, data);
         return true;
     }
-    if (!ReadArchiveFile(p->Name, data))
+    if (!TakeAhead(p->Name, data) && !ReadArchiveFile(p->Name, data))
         return m_host.ReadLooseFile(p->Name, data);
+    ReadAheadAfter(p->Name);
     Kept(p->Name, data);
+    if (EndsWithTxt(p->Name))
+        LearnScenario(p->Name, data);
     return true;
 }
 
+// A file of the game folder's translation\ or of the archives as it is (the reader threads read
+// them too: the archives and the folder listings are read under locks)
 bool ScnVm::ReadArchiveFile(const std::string& name, openshiina::Bytes& data)
 {
     if (m_host.ReadLooseFile(TranslationFolder + name, data))
@@ -232,6 +238,7 @@ void ScnVm::MountArchive(const std::string& archive, bool mounted)
     if (!m_host.MountArchive(archive, mounted))
         return;
     ForgetKept();
+    m_ahead.clear();
 }
 
 game::TranslationTables* ScnVm::Tables()
