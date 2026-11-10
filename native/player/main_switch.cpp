@@ -65,6 +65,7 @@ constexpr const char* kLibrary = "sdmc:/OpenShiina/library.tsv";
 constexpr const char* kSettings = "sdmc:/OpenShiina/settings.json";
 constexpr const char* kGpuCheck = "sdmc:/OpenShiina/gpu-check";
 constexpr const char* kGpuOn = "sdmc:/OpenShiina/gpu";
+constexpr const char* kTextCheck = "sdmc:/OpenShiina/text-check";
 
 /// A switch file of the SD card: there and not starting with '0' (devhost can write one, not delete it).
 bool SwitchOn(const char* path)
@@ -93,6 +94,10 @@ constexpr const char* kData = "romfs:/Data";
 
 int s_nxlink = -1;
 std::FILE* s_log = nullptr;
+// The GPU mode, made by the first game that uses it and kept for the next: it runs on the screen's
+// deko3d device, so main lets it go before the screen (left to exit(), its queue was already gone
+// and deko3d stopped the title: "an error has occurred" after every game)
+std::unique_ptr<player::DekoAccelerator> s_gpu;
 
 void Log(const char* format, ...)
 {
@@ -418,7 +423,12 @@ std::string PickGame(Ui& ui, bool internal)
     std::vector<std::pair<std::string, bool>> roots = {{kGames, false}};
     if (internal)
         roots.emplace_back(kInternalGames, true);
+    // The folders new or changed since the list was made are recognised again (a game that writes
+    // into its own folder changes it): a moment, shown, not a black screen
+    ui.Splash("Looking at the games...");
+    uint64_t looking = armGetSystemTick();
     auto games = player::ListGames(roots, kLibrary, false);
+    Log("[list] %zu games (%.0f ms)\n", games.size(), double(armTicksToNs(armGetSystemTick() - looking)) / 1e6);
     constexpr float RowHeight = 60, ListX = 380, ListY = 110, ListW = 860, IconSize = 44;
     constexpr int Rows = 9;
     size_t choice = 0, top = 0;
@@ -639,7 +649,6 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, on unless
     // sdmc:/OpenShiina/gpu starts with '0'; with gpu-check as well every call of them runs on both
     // and the bytes are compared (the log tells). Without it (it cannot start) the CPU does them
-    static std::unique_ptr<player::DekoAccelerator> s_gpu;
     if (!SwitchOff(kGpuOn))
     {
         try
@@ -655,6 +664,10 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
         }
     }
     Log("GPU mode: %s\n", vm->Accelerator ? (vm->GpuCheck ? "on, checked against the CPU" : "on") : "off");
+    // With text-check every glyph is drawn both in place and the way before, the bytes compared
+    vm->TextCheck = SwitchOn(kTextCheck);
+    if (vm->TextCheck)
+        Log("Text check: on\n");
     LogMemory("its first script loaded");
 
     // The sound device: 44.1 kHz stereo floats, the mixer read on SDL's audio thread
@@ -782,6 +795,9 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             for (const auto& check : vm->GpuChecks)
                 Log("[gpu] %s\n", check.c_str());
             vm->GpuChecks.clear();
+            for (const auto& check : vm->TextChecks)
+                Log("[text] %s\n", check.c_str());
+            vm->TextChecks.clear();
             slowest = std::max(slowest, scripts);
             spanScripts += scripts;
             frames++;
@@ -812,7 +828,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                     std::vector<std::pair<std::string, ScnVm::RoutineTime>> top(routineTimes.begin(), routineTimes.end());
                     std::sort(top.begin(), top.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
                     std::string names;
-                    for (size_t k = 0; k < top.size() && k < 4; k++)
+                    for (size_t k = 0; k < top.size() && k < 7; k++)
                         names += std::format(", {} {:.0f} ms ({} calls)", top[k].first, top[k].second.Milliseconds, top[k].second.Calls);
                     std::vector<std::pair<int, ScnVm::RoutineTime>> ops(opTimes.begin(), opTimes.end());
                     std::sort(ops.begin(), ops.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
@@ -852,12 +868,19 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     {
         Log("Error at frame %llu: %s\n", (unsigned long long)frames, e.what());
     }
+    if (vm->TextCheck)
+        Log("[text] %lld glyphs compared, %lld differed\n", (long long)vm->TextCheckGlyphs, (long long)vm->TextCheckDiffered);
     for (const auto& [routine, c] : vm->GpuCheckCounts)
         Log("[gpu] %s: %lld calls compared, %lld differed; %.2f ms on the GPU against %.2f on the CPU a 100,000 pixels\n", routine.c_str(),
             (long long)c.Calls, (long long)c.Differed, c.GpuMs * 100000 / double(std::max<int64_t>(c.Pixels, 1)),
             c.CpuMs * 100000 / double(std::max<int64_t>(c.Pixels, 1)));
     if (sound != 0)
         SDL_CloseAudioDevice(sound);
+    Log("[leave] the sound closed\n");
+    // (each step of leaving the game in the log, for a leaving that never ends)
+    uint64_t leaving = armGetSystemTick();
+    vm.reset();
+    Log("[leave] the interpreter let go (%.0f ms)\n", double(armTicksToNs(armGetSystemTick() - leaving)) / 1e6);
 }
 
 } // namespace
@@ -942,6 +965,17 @@ int main(int argc, char** argv)
     romfsInit();
     Files::CreateDirectories(kSaves);
     s_settings = player::Settings::Load(kSettings);
+    // The logs of the last runs kept (player.1.log the run before this one, up to player.3.log): the
+    // OpenShiina title starts the player before hbmenu, so a new log must not take the one to read
+    // (the SD card's file system moves no file onto another: the oldest goes first)
+    {
+        const std::string base = std::string(kLog).substr(0, std::string(kLog).size() - 4);
+        auto kept = [&](int k) { return base + "." + std::to_string(k) + ".log"; };
+        unlink(kept(3).c_str());
+        rename(kept(2).c_str(), kept(3).c_str());
+        rename(kept(1).c_str(), kept(2).c_str());
+        rename(kLog, kept(1).c_str());
+    }
     s_log = Files::Open(kLog, "wb");
     if (!prepared.empty())
         Log("At the start: %s\n", prepared.c_str());
@@ -1008,6 +1042,8 @@ int main(int argc, char** argv)
         if (named)
             break;
     }
+    // the GPU mode before the screen it runs on
+    s_gpu.reset();
     ui.reset();
     if (internal)
         fsdevUnmountDevice("user");

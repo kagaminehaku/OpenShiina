@@ -8,11 +8,15 @@
 // the .nro is saved under sdmc:/switch (-p gives the path there) and started through hbloader with
 // its arguments, then "_DEVHOST_=<this .nro>" and the PC's address for nxlink -s, as hbmenu passes
 // it. A path that starts with '@' is a file for sdmc:/OpenShiina (a game's files sent over the
-// network: -p @Games/<folder>/<file>): it is saved there and the next upload waited for.
+// network: -p @Games/<folder>/<file>): it is saved there and the next upload waited for. One that
+// starts with '+' is an .nro saved under sdmc:/switch without being started (-p +openshiina/OpenShiina.nro:
+// a new build put in place, for the OpenShiina title to start next time).
 // A connection that starts with "GETF" in place of a path's length reads instead (tools/devhost/
 // devget.ps1 on the PC): the path's length and a path of the SD card (sdmc:/...), then devhost
 // answers 0, the file's size (8 bytes) and the file as it is, or 1, a length and the folder's
 // entries ("D" or "F", a tab, the size, a tab, the name, a line each), or -1 when there is neither.
+// "DELF" in its place deletes a file under sdmc:/OpenShiina (the files sent with '@'; never a
+// folder, nothing elsewhere): devhost answers 0, or -1 when it cannot.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
 
@@ -52,6 +56,7 @@ constexpr const char* kDataRoot = "sdmc:/OpenShiina";
 constexpr const char* kSelf = "sdmc:/switch/openshiina/devhost.nro";
 constexpr size_t kChunk = 16 * 1024; // the largest compressed chunk nxlink sends
 constexpr int32_t kGetMagic = 0x46544547; // "GETF" as the first 4 bytes, little-endian
+constexpr int32_t kDeleteMagic = 0x464C4544; // "DELF"
 
 void Log(const char* format, ...)
 {
@@ -105,11 +110,13 @@ bool EndsWithNro(const std::string& path)
 
 /// The file under sdmc:/switch for the path nxlink sends, or under sdmc:/OpenShiina for one that starts
 /// with '@' (a data file); empty when it would be outside that folder or a program is not an .nro.
+/// A path that starts with '+' is an .nro under sdmc:/switch too, saved and not started.
 std::string TargetPath(const std::string& sent)
 {
     bool data = !sent.empty() && sent[0] == '@';
+    bool keep = !sent.empty() && sent[0] == '+';
     std::string path = data ? kDataRoot : kRoot;
-    size_t start = data ? 1 : 0;
+    size_t start = data || keep ? 1 : 0;
     while (start <= sent.size())
     {
         size_t end = sent.find_first_of("/\\", start);
@@ -131,7 +138,7 @@ std::string TargetPath(const std::string& sent)
 struct Upload
 {
     std::string path;
-    /// A data file (a path with '@'): saved, not started.
+    /// A data file (a path with '@') or an .nro to keep (with '+'): saved, not started.
     bool data = false;
     std::vector<std::string> arguments;
 };
@@ -271,6 +278,33 @@ bool Serve(int sock, std::string& path, std::string& error)
     return true;
 }
 
+/// A deletion ("DELF" already taken): the path's length and the path, a file under sdmc:/OpenShiina.
+bool Delete(int sock, std::string& path, std::string& error)
+{
+    int32_t length = 0;
+    if (!ReceiveInt(sock, length) || length <= 0 || length > 1024)
+    {
+        error = "a deletion without a path";
+        return false;
+    }
+    path.assign(size_t(length), '\0');
+    if (!ReceiveAll(sock, path.data(), path.size()))
+    {
+        error = "a deletion without a path";
+        return false;
+    }
+    std::string root = std::string(kDataRoot) + "/";
+    struct stat info{};
+    if (path.rfind(root, 0) != 0 || path.size() <= root.size() || path.find("/..") != std::string::npos)
+        error = "only a file under " + root + " is deleted: " + path;
+    else if (stat(path.c_str(), &info) != 0 || !S_ISREG(info.st_mode))
+        error = "no file " + path;
+    else if (unlink(path.c_str()) != 0)
+        error = "cannot delete " + path + ": " + std::strerror(errno);
+    SendInt(sock, error.empty() ? 0 : -1);
+    return error.empty();
+}
+
 /// One upload as hbmenu's netloader takes it: the path's length and the path, the file's size, a
 /// response (0, or -1 when the file cannot be made), the compressed file, a second response, then the
 /// arguments, each ending with a 0. The file is written next to its place and moved there at the end.
@@ -290,7 +324,7 @@ bool Receive(int sock, int32_t nameLength, Upload& upload, std::string& error)
         return false;
     }
     upload.path = TargetPath(name);
-    upload.data = !name.empty() && name[0] == '@';
+    upload.data = !name.empty() && (name[0] == '@' || name[0] == '+');
     std::string part = upload.path + ".part";
     std::FILE* file = nullptr;
     if (upload.path.empty())
@@ -454,6 +488,17 @@ int main(int argc, char** argv)
             close(sock);
             if (served)
                 Log("Sent %s to %s\n", path.c_str(), inet_ntoa(remote.sin_addr));
+            else
+                Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
+            continue;
+        }
+        if (first == kDeleteMagic)
+        {
+            std::string path;
+            bool deleted = Delete(sock, path, error);
+            close(sock);
+            if (deleted)
+                Log("Deleted %s\n", path.c_str());
             else
                 Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
             continue;

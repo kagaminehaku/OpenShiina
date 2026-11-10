@@ -408,6 +408,12 @@ public:
         double GpuMs = 0, CpuMs = 0;
     };
     std::map<std::string, GpuCheckCount> GpuCheckCounts;
+    /// Every glyph drawn in place is drawn again a byte at a time through the 4 GB (the way before)
+    /// and the two compared: the Switch's check of the text drawn in place (sdmc:/OpenShiina/text-check).
+    bool TextCheck = false;
+    /// TextCheck: the glyphs compared, those whose bytes differed, and the first differences (the reader may clear them).
+    int64_t TextCheckGlyphs = 0, TextCheckDiffered = 0;
+    std::vector<std::string> TextChecks;
 
     // ---- Draw (ScnVm.Draw.cs) ----
 

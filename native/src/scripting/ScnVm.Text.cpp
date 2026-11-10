@@ -19,7 +19,10 @@
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstring>
+#include <format>
 #include <stdexcept>
 
 #include "text/Text.h"
@@ -29,6 +32,33 @@
 namespace openshiina::scripting {
 
 namespace {
+
+/// While the player measures where the time goes (ScnVm::RoutineTimes): a part of the text's work
+/// timed under its name, beside the embedded routines in the log of a slow stretch.
+class TextTime
+{
+public:
+    TextTime(ScnVm& vm, const char* name) : m_times(vm.RoutineTimes), m_name(name)
+    {
+        if (m_times)
+            m_start = std::chrono::steady_clock::now();
+    }
+    ~TextTime()
+    {
+        if (!m_times)
+            return;
+        auto& time = (*m_times)[m_name];
+        time.Milliseconds += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - m_start).count();
+        time.Calls++;
+    }
+    TextTime(const TextTime&) = delete;
+    TextTime& operator=(const TextTime&) = delete;
+
+private:
+    std::unordered_map<std::string, ScnVm::RoutineTime>* m_times;
+    const char* m_name;
+    std::chrono::steady_clock::time_point m_start;
+};
 
 // Record fields (dword indices, as the decompiled code numbers them)
 enum : int
@@ -297,7 +327,11 @@ void ScnVm::CreateRecordFont(int rec)
                            G(rec, RStrikeOut), charSet != m_fontCharSets.end() ? charSet->second.first : 0x80, G(rec, RQuality),
                            charSet != m_fontCharSets.end() ? charSet->second.second : 1, std::string(faceBytes.begin(), faceBytes.end())};
     auto* fonts = m_host.Fonts();
-    int font = fonts ? fonts->CreateFont(request) : 0;
+    int font;
+    {
+        TextTime time(*this, "text: font made");
+        font = fonts ? fonts->CreateFont(request) : 0;
+    }
     if (font == 0)
         font = 0x7F000000 + int(m_liveFonts.size());   // no font engine: a stand-in handle
     m_liveFonts.insert(font);
@@ -338,6 +372,7 @@ int ScnVm::SelectedFont(int rec)
 std::pair<int, int> ScnVm::Extent(int font, const uint8_t* text, size_t length)
 {
     auto* fonts = m_host.Fonts();
+    TextTime time(*this, "text: measured");
     return fonts ? fonts->TextExtent(font, text, length) : std::pair(0, 0);
 }
 
@@ -1666,6 +1701,7 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
     auto* fonts = m_host.Fonts();
     if (!fonts)
         return;
+    TextTime drawTime(*this, "text: glyph drawn");
     int count = length & 0x7FFFFFFF;
     bool solid = G(rec, RAntialias) == 0;
     if (G(rec, RBkMode) == 2)
@@ -1681,6 +1717,7 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
         auto cached = cache.find(code);
         if (cached == cache.end())
         {
+            TextTime renderTime(*this, "text: glyph made");
             auto request = m_fontRequests.find(font);
             if (request == m_fontRequests.end())
                 made = fonts->Glyph(font, code);
@@ -1753,7 +1790,52 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
     int pixels = G(rec, RPixels), pitch = G(rec, RSurfacePitch);
     int limit = pixels + pitch * height;
 
-    auto blend = [&](int p, uint32_t a) {
+    int src0 = int(firstRow * uint32_t(glyph->Pitch) + firstCol);
+    if (layer && (uint32_t(length) & 0x80000000u) == 0)
+    {
+        if (solid)
+            throw std::runtime_error("Text without antialiasing (TextOutA) on a layer is not supported yet");
+        DrawGlyphOnLayer(rec, *glyph, src0, cl, ct, firstRow, endRow, firstCol, endCol, alpha);
+        return;
+    }
+    // The edge ("_E": each inked pixel drawn over the (2 ex + 1) x (2 ey + 1) around it)
+    bool edged = (uint32_t(length) & 0x80000000u) != 0;
+    int ex = edged ? G(rec, REdgeX) : 0, ey = edged ? G(rec, REdgeY) : 0;
+
+    // FUN_004325A0's loop: the glyph's rows and columns, each inked pixel blended at the pen (or
+    // over its edge), a byte that would leave the surface skipped
+    auto drawWith = [&](auto&& blend) {
+        int src = src0;
+        int row = ct;
+        for (uint32_t gy = firstRow; gy < endRow; gy++, src += glyph->Pitch, row++)
+        {
+            if (firstCol >= endCol)
+                continue;
+            int dst = pitch * row + cl * 3 + pixels;
+            for (uint32_t col = 0; col < endCol - firstCol; col++, dst += 3)
+            {
+                size_t at = size_t(src) + col;
+                uint8_t v = glyph->Bits.size() > at ? glyph->Bits[at] : uint8_t(0);
+                if (v == 0)
+                    continue;
+                uint32_t a = solid ? (v >= 32 ? 256u : 0u) : (uint32_t(v) * 0xFF >> 6) * uint32_t(alpha) >> 8;
+                if (a == 0)
+                    continue;
+                if (!edged)
+                {
+                    blend(dst, a);
+                    continue;
+                }
+                int corner = dst + pitch * -ey + ex * -3;
+                for (int dy = -ey; dy <= ey; dy++, corner += pitch)
+                    for (int dx = -ex, q = corner; dx <= ex; dx++, q += 3)
+                        blend(q, a);
+            }
+        }
+    };
+    // A byte at a time through the 4 GB (each byte looked up and checked, ~30 ns on the Switch: six
+    // for a pixel, 150 with an edge of 2, most of 00A1's time there)
+    auto slow = [&](int p, uint32_t a) {
         if (p < pixels || p + 3 > limit)
             return;
         uint32_t d0 = ReadByte(p), d1 = ReadByte(p + 1), d2 = ReadByte(p + 2);
@@ -1761,41 +1843,50 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
         WriteByte(p + 1, uint8_t(((g - d1) * a >> 8) + d1));
         WriteByte(p + 2, uint8_t(((r - d2) * a >> 8) + d2));
     };
-
-    int src = int(firstRow * uint32_t(glyph->Pitch) + firstCol);
-    int row = ct;
-    if (layer && (uint32_t(length) & 0x80000000u) == 0)
+    // The surface in place: the same bytes, written in the same order
+    uint8_t* base = limit > pixels && IsContiguous(pixels, limit - pixels) ? Bytes(pixels, limit - pixels) : nullptr;
+    auto fast = [&](int p, uint32_t a) {
+        if (p < pixels || p + 3 > limit)
+            return;
+        uint8_t* d = base + (p - pixels);
+        uint32_t d0 = d[0], d1 = d[1], d2 = d[2];
+        d[0] = uint8_t(((b - d0) * a >> 8) + d0);
+        d[1] = uint8_t(((g - d1) * a >> 8) + d1);
+        d[2] = uint8_t(((r - d2) * a >> 8) + d2);
+    };
+    if (!base)
     {
-        if (solid)
-            throw std::runtime_error("Text without antialiasing (TextOutA) on a layer is not supported yet");
-        DrawGlyphOnLayer(rec, *glyph, src, cl, ct, firstRow, endRow, firstCol, endCol, alpha);
+        drawWith(slow);
         return;
     }
-    for (uint32_t gy = firstRow; gy < endRow; gy++, src += glyph->Pitch, row++)
+    if (!TextCheck)
     {
-        if (firstCol >= endCol)
-            continue;
-        int dst = pitch * row + cl * 3 + pixels;
-        for (uint32_t col = 0; col < endCol - firstCol; col++, dst += 3)
-        {
-            size_t at = size_t(src) + col;
-            uint8_t v = glyph->Bits.size() > at ? glyph->Bits[at] : uint8_t(0);
-            if (v == 0)
-                continue;
-            uint32_t a = solid ? (v >= 32 ? 256u : 0u) : (uint32_t(v) * 0xFF >> 6) * uint32_t(alpha) >> 8;
-            if (a == 0)
-                continue;
-            if ((uint32_t(length) & 0x80000000u) == 0)
-            {
-                blend(dst, a);
-                continue;
-            }
-            int ex = G(rec, REdgeX), ey = G(rec, REdgeY);
-            int corner = dst + pitch * -ey + ex * -3;
-            for (int dy = -ey; dy <= ey; dy++, corner += pitch)
-                for (int dx = -ex, q = corner; dx <= ex; dx++, q += 3)
-                    blend(q, a);
-        }
+        drawWith(fast);
+        return;
+    }
+    // TextCheck: drawn in place, kept, the surface's rows put back, drawn the old way, compared
+    int rowLo = std::max(0, ct - ey - 1), rowHi = std::min(height, cb + ey + 1);
+    int64_t lo = std::max<int64_t>(0, int64_t(pitch) * rowLo), hi = std::min<int64_t>(limit - pixels, int64_t(pitch) * rowHi);
+    if (hi <= lo)
+    {
+        drawWith(fast);
+        return;
+    }
+    openshiina::Bytes before(base + lo, base + hi);
+    drawWith(fast);
+    openshiina::Bytes drawn(base + lo, base + hi);
+    std::memcpy(base + lo, before.data(), before.size());
+    drawWith(slow);
+    TextCheckGlyphs++;
+    if (std::memcmp(base + lo, drawn.data(), drawn.size()) != 0)
+    {
+        size_t k = 0;
+        while (k < drawn.size() && base[lo + int64_t(k)] == drawn[k])
+            k++;
+        TextCheckDiffered++;
+        if (TextCheckDiffered <= 20)
+            TextChecks.push_back(std::format("glyph {:04X}: the bytes drawn in place differ from offset {} of the surface", code,
+                                             lo + int64_t(k)));
     }
 }
 

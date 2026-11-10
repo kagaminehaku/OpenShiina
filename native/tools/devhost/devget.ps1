@@ -1,8 +1,9 @@
-param([Parameter(Mandatory)] [string]$Address, [Parameter(Mandatory)] [string]$Path, [string]$Out)
+param([Parameter(Mandatory)] [string]$Address, [Parameter(Mandatory)] [string]$Path, [string]$Out, [switch]$Delete)
 # Reads a file or a folder of the Switch's SD card from devhost (main.cpp, "GETF"):
 #   devget.ps1 -Address <Switch IP> -Path sdmc:/OpenShiina/Games            (lists the folder)
 #   devget.ps1 -Address <Switch IP> -Path sdmc:/OpenShiina/player.log -Out player.log
-# A file is saved to -Out (or to its own name in the current folder).
+# A file is saved to -Out (or to its own name in the current folder). -Delete deletes a file under
+# sdmc:/OpenShiina instead ("DELF"; never a folder).
 $ErrorActionPreference = 'Stop'
 $client = New-Object System.Net.Sockets.TcpClient
 $client.ReceiveTimeout = 30000
@@ -21,9 +22,15 @@ try {
         return ,$buffer
     }
     $name = [Text.Encoding]::UTF8.GetBytes($Path)
-    $request = [byte[]]([Text.Encoding]::ASCII.GetBytes('GETF') + [BitConverter]::GetBytes([int32]$name.Length) + $name)
+    $magic = if ($Delete) { 'DELF' } else { 'GETF' }
+    $request = [byte[]]([Text.Encoding]::ASCII.GetBytes($magic) + [BitConverter]::GetBytes([int32]$name.Length) + $name)
     $stream.Write($request, 0, $request.Length)
     $status = [BitConverter]::ToInt32((Read-Exactly 4), 0)
+    if ($Delete) {
+        if ($status -ne 0) { throw "devhost did not delete $Path (its screen tells why)" }
+        [pscustomobject]@{ Deleted = $Path }
+        return
+    }
     if ($status -lt 0) { throw "devhost has no $Path (its screen tells why)" }
     if ($status -eq 1) {
         $length = [BitConverter]::ToInt32((Read-Exactly 4), 0)
