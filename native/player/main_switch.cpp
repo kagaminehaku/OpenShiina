@@ -10,7 +10,8 @@
 // Input, as the C# player's touch bar and joystick give it: a touch is the mouse (moved there, the
 // left button held while touching); A is Return, B the right button, X Escape, Y Space, R / ZR
 // Control (held: skip), L Page Up, the D-pad the arrow keys, the left stick moves the pointer (shown
-// while it moves); + opens the menu (GameMenu: back, the scaling, leave the game). Text is drawn
+// while it moves); + opens the menu (GameMenu: back, the scaling, leave the game). A message box
+// of the game is asked over its picture (MessageDialog). Text is drawn
 // with the Switch's own Japanese font
 // (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
 #include <SDL.h>
@@ -273,10 +274,15 @@ public:
 
     void DeleteSaveFile(const std::string& name) override { std::remove(SavePath(name).c_str()); }
 
-    int MessageBox(const std::string& text, const std::string&, int type) override
+    /// MessageBoxA asked of the player (Play's MessageDialog); without it the answer is yes / OK.
+    std::function<int(const std::string& text, const std::string& caption, int type)> AskPlayer;
+
+    int MessageBox(const std::string& text, const std::string& caption, int type) override
     {
         Log("[message box %d] %s\n", type, Text::Cp932ToUtf8(text).c_str());
-        return (type & 0xF) == 4 || (type & 0xF) == 3 ? 6 : 1;    // yes / OK
+        int answer = AskPlayer ? AskPlayer(text, caption, type) : (type & 0xF) == 4 || (type & 0xF) == 3 ? 6 : 1;
+        Log("[message box] answered %d\n", answer);
+        return answer;
     }
 
     IScnShapes* Shapes() override { return &m_shapes; }
@@ -797,6 +803,155 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
     return leave;
 }
 
+/// Text in lines no wider than width: its own line breaks kept, a longer line broken after its last
+/// space that fits or, without one (Japanese), after the last character that fits.
+std::vector<std::string> WrapText(Ui& ui, const std::string& text, float size, float width)
+{
+    std::vector<std::string> lines;
+    size_t start = 0;
+    while (true)
+    {
+        size_t end = text.find('\n', start);
+        std::string paragraph = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (!paragraph.empty() && paragraph.back() == '\r')
+            paragraph.pop_back();
+        std::string line;
+        for (size_t at = 0; at < paragraph.size();)
+        {
+            size_t from = at;
+            player::NextCodepoint(paragraph, at);
+            std::string character = paragraph.substr(from, at - from);
+            if (line.empty() || ui.Text.Measure(line + character, size) <= width)
+            {
+                line += character;
+                continue;
+            }
+            size_t space = line.rfind(' ');
+            if (space != std::string::npos && space > 0)
+            {
+                lines.push_back(line.substr(0, space));
+                line = line.substr(space + 1) + character;
+            }
+            else
+            {
+                lines.push_back(line);
+                line = character;
+            }
+        }
+        lines.push_back(line);
+        if (end == std::string::npos)
+            break;
+        start = end + 1;
+    }
+    while (lines.size() > 1 && lines.back().empty())
+        lines.pop_back();
+    return lines;
+}
+
+/// The scripts' MessageBoxA over the game's picture (they wait for it, as on Windows), as C#
+/// MessageDialog: the caption, the text and the buttons of the type (MB_OK, MB_OKCANCEL,
+/// MB_YESNOCANCEL, MB_YESNO; MB_DEFBUTTON2 / 3 chosen first). The answer is the button's Windows
+/// number (1 OK, 2 cancel, 6 yes, 7 no); B is cancel, or the last button where there is none.
+int MessageDialog(Ui& ui, const std::function<void()>& drawGame, const std::string& text, const std::string& caption, int type)
+{
+    struct Choice
+    {
+        const char* Label;
+        int Result;
+    };
+    std::vector<Choice> buttons;
+    switch (type & 0xF)
+    {
+    case 1: buttons = {{"OK", 1}, {"Cancel", 2}}; break;
+    case 3: buttons = {{"Yes", 6}, {"No", 7}, {"Cancel", 2}}; break;
+    case 4: buttons = {{"Yes", 6}, {"No", 7}}; break;
+    default: buttons = {{"OK", 1}}; break;
+    }
+    int count = int(buttons.size()), cancel = buttons.back().Result;
+    for (const auto& b : buttons)
+        if (b.Result == 2)
+            cancel = 2;
+    int chosen = std::min(count - 1, (type >> 8) & 0xF);
+
+    constexpr float TextSize = 26, LineHeight = 38, PanelW = 760, Margin = 32, ButtonW = 150, ButtonH = 56, Gap = 16;
+    constexpr size_t MostLines = 11;
+    auto lines = WrapText(ui, text, TextSize, PanelW - 2 * Margin);
+    if (lines.size() > MostLines)
+    {
+        lines.resize(MostLines);
+        lines.back() += "\xE2\x80\xA6";
+    }
+    float captionH = caption.empty() ? 0 : 48;
+    float panelH = Margin + captionH + float(lines.size()) * LineHeight + 24 + ButtonH + Margin;
+    float panelX = (1280 - PanelW) / 2, panelY = std::max(20.0f, (672 - panelH) / 2), buttonsY = panelY + panelH - Margin - ButtonH;
+    auto buttonX = [&](int k) { return panelX + PanelW - Margin - float(count - k) * ButtonW - float(count - 1 - k) * Gap; };
+    // a button answers when the touch that pressed it is lifted on it
+    float tx = 0, ty = 0;
+    bool touching = ui.Touch(tx, ty);
+    int pressed = -1;
+    auto under = [&] {
+        for (int k = 0; k < count; k++)
+            if (tx >= buttonX(k) && tx < buttonX(k) + ButtonW && ty >= buttonsY && ty < buttonsY + ButtonH)
+                return k;
+        return -1;
+    };
+    while (appletMainLoop())
+    {
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
+        if (down & HidNpadButton_A)
+            return buttons[chosen].Result;
+        if (down & HidNpadButton_B)
+            return cancel;
+        if ((down & HidNpadButton_AnyLeft) && chosen > 0)
+            chosen--;
+        if ((down & HidNpadButton_AnyRight) && chosen + 1 < count)
+            chosen++;
+        float x, y;
+        bool touch = ui.Touch(x, y);
+        if (touch)
+        {
+            tx = x;
+            ty = y;
+        }
+        if (touch && !touching)
+        {
+            pressed = under();
+            if (pressed >= 0)
+                chosen = pressed;
+        }
+        else if (!touch && touching && pressed >= 0 && under() == pressed)
+            return buttons[pressed].Result;
+        touching = touch;
+
+        player::Renderer& s = ui.Screen;
+        s.Begin(0xFF000000);
+        drawGame();
+        s.Fill({0, 0, 1280, 720}, Rgb(0, 0, 0, 150));
+        s.Fill({panelX, panelY, PanelW, panelH}, kPanel, 18);
+        if (!caption.empty())
+            ui.Text.Draw(ui.Text.Fit(caption, 28, PanelW - 2 * Margin), panelX + Margin, panelY + Margin - 4, 28, kDim);
+        for (size_t k = 0; k < lines.size(); k++)
+            ui.Text.Draw(lines[k], panelX + Margin, panelY + Margin + captionH + float(k) * LineHeight, TextSize, kText);
+        for (int k = 0; k < count; k++)
+        {
+            float bx = buttonX(k);
+            s.Fill({bx, buttonsY, ButtonW, ButtonH}, k == chosen ? kAccent : kBackground, 12);
+            float w = ui.Text.Measure(buttons[k].Label, TextSize);
+            ui.Text.Draw(buttons[k].Label, bx + (ButtonW - w) / 2, buttonsY + 13, TextSize, kText);
+        }
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonA) + " OK     " + kButtonB + (cancel == 2 ? " Cancel" : " No");
+        if (count == 1)
+            hints = std::string(kButtonA) + " OK";
+        else
+            hints = kButtonLeftRight + std::string(" Choose     ") + hints;
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+    }
+    return cancel;
+}
+
 /// frameLimit: leave after that many frames (0: when the player leaves; for tests over nxlink).
 void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
 {
@@ -900,6 +1055,22 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
         }
         ui.Screen.Picture(picture, place, scaling, s_settings.FsrSharpness);
     };
+    // The scripts' MessageBoxA, over the picture as they have drawn it so far; the time it waits
+    // is not the scripts'
+    bool asked = false;
+    uint64_t askedTicks = 0;
+    host.AskPlayer = [&](const std::string& text, const std::string& caption, int type) {
+        uint64_t start = armGetSystemTick();
+        if (vm->ScreenInvalidated)
+        {
+            vm->ScreenInvalidated = false;
+            pictureVersion++;
+        }
+        int answer = MessageDialog(ui, drawGame, Text::Cp932ToUtf8(text), Text::Cp932ToUtf8(caption), type);
+        asked = true;
+        askedTicks += armGetSystemTick() - start;
+        return answer;
+    };
     try
     {
         while (running && appletMainLoop())
@@ -973,7 +1144,29 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                 Log("The scripts quit after %llu frames.\n", (unsigned long long)frames);
                 break;
             }
-            uint64_t scripts = armGetSystemTick() - before;
+            uint64_t scripts = armGetSystemTick() - before - askedTicks;
+            askedTicks = 0;
+            if (asked)
+            {
+                // The buttons let go while the game asked: let go for the game too
+                asked = false;
+                u64 held = padGetButtons(&ui.Pad);
+                for (const auto& k : kKeys)
+                {
+                    bool down = false;
+                    for (const auto& other : kKeys)
+                        down |= other.VirtualKey == k.VirtualKey && (held & other.Button) != 0;
+                    if (host.Keys[k.VirtualKey] && !down)
+                    {
+                        host.Keys[k.VirtualKey] = false;
+                        vm->WindowMessage(ScnMessage::KeyUp, k.VirtualKey, ScnMessage::Key(k.ScanCode, false, false));
+                    }
+                }
+                if ((host.Buttons & 2) && !(held & HidNpadButton_B))
+                    mouse(ScnMessage::RButtonUp, host.Buttons & ~2);
+                spanStart = armGetSystemTick();
+                spanFrames = spanScripts = 0;
+            }
             for (const auto& check : vm->GpuChecks)
                 Log("[gpu] %s\n", check.c_str());
             vm->GpuChecks.clear();
