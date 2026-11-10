@@ -297,15 +297,46 @@ void StorePixel(uint8_t* output, int c, const F4& v)
 #endif
 }
 
+/// A source row's pixels as floats, each once (the columns share them: a partly covered pixel is
+/// the last of one column and the first of the next), four at a time where the vectors are.
+void ConvertRow(const uint8_t* line, int count, F4* out)
+{
+    int p = 0;
+#if defined(__aarch64__)
+    for (; p + 4 <= count; p += 4)
+    {
+        uint8x16_t b = vld1q_u8(line + p * 4);
+        uint16x8_t low = vmovl_u8(vget_low_u8(b)), high = vmovl_u8(vget_high_u8(b));
+        out[p].V = vcvtq_f32_u32(vmovl_u16(vget_low_u16(low)));
+        out[p + 1].V = vcvtq_f32_u32(vmovl_u16(vget_high_u16(low)));
+        out[p + 2].V = vcvtq_f32_u32(vmovl_u16(vget_low_u16(high)));
+        out[p + 3].V = vcvtq_f32_u32(vmovl_u16(vget_high_u16(high)));
+    }
+#elif defined(_M_X64) || defined(__x86_64__)
+    __m128i zero = _mm_setzero_si128();
+    for (; p + 4 <= count; p += 4)
+    {
+        __m128i b = _mm_loadu_si128(reinterpret_cast<const __m128i*>(line + p * 4));
+        __m128i low = _mm_unpacklo_epi8(b, zero), high = _mm_unpackhi_epi8(b, zero);
+        out[p].V = _mm_cvtepi32_ps(_mm_unpacklo_epi16(low, zero));
+        out[p + 1].V = _mm_cvtepi32_ps(_mm_unpackhi_epi16(low, zero));
+        out[p + 2].V = _mm_cvtepi32_ps(_mm_unpacklo_epi16(high, zero));
+        out[p + 3].V = _mm_cvtepi32_ps(_mm_unpackhi_epi16(high, zero));
+    }
+#endif
+    for (; p < count; p++)
+        out[p] = Pixel(line, p);
+}
+
 /// One source row's part of a destination pixel: its first, whole and last columns.
-F4 AddRow(F4 acc, const uint8_t* line, int p, const SseScaleEntry& col, float wy, float wholeWeight)
+F4 AddRow(F4 acc, const F4* line, int p, const SseScaleEntry& col, float wy, float wholeWeight)
 {
     if ((col.Flags & 0x80) != 0)
-        acc += Pixel(line, p++) * (col.First * wy);
+        acc += line[p++] * (col.First * wy);
     for (uint32_t k = 0; k < col.Count; k++)
-        acc += Pixel(line, p++) * wholeWeight;
+        acc += line[p++] * wholeWeight;
     if ((col.Flags & 0x40) != 0)
-        acc += Pixel(line, p) * (col.Last * wy);
+        acc += line[p] * (col.Last * wy);
     return acc;
 }
 
@@ -314,6 +345,9 @@ struct SseScaleWork
     std::vector<SseScaleEntry> Rows, Columns;
     std::vector<int> ColX, RowY;
 };
+
+// Each core's source rows as floats
+thread_local std::vector<F4> t_sseLines;
 
 thread_local SseScaleWork t_sseScale;
 
@@ -375,10 +409,17 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
             const auto& row = rows[size_t(r)];
             uint8_t* output = Bytes(dstRow + r * dstPitch, nc * 4);
             int top = srcX + rowY[size_t(r)] * srcPitch;
+            // the destination row's source rows as floats
+            int lines = ((row.Flags & 0x80) != 0 ? 1 : 0) + int(row.Count) + ((row.Flags & 0x40) != 0 ? 1 : 0);
+            auto& converted = t_sseLines;
+            if (converted.size() < size_t(lines) * size_t(width))
+                converted.resize(size_t(lines) * size_t(width));
+            for (int k = 0; k < lines; k++)
+                ConvertRow(Bytes(top + k * srcPitch, width * 4), width, converted.data() + size_t(k) * size_t(width));
             if (row.Flags == 0xC0 && row.Count <= 1)
             {
-                const uint8_t* r0 = Bytes(top, width * 4);
-                const uint8_t* r1 = Bytes(top + srcPitch, width * 4);
+                const F4* r0 = converted.data();
+                const F4* r1 = r0 + width;
                 if (row.Count == 0)
                 {
                     // Rows 0xC0 with no whole row: across the two rows, column by column
@@ -391,19 +432,19 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
                         int p = colX[size_t(c)];
                         if ((col.Flags & 0x80) != 0)
                         {
-                            acc += Pixel(r0, p) * (w0 * col.First);
-                            acc += Pixel(r1, p) * (col.First * w1);
+                            acc += r0[p] * (w0 * col.First);
+                            acc += r1[p] * (col.First * w1);
                             p++;
                         }
                         for (uint32_t k = 0; k < col.Count; k++, p++)
                         {
-                            acc += Pixel(r0, p) * whole0;
-                            acc += Pixel(r1, p) * whole1;
+                            acc += r0[p] * whole0;
+                            acc += r1[p] * whole1;
                         }
                         if ((col.Flags & 0x40) != 0)
                         {
-                            acc += Pixel(r0, p) * (w0 * col.Last);
-                            acc += Pixel(r1, p) * (col.Last * w1);
+                            acc += r0[p] * (w0 * col.Last);
+                            acc += r1[p] * (col.Last * w1);
                         }
                         StorePixel(output, c, acc);
                     }
@@ -412,7 +453,7 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
                 {
                     // Rows 0xC0 with one whole row: across the three rows, column by column (the partial
                     // last column with the first two rows' weights swapped, as the x86 code has them)
-                    const uint8_t* r2 = Bytes(top + 2 * srcPitch, width * 4);
+                    const F4* r2 = r1 + width;
                     float w0 = row.First, w2 = row.Last;
                     float whole0 = wholeX * w0, whole1 = wholeXY, whole2 = wholeX * w2;
                     for (int c = 0; c < nc; c++)
@@ -422,22 +463,22 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
                         int p = colX[size_t(c)];
                         if ((col.Flags & 0x80) != 0)
                         {
-                            acc += Pixel(r0, p) * (w0 * col.First);
-                            acc += Pixel(r1, p) * (wholeY * col.First);
-                            acc += Pixel(r2, p) * (col.First * w2);
+                            acc += r0[p] * (w0 * col.First);
+                            acc += r1[p] * (wholeY * col.First);
+                            acc += r2[p] * (col.First * w2);
                             p++;
                         }
                         for (uint32_t k = 0; k < col.Count; k++, p++)
                         {
-                            acc += Pixel(r0, p) * whole0;
-                            acc += Pixel(r1, p) * whole1;
-                            acc += Pixel(r2, p) * whole2;
+                            acc += r0[p] * whole0;
+                            acc += r1[p] * whole1;
+                            acc += r2[p] * whole2;
                         }
                         if ((col.Flags & 0x40) != 0)
                         {
-                            acc += Pixel(r0, p) * (wholeY * col.Last);
-                            acc += Pixel(r1, p) * (w0 * col.Last);
-                            acc += Pixel(r2, p) * (col.Last * w2);
+                            acc += r0[p] * (wholeY * col.Last);
+                            acc += r1[p] * (w0 * col.Last);
+                            acc += r2[p] * (col.Last * w2);
                         }
                         StorePixel(output, c, acc);
                     }
@@ -445,27 +486,25 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
                 continue;
             }
             // The general loops: the source rows one after the other, in each the pixel's columns
-            int lines = ((row.Flags & 0x80) != 0 ? 1 : 0) + int(row.Count) + ((row.Flags & 0x40) != 0 ? 1 : 0);
             if (lines == 0)
             {
                 for (int c = 0; c < nc; c++)
                     StorePixel(output, c, F4{});
                 continue;
             }
-            // the destination row's source rows in one block, a row srcPitch bytes after the other
-            const uint8_t* block = Bytes(top, (lines - 1) * srcPitch + width * 4);
+            const F4* block = converted.data();
             float wholeFirst = wholeX * row.First, wholeLast = wholeX * row.Last;
             for (int c = 0; c < nc; c++)
             {
                 const auto& col = cols[size_t(c)];
                 F4 acc;
-                int at = 0;
+                size_t at = 0;
                 if ((row.Flags & 0x80) != 0)
                 {
                     acc = AddRow(acc, block + at, colX[size_t(c)], col, row.First, wholeFirst);
-                    at += srcPitch;
+                    at += size_t(width);
                 }
-                for (uint32_t k = 0; k < row.Count; k++, at += srcPitch)
+                for (uint32_t k = 0; k < row.Count; k++, at += size_t(width))
                     acc = AddRow(acc, block + at, colX[size_t(c)], col, wholeY, wholeXY);
                 if ((row.Flags & 0x40) != 0)
                     acc = AddRow(acc, block + at, colX[size_t(c)], col, row.Last, wholeLast);
