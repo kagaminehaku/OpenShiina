@@ -50,6 +50,8 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
     private readonly Dictionary<int, SKTypeface?> m_fallbacks = new();
     // The faces of font files the scripts added (AddFontMemResourceEx), found before the system's
     private readonly List<SKTypeface> m_memoryFaces = new();
+    // Their family names (FamilyNames), the faces in the same order
+    private readonly List<string[]> m_memoryFamilies = new();
     private readonly Font m_system;
     private int m_next = 1;
 
@@ -109,6 +111,7 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
             if (SKTypeface.FromData(data, index) is not { } face)
                 break;
             m_memoryFaces.Add(face);
+            m_memoryFamilies.Add(FamilyNames(face));
             added++;
         }
         if (added > 0)
@@ -153,14 +156,46 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
         return new Font(font, (int)Math.Round(-m.Ascent), (int)Math.Round(m.Descent));
     }
 
+    /// <summary>
+    /// Every family name of a face: Skia's (the typographic family, name 16, when there is one) and
+    /// those of its name table - the family (name 1, the one GDI's CreateFont looks for) and the
+    /// typographic family in each language. Nukitashi 2's Rounded-X Mgen+ 1m has "Rounded-X Mgen+ 1m
+    /// regular" as its family and "Rounded-X Mgen+ 1m" as its typographic one, and its scripts ask
+    /// for the former.
+    /// </summary>
+    private static string[] FamilyNames(SKTypeface face)
+    {
+        var names = new List<string> { face.FamilyName };
+        const uint NameTag = 0x6E616D65;    // 'name'
+        if (face.TryGetTableData(NameTag, out byte[]? table) && table is { Length: >= 6 })
+        {
+            int Word(int at) => at + 1 < table.Length ? table[at] << 8 | table[at + 1] : 0;
+            int count = Word(2), strings = Word(4);
+            for (int k = 0; k < count && 6 + 12 * k + 12 <= table.Length; k++)
+            {
+                int record = 6 + 12 * k;
+                int platform = Word(record), encoding = Word(record + 2), id = Word(record + 6);
+                int length = Word(record + 8), offset = strings + Word(record + 10);
+                if ((id != 1 && id != 16) || offset + length > table.Length)
+                    continue;
+                if (platform is 0 or 3)
+                    names.Add(System.Text.Encoding.BigEndianUnicode.GetString(table, offset, length & ~1));
+                else if (platform == 1 && encoding == 0)
+                    names.Add(new string(table.AsSpan(offset, length).ToArray().Where(b => b < 0x80).Select(b => (char)b).ToArray()));
+            }
+        }
+        return names.Where(n => n.Length > 0).Distinct().ToArray();
+    }
+
     /// <summary>The face asked for, or a stand-in for it (then measured as MS Gothic).</summary>
     private (SKTypeface Face, bool StandIn) Face(string name, SKFontStyle style)
     {
         string key = $"{name}/{style.Weight}/{style.Slant}";
         if (m_faces.TryGetValue(key, out var known))
             return known;
-        // A face the scripts added, the closest to the weight and slant asked for
-        if (m_memoryFaces.Where(f => f.FamilyName.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+        // A face the scripts added (by any of its family names), the closest to the weight and slant asked for
+        string wanted = name.Trim();
+        if (m_memoryFaces.Where((f, k) => m_memoryFamilies[k].Any(n => n.Equals(wanted, StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(f => Math.Abs(f.FontStyle.Weight - style.Weight) + (f.FontStyle.Slant == style.Slant ? 0 : 1000))
                 .FirstOrDefault() is { } added)
             return m_faces[key] = (added, false);
@@ -335,5 +370,6 @@ public sealed class SkiaFonts : IScnFonts, IDisposable
         foreach (var face in m_memoryFaces)
             face.Dispose();
         m_memoryFaces.Clear();
+        m_memoryFamilies.Clear();
     }
 }

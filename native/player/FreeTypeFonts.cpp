@@ -6,8 +6,9 @@
 // being proportional where MS Gothic is fixed-pitch, its advances are MS Gothic's too - a whole em a
 // double-byte character, half an em a single-byte one, each glyph centred in its cell - since the
 // games lay their text out for it. Fonts the scripts add from their archives (AddFontMemResourceEx:
-// Libra of the Vampire Princess's Noto Serif, Roboto...) are found by their family name first, and
-// measured by their own metrics. The gaiji of translated scenarios (ScnGaiji) are drawn with the
+// Libra of the Vampire Princess's Noto Serif, Roboto, Nukitashi 2's Rounded-X Mgen+ 1m...) are found by
+// any of their family names first (FamilyNames: GDI's is the name table's family), and measured by
+// their own metrics. The gaiji of translated scenarios (ScnGaiji) are drawn with the
 // system's faces too, each letter with its own advance (the C# player's SkiaFonts: a Latin face).
 //
 // GDI's terms, as the engine uses them: a font's height > 0 is the cell height (ascent + descent), < 0
@@ -22,6 +23,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_SFNT_NAMES_H
 #include FT_SYNTHESIS_H
 #include <switch.h>
 
@@ -66,12 +68,65 @@ uint32_t Decode(int code)
     return code > 0xFF ? FirstCodePoint(Text::Cp932ToUtf8(bytes, 2)) : FirstCodePoint(Text::Cp932ToUtf8(bytes + 1, 1));
 }
 
+/// Every family name of a face in UTF-8: FreeType's (the typographic family, name 16, when there is one)
+/// and those of its name table - the family (name 1, the one GDI's CreateFont looks for) and the
+/// typographic family in each language. Nukitashi 2's Rounded-X Mgen+ 1m has "Rounded-X Mgen+ 1m regular"
+/// as its family and "Rounded-X Mgen+ 1m" as its typographic one, and its scripts ask for the former.
+std::vector<std::string> FamilyNames(FT_Face face)
+{
+    std::vector<std::string> names;
+    auto add = [&](std::string name) {
+        if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end())
+            names.push_back(std::move(name));
+    };
+    if (face->family_name)
+        add(face->family_name);
+    FT_UInt count = FT_Get_Sfnt_Name_Count(face);
+    for (FT_UInt k = 0; k < count; k++)
+    {
+        FT_SfntName name;
+        if (FT_Get_Sfnt_Name(face, k, &name) != 0 || (name.name_id != 1 && name.name_id != 16))
+            continue;
+        std::string utf8;
+        if (name.platform_id == 0 || name.platform_id == 3)
+        {
+            // UTF-16 big-endian
+            std::u32string text;
+            for (FT_UInt i = 0; i + 1 < name.string_len; i += 2)
+            {
+                char32_t c = char32_t(name.string[i] << 8 | name.string[i + 1]);
+                if (c >= 0xD800 && c < 0xDC00 && i + 3 < name.string_len)
+                {
+                    char32_t low = char32_t(name.string[i + 2] << 8 | name.string[i + 3]);
+                    if (low >= 0xDC00 && low < 0xE000)
+                    {
+                        c = 0x10000 + ((c - 0xD800) << 10) + (low - 0xDC00);
+                        i += 2;
+                    }
+                }
+                text.push_back(c);
+            }
+            utf8 = Text::CodePointsToUtf8(text);
+        }
+        else if (name.platform_id == 1 && name.encoding_id == 0)
+        {
+            // Mac Roman: its ASCII part
+            for (FT_UInt i = 0; i < name.string_len; i++)
+                if (name.string[i] < 0x80)
+                    utf8.push_back(char(name.string[i]));
+        }
+        add(std::move(utf8));
+    }
+    return names;
+}
+
 } // namespace
 
 struct FreeTypeFonts::Face
 {
     FT_Face Ft = nullptr;
-    std::string Family;
+    /// Its family names (FamilyNames): a font the scripts ask for by any of them is this face.
+    std::vector<std::string> Families;
     // The file the face is read from, for the faces the scripts add (the system's stay in its memory)
     std::vector<uint8_t> Bytes;
 };
@@ -104,7 +159,7 @@ FreeTypeFonts::FreeTypeFonts()
         auto face = std::make_unique<Face>();
         if (FT_New_Memory_Face(library, static_cast<const FT_Byte*>(data.address), FT_Long(data.size), 0, &face->Ft) != 0)
             continue;
-        face->Family = face->Ft->family_name ? face->Ft->family_name : "";
+        face->Families = FamilyNames(face->Ft);
         m_faces.push_back(std::move(face));
     }
     // SYSTEM_FONT, the font of a new device context: about 16 pixels high, bold
@@ -131,9 +186,15 @@ std::unique_ptr<FreeTypeFonts::Font> FreeTypeFonts::Make(const scripting::ScnFon
     font->Bold = r.Weight >= 600;
     font->Italic = r.Italic != 0;
     std::string family = Text::Cp932ToUtf8(r.Face);
+    // (the C# player's SkiaFonts: spaces around the name asked for do not count)
+    while (!family.empty() && family.back() == ' ')
+        family.pop_back();
+    while (!family.empty() && family.front() == ' ')
+        family.erase(family.begin());
     for (auto& face : m_memoryFaces)
-        if (Text::EqualsIgnoreCase(face->Family, family))
-            font->Own = face.get();
+        for (const auto& name : face->Families)
+            if (Text::EqualsIgnoreCase(name, family))
+                font->Own = face.get();
     if (font->Own)
     {
         // A face the scripts added: measured by its own metrics. Height > 0 the cell, < 0 the em
@@ -183,7 +244,7 @@ int FreeTypeFonts::AddMemoryFonts(const uint8_t* data, size_t length)
         face->Bytes.assign(data, data + length);
         if (FT_New_Memory_Face(Library(m_library), face->Bytes.data(), FT_Long(face->Bytes.size()), index, &face->Ft) != 0)
             break;
-        face->Family = face->Ft->family_name ? face->Ft->family_name : "";
+        face->Families = FamilyNames(face->Ft);
         FT_Long faces = face->Ft->num_faces;
         m_memoryFaces.push_back(std::move(face));
         added++;
