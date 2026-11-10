@@ -38,7 +38,9 @@ namespace {
 class TextTime
 {
 public:
-    TextTime(ScnVm& vm, const char* name) : m_times(vm.RoutineTimes), m_name(name)
+    // (the names are made once: a std::string made from a name at every call, a heap block for the
+    // longer ones, was a good part of what the timers measured on the Switch)
+    TextTime(ScnVm& vm, const std::string& name) : m_times(vm.RoutineTimes), m_name(name)
     {
         if (m_times)
             m_start = std::chrono::steady_clock::now();
@@ -56,7 +58,7 @@ public:
 
 private:
     std::unordered_map<std::string, ScnVm::RoutineTime>* m_times;
-    const char* m_name;
+    const std::string& m_name;
     std::chrono::steady_clock::time_point m_start;
 };
 
@@ -329,7 +331,8 @@ void ScnVm::CreateRecordFont(int rec)
     auto* fonts = m_host.Fonts();
     int font;
     {
-        TextTime time(*this, "text: font made");
+        static const std::string name = "text: font made";
+        TextTime time(*this, name);
         font = fonts ? fonts->CreateFont(request) : 0;
     }
     if (font == 0)
@@ -372,7 +375,8 @@ int ScnVm::SelectedFont(int rec)
 std::pair<int, int> ScnVm::Extent(int font, const uint8_t* text, size_t length)
 {
     auto* fonts = m_host.Fonts();
-    TextTime time(*this, "text: measured");
+    static const std::string name = "text: measured";
+    TextTime time(*this, name);
     return fonts ? fonts->TextExtent(font, text, length) : std::pair(0, 0);
 }
 
@@ -1701,7 +1705,8 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
     auto* fonts = m_host.Fonts();
     if (!fonts)
         return;
-    TextTime drawTime(*this, "text: glyph drawn");
+    static const std::string drawName = "text: glyph drawn", renderName = "text: glyph made";
+    TextTime drawTime(*this, drawName);
     int count = length & 0x7FFFFFFF;
     bool solid = G(rec, RAntialias) == 0;
     if (G(rec, RBkMode) == 2)
@@ -1717,7 +1722,7 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
         auto cached = cache.find(code);
         if (cached == cache.end())
         {
-            TextTime renderTime(*this, "text: glyph made");
+            TextTime renderTime(*this, renderName);
             auto request = m_fontRequests.find(font);
             if (request == m_fontRequests.end())
                 made = fonts->Glyph(font, code);
@@ -1916,17 +1921,21 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
         return;
     // The frame's rows the glyph covers: (address of its column 0, the glyph's row), from the frame's
     // table of row addresses (f + 0x14, PicturePixel's), read at once
-    std::vector<std::pair<int, int>> rows;
+    // (kept from glyph to glyph: a heap block a glyph was a part of its time on the Switch)
+    static const std::string rowsName = "text: layer rows", pixelsName = "text: layer pixels";
+    auto& rows = m_layerGlyphRows;
+    rows.clear();
     {
-        TextTime rowsTime(*this, "text: layer rows");
+        TextTime rowsTime(*this, rowsName);
         int skip = std::max(0, -top);
         int first = top + skip, count = std::min(int(endRow - firstRow) - skip, height - first);
         if (count <= 0)
             return;
-        openshiina::Bytes table = ReadBytes(f + 0x14 + 4 * first, 4 * count);
+        int at = f + 0x14 + 4 * first;
+        const uint8_t* table = IsContiguous(at, 4 * count) ? Bytes(at, 4 * count) : nullptr;
         src += skip * glyph.Pitch;
         for (int k = 0; k < count; k++, src += glyph.Pitch)
-            rows.emplace_back(int(LittleEndian::ToUInt32(table.data() + 4 * k)) + 8 + left * 4, src);
+            rows.emplace_back((table ? int(LittleEndian::ToUInt32(table + 4 * k)) : Read32(at + 4 * k)) + 8 + left * 4, src);
     }
     // A row in place when it is one piece of the scripts' memory (the same bytes, in the same order,
     // as Read32 / Write32 a pixel at a time through the 4 GB, which was most of 00A1's time on the
@@ -1963,7 +1972,7 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     };
     if (!TextCheck)
     {
-        TextTime pixelsTime(*this, "text: layer pixels");
+        TextTime pixelsTime(*this, pixelsName);
         drawRows(true);
         return;
     }

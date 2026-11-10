@@ -1014,6 +1014,8 @@ private:
     void FindIndent(int rec, int font, bool dc);
     void DrawWithEffects(int rec, int surface, bool invalidate, int font, const openshiina::Bytes& ch, int length);
     void DrawGlyph(int rec, int surface, int font, int x, int y, const openshiina::Bytes& ch, int length);
+    // DrawGlyphOnLayer's rows (address, the glyph's row), kept from glyph to glyph
+    std::vector<std::pair<int, int>> m_layerGlyphRows;
     void DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, int top, uint32_t firstRow, uint32_t endRow, uint32_t firstCol,
                           uint32_t endCol, int alpha);
     int CurrentRecord(const ScnContext& c) const { return RecordAddress(c.TextRecord); }
