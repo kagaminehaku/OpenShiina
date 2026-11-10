@@ -404,6 +404,9 @@ int Run(int argc, std::string* argv)
     // SCNRUN_TEXTCHECK=1: every glyph drawn in place is drawn again the old way and compared
     const char* textCheck = std::getenv("SCNRUN_TEXTCHECK");
     vm.TextCheck = textCheck && std::string(textCheck) == "1";
+    // The pixel routines' vector lanes against one lane after the other (as the Switch player at its start)
+    std::string lanes = ScnVm::CheckVectorLanes();
+    std::printf("Vector lanes: %s\n", lanes.empty() ? "as the x86 code" : lanes.c_str());
     // SCNRUN_TIMES=1: the time of each embedded routine and text step (the Switch player's slow log), at the end
     const char* timesVariable = std::getenv("SCNRUN_TIMES");
     std::unordered_map<std::string, ScnVm::RoutineTime> routineTimes;

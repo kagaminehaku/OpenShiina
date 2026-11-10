@@ -27,10 +27,20 @@
 //     the tables seen), else whatever the register held: those run as x86 code.
 #include "scripting/ScnVm.h"
 #include "scripting/ParallelRows.h"
+#include "scripting/X86Ops.h"
 
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <cstring>
+#include <format>
+#include <string>
+
+#if defined(__aarch64__)
+#include <arm_neon.h>
+#elif defined(_M_X64) || defined(__x86_64__)
+#include <emmintrin.h>
+#endif
 
 namespace openshiina::scripting {
 
@@ -43,7 +53,36 @@ struct SseScaleEntry
     float First, Last;
 };
 
-/// Four float lanes (a pixel's channels).
+/// Four float lanes (a pixel's channels): the SSE2 build's own instructions on a PC, NEON's that do
+/// the same on the Switch (single floats, each product rounded before its sum, as mulps then
+/// addps), else one lane after the other.
+#if defined(__aarch64__)
+struct F4
+{
+    float32x4_t V = vdupq_n_f32(0);
+
+    F4& operator+=(const F4& o)
+    {
+        V = vaddq_f32(V, o.V);
+        return *this;
+    }
+};
+
+F4 operator*(const F4& a, float w) { return {vmulq_n_f32(a.V, w)}; }
+#elif defined(_M_X64) || defined(__x86_64__)
+struct F4
+{
+    __m128 V = _mm_setzero_ps();
+
+    F4& operator+=(const F4& o)
+    {
+        V = _mm_add_ps(V, o.V);
+        return *this;
+    }
+};
+
+F4 operator*(const F4& a, float w) { return {_mm_mul_ps(a.V, _mm_set1_ps(w))}; }
+#else
 struct F4
 {
     float V[4] = {};
@@ -63,6 +102,7 @@ F4 operator*(const F4& a, float w)
         r.V[k] = a.V[k] * w;
     return r;
 }
+#endif
 
 /// The step of an axis: rcpps(x) (exact here) refined once by Newton's method, as the x86 code does it.
 float SseScaleStep(uint32_t size)
@@ -199,23 +239,62 @@ Store:
 /// A pixel's four bytes as floats (movd, punpcklbw, punpcklwd, cvtdq2ps).
 F4 Pixel(const uint8_t* line, int p)
 {
+    uint32_t bytes;
+    std::memcpy(&bytes, line + p * 4, 4);
+#if defined(__aarch64__)
+    return {vcvtq_f32_u32(vmovl_u16(vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(bytes))))))};
+#elif defined(_M_X64) || defined(__x86_64__)
+    __m128i zero = _mm_setzero_si128();
+    return {_mm_cvtepi32_ps(_mm_unpacklo_epi16(_mm_unpacklo_epi8(_mm_cvtsi32_si128(int(bytes)), zero), zero))};
+#else
     F4 r;
     for (int k = 0; k < 4; k++)
-        r.V[k] = float(line[p * 4 + k]);
+        r.V[k] = float(uint8_t(bytes >> (8 * k)));
     return r;
+#endif
+}
+
+#if !defined(_M_X64) && !defined(__x86_64__)
+/// f to the nearest integer, ties to even, as cvtps2dq: under 2^22 by adding and taking away
+/// 1.5 * 2^23 (the float's last bit is then the units: the sum rounds as cvtps2dq does, in the
+/// default rounding, which nothing here changes); nearbyint, slow (it heeds the rounding mode),
+/// only for the rest
+int RoundEven(float f)
+{
+    constexpr float Magic = 12582912.0f;
+    if (f > -4194304.0f && f < 4194304.0f)
+        return int((f + Magic) - Magic);
+    return f >= -2147483648.0f && f < 2147483648.0f ? int(std::nearbyint(f)) : INT32_MIN;
 }
 
 /// A lane into its byte: cvtps2dq (to nearest even), packssdw, packuswb.
-uint8_t StoreLane(float f)
-{
-    int i = f >= -2147483648.0f && f < 2147483648.0f ? int(std::nearbyint(f)) : INT32_MIN;
-    return uint8_t(std::clamp(std::clamp(i, -32768, 32767), 0, 255));
-}
+uint8_t StoreLane(float f) { return uint8_t(std::clamp(std::clamp(RoundEven(f), -32768, 32767), 0, 255)); }
+#endif
 
 void StorePixel(uint8_t* output, int c, const F4& v)
 {
+#if defined(__aarch64__)
+    // fcvtns rounds to nearest even as cvtps2dq, but saturates where cvtps2dq gives 0x80000000:
+    // a lane of 2^31 or more (none in the copies seen) goes the scalar way
+    if (vmaxvq_f32(v.V) < 2147483648.0f)
+    {
+        int16x4_t words = vqmovn_s32(vcvtnq_s32_f32(v.V));
+        uint32_t bytes = vget_lane_u32(vreinterpret_u32_u8(vqmovun_s16(vcombine_s16(words, words))), 0);
+        std::memcpy(output + c * 4, &bytes, 4);
+        return;
+    }
+    float lanes[4];
+    vst1q_f32(lanes, v.V);
+    for (int k = 0; k < 4; k++)
+        output[c * 4 + k] = StoreLane(lanes[k]);
+#elif defined(_M_X64) || defined(__x86_64__)
+    __m128i words = _mm_packs_epi32(_mm_cvtps_epi32(v.V), _mm_setzero_si128());
+    uint32_t bytes = uint32_t(_mm_cvtsi128_si32(_mm_packus_epi16(words, words)));
+    std::memcpy(output + c * 4, &bytes, 4);
+#else
     for (int k = 0; k < 4; k++)
         output[c * 4 + k] = StoreLane(v.V[k]);
+#endif
 }
 
 /// One source row's part of a destination pixel: its first, whole and last columns.
@@ -395,6 +474,76 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
         }
     });
     return true;
+}
+
+std::string ScnVm::CheckVectorLanes()
+{
+    // one lane as the x86 code makes it: cvtps2dq (0x80000000 out of range), packssdw, packuswb
+    auto lane = [](float f) {
+        int i = f >= -2147483648.0f && f < 2147483648.0f ? int(std::nearbyint(f)) : INT32_MIN;
+        return uint8_t(std::clamp(std::clamp(i, -32768, 32767), 0, 255));
+    };
+    uint64_t seed = 0x9E3779B97F4A7C15ull;
+    auto next = [&] {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        return seed;
+    };
+    // a float of the kinds a sum can be: ordinary, a tie (k + 0.5), small, huge or negative
+    auto value = [&] {
+        uint64_t r = next();
+        float f = float(r >> 40) / float(1 << 16);
+        switch (r & 7)
+        {
+        case 0: return float(int(r >> 8 & 511) - 128) + 0.5f;
+        case 1: return f * 1e-3f;
+        case 2: return f * 1e7f + 2147483520.0f;
+        case 3: return -f * 1e5f;
+        case 4: return float(int64_t(r >> 33)) * 4.0f;
+        default: return f;
+        }
+    };
+    std::string report;
+    int floats = 0, bytes = 0, words = 0;
+    for (int n = 0; n < 200000; n++)
+    {
+        float in[4] = {value(), value(), value(), value()};
+        F4 v;
+        for (int k = 0; k < 4; k++)
+        {
+            // each lane put in as a sum of products of ones: exact, the lanes apart
+            uint8_t one[16] = {};
+            one[k * 4 + k] = 1;
+            v += Pixel(one, k) * in[k];
+        }
+        uint8_t out[4];
+        StorePixel(out, 0, v);
+        for (int k = 0; k < 4; k++)
+            if (out[k] != lane(in[k]) && floats++ < 3)
+                report += std::format(" store {} -> {} (x86 {});", in[k], out[k], lane(in[k]));
+        uint32_t pixel = uint32_t(next());
+        F4 p = Pixel(reinterpret_cast<const uint8_t*>(&pixel), 0) * 1.0f;
+        uint8_t back[4];
+        StorePixel(back, 0, p);
+        if (std::memcmp(back, &pixel, 4) != 0 && bytes++ < 3)
+            report += std::format(" pixel {:08X};", pixel);
+        uint64_t a = next(), b = n % 3 == 0 ? 0xFFFF'8000'7FFF'0001ull : next();
+        auto lanes = [&](auto f) {
+            uint64_t r = 0;
+            for (int k = 0; k < 4; k++)
+                r |= uint64_t(uint16_t(f(uint32_t(X86Ops::W(a, k)), uint32_t(X86Ops::W(b, k))))) << (16 * k);
+            return r;
+        };
+        if ((X86Ops::Pmullw(a, b) != lanes([](uint32_t x, uint32_t y) { return x * y; })
+             || X86Ops::Paddw(a, b) != lanes([](uint32_t x, uint32_t y) { return x + y; })
+             || X86Ops::Psubw(a, b) != lanes([](uint32_t x, uint32_t y) { return x - y; }))
+            && words++ < 3)
+            report += std::format(" words {:016X} {:016X};", a, b);
+    }
+    if (floats + bytes + words != 0)
+        report = std::format("{} stores, {} pixels, {} word operations differed:", floats, bytes, words) + report;
+    return report;
 }
 
 } // namespace openshiina::scripting

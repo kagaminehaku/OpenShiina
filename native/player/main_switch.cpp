@@ -1700,6 +1700,9 @@ int main(int argc, char** argv)
         for (char32_t c : ui->Text.Missing(player::VietnameseWords()))
             missing += std::format(" U+{:04X}", uint32_t(c));
         Log("Vietnamese: %s\n", missing.empty() ? "every letter drawn" : ("no font draws" + missing).c_str());
+        // (the NEON lanes of the pixel routines, which the PC tests do not run)
+        std::string lanes = ScnVm::CheckVectorLanes();
+        Log("Vector lanes: %s\n", lanes.empty() ? "as the x86 code" : lanes.c_str());
     }
     catch (const std::exception& e)
     {

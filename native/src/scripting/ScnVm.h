@@ -457,6 +457,10 @@ public:
     static int ScaleEntryCount(int start, int end);
     /// Bitch Nee-chan START C7C70: Scale32's SSE2 build (single floats).
     bool Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb);
+    /// The vector lanes of the pixel routines (Scale32Sse's floats, X86Ops' MMX words) against one
+    /// lane after the other, on random values (ties and huge ones among them): what differed, empty
+    /// when nothing (the Switch player tells it at its start: its NEON lanes are tried only there).
+    static std::string CheckVectorLanes();
     /// Ero-On! START 5E2D6: the scaling-down case of the first v2.49 build.
     bool Scale16(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb);
     /// Ero-On! START 5DFA5: its enlarging case, with its weight table at table.
