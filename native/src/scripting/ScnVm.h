@@ -1016,6 +1016,26 @@ private:
     void DrawGlyph(int rec, int surface, int font, int x, int y, const openshiina::Bytes& ch, int length);
     // DrawGlyphOnLayer's rows (address, the glyph's row), kept from glyph to glyph
     std::vector<std::pair<int, int>> m_layerGlyphRows;
+    // 00A1's glyphs on layers, kept for its end (FlushLayerGlyphs): each row's pixels in place, its
+    // coverage bytes (in the glyph cache: ClearGlyphs draws them first), its row of the frame and its
+    // colour
+    struct PendingGlyphRow
+    {
+        uint8_t* Out;
+        const uint8_t* Bits;
+        int Count, Y, Paint;
+    };
+    struct GlyphPaint
+    {
+        uint32_t Opaque, RB, G16, Alpha;
+    };
+    std::vector<PendingGlyphRow> m_pendingGlyphRows;
+    std::vector<GlyphPaint> m_glyphPaints;
+    std::vector<int64_t> m_glyphRowWork;
+    int64_t m_pendingGlyphPixels = 0;
+    // 00A1s running (the glyphs are kept while there is one)
+    int m_glyphBatches = 0;
+    void FlushLayerGlyphs();
     void DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, int top, uint32_t firstRow, uint32_t endRow, uint32_t firstCol,
                           uint32_t endCol, int alpha);
     int CurrentRecord(const ScnContext& c) const { return RecordAddress(c.TextRecord); }

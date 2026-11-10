@@ -17,8 +17,10 @@
 // are left out and the lines broken by their widths. Texts the scripts draw from their own code
 // are drawn translated when strings.txt or the tables have the whole of them (Translated).
 #include "scripting/ScnVm.h"
+#include "scripting/ParallelRows.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -143,6 +145,37 @@ const LayerTables& Layer()
 {
     static const auto tables = std::make_unique<LayerTables>();
     return *tables;
+}
+
+/// The pixels of a copy a glyph's pixel on a layer is worth, for ParallelRows (its time against
+/// theirs on the Switch).
+constexpr int64_t GlyphPixelWork = 8;
+
+/// A row of a glyph over a row of a layer: count coverage bytes at bits over the pixels at out, in
+/// the colour opaque (r << 16 | b and g << 16 apart for the blend) at alpha; full coverage writes
+/// opaque as it is.
+void DrawLayerRow(uint8_t* out, const uint8_t* bits, int count, uint32_t opaque, uint32_t rb, uint32_t g16, uint32_t alpha,
+                  const LayerTables& tables)
+{
+    for (int col = 0; col < count; col++, out += 4)
+    {
+        uint32_t v = bits[col];
+        if (v == 0)
+            continue;
+        uint32_t a16 = (v * 0xFF >> 6) * alpha & 0xFF00;
+        if (a16 == 0xFF00)
+        {
+            LittleEndian::Pack(opaque, out);
+            continue;
+        }
+        uint32_t d = LittleEndian::ToUInt32(out);
+        uint32_t index = (d & 0xFF) | a16;
+        uint32_t t = tables.Share[index];
+        uint32_t drb = (d >> 8) & 0xFF00FF;
+        LittleEndian::Pack(((((rb - drb) * t >> 8) + drb) & 0xFF00FF) * 0x100
+                               + ((((g16 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index],
+                           out);
+    }
 }
 
 } // namespace
@@ -288,6 +321,7 @@ void ScnVm::SetText(int rec, int x, int y, int text)
 void ScnVm::ClearGlyphs(int rec)
 {
     // FUN_004314E0: forget the glyphs made with the record's font
+    FlushLayerGlyphs();
     m_glyphs[size_t(G(rec, RIndex) % TextRecords)].clear();
 }
 
@@ -1656,6 +1690,7 @@ void ScnVm::DrawWithEffects(int rec, int surface, bool invalidate, int font, con
 void ScnVm::BitBlt(int dst, int x, int y, int width, int height, int src, int sx, int sy)
 {
     // BitBlt SRCCOPY between two 24-bit surfaces, clipped to both
+    FlushLayerGlyphs();
     if (src < 0 || src >= SurfaceCount)
         return;
     int dw = SurfaceField(dst, 7), dh = SurfaceField(dst, 8), sw = SurfaceField(src, 7), sh = SurfaceField(src, 8);
@@ -1803,6 +1838,8 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
         DrawGlyphOnLayer(rec, *glyph, src0, cl, ct, firstRow, endRow, firstCol, endCol, alpha);
         return;
     }
+    // (the glyphs 00A1 keeps for its end go first)
+    FlushLayerGlyphs();
     // The edge ("_E": each inked pixel drawn over the (2 ex + 1) x (2 ey + 1) around it)
     bool edged = (uint32_t(length) & 0x80000000u) != 0;
     int ex = edged ? G(rec, REdgeX) : 0, ey = edged ? G(rec, REdgeY) : 0;
@@ -1925,10 +1962,12 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     static const std::string rowsName = "text: layer rows", pixelsName = "text: layer pixels";
     auto& rows = m_layerGlyphRows;
     rows.clear();
+    int first = 0;
     {
         TextTime rowsTime(*this, rowsName);
         int skip = std::max(0, -top);
-        int first = top + skip, count = std::min(int(endRow - firstRow) - skip, height - first);
+        first = top + skip;
+        int count = std::min(int(endRow - firstRow) - skip, height - first);
         if (count <= 0)
             return;
         int at = f + 0x14 + 4 * first;
@@ -1940,13 +1979,37 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     // A row in place when it is one piece of the scripts' memory (the same bytes, in the same order,
     // as Read32 / Write32 a pixel at a time through the 4 GB, which was most of 00A1's time on the
     // Switch with a game that writes its text on layers)
+    uint32_t rb = r << 16 | b, g16 = g * 0x10000;
+    if (m_glyphBatches > 0 && !TextCheck)
+    {
+        // In 00A1: kept for its end (FlushLayerGlyphs) when all its rows are in place and the glyph
+        // stays (009C's is made again for each character), else drawn now, after those kept
+        bool inPlace = &glyph != &m_glyph250;
+        for (const auto& [p, from] : rows)
+            if (!IsContiguous(p + colFrom * 4, (colTo - colFrom) * 4) || size_t(from) + size_t(colTo) > glyph.Bits.size())
+            {
+                inPlace = false;
+                break;
+            }
+        if (inPlace)
+        {
+            int paint = int(m_glyphPaints.size());
+            m_glyphPaints.push_back({opaque, rb, g16, uint32_t(alpha)});
+            int count = colTo - colFrom, y = first;
+            for (const auto& [p, from] : rows)
+                m_pendingGlyphRows.push_back({Bytes(p + colFrom * 4, count * 4), glyph.Bits.data() + from + colFrom, count, y++, paint});
+            m_pendingGlyphPixels += int64_t(count) * int64_t(rows.size());
+            return;
+        }
+        FlushLayerGlyphs();
+    }
     // A pixel d of the frame with the glyph's coverage a16 over it (not full: that is the colour opaque)
     auto blend = [&](uint32_t d, uint32_t a16) {
         uint32_t index = (d & 0xFF) | a16;
         uint32_t t = tables.Share[index];
-        uint32_t rb = (d >> 8) & 0xFF00FF;
-        return ((((((r << 16 | b) - rb) * t >> 8) + rb) & 0xFF00FF) * 0x100)
-             + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
+        uint32_t drb = (d >> 8) & 0xFF00FF;
+        return ((((rb - drb) * t >> 8) + drb) & 0xFF00FF) * 0x100 + ((((g16 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000)
+             + tables.Alpha[index];
     };
     auto drawRows = [&](bool inPlace) {
         for (const auto& [p, from] : rows)
@@ -1958,15 +2021,7 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
             if (row && bits)
             {
                 // Nearly always: both in place, nothing to check a pixel
-                uint8_t* out = row;
-                for (int col = colFrom; col < colTo; col++, out += 4)
-                {
-                    uint32_t v = bits[col];
-                    if (v == 0)
-                        continue;
-                    uint32_t a16 = (v * 0xFF >> 6) * uint32_t(alpha) & 0xFF00;
-                    LittleEndian::Pack(a16 == 0xFF00 ? opaque : blend(LittleEndian::ToUInt32(out), a16), out);
-                }
+                DrawLayerRow(row, bits + colFrom, colTo - colFrom, opaque, rb, g16, uint32_t(alpha), tables);
                 continue;
             }
             for (int col = colFrom; col < colTo; col++)
@@ -2010,6 +2065,62 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
                 TextChecks.push_back(std::format("a glyph on a layer: the bytes drawn in place differ in its row at {:08X}", rows[k].first));
             break;
         }
+}
+
+void ScnVm::FlushLayerGlyphs()
+{
+    // The glyphs 00A1 kept, in the order they came: a frame row's pixels all on one core, the rows
+    // shared out between the cores in bands of about the same work (a glyph's pixel depends on that
+    // pixel only, so each row comes out as drawn one glyph after another)
+    if (m_pendingGlyphRows.empty())
+        return;
+    static const std::string pixelsName = "text: layer pixels";
+    TextTime pixelsTime(*this, pixelsName);
+    const auto& tables = Layer();
+    auto draw = [&](const PendingGlyphRow& row) {
+        const auto& paint = m_glyphPaints[size_t(row.Paint)];
+        DrawLayerRow(row.Out, row.Bits, row.Count, paint.Opaque, paint.RB, paint.G16, paint.Alpha, tables);
+    };
+    // (a glyph's pixel is worth several of a copy: the bytes of two pictures and two tables)
+    int64_t total = m_pendingGlyphPixels;
+    int parts = ParallelRows::Parts(ParallelRows::MaxParts(), total * GlyphPixelWork);
+    if (parts <= 1)
+    {
+        for (const auto& row : m_pendingGlyphRows)
+            draw(row);
+    }
+    else
+    {
+        // The bands: where the work done row by row passes a part's share
+        int maxY = 0;
+        for (const auto& row : m_pendingGlyphRows)
+            maxY = std::max(maxY, row.Y);
+        auto& work = m_glyphRowWork;
+        work.assign(size_t(maxY) + 1, 0);
+        for (const auto& row : m_pendingGlyphRows)
+            work[size_t(row.Y)] += row.Count;
+        std::array<int, 9> cuts{};
+        cuts[size_t(parts)] = maxY + 1;
+        int64_t sum = 0;
+        int t = 1;
+        for (int y = 0; y <= maxY && t < parts; y++)
+        {
+            sum += work[size_t(y)];
+            while (t < parts && sum * parts >= total * t)
+                cuts[size_t(t++)] = y + 1;
+        }
+        while (t < parts)
+            cuts[size_t(t++)] = maxY + 1;
+        ParallelRows::For(parts, total * GlyphPixelWork, [&](int from, int to) {
+            int lo = cuts[size_t(from)], hi = cuts[size_t(to)];
+            for (const auto& row : m_pendingGlyphRows)
+                if (row.Y >= lo && row.Y < hi)
+                    draw(row);
+        });
+    }
+    m_pendingGlyphRows.clear();
+    m_glyphPaints.clear();
+    m_pendingGlyphPixels = 0;
 }
 
 // ---- Opcodes ----
@@ -2147,6 +2258,19 @@ void ScnVm::RegisterText()
     // 00A1 slot, v (FUN_004157C0): redraw the snapshot's text into the slot's text surface - what was
     // shown before at once, then on with the waits; v = still running
     Register(0x00A1, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        // Its glyphs on layers drawn together at its end, shared out between the cores
+        struct Batch
+        {
+            ScnVm& Vm;
+            explicit Batch(ScnVm& v) : Vm(v) { Vm.m_glyphBatches++; }
+            ~Batch()
+            {
+                if (--Vm.m_glyphBatches == 0)
+                    Vm.FlushLayerGlyphs();
+            }
+            Batch(const Batch&) = delete;
+            Batch& operator=(const Batch&) = delete;
+        } batch(vm);
         int owner = vm.Value(c, i.Args[0]);
         int rec = vm.CurrentRecord(c);
         int snapshot = SnapshotRegion + c.TextRecord * SnapshotSize;

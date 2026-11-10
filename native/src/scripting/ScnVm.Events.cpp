@@ -25,6 +25,8 @@ int EventGlobal(ScnEvent e)
 
 int ScnVm::RunSlotSync(int slot)
 {
+    // (the scripts see the glyphs 00A1 kept)
+    FlushLayerGlyphs();
     auto& c = m_slots[size_t(slot)];
     if (c.CodeBase == 0)
         return 1;
