@@ -1103,14 +1103,12 @@ private:
 
     // ---- Layers ----
     void RegisterLayers();
-    void DrawSprite32(int entry, int pixels, int targetWidth, int targetHeight, int pitch);
+    void DrawSprite32(int entry, int pixels, int targetWidth, int targetHeight, int pitch, int targetPicture);
     void DrawRow32(int p, int dst, int skip, int visible);
-    void DrawRun32(int method, int n, int data, int dst);
+    void DrawRun32(int method, int n, const uint8_t* source, uint8_t* target);
     int PictureFrame(int slot, int frame);
     void BlendPictures(const int* v);
     int LayerEntry();
-    // A run's source bytes when they cannot be read in place (they share bytes with the target)
-    openshiina::Bytes m_runSource;
     int m_layerEntry = 0;
 
     void RegisterNativeKernels();

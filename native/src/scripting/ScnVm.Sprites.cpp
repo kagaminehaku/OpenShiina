@@ -78,9 +78,27 @@ void Fill24(uint8_t* target, int length, uint8_t b, uint8_t g, uint8_t r)
 /// the colour, 0 leaves the picture, else d + ((s - d) a >> 8)
 void DrawAlphaPixels(int n, const uint8_t* src, int s, uint8_t* row, int d, const uint8_t* table)
 {
+    if (!table)
+    {
+        // The same sums with no branch, so the compiler does several pixels at once (NEON):
+        // ((source - d) * a >> 8) + d is (source * a + d * (256 - a)) >> 8, d itself for a = 0. The
+        // row never shares bytes with the run (ReadRow copies it then)
+        const uint8_t* __restrict in = src + s;
+        uint8_t* __restrict out = row + d;
+        for (int i = 0; i < n; i++, in += 4, out += 3)
+        {
+            uint32_t a = in[0], rest = 256 - a;
+            uint32_t b = in[1], g = in[2], r = in[3];
+            uint32_t mb = (b * a + out[0] * rest) >> 8, mg = (g * a + out[1] * rest) >> 8, mr = (r * a + out[2] * rest) >> 8;
+            out[0] = uint8_t(a == 0xFF ? b : mb);
+            out[1] = uint8_t(a == 0xFF ? g : mg);
+            out[2] = uint8_t(a == 0xFF ? r : mr);
+        }
+        return;
+    }
     for (int i = 0; i < n; i++, s += 4, d += 3)
     {
-        int alpha = table ? table[src[s]] : src[s];
+        int alpha = table[src[s]];
         if (alpha == 0xFF)
         {
             row[d] = src[s + 1];

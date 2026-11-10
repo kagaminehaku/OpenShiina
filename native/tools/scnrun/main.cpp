@@ -407,8 +407,12 @@ int Run(int argc, std::string* argv)
     // SCNRUN_TIMES=1: the time of each embedded routine and text step (the Switch player's slow log), at the end
     const char* timesVariable = std::getenv("SCNRUN_TIMES");
     std::unordered_map<std::string, ScnVm::RoutineTime> routineTimes;
+    std::unordered_map<int, ScnVm::RoutineTime> opTimes;
     if (timesVariable && std::string(timesVariable) == "1")
+    {
         vm.RoutineTimes = &routineTimes;
+        vm.OpTimes = &opTimes;
+    }
     if (!vm.LoadModule(0, Text::Utf8ToCp932(start), true))
     {
         std::printf("%s is missing.\n", start.c_str());
@@ -487,6 +491,10 @@ int Run(int argc, std::string* argv)
         std::sort(times.begin(), times.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
         for (size_t k = 0; k < times.size() && k < 12; k++)
             std::printf("  [time] %s %.1f ms (%d calls)\n", times[k].first.c_str(), times[k].second.Milliseconds, times[k].second.Calls);
+        std::vector<std::pair<int, ScnVm::RoutineTime>> ops(opTimes.begin(), opTimes.end());
+        std::sort(ops.begin(), ops.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
+        for (size_t k = 0; k < ops.size() && k < 8; k++)
+            std::printf("  [op] %04X %.1f ms (%d calls)\n", ops[k].first, ops[k].second.Milliseconds, ops[k].second.Calls);
     }
     if (vm.TextCheck)
     {
