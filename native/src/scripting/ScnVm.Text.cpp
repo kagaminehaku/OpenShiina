@@ -1904,38 +1904,75 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     if (f == 0)
         return;
     int width = Read32(f), height = Read32(f + 4);
+    if (firstCol >= endCol)
+        return;
     uint32_t r = uint32_t(G(rec, RTextR)), g = uint32_t(G(rec, RTextG)), b = uint32_t(G(rec, RTextB));
     uint32_t opaque = r << 24 | g << 16 | b << 8 | 0xFF;
+    int columns = int(endCol - firstCol);
+    // The frame's rows the glyph covers: (address, the glyph's row)
+    std::vector<std::pair<int, int>> rows;
     for (uint32_t gy = firstRow; gy < endRow; gy++, src += glyph.Pitch, top++)
-    {
-        if (top < 0 || top >= height || firstCol >= endCol)
-            continue;
-        int p = PicturePixel(picture, frameIndex, left, top, 4);
-        for (uint32_t col = 0; col < endCol - firstCol; col++, p += 4)
+        if (top >= 0 && top < height)
+            rows.emplace_back(PicturePixel(picture, frameIndex, left, top, 4), src);
+    // A row in place when it is one piece of the scripts' memory (the same bytes, in the same order,
+    // as Read32 / Write32 a pixel at a time through the 4 GB, which was most of 00A1's time on the
+    // Switch with a game that writes its text on layers)
+    auto drawRows = [&](bool inPlace) {
+        for (const auto& [p, from] : rows)
         {
-            // The glyph was clipped to the text's surface; a column outside the frame would write
-            // into a row header
-            if (left + int(col) < 0 || left + int(col) >= width)
-                continue;
-            size_t at = size_t(src) + col;
-            uint8_t v = glyph.Bits.size() > at ? glyph.Bits[at] : uint8_t(0);
-            if (v == 0)
-                continue;
-            uint32_t a16 = (uint32_t(v) * 0xFF >> 6) * uint32_t(alpha) & 0xFF00;
-            if (a16 == 0xFF00)
+            uint8_t* row = inPlace && IsContiguous(p, columns * 4) ? Bytes(p, columns * 4) : nullptr;
+            for (int col = 0; col < columns; col++)
             {
-                Write32(p, int(opaque));
-                continue;
+                // The glyph was clipped to the text's surface; a column outside the frame would write
+                // into a row header
+                if (left + col < 0 || left + col >= width)
+                    continue;
+                size_t at = size_t(from) + size_t(col);
+                uint8_t v = glyph.Bits.size() > at ? glyph.Bits[at] : uint8_t(0);
+                if (v == 0)
+                    continue;
+                uint32_t a16 = (uint32_t(v) * 0xFF >> 6) * uint32_t(alpha) & 0xFF00;
+                uint32_t value = opaque;
+                if (a16 != 0xFF00)
+                {
+                    uint32_t d = row ? LittleEndian::ToUInt32(row + col * 4) : uint32_t(Read32(p + col * 4));
+                    uint32_t index = (d & 0xFF) | a16;
+                    uint32_t t = tables.Share[index];
+                    uint32_t rb = (d >> 8) & 0xFF00FF;
+                    value = ((((((r << 16 | b) - rb) * t >> 8) + rb) & 0xFF00FF) * 0x100)
+                          + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
+                }
+                if (row)
+                    LittleEndian::Pack(value, row + col * 4);
+                else
+                    Write32(p + col * 4, int(value));
             }
-            uint32_t d = uint32_t(Read32(p));
-            uint32_t index = (d & 0xFF) | a16;
-            uint32_t t = tables.Share[index];
-            uint32_t rb = (d >> 8) & 0xFF00FF;
-            uint32_t value = ((((((r << 16 | b) - rb) * t >> 8) + rb) & 0xFF00FF) * 0x100)
-                           + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
-            Write32(p, int(value));
         }
+    };
+    if (!TextCheck)
+    {
+        drawRows(true);
+        return;
     }
+    // TextCheck: drawn in place, kept, the rows put back, drawn the old way, compared
+    std::vector<openshiina::Bytes> before, drawn;
+    for (const auto& [p, from] : rows)
+        before.push_back(ReadBytes(p, columns * 4));
+    drawRows(true);
+    for (const auto& [p, from] : rows)
+        drawn.push_back(ReadBytes(p, columns * 4));
+    for (size_t k = 0; k < rows.size(); k++)
+        WriteBytes(rows[k].first, before[k]);
+    drawRows(false);
+    TextCheckGlyphs++;
+    for (size_t k = 0; k < rows.size(); k++)
+        if (ReadBytes(rows[k].first, columns * 4) != drawn[k])
+        {
+            TextCheckDiffered++;
+            if (TextCheckDiffered <= 20)
+                TextChecks.push_back(std::format("a glyph on a layer: the bytes drawn in place differ in its row at {:08X}", rows[k].first));
+            break;
+        }
 }
 
 // ---- Opcodes ----

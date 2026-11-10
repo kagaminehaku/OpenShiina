@@ -401,6 +401,9 @@ int Run(int argc, std::string* argv)
     const char* ahead = std::getenv("SCNRUN_AHEAD");
     vm.LoadInBackground = bgload && std::string(bgload) == "1";
     vm.ReadAhead = !(ahead && std::string(ahead) == "0");
+    // SCNRUN_TEXTCHECK=1: every glyph drawn in place is drawn again the old way and compared
+    const char* textCheck = std::getenv("SCNRUN_TEXTCHECK");
+    vm.TextCheck = textCheck && std::string(textCheck) == "1";
     if (!vm.LoadModule(0, Text::Utf8ToCp932(start), true))
     {
         std::printf("%s is missing.\n", start.c_str());
@@ -473,6 +476,12 @@ int Run(int argc, std::string* argv)
     std::printf("%d frames in %.2f s, script memory %lld MB\n", frame, seconds, (long long)(vm.ScriptMemoryBytes() >> 20));
     if (vm.LoadInBackground)
         std::printf("  read ahead: %d files, %d of them used\n", vm.ReadAheadCounts().first, vm.ReadAheadCounts().second);
+    if (vm.TextCheck)
+    {
+        std::printf("  text check: %lld glyphs, %lld differed\n", (long long)vm.TextCheckGlyphs, (long long)vm.TextCheckDiffered);
+        for (const auto& check : vm.TextChecks)
+            std::printf("    %s\n", check.c_str());
+    }
     // As ScnBoot ends its output: each opcode run, how often
     std::string counts;
     int kinds = 0;
