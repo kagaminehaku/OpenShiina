@@ -1,6 +1,6 @@
 // The Switch player's settings, of the C# player's (Game/PlayerSettings.cs) those it has:
 // sdmc:/OpenShiina/settings.json with the C# player's names and values ("Scaling": "Sharp",
-// "FsrSharpness": 8, "FileCache": "High", "ShowFrameRate": true); the keys it does not know are kept as they are when it
+// "FsrSharpness": 8, "FileCache": "High", "ShowFrameRate": true, "Language": "vi"); the keys it does not know are kept as they are when it
 // writes the file. The file cache is High (256 MB) when the file does not say: the C# player's Auto
 // would give the Switch 96 MB, too little for the large pictures of the 1600 x 900 games. The
 // Switch's own: "ConsoleStorageWarned", the warning before the first game moved onto the console's
@@ -24,6 +24,8 @@ struct Settings
     int FileCache = 4;
     /// Frames a second and the slowest frame over the game's corner (C# ShowFrameRate).
     bool ShowFrameRate = true;
+    /// The language of the player's screens (C# Language): "" (the console's), "en" or "vi".
+    std::string Language;
     /// The warning before the first game moved onto the console's storage was shown and accepted.
     bool ConsoleWarned = false;
 

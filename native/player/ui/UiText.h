@@ -1,6 +1,8 @@
 // The player's own text (its screens, not the game's): the Switch's shared fonts (the standard one
-// with Japanese, then Nintendo's extension with the buttons' symbols) drawn through FreeType into a
-// coverage atlas the Renderer draws glyphs from; each glyph made once per size.
+// with Japanese, then Nintendo's extension with the buttons' symbols, Chinese, Korean), then a font
+// of the SD card (sdmc:/OpenShiina/font.ttf or .otf) or of the romfs (ui/vietnamese.ttf) when there
+// is one, drawn through FreeType into a coverage atlas the Renderer draws glyphs from; each glyph
+// made once per size.
 #pragma once
 
 #include <cstdint>
@@ -27,6 +29,10 @@ public:
     float Measure(std::string_view text, float size);
     /// Text cut to width with "…" when it is longer.
     std::string Fit(std::string_view text, float size, float width);
+    /// The characters of text no font has.
+    std::u32string Missing(std::string_view text);
+    /// The fonts read besides the console's.
+    const std::vector<std::string>& ExtraFonts() const { return m_extraFonts; }
 
 private:
     struct Glyph
@@ -39,6 +45,7 @@ private:
     Renderer& m_renderer;
     void* m_library = nullptr;
     std::vector<void*> m_faces;
+    std::vector<std::string> m_extraFonts;
     Texture m_atlas;
     int m_shelfX = 0, m_shelfY = 0, m_shelfHeight = 0;
     std::unordered_map<uint64_t, Glyph> m_glyphs;

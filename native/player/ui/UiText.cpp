@@ -68,6 +68,17 @@ UiText::UiText(Renderer& renderer) : m_renderer(renderer)
             && FT_New_Memory_Face(library, static_cast<const FT_Byte*>(data.address), FT_Long(data.size), 0, &face) == 0)
             m_faces.push_back(face);
     }
+    // then a font of the SD card's or the romfs', for what the console's lack (Vietnamese: the
+    // Switch has no such language, its fonts may not have all of its letters)
+    for (const char* path : {"sdmc:/OpenShiina/font.ttf", "sdmc:/OpenShiina/font.otf", "romfs:/ui/vietnamese.ttf"})
+    {
+        FT_Face face = nullptr;
+        if (FT_New_Face(library, path, 0, &face) == 0)
+        {
+            m_faces.push_back(face);
+            m_extraFonts.push_back(path);
+        }
+    }
 }
 
 UiText::~UiText()
@@ -77,6 +88,21 @@ UiText::~UiText()
     if (m_library)
         FT_Done_FreeType(static_cast<FT_Library>(m_library));
     plExit();
+}
+
+std::u32string UiText::Missing(std::string_view text)
+{
+    std::u32string missing;
+    for (size_t at = 0; at < text.size();)
+    {
+        uint32_t c = NextCodepoint(text, at);
+        bool found = false;
+        for (void* f : m_faces)
+            found |= FT_Get_Char_Index(Face(f), c) != 0;
+        if (!found && missing.find(char32_t(c)) == std::u32string::npos)
+            missing += char32_t(c);
+    }
+    return missing;
 }
 
 const UiText::Glyph& UiText::Find(uint32_t codepoint, int size)

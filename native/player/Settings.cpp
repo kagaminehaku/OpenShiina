@@ -75,6 +75,8 @@ Settings Settings::Load(const std::string& path)
                 settings.FileCache = k;
     if (auto r = json.find("ShowFrameRate"); r != json.end() && r->is_boolean())
         settings.ShowFrameRate = r->get<bool>();
+    if (auto l = json.find("Language"); l != json.end() && l->is_string())
+        settings.Language = l->get<std::string>();
     if (auto w = json.find("ConsoleStorageWarned"); w != json.end() && w->is_boolean())
         settings.ConsoleWarned = w->get<bool>();
     return settings;
@@ -89,6 +91,7 @@ void Settings::Save(const std::string& path) const
     json["FsrSharpness"] = FsrSharpness;
     json["FileCache"] = kFileCacheChoices[std::clamp(FileCache, 0, 5)].Name;
     json["ShowFrameRate"] = ShowFrameRate;
+    json["Language"] = Language;
     if (ConsoleWarned)
         json["ConsoleStorageWarned"] = true;
     std::string text = json.dump(2);
