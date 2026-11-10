@@ -416,13 +416,18 @@ std::vector<std::string> WrapText(Ui& ui, const std::string& text, float size, f
     return lines;
 }
 
+/// The setting "Language" and the Vietnamese screens (Strings.cpp): off for now, the screens in
+/// English (the Switch's fonts lack most of Vietnamese's letters; a font of its own is to come).
+constexpr bool kLanguages = false;
+
 /// The settings, as the C# player has them ("Scaling", "FSR sharpness" and "Show the frame rate" of
-/// its Graphics page, "File cache", "Language"; the file cache counts from the next game started):
+/// its Graphics page, "File cache", "Language" with kLanguages; the file cache counts from the next
+/// game started):
 /// up / down choose a row, left / right (or A, or a touch on the row's two halves) change it; B or
 /// X goes back, and the file is written if anything changed.
 void SettingsScreen(Ui& ui)
 {
-    constexpr int Rows = 5;
+    constexpr int Rows = kLanguages ? 5 : 4;
     constexpr float RowHeight = 76, ListX = 380, ListY = 120, ListW = 860;
     constexpr int LanguageCount = int(std::size(player::kLanguageChoices));
     constexpr int ScalingCount = int(std::size(player::kScalingChoices));
@@ -489,9 +494,9 @@ void SettingsScreen(Ui& ui)
         const auto& scaling = player::kScalingChoices[scalingIndex()];
         const auto& cache = player::kFileCacheChoices[s_settings.FileCache];
         std::string cacheLabel = cache.Megabytes != 0 ? Tr(cache.Label) : Trf("Auto ({} MB here)", s_settings.FileCacheBytes() >> 20);
-        std::string values[Rows] = {Tr(scaling.Label), std::to_string(s_settings.FsrSharpness), cacheLabel,
-                                    Tr(s_settings.ShowFrameRate ? "On" : "Off"), Tr(player::kLanguageChoices[languageIndex()].Name)};
-        const char* names[Rows] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate", "Language"};
+        std::string values[5] = {Tr(scaling.Label), std::to_string(s_settings.FsrSharpness), cacheLabel,
+                                 Tr(s_settings.ShowFrameRate ? "On" : "Off"), Tr(player::kLanguageChoices[languageIndex()].Name)};
+        const char* names[5] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate", "Language"};
         for (int r = 0; r < Rows; r++)
         {
             float y = ListY + float(r) * RowHeight;
@@ -1672,7 +1677,8 @@ int main(int argc, char** argv)
     // (where the games go, there to be seen on the card; the console's storage is written only by a move)
     Files::CreateDirectories(kGames);
     s_settings = player::Settings::Load(kSettings);
-    player::SetLanguage(s_settings.Language);
+    if (kLanguages)
+        player::SetLanguage(s_settings.Language);
     // The logs of the last runs kept (player.1.log the run before this one, up to player.3.log): the
     // OpenShiina title starts the player before hbmenu, so a new log must not take the one to read
     // (the SD card's file system moves no file onto another: the oldest goes first)
@@ -1696,10 +1702,13 @@ int main(int argc, char** argv)
         for (const auto& font : ui->Text.ExtraFonts())
             Log("Font: %s\n", font.c_str());
         // (the Switch has no Vietnamese: whether its fonts draw all the letters of the screens' words)
-        std::string missing;
-        for (char32_t c : ui->Text.Missing(player::VietnameseWords()))
-            missing += std::format(" U+{:04X}", uint32_t(c));
-        Log("Vietnamese: %s\n", missing.empty() ? "every letter drawn" : ("no font draws" + missing).c_str());
+        if (kLanguages)
+        {
+            std::string missing;
+            for (char32_t c : ui->Text.Missing(player::VietnameseWords()))
+                missing += std::format(" U+{:04X}", uint32_t(c));
+            Log("Vietnamese: %s\n", missing.empty() ? "every letter drawn" : ("no font draws" + missing).c_str());
+        }
         // (the NEON lanes of the pixel routines, which the PC tests do not run)
         std::string lanes = ScnVm::CheckVectorLanes();
         Log("Vector lanes: %s\n", lanes.empty() ? "as the x86 code" : lanes.c_str());
