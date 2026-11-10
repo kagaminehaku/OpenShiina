@@ -294,6 +294,8 @@ void ScnAddressSpace::Discard(uint32_t address, int64_t length)
     Clear(start, first - start);
     Clear(last, end - last);
     std::lock_guard lock(m_commitLock);
+    if (BeforeRelease)
+        BeforeRelease(m_base + first, last - first);
     for (int64_t part = first >> kPartBits; part < last >> kPartBits; part++)
         if (m_committed[part].load(std::memory_order_relaxed))
         {

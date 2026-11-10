@@ -184,9 +184,10 @@ if(NINTENDO_SWITCH)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../src/OpenShiina.Core/Data/Formats.Json" "${PLAYER_ROMFS}/Data/Formats.Json" COPYONLY)
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../src/OpenShiina.Core/Data/ScnOps" DESTINATION "${PLAYER_ROMFS}/Data")
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/player/romfs/ui" DESTINATION "${PLAYER_ROMFS}")
-    # The shaders, compiled for the Tegra X1 when the player is built (uam), into the romfs
+    # The shaders, compiled for the Tegra X1 when the player is built (uam), into the romfs; *_csh:
+    # the GPU mode's kernels of the Switch's own
     set(PLAYER_SHADERS)
-    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag)
+    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag scale32sse_csh:comp)
         string(REPLACE ":" ";" parts "${shader}")
         list(GET parts 0 name)
         list(GET parts 1 stage)

@@ -38,6 +38,12 @@ struct Enlarge16GpuParameters
     int32_t RowCount, ColumnCount, Width;
 };
 
+struct Scale32SseGpuParameters
+{
+    int32_t RowCount, ColumnCount, SourceWord, SourcePitch, OutputWord, OutputPitch;
+    float WholeX, WholeY, WholeXY;
+};
+
 struct RotateZoomGpuParameters
 {
     int32_t Width, Height, SX, SY, SXEnd, SYEnd, SW, Keep;
@@ -106,6 +112,18 @@ void ScnVm::GpuWrite(int address, const uint8_t* bytes, int length)
     }
     else
         WriteBytes(address, bytes, length);
+}
+
+bool ScnVm::GpuMemory(IScnGpuKernel* kernel, int binding, int address, int64_t bytes, bool output, uint32_t& word)
+{
+    if ((address & 3) != 0 || bytes <= 0 || ScnAddressSpace::Contiguous(uint32_t(address), bytes) < bytes)
+        return false;
+    auto [region, regionBytes] = m_memory->Parts(uint32_t(address), bytes);
+    uint32_t offset = 0;
+    if (!kernel->Memory(binding, region, regionBytes, m_memory->Base() + uint32_t(address), bytes, output, offset))
+        return false;
+    word = offset / 4;
+    return true;
 }
 
 bool ScnVm::SubpixelOnGpu(const std::vector<std::array<int, 3>>& rows, int srcPitch, int inPixels, int outPixels, SubpixelGpuParameters parameters)
@@ -244,6 +262,47 @@ bool ScnVm::Enlarge16OnGpu(const std::vector<std::array<int, 4>>& rows, const st
         return false;
     for (int r = 0; r < nr; r++)
         GpuWrite(dst + r * dstPitch, output + size_t(r) * size_t(nc) * 4, nc * 4);
+    return true;
+}
+
+bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, const std::vector<std::array<uint32_t, 5>>& columns, int width, int height,
+                            int src, int srcPitch, int dst, int dstPitch, float wholeX, float wholeY, float wholeXY)
+{
+    // (the Switch's own kernel: the scripts' memory read and written in place where it can be)
+    IScnGpuKernel* kernel = Accelerator->Kernel("scale32sse_csh");
+    if (!kernel)
+        return false;
+    int nr = int(rows.size()), nc = int(columns.size());
+    Scale32SseGpuParameters parameters{nr, nc, 0, width, 0, nc, wholeX, wholeY, wholeXY};
+    uint32_t word = 0;
+    if (srcPitch % 4 == 0 && GpuMemory(kernel, 0, src, int64_t(height - 1) * srcPitch + int64_t(width) * 4, false, word))
+        parameters.SourceWord = int32_t(word), parameters.SourcePitch = srcPitch / 4;
+    else
+    {
+        uint8_t* source = kernel->Input(0, int64_t(height) * width * 4);
+        if (!source)
+            return false;
+        for (int r = 0; r < height; r++)
+            ReadBytes(src + r * srcPitch, source + size_t(r) * size_t(width) * 4, width * 4);
+    }
+    auto* rowTable = kernel->Input(1, int64_t(nr) * 20);
+    auto* columnTable = kernel->Input(2, int64_t(nc) * 20);
+    if (!rowTable || !columnTable)
+        return false;
+    std::memcpy(rowTable, rows.data(), size_t(nr) * 20);
+    std::memcpy(columnTable, columns.data(), size_t(nc) * 20);
+    bool inPlace = dstPitch % 4 == 0 && GpuMemory(kernel, 3, dst, int64_t(nr - 1) * dstPitch + int64_t(nc) * 4, true, word);
+    uint8_t* output = nullptr;
+    if (inPlace)
+        parameters.OutputWord = int32_t(word), parameters.OutputPitch = dstPitch / 4;
+    else if (!(output = kernel->Output(3, int64_t(nr) * nc * 4)))
+        return false;
+    if (!kernel->Run(&parameters, sizeof parameters, (nc + 15) / 16, (nr + 15) / 16))
+        return false;
+    // (with GpuCheck the rows written in place are kept aside too, before the CPU writes over them)
+    if (!inPlace || GpuCheck)
+        for (int r = 0; r < nr; r++)
+            GpuWrite(dst + r * dstPitch, inPlace ? Bytes(dst + r * dstPitch, nc * 4) : output + size_t(r) * size_t(nc) * 4, nc * 4);
     return true;
 }
 

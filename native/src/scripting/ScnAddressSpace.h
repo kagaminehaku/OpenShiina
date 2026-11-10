@@ -16,7 +16,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <mutex>
+#include <utility>
 
 namespace openshiina::scripting {
 
@@ -57,6 +59,22 @@ public:
         CommitParts(address, length > 0 ? length : 1);
         return m_base + address;
     }
+
+    /// The whole parts around [address, address + length) (which must not run past the top of the
+    /// 4 GB), given memory: their start and their size, for a device to map them (the GPU mode).
+    std::pair<uint8_t*, int64_t> Parts(uint32_t address, int64_t length)
+    {
+        CommitParts(address, length > 0 ? length : 1);
+        int64_t first = int64_t(address) & ~(kPartSize - 1), end = (int64_t(address) + (length > 0 ? length : 1) + kPartSize - 1) & ~(kPartSize - 1);
+        return {m_base + first, end - first};
+    }
+
+    /// The memory of address 0 (and the 4 GB from it).
+    uint8_t* Base() const { return m_base; }
+
+    /// Called before whole parts go back ([from, from + bytes), still there): a device that mapped
+    /// them lets them go first.
+    std::function<void(uint8_t*, int64_t)> BeforeRelease;
 
     /// [address, address + length) reads as zero again: whole parts go back, the bytes of the parts
     /// at either end are cleared.

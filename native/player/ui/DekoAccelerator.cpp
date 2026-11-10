@@ -1,13 +1,8 @@
 // The GPU mode on the Switch (see DekoAccelerator.h)
 #include "ui/DekoAccelerator.h"
 
-#include <switch.h>
-
+#include <algorithm>
 #include <cstdio>
-#include <cstring>
-#include <format>
-
-#include "ui/Renderer.h"
 
 namespace openshiina::player {
 
@@ -18,6 +13,9 @@ constexpr uint32_t Align(uint32_t v, uint32_t a) { return (v + a - 1) & ~(a - 1)
 constexpr uint32_t CodeBytes = 64u << 10, CommandBytes = 64u << 10, UniformBytes = 256;
 // A buffer grows by whole megabytes (a few sizes, not a new block every call)
 constexpr uint32_t BufferStep = 1u << 20;
+// The blocks on the scripts' memory: how many are kept, and the largest made
+constexpr size_t MaxScriptBlocks = 32;
+constexpr int64_t MaxScriptBlock = int64_t(256) << 20;
 
 } // namespace
 
@@ -29,13 +27,39 @@ public:
     uint8_t* Input(int binding, int64_t bytes) override { return Buffer(binding, bytes, false); }
     uint8_t* Output(int binding, int64_t bytes) override { return Buffer(binding, bytes, true); }
 
+    bool Memory(int binding, uint8_t* region, int64_t regionBytes, uint8_t* at, int64_t bytes, bool output, uint32_t& offset) override
+    {
+        if (bytes <= 0 || at < region || at + bytes > region + regionBytes)
+            return false;
+        ScriptBlock* block = m_owner.ScriptBlockFor(region, regionBytes);
+        if (!block)
+            return false;
+        offset = uint32_t(at - block->Start);
+        m_script[binding] = {block->Memory, uint32_t(block->Bytes), offset, uint32_t(bytes), output};
+        return true;
+    }
+
+    /// The bindings on the scripts' memory are for one run: none stays once their blocks may go.
+    void ForgetScripts() { m_script.clear(); }
+
     bool Run(const void* parameters, size_t size, int groupsX, int groupsY) override
+    {
+        bool done = Dispatch(parameters, size, groupsX, groupsY);
+        m_script.clear();
+        return done;
+    }
+
+private:
+    bool Dispatch(const void* parameters, size_t size, int groupsX, int groupsY)
     {
         if (size > UniformBytes || groupsX <= 0 || groupsY <= 0)
             return false;
         // What the CPU wrote in memory, and nothing of the outputs left in the CPU's cache
         for (auto& [binding, b] : m_buffers)
-            b.Memory.flushCpuCache(0, b.Used);
+            if (!m_script.count(binding))
+                b.Memory.flushCpuCache(0, b.Used);
+        for (auto& [binding, s] : m_script)
+            s.Block.flushCpuCache(s.Offset, s.Bytes);
         dk::CmdBuf& cmd = m_owner.m_cmd;
         cmd.clear();
         cmd.addMemory(m_owner.m_dataMem, 0, CommandBytes);
@@ -46,7 +70,10 @@ public:
         cmd.bindUniformBuffer(DkStage_Compute, 0, uniforms, UniformBytes);
         cmd.pushConstants(uniforms, UniformBytes, 0, uint32_t(size), parameters);
         for (auto& [binding, b] : m_buffers)
-            cmd.bindStorageBuffer(DkStage_Compute, uint32_t(binding), b.Memory.getGpuAddr(), b.Used);
+            if (!m_script.count(binding))
+                cmd.bindStorageBuffer(DkStage_Compute, uint32_t(binding), b.Memory.getGpuAddr(), b.Used);
+        for (auto& [binding, s] : m_script)
+            cmd.bindStorageBuffer(DkStage_Compute, uint32_t(binding), s.Block.getGpuAddr(), s.Size);
         cmd.dispatchCompute(uint32_t(groupsX), uint32_t(groupsY), 1);
         cmd.barrier(DkBarrier_Full, DkInvalidateFlags_L2Cache);
         m_owner.m_queue.submitCommands(cmd.finishList());
@@ -56,12 +83,14 @@ public:
             return false;
         // The outputs as the GPU wrote them in memory
         for (auto& [binding, b] : m_buffers)
-            if (b.Output)
+            if (b.Output && !m_script.count(binding))
                 b.Memory.flushCpuCache(0, b.Used);
+        for (auto& [binding, s] : m_script)
+            if (s.Output)
+                s.Block.flushCpuCache(s.Offset, s.Bytes);
         return true;
     }
 
-private:
     struct StorageBuffer
     {
         dk::UniqueMemBlock Memory;
@@ -69,8 +98,17 @@ private:
         bool Output = false;
     };
 
+    // A binding on the scripts' memory: its block (the accelerator's), the block's size, the bytes of the run in it
+    struct ScriptBinding
+    {
+        dk::MemBlock Block;
+        uint32_t Size = 0, Offset = 0, Bytes = 0;
+        bool Output = false;
+    };
+
     uint8_t* Buffer(int binding, int64_t bytes, bool output)
     {
+        m_script.erase(binding);
         if (bytes <= 0 || bytes > (int64_t(1) << 30))
             return nullptr;
         StorageBuffer& b = m_buffers[binding];
@@ -91,6 +129,7 @@ private:
     DekoAccelerator& m_owner;
     dk::Shader m_shader;
     std::map<int, StorageBuffer> m_buffers;
+    std::map<int, ScriptBinding> m_script;
 };
 
 DekoAccelerator::DekoAccelerator(dk::Device device) : m_device(device)
@@ -110,74 +149,35 @@ DekoAccelerator::~DekoAccelerator()
     m_queue.waitIdle();
 }
 
-std::string DekoAccelerator::ProbeScriptMemory(uint8_t* window, uint32_t bytes)
+DekoAccelerator::ScriptBlock* DekoAccelerator::ScriptBlockFor(uint8_t* region, int64_t bytes)
 {
-    auto since = [](uint64_t start) { return double(armTicksToNs(armGetSystemTick() - start)) / 1e6; };
-    auto error = [] {
-        std::string e = Renderer::LastDeviceError;
-        Renderer::LastDeviceError.clear();
-        return e.empty() ? std::string() : " (" + e + ")";
-    };
-    Renderer::LastDeviceError.clear();
-    uint64_t start = armGetSystemTick();
-    dk::UniqueMemBlock scripts = dk::MemBlockMaker{m_device, bytes}
-                                     .setFlags(DkMemBlockFlags_CpuCached | DkMemBlockFlags_GpuUncached)
-                                     .setStorage(window)
-                                     .create();
-    double made = since(start);
-    if (!scripts)
-        return std::format("no memory block on them{} ({:.2f} ms)", error(), made);
-    dk::UniqueMemBlock other = dk::MemBlockMaker{m_device, bytes}.setFlags(DkMemBlockFlags_CpuCached | DkMemBlockFlags_GpuUncached).create();
-    if (!other)
-        return "no memory block to compare with" + error();
-    auto* words = reinterpret_cast<uint32_t*>(window);
-    auto* otherWords = static_cast<uint32_t*>(other.getCpuAddr());
-    uint32_t count = bytes / 4;
-    for (uint32_t k = 0; k < count; k++)
-        words[k] = k * 2654435761u;
-    std::memset(otherWords, 0, bytes);
-    start = armGetSystemTick();
-    scripts.flushCpuCache(0, bytes);
-    double flushed = since(start);
-    other.flushCpuCache(0, bytes);
-    auto copy = [&](DkGpuAddr from, DkGpuAddr to) {
-        m_cmd.clear();
-        m_cmd.addMemory(m_dataMem, 0, CommandBytes);
-        m_cmd.copyBuffer(from, to, bytes);
-        m_cmd.barrier(DkBarrier_Full, DkInvalidateFlags_L2Cache);
-        m_queue.submitCommands(m_cmd.finishList());
-        m_queue.signalFence(m_fence);
-        m_queue.flush();
-        return m_fence.wait() == DkResult_Success;
-    };
-    // the GPU reads them
-    start = armGetSystemTick();
-    bool read = copy(scripts.getGpuAddr(), other.getGpuAddr());
-    double copied = since(start);
-    other.flushCpuCache(0, bytes);
-    uint32_t readWrong = 0;
-    for (uint32_t k = 0; k < count; k++)
-        readWrong += otherWords[k] != k * 2654435761u;
-    // the GPU writes them
-    for (uint32_t k = 0; k < count; k++)
-        otherWords[k] = ~(k * 2654435761u);
-    other.flushCpuCache(0, bytes);
-    bool wrote = copy(other.getGpuAddr(), scripts.getGpuAddr());
-    scripts.flushCpuCache(0, bytes);
-    uint32_t writeWrong = 0;
-    for (uint32_t k = 0; k < count; k++)
-        writeWrong += words[k] != ~(k * 2654435761u);
-    // what the CPU takes to copy them (the GPU mode's way now)
-    start = armGetSystemTick();
-    std::memcpy(otherWords, words, bytes);
-    double cpuCopy = since(start);
-    start = armGetSystemTick();
-    scripts = {};
-    double letGo = since(start);
-    return std::format("{} MB: made {:.2f} ms, CPU cache flushed {:.2f} ms, GPU read {} ({} words wrong, {:.2f} ms), GPU wrote {} ({} words wrong), "
-                       "let go {:.2f} ms; the CPU copies them in {:.2f} ms{}",
-                       bytes >> 20, made, flushed, read ? "done" : "failed", readWrong, copied, wrote ? "done" : "failed", writeWrong, letGo,
-                       cpuCopy, error());
+    if (bytes <= 0 || bytes > MaxScriptBlock || (uintptr_t(region) | uintptr_t(bytes)) % DK_MEMBLOCK_ALIGNMENT != 0)
+        return nullptr;
+    for (auto& block : m_scriptBlocks)
+        if (block.Start <= region && region + bytes <= block.Start + block.Bytes)
+        {
+            block.Used = ++m_scriptUses;
+            return &block;
+        }
+    if (m_scriptBlocks.size() >= MaxScriptBlocks)
+        m_scriptBlocks.erase(std::min_element(m_scriptBlocks.begin(), m_scriptBlocks.end(),
+                                              [](const ScriptBlock& a, const ScriptBlock& b) { return a.Used < b.Used; }));
+    dk::UniqueMemBlock memory = dk::MemBlockMaker{m_device, uint32_t(bytes)}
+                                    .setFlags(DkMemBlockFlags_CpuCached | DkMemBlockFlags_GpuUncached)
+                                    .setStorage(region)
+                                    .create();
+    if (!memory)
+        return nullptr;
+    m_scriptBlocks.push_back({region, bytes, std::move(memory), ++m_scriptUses});
+    return &m_scriptBlocks.back();
+}
+
+void DekoAccelerator::Forget(uint8_t* from, int64_t bytes)
+{
+    for (auto& [name, kernel] : m_kernels)
+        if (kernel)
+            kernel->ForgetScripts();
+    std::erase_if(m_scriptBlocks, [&](const ScriptBlock& block) { return block.Start < from + bytes && from < block.Start + block.Bytes; });
 }
 
 scripting::IScnGpuKernel* DekoAccelerator::Kernel(const std::string& name)

@@ -149,8 +149,6 @@ public:
     uint8_t* Bytes(int address, int length);
     /// The memory the scripts' parts of the 4 GB have been given, in bytes.
     int64_t ScriptMemoryBytes() const { return m_memory->CommittedBytes(); }
-    /// Script memory no region of the engine uses (above the high heap), for the players' own tests.
-    static constexpr uint32_t SpareRegion = 0xFF000000;
     /// [address, address + length) does not run past the top of the 4 GB.
     bool IsContiguous(int address, int length) const { return ScnAddressSpace::Contiguous(uint32_t(address), length) >= length; }
     /// The bytes [address, address + length) to read: in place, or copied into spare (made larger
@@ -1236,6 +1234,14 @@ private:
     /// The GPU's bytes into the scripts' memory, or with GpuCheck kept to compare with the CPU's.
     void GpuWrite(int address, const uint8_t* bytes, int length);
     std::vector<std::pair<int, openshiina::Bytes>> m_gpuPending;
+    /// The kernel's binding on the scripts' memory [address, address + bytes) itself (the GPU reads
+    /// or writes it in place): the word of address in the buffer into word; false when the device
+    /// cannot (or the address is not on a 4-byte boundary).
+    bool GpuMemory(IScnGpuKernel* kernel, int binding, int address, int64_t bytes, bool output, uint32_t& word);
+    /// Scale32Sse's tables (flags, count, first, last weights; the first source row or column of
+    /// each) and the copy on the GPU (kernel scale32sse).
+    bool Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, const std::vector<std::array<uint32_t, 5>>& columns, int width, int height,
+                         int src, int srcPitch, int dst, int dstPitch, float wholeX, float wholeY, float wholeXY);
     /// Rows: kind (0-5, as SubpixelRow), source, target.
     bool SubpixelOnGpu(const std::vector<std::array<int, 3>>& rows, int srcPitch, int inPixels, int outPixels, SubpixelGpuParameters parameters);
     bool RotateZoomOnGpu(const std::vector<uint32_t>& source, int sw, int sh, int l, int t, int r, int b, int sx, int sy, int sxEnd, int syEnd,

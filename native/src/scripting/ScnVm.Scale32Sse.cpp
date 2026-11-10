@@ -30,6 +30,7 @@
 #include "scripting/X86Ops.h"
 
 #include <algorithm>
+#include <bit>
 #include <climits>
 #include <cmath>
 #include <cstring>
@@ -402,6 +403,23 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
     if (srcPitch <= 0 || dstPitch <= 0 || (srcX < dstEnd && dstRow < srcEnd))
         return false;
 
+    constexpr const char* Routine = "scale32 (SSE2 build)";
+    if (UseGpu(Routine, int64_t(nr) * nc))
+    {
+        auto entry = [](const SseScaleEntry& e, int from) {
+            return std::array<uint32_t, 5>{uint32_t(e.Flags), e.Count, std::bit_cast<uint32_t>(e.First), std::bit_cast<uint32_t>(e.Last), uint32_t(from)};
+        };
+        using Entries = std::vector<std::array<uint32_t, 5>>;
+        Entries rowEntries = Entries(size_t(nr)), columnEntries = Entries(size_t(nc));
+        for (int r = 0; r < nr; r++)
+            rowEntries[size_t(r)] = entry(rows[size_t(r)], rowY[size_t(r)]);
+        for (int c = 0; c < nc; c++)
+            columnEntries[size_t(c)] = entry(cols[size_t(c)], colX[size_t(c)]);
+        if (!Scale32SseOnGpu(rowEntries, columnEntries, width, height, srcX, srcPitch, dstRow, dstPitch, wholeX, wholeY, wholeXY))
+            GpuFailed(Routine);
+        else if (!GpuCheck)
+            return true;
+    }
     // Rows are independent: they run on several cores (the result does not depend on it)
     ParallelRows::For(nr, int64_t(nr) * nc * 4, [&](int from, int to) {
         for (int r = from; r < to; r++)
@@ -512,6 +530,7 @@ bool ScnVm::Scale32Sse(int dst, int dstPitch, int dl, int dt, int dr, int db, in
             }
         }
     });
+    GpuDone(Routine);
     return true;
 }
 

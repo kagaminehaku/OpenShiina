@@ -27,6 +27,11 @@ ScreenArea ScreenArea::Clip(int width, int height) const
 ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     : m_memory(std::make_unique<ScnAddressSpace>()), m_opcodes(opcodes), m_host(host)
 {
+    // The GPU mode lets go of the parts it mapped before they go back
+    m_memory->BeforeRelease = [this](uint8_t* from, int64_t bytes) {
+        if (Accelerator)
+            Accelerator->Forget(from, bytes);
+    };
     // An engine without op_AA82 (before v2.44) has no such switch: its file writes always happen
     FileWritesEnabled = !opcodes.HasLayout(0xAA82);
     for (int i = 0; i < Slots; i++)
@@ -61,7 +66,12 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterEngine233();
 }
 
-ScnVm::~ScnVm() = default;
+ScnVm::~ScnVm()
+{
+    // Nothing of the GPU mode stays on the scripts' memory once it is gone
+    if (Accelerator)
+        Accelerator->Forget(m_memory->Base(), ScnAddressSpace::Size);
+}
 
 OpHandler ScnVm::HandlerFor(int op) const
 {
