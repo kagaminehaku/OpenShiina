@@ -404,6 +404,11 @@ int Run(int argc, std::string* argv)
     // SCNRUN_TEXTCHECK=1: every glyph drawn in place is drawn again the old way and compared
     const char* textCheck = std::getenv("SCNRUN_TEXTCHECK");
     vm.TextCheck = textCheck && std::string(textCheck) == "1";
+    // SCNRUN_TIMES=1: the time of each embedded routine and text step (the Switch player's slow log), at the end
+    const char* timesVariable = std::getenv("SCNRUN_TIMES");
+    std::unordered_map<std::string, ScnVm::RoutineTime> routineTimes;
+    if (timesVariable && std::string(timesVariable) == "1")
+        vm.RoutineTimes = &routineTimes;
     if (!vm.LoadModule(0, Text::Utf8ToCp932(start), true))
     {
         std::printf("%s is missing.\n", start.c_str());
@@ -476,6 +481,13 @@ int Run(int argc, std::string* argv)
     std::printf("%d frames in %.2f s, script memory %lld MB\n", frame, seconds, (long long)(vm.ScriptMemoryBytes() >> 20));
     if (vm.LoadInBackground)
         std::printf("  read ahead: %d files, %d of them used\n", vm.ReadAheadCounts().first, vm.ReadAheadCounts().second);
+    if (vm.RoutineTimes)
+    {
+        std::vector<std::pair<std::string, ScnVm::RoutineTime>> times(routineTimes.begin(), routineTimes.end());
+        std::sort(times.begin(), times.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
+        for (size_t k = 0; k < times.size() && k < 12; k++)
+            std::printf("  [time] %s %.1f ms (%d calls)\n", times[k].first.c_str(), times[k].second.Milliseconds, times[k].second.Calls);
+    }
     if (vm.TextCheck)
     {
         std::printf("  text check: %lld glyphs, %lld differed\n", (long long)vm.TextCheckGlyphs, (long long)vm.TextCheckDiffered);

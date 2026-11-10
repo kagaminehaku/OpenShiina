@@ -1909,33 +1909,45 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     uint32_t r = uint32_t(G(rec, RTextR)), g = uint32_t(G(rec, RTextG)), b = uint32_t(G(rec, RTextB));
     uint32_t opaque = r << 24 | g << 16 | b << 8 | 0xFF;
     int columns = int(endCol - firstCol);
-    // The frame's rows the glyph covers: (address, the glyph's row)
+    // The columns inside the frame: the glyph was clipped to the text's surface, and a column outside
+    // the frame would write into a row header
+    int colFrom = std::max(0, -left), colTo = std::min(columns, width - left);
+    if (colFrom >= colTo)
+        return;
+    // The frame's rows the glyph covers: (address of its column 0, the glyph's row), from the frame's
+    // table of row addresses (f + 0x14, PicturePixel's), read at once
     std::vector<std::pair<int, int>> rows;
-    for (uint32_t gy = firstRow; gy < endRow; gy++, src += glyph.Pitch, top++)
-        if (top >= 0 && top < height)
-            rows.emplace_back(PicturePixel(picture, frameIndex, left, top, 4), src);
+    {
+        TextTime rowsTime(*this, "text: layer rows");
+        int skip = std::max(0, -top);
+        int first = top + skip, count = std::min(int(endRow - firstRow) - skip, height - first);
+        if (count <= 0)
+            return;
+        openshiina::Bytes table = ReadBytes(f + 0x14 + 4 * first, 4 * count);
+        src += skip * glyph.Pitch;
+        for (int k = 0; k < count; k++, src += glyph.Pitch)
+            rows.emplace_back(int(LittleEndian::ToUInt32(table.data() + 4 * k)) + 8 + left * 4, src);
+    }
     // A row in place when it is one piece of the scripts' memory (the same bytes, in the same order,
     // as Read32 / Write32 a pixel at a time through the 4 GB, which was most of 00A1's time on the
     // Switch with a game that writes its text on layers)
     auto drawRows = [&](bool inPlace) {
         for (const auto& [p, from] : rows)
         {
-            uint8_t* row = inPlace && IsContiguous(p, columns * 4) ? Bytes(p, columns * 4) : nullptr;
-            for (int col = 0; col < columns; col++)
+            // (row: the bytes of column colFrom on)
+            uint8_t* row = inPlace && IsContiguous(p + colFrom * 4, (colTo - colFrom) * 4) ? Bytes(p + colFrom * 4, (colTo - colFrom) * 4) : nullptr;
+            // The glyph's row as it is, when all of it is there
+            const uint8_t* bits = size_t(from) + size_t(colTo) <= glyph.Bits.size() ? glyph.Bits.data() + from : nullptr;
+            for (int col = colFrom; col < colTo; col++)
             {
-                // The glyph was clipped to the text's surface; a column outside the frame would write
-                // into a row header
-                if (left + col < 0 || left + col >= width)
-                    continue;
-                size_t at = size_t(from) + size_t(col);
-                uint8_t v = glyph.Bits.size() > at ? glyph.Bits[at] : uint8_t(0);
+                uint8_t v = bits ? bits[col] : glyph.Bits.size() > size_t(from) + size_t(col) ? glyph.Bits[size_t(from) + size_t(col)] : uint8_t(0);
                 if (v == 0)
                     continue;
                 uint32_t a16 = (uint32_t(v) * 0xFF >> 6) * uint32_t(alpha) & 0xFF00;
                 uint32_t value = opaque;
                 if (a16 != 0xFF00)
                 {
-                    uint32_t d = row ? LittleEndian::ToUInt32(row + col * 4) : uint32_t(Read32(p + col * 4));
+                    uint32_t d = row ? LittleEndian::ToUInt32(row + (col - colFrom) * 4) : uint32_t(Read32(p + col * 4));
                     uint32_t index = (d & 0xFF) | a16;
                     uint32_t t = tables.Share[index];
                     uint32_t rb = (d >> 8) & 0xFF00FF;
@@ -1943,7 +1955,7 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
                           + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
                 }
                 if (row)
-                    LittleEndian::Pack(value, row + col * 4);
+                    LittleEndian::Pack(value, row + (col - colFrom) * 4);
                 else
                     Write32(p + col * 4, int(value));
             }
@@ -1951,6 +1963,7 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     };
     if (!TextCheck)
     {
+        TextTime pixelsTime(*this, "text: layer pixels");
         drawRows(true);
         return;
     }
