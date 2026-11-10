@@ -691,6 +691,14 @@ went into GameMap) share two routines of their saves, a copy of 99 rows of 528 b
 24 mask (Re: Rem Plus's mask28 with 24), now C#. Their 1,673 and 3,836 files come out whole.
 Swept: 19 and 78 scenarios, every one to its end.
 
+**Nukige Mitai na Shima ni Sunderu... 2**'s window size setting (960 x 540, 1280 x 720, 1600 x 900, 1920 x 1080, kept in its
+saved settings) asks the engine for a window of that size with `0A00 w, h` and keeps its 1600 x 900
+surfaces: the engine stretches the screen into the window, and START takes the mouse of `0456` in
+the window's pixels, (x * 1600 + w / 2) / w, gives `0457` points in them, and in full screen the
+parts `07D0` shows too. The players kept the window at 1600 x 900 and gave `0456` the screen's
+points, so after another size the clicks missed (the keys still chose); they keep the size 0A00
+asks for now and give and take the mouse in it (tried on the Switch at 1280 x 720).
+
 **Nukige Mitai na Shima ni Sunderu** (Qruppo, NUKITASHI.EXE, engine v2.50, 1600 x 900, with
 RIOSUB.DLL) and its sequel **Nukige Mitai na Shima ni Sunderu... 2** (NUKITASHI2.EXE) run the
 same picture routines, eight of them without C# until now (each the same bytes as its x86 code on

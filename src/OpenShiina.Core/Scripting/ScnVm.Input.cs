@@ -145,23 +145,27 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], vm.m_host.Active ? state : 0);
             return 0;
         });
-        // 0456 x, y: where the mouse is (FUN_0040CE90; kept at 0xBCE348 / 0xBCE344)
+        // 0456 x, y: where the mouse is in the window's client (FUN_0040CE90; kept at 0xBCE348 /
+        // 0xBCE344): the host's point of the screen, in the window 0A00 sized (the same point
+        // until a game sizes it)
         Register(0x0456, (vm, c, i) =>
         {
-            var (x, y) = vm.m_host.MousePosition;
+            var (sx, sy) = vm.m_host.MousePosition;
+            var (x, y) = vm.ScreenToClient(sx, sy);
             vm.EngineGlobals[0xBCE348] = x;
             vm.EngineGlobals[0xBCE344] = y;
             vm.Store(c, i.Args[0], x);
             vm.Store(c, i.Args[1], y);
             return 0;
         });
-        // 0457 x, y: move the mouse there
+        // 0457 x, y: move the mouse to that point of the window's client
         Register(0x0457, (vm, c, i) =>
         {
             int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
             vm.EngineGlobals[0xBCE348] = x;
             vm.EngineGlobals[0xBCE344] = y;
-            vm.m_host.SetMousePosition(x, y);
+            var (sx, sy) = vm.ClientToScreen(x, y);
+            vm.m_host.SetMousePosition(sx, sy);
             return 0;
         });
         // 0458 l, r: the left and right mouse buttons held, 1 or 0 (aoj.EXE 0x417BF0: bits 0 and 1
@@ -189,10 +193,12 @@ public sealed partial class ScnVm
         Register(0x0460, (vm, c, i) => { vm.m_host.ShowPointer(true); return 0; });
         Register(0x0461, (vm, c, i) => { vm.m_host.ShowPointer(false); return 0; });
         // 0492 x, y: window point -> picture point (x - offset) / scale, both in and out; the
-        // host already gives picture points, so they stay as they are
+        // host shows the picture at (0, 0) at its own size, so only a window 0A00 sized changes
+        // them
         Register(0x0492, (vm, c, i) =>
         {
             int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
+            (x, y) = vm.ClientToScreen(x, y);
             vm.Store(c, i.Args[0], x);
             vm.Store(c, i.Args[1], y);
             return 0;

@@ -274,6 +274,26 @@ public:
     int EngineVersion = 247;
     /// The window size of RIO.INI (WindowWidth / WindowHeight).
     int ScreenWidth = 800, ScreenHeight = 600;
+    /// The window's client size the scripts last asked for with 0A00 (0: the screen's): the games
+    /// with a window size setting (Nukitashi 2: 960 x 540 to 1920 x 1080 for a 1600 x 900 screen)
+    /// keep their surfaces and have the engine stretch the screen into a window of another size.
+    int ClientWidthSet = 0, ClientHeightSet = 0;
+    /// The window's client size (0A00), the screen's until the scripts ask for another.
+    int ClientWidth() const { return ClientWidthSet > 0 ? ClientWidthSet : ScreenWidth; }
+    int ClientHeight() const { return ClientHeightSet > 0 ? ClientHeightSet : ScreenHeight; }
+    /// A point of the screen (where the host puts the mouse) as the window's client sees it, the way
+    /// 0456 gives it: the scripts that sized the window turn it back with (x * screen + client / 2) / client.
+    std::pair<int, int> ScreenToClient(int x, int y) const
+    {
+        return {int((int64_t(x) * ClientWidth() + ScreenWidth / 2) / ScreenWidth),
+                int((int64_t(y) * ClientHeight() + ScreenHeight / 2) / ScreenHeight)};
+    }
+    /// A point of the window's client (0457) on the screen.
+    std::pair<int, int> ClientToScreen(int x, int y) const
+    {
+        return {int((int64_t(x) * ScreenWidth + ClientWidth() / 2) / ClientWidth()),
+                int((int64_t(y) * ScreenHeight + ClientHeight() / 2) / ClientHeight())};
+    }
     /// The save folder as the scripts see it: a path ending with '\' (Shift-JIS).
     std::string DataPath();
     /// The game being played (its scheme's name, "Azu Plus", UTF-8).

@@ -302,6 +302,13 @@ void ScnVm::RegisterDraw()
     Register(0x07D0, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         int l = vm.Value(c, i.Args[0]), t = vm.Value(c, i.Args[1]), r = vm.Value(c, i.Args[2]), b = vm.Value(c, i.Args[3]);
         vm.InvalidateWindow(l, t, r, b);
+        // In a window 0A00 sized, full screen gives the part in the window's pixels (Nukitashi 2's
+        // START, L_2B710): that part of the screen too (both are shown, so the part is there
+        // whichever the scripts meant)
+        int cw = vm.ClientWidth(), ch = vm.ClientHeight();
+        if (cw != vm.ScreenWidth || ch != vm.ScreenHeight)
+            vm.InvalidateWindow(int(int64_t(l) * vm.ScreenWidth / cw), int(int64_t(t) * vm.ScreenHeight / ch),
+                                int((int64_t(r) * vm.ScreenWidth + cw - 1) / cw), int((int64_t(b) * vm.ScreenHeight + ch - 1) / ch));
         vm.FrameShown = true;
         return 0;
     });

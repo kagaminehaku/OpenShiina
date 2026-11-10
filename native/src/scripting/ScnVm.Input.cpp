@@ -167,21 +167,25 @@ void ScnVm::RegisterInput()
         vm.Store(c, i.Args[1], vm.m_host.Active() ? state : 0);
         return 0;
     });
-    // 0456 x, y: where the mouse is (FUN_0040CE90; kept at 0xBCE348 / 0xBCE344)
+    // 0456 x, y: where the mouse is in the window's client (FUN_0040CE90; kept at 0xBCE348 /
+    // 0xBCE344): the host's point of the screen, in the window 0A00 sized (the same point until a
+    // game sizes it)
     Register(0x0456, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        auto [x, y] = vm.m_host.MousePosition();
+        auto [sx, sy] = vm.m_host.MousePosition();
+        auto [x, y] = vm.ScreenToClient(sx, sy);
         vm.EngineGlobals[0xBCE348] = x;
         vm.EngineGlobals[0xBCE344] = y;
         vm.Store(c, i.Args[0], x);
         vm.Store(c, i.Args[1], y);
         return 0;
     });
-    // 0457 x, y: move the mouse there
+    // 0457 x, y: move the mouse to that point of the window's client
     Register(0x0457, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
         vm.EngineGlobals[0xBCE348] = x;
         vm.EngineGlobals[0xBCE344] = y;
-        vm.m_host.SetMousePosition(x, y);
+        auto [sx, sy] = vm.ClientToScreen(x, y);
+        vm.m_host.SetMousePosition(sx, sy);
         return 0;
     });
     // 0458 l, r: the left and right mouse buttons held, 1 or 0
@@ -208,11 +212,13 @@ void ScnVm::RegisterInput()
         vm.m_host.ShowPointer(false);
         return 0;
     });
-    // 0492 x, y: window point -> picture point; the host already gives picture points
+    // 0492 x, y: window point -> picture point; the host shows the picture at (0, 0) at its own
+    // size, so only a window 0A00 sized changes them
     Register(0x0492, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
-        vm.Store(c, i.Args[0], x);
-        vm.Store(c, i.Args[1], y);
+        auto [px, py] = vm.ClientToScreen(x, y);
+        vm.Store(c, i.Args[0], px);
+        vm.Store(c, i.Args[1], py);
         return 0;
     });
     // 03E9 v: the buttons held (keyboard, mouse and joystick)

@@ -14,6 +14,27 @@ public sealed partial class ScnVm
     public int ScreenWidth { get; set; } = 800;
     public int ScreenHeight { get; set; } = 600;
 
+    // The window's client size the scripts last asked for with 0A00 (0: the screen's): the games
+    // with a window size setting (Nukitashi 2: 960 x 540 to 1920 x 1080 for a 1600 x 900 screen)
+    // keep their surfaces and have the engine stretch the screen into a window of another size
+    private int m_clientWidth, m_clientHeight;
+
+    /// <summary>The window's client size (0A00), the screen's until the scripts ask for another.</summary>
+    public int ClientWidth => m_clientWidth > 0 ? m_clientWidth : ScreenWidth;
+    public int ClientHeight => m_clientHeight > 0 ? m_clientHeight : ScreenHeight;
+
+    /// <summary>
+    /// A point of the screen (where the host puts the mouse) as the window's client sees it, the
+    /// way 0456 gives it: the scripts that sized the window turn it back with
+    /// (x * screen + client / 2) / client.
+    /// </summary>
+    private (int X, int Y) ScreenToClient(int x, int y) =>
+        ((int)(((long)x * ClientWidth + ScreenWidth / 2) / ScreenWidth), (int)(((long)y * ClientHeight + ScreenHeight / 2) / ScreenHeight));
+
+    /// <summary>A point of the window's client (0457) on the screen.</summary>
+    private (int X, int Y) ClientToScreen(int x, int y) =>
+        ((int)(((long)x * ScreenWidth + ClientWidth / 2) / ClientWidth), (int)(((long)y * ScreenHeight + ClientHeight / 2) / ClientHeight));
+
     // The registry key opened by op_00FA, and the values the installer wrote there
     private string m_registryKey = "";
 

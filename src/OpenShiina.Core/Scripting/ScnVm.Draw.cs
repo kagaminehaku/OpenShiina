@@ -336,6 +336,14 @@ public sealed partial class ScnVm
             if (vm.Trace != null)
                 vm.TraceLine(c, $"07D0 {l},{t}-{r},{b}");
             vm.InvalidateWindow(l, t, r, b);
+            // In a window 0A00 sized, full screen gives the part in the window's pixels
+            // (Nukitashi 2's START, L_2B710): that part of the screen too (both are shown, so the
+            // part is there whichever the scripts meant)
+            if (vm.ClientWidth != vm.ScreenWidth || vm.ClientHeight != vm.ScreenHeight)
+                vm.InvalidateWindow(
+                    (int)((long)l * vm.ScreenWidth / vm.ClientWidth), (int)((long)t * vm.ScreenHeight / vm.ClientHeight),
+                    (int)(((long)r * vm.ScreenWidth + vm.ClientWidth - 1) / vm.ClientWidth),
+                    (int)(((long)b * vm.ScreenHeight + vm.ClientHeight - 1) / vm.ClientHeight));
             vm.FrameShown = true;
             return 0;
         });

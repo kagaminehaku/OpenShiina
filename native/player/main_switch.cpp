@@ -76,6 +76,17 @@ bool SwitchOn(const char* path)
     std::fclose(f);
     return c != '0';
 }
+
+/// A switch file of the SD card for something on by default: there and starting with '0'.
+bool SwitchOff(const char* path)
+{
+    std::FILE* f = Files::Open(path, "rb");
+    if (!f)
+        return false;
+    int c = std::fgetc(f);
+    std::fclose(f);
+    return c == '0';
+}
 constexpr const char* kSaves = "sdmc:/OpenShiina/Saves";
 constexpr const char* kLog = "sdmc:/OpenShiina/player.log";
 constexpr const char* kData = "romfs:/Data";
@@ -625,17 +636,25 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     // HOME (or the console asleep) stops the game where it is, its clock and its sound too, whatever
     // RIO.INI's Background says (on Windows a game may go on behind other windows)
     vm->SetPauseInBackground(true);
-    // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, only with
-    // sdmc:/OpenShiina/gpu ("1") until it has been tried on the console; with gpu-check as well
-    // every call of them runs on both and the bytes are compared (the log tells)
+    // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, on unless
+    // sdmc:/OpenShiina/gpu starts with '0'; with gpu-check as well every call of them runs on both
+    // and the bytes are compared (the log tells). Without it (it cannot start) the CPU does them
     static std::unique_ptr<player::DekoAccelerator> s_gpu;
-    if (SwitchOn(kGpuOn))
+    if (!SwitchOff(kGpuOn))
     {
-        if (!s_gpu)
-            s_gpu = std::make_unique<player::DekoAccelerator>(ui.Screen.Device());
-        vm->Accelerator = s_gpu.get();
-        vm->GpuCheck = SwitchOn(kGpuCheck);
+        try
+        {
+            if (!s_gpu)
+                s_gpu = std::make_unique<player::DekoAccelerator>(ui.Screen.Device());
+            vm->Accelerator = s_gpu.get();
+            vm->GpuCheck = SwitchOn(kGpuCheck);
+        }
+        catch (const std::exception& e)
+        {
+            Log("GPU mode: %s; the CPU draws\n", e.what());
+        }
     }
+    Log("GPU mode: %s\n", vm->Accelerator ? (vm->GpuCheck ? "on, checked against the CPU" : "on") : "off");
     LogMemory("its first script loaded");
 
     // The sound device: 44.1 kHz stereo floats, the mixer read on SDL's audio thread

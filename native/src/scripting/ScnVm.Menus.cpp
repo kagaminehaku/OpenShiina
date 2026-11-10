@@ -120,10 +120,18 @@ void ScnVm::RegisterMenus()
     });
     // 0A00 w, h, flags (FUN_00426440 -> FUN_004260A0): the engine's screen becomes w x h at bpp
     // flags & 0xFF (0: 24); bit 31 keeps the surfaces, bit 30 sizes the window too. The v2.50
-    // games ask for the size RIO.INI gave at start; the screen stays as it is
+    // games ask for the size RIO.INI gave at start; Nukitashi 2's window size setting asks for
+    // another and keeps the surfaces: the screen is stretched into that window, and the scripts
+    // take the mouse (0456, 0457) and the parts to show (07D0, full screen) in the window's
+    // pixels. The host still shows the screen as it does: the window's size only changes those
     Register(0x0A00, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        for (int k = 0; k < 3; k++)
-            vm.Value(c, i.Args[k]);
+        int w = vm.Value(c, i.Args[0]), h = vm.Value(c, i.Args[1]);
+        vm.Value(c, i.Args[2]);
+        if (w > 0 && h > 0)
+        {
+            vm.ClientWidthSet = w;
+            vm.ClientHeightSet = h;
+        }
         return 0;
     });
     // 09DD index, v: GetSystemMetrics (FUN_00425F80), as a 1920 x 1080 screen (09E2 too)
