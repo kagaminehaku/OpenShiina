@@ -272,7 +272,7 @@ bool ScnVm::Subpixel32(int dst, int dstPitch, int dtx, int dty, int w, int h, in
         gpuRows.reserve(rows.size());
         for (const auto& [kind, s, d] : rows)
             gpuRows.push_back({int(kind), s, d});
-        SubpixelGpuParameters parameters{0, 0, 0, int(middle), ax, bx, tailX, srcTailX, ay, by, tailY, srcTailY, d0, d4, d8, dc, d0 == 0 ? 1 : 0};
+        SubpixelGpuParameters parameters{0, 0, 0, int(middle), ax, bx, tailX, srcTailX, ay, by, tailY, srcTailY, d0, d4, d8, dc, d0 == 0 ? 1 : 0, 0, 0, 0, 0};
         if (!SubpixelOnGpu(gpuRows, srcPitch, int(middle) + 3, outPixels, parameters))
             GpuFailed("subpixel32");
         else if (!GpuCheck)

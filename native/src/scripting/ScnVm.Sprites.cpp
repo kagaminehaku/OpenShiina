@@ -1017,12 +1017,29 @@ void ScnVm::StretchCopy(int dst, int x, int y, int w, int h, int src, int sx, in
         int fy = sy + int(int64_t(row) * sh / h);
         if (ty < 0 || ty >= dh || fy < 0 || fy >= shei)
             continue;
+        // The two rows in place when they are pieces of memory (a pixel at a time, in the same
+        // order: the same bytes when they share some), else a byte at a time
+        int to = d0 + ty * dp, from = s0 + fy * spitch;
+        if (dw > 0 && swid > 0 && IsContiguous(to, dw * 3) && IsContiguous(from, swid * 3))
+        {
+            uint8_t* target = Bytes(to, dw * 3);
+            const uint8_t* source = Bytes(from, swid * 3);
+            for (int col = 0; col < std::abs(w); col++)
+            {
+                int tx = x + col, fx = sx + int(int64_t(col) * sw / w);
+                if (tx < 0 || tx >= dw || fx < 0 || fx >= swid)
+                    continue;
+                uint8_t b = source[fx * 3], g = source[fx * 3 + 1], r = source[fx * 3 + 2];
+                target[tx * 3] = b, target[tx * 3 + 1] = g, target[tx * 3 + 2] = r;
+            }
+            continue;
+        }
         for (int col = 0; col < std::abs(w); col++)
         {
             int tx = x + col, fx = sx + int(int64_t(col) * sw / w);
             if (tx < 0 || tx >= dw || fx < 0 || fx >= swid)
                 continue;
-            CopyPixel24(d0 + ty * dp + tx * 3, s0 + fy * spitch + fx * 3);
+            CopyPixel24(to + tx * 3, from + fx * 3);
         }
     }
 }
@@ -1078,9 +1095,35 @@ void ScnVm::SoftStretch(int dst, int dx, int dy, int dw, int dh, int src, int sx
     int srcPitch = SurfaceField(src, 10), dstPitch = SurfaceField(dst, 10);
     int srcBase = SurfaceField(src, 2) + skipX * 3 + srcPitch * sy;
     int dstRow = SurfaceField(dst, 2) + dstPitch * startY + startX * 3;
+    // Where each pixel of a row reads, from the row's first source byte: the same for every row,
+    // so a row goes in place (a pixel at a time, in the same order) when its bytes are pieces of
+    // memory, else a byte at a time
+    std::vector<int> offsets;
+    int low = 0, high = 0;
+    for (int x = startX, at = 0; x < endX; x++)
+    {
+        at += table[size_t(x)];
+        offsets.push_back(at);
+        low = std::min(low, at);
+        high = std::max(high, at);
+    }
+    int pixels = int(offsets.size());
     for (int y = startY; y < endY; y++, rowAcc += ystep, dstRow += dstPitch)
     {
         int p = (rowAcc >> 16) * srcPitch + srcBase, q = dstRow;
+        int64_t first = int64_t(p) + low;
+        if (pixels > 0 && first >= 0 && int64_t(q) >= 0 && IsContiguous(int(first), high - low + 3) && IsContiguous(q, pixels * 3))
+        {
+            const uint8_t* source = Bytes(int(first), high - low + 3) - low;
+            uint8_t* target = Bytes(q, pixels * 3);
+            for (int k = 0; k < pixels; k++)
+            {
+                const uint8_t* from = source + offsets[size_t(k)];
+                uint8_t b = from[0], g = from[1], r = from[2];
+                target[k * 3] = b, target[k * 3 + 1] = g, target[k * 3 + 2] = r;
+            }
+            continue;
+        }
         for (int x = startX; x < endX; x++, q += 3)
         {
             p += table[size_t(x)];

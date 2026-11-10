@@ -185,6 +185,90 @@ void Enlarge32Walk(const Enlarge32Table& t, const Enlarge32RowWork& row, const u
     }
 }
 
+/// What the walk (Enlarge32Walk) makes of each destination column, for the GPU: a source pixel used
+/// whole (Full), times a weight (Weighted), or two mixed (Mixed); its source pixel (Cur, CurTwo on
+/// the rows from two source rows, which after a partly covered first column that used up its pixel
+/// take the next one) and the other of a mix (Next).
+struct Enlarge32Step
+{
+    enum Kind : uint32_t { Full, Weighted, Mixed };
+    uint32_t What = Full;
+    int Cur = 0, CurTwo = 0, Next = 0;
+    uint64_t W0 = 0, W1 = 0;
+};
+
+/// The walk of Enlarge32Walk with source pixels as their places: the steps of one kind of row.
+void Enlarge32Steps(const Enlarge32Table& t, bool two, std::vector<Enlarge32Step>& steps)
+{
+    steps.clear();
+    int x = 0, ebp = t.Start, m = 0, cur = 0;
+    auto add = [&](uint32_t what, int at, int next, uint64_t w0, uint64_t w1) { steps.push_back({what, at, at, next, w0, w1}); };
+    if (t.Left)
+    {
+        const auto& left = *t.Left;
+        if (!t.LeftTwo)
+        {
+            add(Enlarge32Step::Weighted, cur, 0, left.W0, 0);
+            ebp -= left.Count;
+            if (ebp == 0)
+            {
+                if (two)
+                    cur = ++x;
+                else
+                    cur = x++;
+                ebp = t.DW;
+            }
+        }
+        else
+        {
+            add(Enlarge32Step::Mixed, cur, x + 1, left.W0, left.W1);
+            cur = ++x;
+            ebp = left.Count;
+        }
+    }
+    bool reload = false;
+    int sw = t.SW, dwSw = t.DW - t.SW;
+    for (int c = t.WholeColumns;;)
+    {
+        if (ebp >= sw)
+        {
+            add(Enlarge32Step::Full, cur, 0, 0, 0);
+            ebp -= sw;
+            if (ebp == 0)
+            {
+                ebp = t.DW;
+                x++;
+                if (--c == 0)
+                {
+                    reload = true;
+                    break;
+                }
+                cur = x;
+                continue;
+            }
+            if (--c == 0)
+                break;
+            continue;
+        }
+        const auto& e = t.Middle[size_t(m++)];
+        add(Enlarge32Step::Mixed, cur, x + 1, e.W0, e.W1);
+        cur = ++x;
+        ebp += dwSw;
+        if (--c == 0)
+            break;
+    }
+    if (t.Right)
+    {
+        const auto& right = *t.Right;
+        if (reload)
+            cur = x;
+        if (!t.RightTwo)
+            add(Enlarge32Step::Weighted, cur, 0, right.W0, 0);
+        else
+            add(Enlarge32Step::Mixed, cur, x + 1, right.W0, right.W1);
+    }
+}
+
 } // namespace
 
 bool ScnVm::Enlarge32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb)
@@ -347,10 +431,50 @@ bool ScnVm::Enlarge32(int dst, int dstPitch, int dl, int dt, int dr, int db, int
         dstTo = maxT->Target + outPixels * int64_t(4);
     }
     bool apart = srcTo <= dstFrom || dstTo <= srcFrom;
+    constexpr const char* Routine = "enlarge32";
+    if (apart && srcPitch > 0 && dstPitch > 0 && !rows.empty() && UseGpu(Routine, int64_t(rows.size()) * outPixels))
+    {
+        // Each destination pixel on its own: the columns' steps (the same for the rows of each kind,
+        // but for the source pixel after a partly covered first column), the rows' source rows and weights
+        std::vector<Enlarge32Step> one, two;
+        Enlarge32Steps(table, false, one);
+        Enlarge32Steps(table, true, two);
+        bool same = one.size() == size_t(outPixels) && two.size() == one.size();
+        auto low = [](uint64_t v) { return uint32_t(v); };
+        auto high = [](uint64_t v) { return uint32_t(v >> 32); };
+        std::vector<std::array<uint32_t, 8>> columnEntries, rowEntries;
+        int width = 0, lines = 0;
+        for (size_t o = 0; same && o < one.size(); o++)
+        {
+            const auto& a = one[o];
+            const auto& b = two[o];
+            same = a.What == b.What && a.Next == b.Next && a.W0 == b.W0 && a.W1 == b.W1;
+            width = std::max({width, a.Cur + 1, b.Cur + 1, a.What == Enlarge32Step::Mixed ? a.Next + 1 : 0});
+            columnEntries.push_back({a.What, uint32_t(a.Cur), uint32_t(b.Cur), uint32_t(a.Next), low(a.W0), high(a.W0), low(a.W1), high(a.W1)});
+        }
+        for (size_t r = 0; same && r < rows.size(); r++)
+        {
+            const auto& row = rows[r];
+            int line = (row.Source - rows[0].Source) / srcPitch;
+            bool twoRows = row.Kind == Enlarge32Row::Two || row.Kind == Enlarge32Row::WholeTwo;
+            same = line * srcPitch == row.Source - rows[0].Source && row.Target == rows[0].Target + int(r) * dstPitch;
+            lines = std::max(lines, line + (twoRows ? 2 : 1));
+            uint64_t a = twoRows ? row.Upper : row.Weight;
+            rowEntries.push_back({uint32_t(row.Kind), uint32_t(line), low(a), high(a), low(row.Lower), high(row.Lower), 0, 0});
+        }
+        if (same && width <= sourcePixels)
+        {
+            if (!Enlarge32OnGpu(rowEntries, columnEntries, width, lines, rows[0].Source, srcPitch, rows[0].Target, dstPitch))
+                GpuFailed(Routine);
+            else if (!GpuCheck)
+                return true;
+        }
+    }
     if (apart && srcPitch > 0 && dstPitch > 0)
         ParallelRows::For(int(rows.size()), int64_t(rows.size()) * outPixels, runRows);
     else
         runRows(0, int(rows.size()));
+    GpuDone(Routine);
     return true;
 }
 

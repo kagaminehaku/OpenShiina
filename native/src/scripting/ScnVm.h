@@ -1219,6 +1219,8 @@ public:
         uint32_t AX, BX, TailX, SrcTailX, AY, BY, TailY, SrcTailY;
         uint32_t D0, D4, D8, DC;
         int32_t CopyAcross;
+        // (the Switch's: where the source and the destination rows are, in words)
+        int32_t SourceWord, SourcePitch, OutputWord, OutputPitch;
     };
 
 private:
@@ -1238,8 +1240,23 @@ private:
     /// or writes it in place): the word of address in the buffer into word; false when the device
     /// cannot (or the address is not on a 4-byte boundary).
     bool GpuMemory(IScnGpuKernel* kernel, int binding, int address, int64_t bytes, bool output, uint32_t& word);
+    /// A kernel's source: height rows of width pixels from src, srcPitch bytes apart, in place or
+    /// copied (rows width pixels apart); the word of the first pixel and the pitch in words.
+    bool GpuSource(IScnGpuKernel* kernel, int binding, int src, int srcPitch, int width, int height, int32_t& word, int32_t& pitch,
+                   bool inPlace = true);
+    /// A kernel's destination, as GpuSource: in place (output null) or a buffer of its own (output).
+    bool GpuTarget(IScnGpuKernel* kernel, int binding, int dst, int dstPitch, int width, int height, int32_t& word, int32_t& pitch, uint8_t*& output);
+    /// After the run: a destination's buffer into the scripts' memory (GpuWrite); with GpuCheck the
+    /// rows written in place are kept aside too, before the CPU writes over them.
+    void GpuTargetDone(int dst, int dstPitch, int width, int height, const uint8_t* output);
     /// Scale32Sse's tables (flags, count, first, last weights; the first source row or column of
     /// each) and the copy on the GPU (kernel scale32sse).
+    /// Enlarge32's steps on the GPU (kernel enlarge32_csh). Rows: kind, source row (from src), the
+    /// weight of a partly covered row or the upper row's, the lower row's (64-bit lanes, low then
+    /// high), two unused; columns: what, source pixel (one-row rows), source pixel (two-row rows),
+    /// the next of a mix, the two weights.
+    bool Enlarge32OnGpu(const std::vector<std::array<uint32_t, 8>>& rows, const std::vector<std::array<uint32_t, 8>>& columns, int width, int height,
+                        int src, int srcPitch, int dst, int dstPitch);
     bool Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, const std::vector<std::array<uint32_t, 5>>& columns, int width, int height,
                          int src, int srcPitch, int dst, int dstPitch, float wholeX, float wholeY, float wholeXY);
     /// Rows: kind (0-5, as SubpixelRow), source, target.

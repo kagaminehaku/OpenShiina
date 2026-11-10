@@ -187,7 +187,7 @@ if(NINTENDO_SWITCH)
     # The shaders, compiled for the Tegra X1 when the player is built (uam), into the romfs; *_csh:
     # the GPU mode's kernels of the Switch's own
     set(PLAYER_SHADERS)
-    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag scale32sse_csh:comp)
+    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag scale32sse_csh:comp enlarge32_csh:comp)
         string(REPLACE ":" ";" parts "${shader}")
         list(GET parts 0 name)
         list(GET parts 1 stage)
@@ -208,6 +208,25 @@ if(NINTENDO_SWITCH)
         string(REPLACE "layout(push_constant) uniform" "layout(std140, binding = 0) uniform" text "${text}")
         string(REGEX REPLACE "([^A-Za-z_])packed\\(" "\\1packedLanes(" text "${text}")
         set(glsl "${CMAKE_CURRENT_BINARY_DIR}/gpu/${name}.glsl")
+        # subpixel32 reads and writes the scripts' memory in place (DekoAccelerator): its rows from a
+        # first word and a pitch, given after the C# player's parameters
+        if(name STREQUAL "subpixel32")
+            foreach(pair "source[row * inPixels + at]=source[sourceWord + row * sourcePitch + at]"
+                         "source[P * inPixels + s]=source[sourceWord + P * sourcePitch + s]"
+                         "pixels[r * outPixels + o]=pixels[outputWord + r * outputPitch + o]"
+                         "int copyAcross;=int copyAcross@ int sourceWord@ int sourcePitch@ int outputWord@ int outputPitch;")
+                string(FIND "${pair}" "=" at)
+                string(SUBSTRING "${pair}" 0 ${at} from)
+                math(EXPR at "${at} + 1")
+                string(SUBSTRING "${pair}" ${at} -1 to)
+                string(REPLACE "@" ";" to "${to}")
+                string(FIND "${text}" "${from}" found)
+                if(found EQUAL -1)
+                    message(FATAL_ERROR "${name}.comp has no '${from}' any more")
+                endif()
+                string(REPLACE "${from}" "${to}" text "${text}")
+            endforeach()
+        endif()
         file(WRITE "${glsl}" "${text}")
         set(output "${PLAYER_ROMFS}/shaders/${name}.dksh")
         add_custom_command(OUTPUT "${output}"
