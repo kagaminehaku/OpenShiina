@@ -1,6 +1,7 @@
 // OpenShiina.nro: the player on the Switch. It shows its logo at once (ui/Renderer, deko3d), then the
 // games of sdmc:/OpenShiina/Games and of the console's storage to pick from (GameList; a folder
-// named as the first argument starts at once); X opens the settings (settings.json), and the game's
+// named as the first argument starts at once); X opens the settings (settings.json), R moves the game
+// chosen between the SD card and the console's storage (GameMove), and the game's
 // picture fills the screen as the setting "Scaling" says. Its
 // saves go to sdmc:/OpenShiina/Saves/<game>; Formats.Json, the opcode tables, the shaders and the
 // logo are in the romfs. What it prints goes to sdmc:/OpenShiina/player.log and, started by
@@ -36,6 +37,7 @@
 #include "DevHostReturn.h"
 #include "FreeTypeFonts.h"
 #include "GameList.h"
+#include "GameMove.h"
 #include "Settings.h"
 #include "ui/DekoAccelerator.h"
 #include "archives/FormatManager.h"
@@ -60,7 +62,7 @@ using player::Rect;
 namespace {
 
 constexpr const char* kGames = "sdmc:/OpenShiina/Games";
-// The console's own storage (DBI's "Nand USER"), mounted as user: (read only) when it can be
+// The console's own storage (DBI's "Nand USER"), mounted as user: when it can be (written only by a move)
 constexpr const char* kInternalGames = "user:/OpenShiina/Games";
 constexpr const char* kLibrary = "sdmc:/OpenShiina/library.tsv";
 constexpr const char* kSettings = "sdmc:/OpenShiina/settings.json";
@@ -148,6 +150,7 @@ constexpr const char* kButtonA = "\xEE\x83\xA0";
 constexpr const char* kButtonB = "\xEE\x83\xA1";
 constexpr const char* kButtonX = "\xEE\x83\xA2";
 constexpr const char* kButtonY = "\xEE\x83\xA3";
+constexpr const char* kButtonR = "\xEE\x83\xA5";
 // (arrows of the Japanese font: left, right)
 constexpr const char* kButtonLeftRight = "\xE2\x86\x90\xE2\x86\x92";
 constexpr const char* kButtonPlus = "\xEE\x83\xAF";
@@ -430,8 +433,166 @@ void SettingsScreen(Ui& ui)
         s_settings.Save(kSettings);
 }
 
+/// The rail of the list's screens: the logo and the wordmark.
+void DrawRail(Ui& ui)
+{
+    player::Renderer& s = ui.Screen;
+    s.Fill({0, 0, 340, 720}, kPanel);
+    s.Image(ui.Logo, {90, 60, 160, 160});
+    float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
+    s.Image(ui.Wordmark, {30, 240, ww, wh});
+}
+
+/// A title and its lines beside the rail: true for A, false for B (or + / leaving); only A when
+/// choice is false (a message).
+bool Ask(Ui& ui, const std::string& title, const std::vector<std::string>& lines, bool choice)
+{
+    constexpr float ListX = 380, ListW = 860;
+    while (appletMainLoop())
+    {
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
+        if (down & HidNpadButton_A)
+            return true;
+        if (down & (HidNpadButton_B | HidNpadButton_Plus))
+            return !choice;
+        player::Renderer& s = ui.Screen;
+        s.Begin(kBackground);
+        DrawRail(ui);
+        ui.Text.Draw(title, ListX, 48, 34, kText);
+        float y = 120;
+        for (const auto& line : lines)
+        {
+            ui.Text.Draw(ui.Text.Fit(line, 26, ListW), ListX, y, 26, kText);
+            y += 42;
+        }
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = choice ? std::string(kButtonA) + " Go on     " + kButtonB + " Cancel" : std::string(kButtonA) + " OK";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+    }
+    return false;
+}
+
+std::string SizeText(int64_t bytes)
+{
+    constexpr double MB = 1024.0 * 1024.0;
+    return bytes >= int64_t(1) << 30 ? std::format("{:.1f} GB", double(bytes) / (MB * 1024.0)) : std::format("{:.0f} MB", double(bytes) / MB);
+}
+
+/// Moves the game between the SD card and the console's storage (R in the list): measured, asked, the
+/// warning shown before the first one onto the console, copied with a bar (B cancels), then the old
+/// folder deleted. True when it moved.
+bool MoveGame(Ui& ui, const player::GameEntry& game)
+{
+    // the space kept free on the console's storage, for the system's saves and updates
+    constexpr int64_t ConsoleReserve = int64_t(1) << 30;
+    bool toConsole = !game.Internal;
+    std::string folder = Files::FileName(game.Path);
+    std::string target = Files::Combine(toConsole ? kInternalGames : kGames, folder);
+    const char* where = toConsole ? "the console's storage" : "the SD card";
+    auto tell = [&](const std::string& line) { Ask(ui, "Move", {game.Name, line}, false); };
+    if (Files::IsDirectory(target) || Files::IsFile(target))
+    {
+        tell(std::format("{} has a folder named {} already.", where, folder));
+        return false;
+    }
+    ui.Splash("Measuring " + folder + "...");
+    auto size = player::MeasureFolder(game.Path);
+    if (!size.Readable)
+    {
+        tell("Not all of its folder can be read.");
+        return false;
+    }
+    if (toConsole && size.HugeFile)
+    {
+        tell("It has a file of 4 GB or more: the console's storage (FAT32) cannot hold it.");
+        return false;
+    }
+    int64_t free = player::FreeSpace(toConsole ? "user" : "sdmc");
+    int64_t reserve = toConsole ? ConsoleReserve : 0;
+    if (free >= 0 && size.Bytes + reserve > free)
+    {
+        tell(std::format("It needs {}{}; {} has {} free.", SizeText(size.Bytes), toConsole ? " and 1 GB kept free" : "", where, SizeText(free)));
+        return false;
+    }
+    if (toConsole && !s_settings.ConsoleWarned)
+    {
+        std::string kind = player::ConsoleStorageKind();
+        std::vector<std::string> lines = {
+            "The game goes into the console's own storage" + (kind.empty() ? std::string() : " (" + kind + ")") + ": its USER",
+            "partition, beside the system's games and saves. Before the first one:",
+            "- Keep the console charged: switched off while copying, that partition can be damaged.",
+            "- 1 GB is kept free there: the system needs room for its saves and updates.",
+            "- A format or a factory reset of the console deletes the games there.",
+            "- Only the folder OpenShiina/Games is written; nothing else there changes.",
+            "This is shown once."};
+        if (!Ask(ui, "The console's storage", lines, true))
+            return false;
+        s_settings.ConsoleWarned = true;
+        s_settings.Save(kSettings);
+    }
+    std::vector<std::string> lines = {game.Name, std::format("{} in {} files, to {}.", SizeText(size.Bytes), size.Files, where)};
+    if (free >= 0)
+        lines.push_back(std::format("Free there now: {}.", SizeText(free)));
+    lines.push_back("The game is copied, then deleted from where it was.");
+    if (!Ask(ui, "Move", lines, true))
+        return false;
+
+    if (toConsole)
+        Files::CreateDirectories(kInternalGames);
+    // (the console does not sleep by itself while it copies)
+    appletSetMediaPlaybackState(true);
+    uint64_t drawn = 0, started = armGetSystemTick();
+    std::string error;
+    bool copied = player::CopyFolder(game.Path, target, [&](int64_t done) {
+        padUpdate(&ui.Pad);
+        if ((padGetButtonsDown(&ui.Pad) & HidNpadButton_B) || !appletMainLoop())
+            return false;
+        uint64_t now = armGetSystemTick();
+        if (drawn != 0 && armTicksToNs(now - drawn) < 100000000)
+            return true;
+        drawn = now;
+        constexpr float ListX = 380, ListW = 860;
+        player::Renderer& s = ui.Screen;
+        s.Begin(kBackground);
+        DrawRail(ui);
+        ui.Text.Draw(std::string("Moving to ") + where, ListX, 48, 34, kText);
+        ui.Text.Draw(ui.Text.Fit(game.Name, 28, ListW), ListX, 130, 28, kText);
+        float part = size.Bytes > 0 ? float(double(done) / double(size.Bytes)) : 1.0f;
+        s.Fill({ListX, 200, ListW, 28}, kPanel, 14);
+        s.Fill({ListX, 200, std::max(28.0f, ListW * std::min(part, 1.0f)), 28}, kAccent, 14);
+        double seconds = double(armTicksToNs(now - started)) / 1e9;
+        std::string line = std::format("{} of {}", SizeText(done), SizeText(size.Bytes));
+        if (seconds > 1)
+            line += std::format(", {:.0f} MB a second", double(done) / (1024.0 * 1024.0) / seconds);
+        ui.Text.Draw(line, ListX, 250, 26, kDim);
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonB) + " Cancel";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+        return true;
+    }, error);
+    appletSetMediaPlaybackState(false);
+    double seconds = double(armTicksToNs(armGetSystemTick() - started)) / 1e9;
+    if (!copied)
+    {
+        Log("[move] %s to %s: %s\n", game.Path.c_str(), target.c_str(), error.c_str());
+        tell(error == "cancelled" ? "Cancelled: it stays where it was." : "Not moved (it stays where it was): " + error + ".");
+        return false;
+    }
+    Log("[move] %s to %s: %lld bytes in %.1f s\n", game.Path.c_str(), target.c_str(), (long long)size.Bytes, seconds);
+    ui.Splash("Deleting it from where it was...");
+    if (!player::RemoveFolder(game.Path))
+    {
+        Log("[move] %s: not all deleted\n", game.Path.c_str());
+        tell("Copied, but not all of the old folder could be deleted: " + game.Path);
+    }
+    return true;
+}
+
 /// The game to play from the list (its folder), kToHbmenu for −, or nothing for + (leave). Y looks
-/// at every folder again.
+/// at every folder again; R moves the game chosen to the other storage.
 std::string PickGame(Ui& ui, bool internal)
 {
     std::vector<std::pair<std::string, bool>> roots = {{kGames, false}};
@@ -459,6 +620,13 @@ std::string PickGame(Ui& ui, bool internal)
             return games[choice].Path;
         if (down & HidNpadButton_X)
             SettingsScreen(ui);
+        if (internal && !games.empty() && (down & HidNpadButton_R) && MoveGame(ui, games[choice]))
+        {
+            ui.Splash("Looking at the games...");
+            games = player::ListGames(roots, kLibrary, false);
+            choice = std::min(choice, games.empty() ? size_t(0) : games.size() - 1);
+            top = std::min(top, choice);
+        }
         if (down & HidNpadButton_Y)
         {
             ui.Splash("Looking at the games...");
@@ -489,15 +657,11 @@ std::string PickGame(Ui& ui, bool internal)
 
         player::Renderer& s = ui.Screen;
         s.Begin(kBackground);
-        // the rail: the logo, the wordmark
-        s.Fill({0, 0, 340, 720}, kPanel);
-        s.Image(ui.Logo, {90, 60, 160, 160});
-        float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
-        s.Image(ui.Wordmark, {30, 240, ww, wh});
+        DrawRail(ui);
         // the games: the icon, the name (dim for a folder no scheme opens)
         ui.Text.Draw("Games", ListX, 48, 34, kText);
         if (games.empty())
-            ui.Text.Draw(std::string("No game folder in ") + kGames, ListX, ListY + 10, 24, kDim);
+            ui.Text.Draw(std::string("No game folder in ") + kGames + " yet", ListX, ListY + 10, 24, kDim);
         bool readOne = false;
         for (size_t k = top; k < games.size() && k < top + Rows; k++)
         {
@@ -517,7 +681,8 @@ std::string PickGame(Ui& ui, bool internal)
         // the buttons
         s.Fill({0, 672, 1280, 48}, kPanel);
         // (− only when a loader started the player: installed as its own title, there is no hbmenu to go to)
-        std::string hints = std::string(kButtonA) + " Play     " + kButtonY + " Look again     " + kButtonX + " Settings     "
+        std::string hints = std::string(kButtonA) + " Play     " + (internal && !games.empty() ? std::string(kButtonR) + " Move     " : "")
+                            + kButtonY + " Look again     " + kButtonX + " Settings     "
                             + (envHasNextLoad() ? std::string(kButtonMinus) + " hbmenu     " : "") + kButtonPlus + " Quit";
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
         s.End();
@@ -981,6 +1146,8 @@ int main(int argc, char** argv)
     }
     romfsInit();
     Files::CreateDirectories(kSaves);
+    // (where the games go, there to be seen on the card; the console's storage is written only by a move)
+    Files::CreateDirectories(kGames);
     s_settings = player::Settings::Load(kSettings);
     // The logs of the last runs kept (player.1.log the run before this one, up to player.3.log): the
     // OpenShiina title starts the player before hbmenu, so a new log must not take the one to read
@@ -1029,7 +1196,7 @@ int main(int argc, char** argv)
     bool named = !folder.empty();
     if (named)
         folder = Files::Combine(kGames, folder);
-    // The console's own storage, read only, for games put there over DBI's MTP ("Nand USER")
+    // The console's own storage, for games put there over DBI's MTP ("Nand USER") or moved there (R)
     FsFileSystem userFs;
     bool internal = R_SUCCEEDED(fsOpenBisFileSystem(&userFs, FsBisPartitionId_User, ""));
     if (internal && fsdevMountDevice("user", userFs) < 0)
