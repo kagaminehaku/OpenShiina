@@ -1940,6 +1940,14 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
     // A row in place when it is one piece of the scripts' memory (the same bytes, in the same order,
     // as Read32 / Write32 a pixel at a time through the 4 GB, which was most of 00A1's time on the
     // Switch with a game that writes its text on layers)
+    // A pixel d of the frame with the glyph's coverage a16 over it (not full: that is the colour opaque)
+    auto blend = [&](uint32_t d, uint32_t a16) {
+        uint32_t index = (d & 0xFF) | a16;
+        uint32_t t = tables.Share[index];
+        uint32_t rb = (d >> 8) & 0xFF00FF;
+        return ((((((r << 16 | b) - rb) * t >> 8) + rb) & 0xFF00FF) * 0x100)
+             + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
+    };
     auto drawRows = [&](bool inPlace) {
         for (const auto& [p, from] : rows)
         {
@@ -1947,6 +1955,20 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
             uint8_t* row = inPlace && IsContiguous(p + colFrom * 4, (colTo - colFrom) * 4) ? Bytes(p + colFrom * 4, (colTo - colFrom) * 4) : nullptr;
             // The glyph's row as it is, when all of it is there
             const uint8_t* bits = size_t(from) + size_t(colTo) <= glyph.Bits.size() ? glyph.Bits.data() + from : nullptr;
+            if (row && bits)
+            {
+                // Nearly always: both in place, nothing to check a pixel
+                uint8_t* out = row;
+                for (int col = colFrom; col < colTo; col++, out += 4)
+                {
+                    uint32_t v = bits[col];
+                    if (v == 0)
+                        continue;
+                    uint32_t a16 = (v * 0xFF >> 6) * uint32_t(alpha) & 0xFF00;
+                    LittleEndian::Pack(a16 == 0xFF00 ? opaque : blend(LittleEndian::ToUInt32(out), a16), out);
+                }
+                continue;
+            }
             for (int col = colFrom; col < colTo; col++)
             {
                 uint8_t v = bits ? bits[col] : glyph.Bits.size() > size_t(from) + size_t(col) ? glyph.Bits[size_t(from) + size_t(col)] : uint8_t(0);
@@ -1955,14 +1977,7 @@ void ScnVm::DrawGlyphOnLayer(int rec, const ScnGlyph& glyph, int src, int left, 
                 uint32_t a16 = (uint32_t(v) * 0xFF >> 6) * uint32_t(alpha) & 0xFF00;
                 uint32_t value = opaque;
                 if (a16 != 0xFF00)
-                {
-                    uint32_t d = row ? LittleEndian::ToUInt32(row + (col - colFrom) * 4) : uint32_t(Read32(p + col * 4));
-                    uint32_t index = (d & 0xFF) | a16;
-                    uint32_t t = tables.Share[index];
-                    uint32_t rb = (d >> 8) & 0xFF00FF;
-                    value = ((((((r << 16 | b) - rb) * t >> 8) + rb) & 0xFF00FF) * 0x100)
-                          + ((((g * 0x10000 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000)) & 0xFF0000) + tables.Alpha[index];
-                }
+                    value = blend(row ? LittleEndian::ToUInt32(row + (col - colFrom) * 4) : uint32_t(Read32(p + col * 4)), a16);
                 if (row)
                     LittleEndian::Pack(value, row + (col - colFrom) * 4);
                 else
