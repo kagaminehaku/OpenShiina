@@ -13,6 +13,7 @@
 // with the Switch's own Japanese font
 // (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
 #include <SDL.h>
+#include <malloc.h>
 #include <switch.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -122,12 +123,17 @@ size_t s_failedSize = 0;
 
 /// How much memory the program has and uses (applet mode, from the Album, gives it far less than a
 /// game's: started from the OpenShiina title it has all of it).
+/// The heap in use (malloc's blocks: the scripts' memory, the files kept, the pictures...): the
+/// process's own count is the whole heap, which the player takes at the start.
+size_t HeapInUse() { return mallinfo().uordblks; }
+
 void LogMemory(const char* when)
 {
     u64 total = 0, used = 0;
     svcGetInfo(&total, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
     svcGetInfo(&used, InfoType_UsedMemorySize, CUR_PROCESS_HANDLE, 0);
-    Log("[memory] %s: %llu MB used of %llu MB\n", when, (unsigned long long)(used >> 20), (unsigned long long)(total >> 20));
+    Log("[memory] %s: %llu MB used of %llu MB, %zu MB of the heap in use\n", when, (unsigned long long)(used >> 20),
+        (unsigned long long)(total >> 20), HeapInUse() >> 20);
 }
 
 /// A colour as the Renderer takes it, 0xAABBGGRR.
@@ -339,12 +345,13 @@ bool IconOf(Ui& ui, const player::GameEntry& game, bool& readOne, player::Textur
     return true;
 }
 
-/// The settings, as the C# player has them (its Graphics page's "Scaling" and "FSR sharpness"):
+/// The settings, as the C# player has them ("Scaling" and "FSR sharpness" of its Graphics page, "File
+/// cache"; the file cache counts from the next game started):
 /// up / down choose a row, left / right (or A, or a touch on the row's two halves) change it; B or
 /// X goes back, and the file is written if anything changed.
 void SettingsScreen(Ui& ui)
 {
-    constexpr int Rows = 2;
+    constexpr int Rows = 3;
     constexpr float RowHeight = 76, ListX = 380, ListY = 130, ListW = 860;
     constexpr int ScalingCount = int(std::size(player::kScalingChoices));
     player::Settings before = s_settings;
@@ -359,8 +366,10 @@ void SettingsScreen(Ui& ui)
     auto change = [&](int r, int step) {
         if (r == 0)
             s_settings.PictureScaling = player::kScalingChoices[(scalingIndex() + step + ScalingCount) % ScalingCount].Value;
-        else
+        else if (r == 1)
             s_settings.FsrSharpness = std::clamp(s_settings.FsrSharpness + step, 1, 10);
+        else
+            s_settings.FileCache = std::clamp(s_settings.FileCache + step, 0, int(std::size(player::kFileCacheChoices)) - 1);
     };
     while (appletMainLoop())
     {
@@ -393,8 +402,10 @@ void SettingsScreen(Ui& ui)
         s.Image(ui.Wordmark, {30, 240, ww, wh});
         ui.Text.Draw("Settings", ListX, 48, 34, kText);
         const auto& scaling = player::kScalingChoices[scalingIndex()];
-        std::string values[Rows] = {scaling.Label, std::to_string(s_settings.FsrSharpness)};
-        const char* names[Rows] = {"Scaling", "FSR sharpness"};
+        const auto& cache = player::kFileCacheChoices[s_settings.FileCache];
+        std::string cacheLabel = cache.Megabytes != 0 ? cache.Label : std::format("Auto ({} MB here)", s_settings.FileCacheBytes() >> 20);
+        std::string values[Rows] = {scaling.Label, std::to_string(s_settings.FsrSharpness), cacheLabel};
+        const char* names[Rows] = {"Scaling", "FSR sharpness", "File cache"};
         for (int r = 0; r < Rows; r++)
         {
             float y = ListY + float(r) * RowHeight;
@@ -404,15 +415,18 @@ void SettingsScreen(Ui& ui)
             std::string value = std::string("<  ") + values[r] + "  >";
             ui.Text.Draw(value, ListX + ListW - 40 - ui.Text.Measure(value, 28), y + 16, 28, kText);
         }
-        // what the scaling chosen does
-        ui.Text.Draw(ui.Text.Fit(scaling.Help, 24, ListW - 20), ListX + 8, ListY + Rows * RowHeight + 20, 24, kDim);
-        ui.Text.Draw("FSR sharpness: 1 mild ... 10 strongest (for FSR 1 only).", ListX + 8, ListY + Rows * RowHeight + 56, 24, kDim);
+        // what the chosen row's value does
+        const char* help = row == 0 ? scaling.Help : row == 1 ? "1 mild ... 10 strongest (for FSR 1 only)." : cache.Help;
+        ui.Text.Draw(ui.Text.Fit(help, 24, ListW - 20), ListX + 8, ListY + Rows * RowHeight + 20, 24, kDim);
+        if (row == 2)
+            ui.Text.Draw("From the next game started.", ListX + 8, ListY + Rows * RowHeight + 56, 24, kDim);
         s.Fill({0, 672, 1280, 48}, kPanel);
         std::string hints = std::string(kButtonLeftRight) + " Change     " + kButtonB + " Back";
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
         s.End();
     }
-    if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness)
+    if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness
+        || s_settings.FileCache != before.FileCache)
         s_settings.Save(kSettings);
 }
 
@@ -646,6 +660,9 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     // HOME (or the console asleep) stops the game where it is, its clock and its sound too, whatever
     // RIO.INI's Background says (on Windows a game may go on behind other windows)
     vm->SetPauseInBackground(true);
+    // The decoded files kept (the setting "File cache")
+    vm->FileCacheBytes = s_settings.FileCacheBytes();
+    Log("File cache: %lld MB\n", (long long)(vm->FileCacheBytes >> 20));
     // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, on unless
     // sdmc:/OpenShiina/gpu starts with '0'; with gpu-check as well every call of them runs on both
     // and the bytes are compared (the log tells). Without it (it cannot start) the CPU does them
@@ -835,8 +852,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                     names += "; opcodes";
                     for (size_t k = 0; k < ops.size() && k < 5; k++)
                         names += std::format(" {:04X} {:.0f} ms ({})", ops[k].first, ops[k].second.Milliseconds, ops[k].second.Calls);
-                    Log("frame %llu: %.1f a second, scripts %.0f ms of %.1f s%s\n", (unsigned long long)frames, spanFrames / seconds,
-                        double(armTicksToNs(spanScripts)) / 1e6, seconds, names.c_str());
+                    Log("frame %llu: %.1f a second, scripts %.0f ms of %.1f s, heap %zu MB%s\n", (unsigned long long)frames,
+                        spanFrames / seconds, double(armTicksToNs(spanScripts)) / 1e6, seconds, HeapInUse() >> 20, names.c_str());
                 }
                 routineTimes.clear();
                 opTimes.clear();

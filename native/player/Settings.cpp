@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include <json.hpp>
+#include <switch.h>
 
 #include "io/Binary.h"
 #include "platform/Files.h"
@@ -21,6 +22,29 @@ const ScalingChoice kScalingChoices[5] = {
     {Scaling::Nearest, "Nearest", "Nearest", "The screen's size, pixels as they fall (uneven when not a whole number)."},
     {Scaling::Fsr, "Fsr", "FSR 1", "AMD's upscaler, clean edges, sharpened as set below (the GPU's work)."},
 };
+
+// The C# player's labels and help lines (Localization/Strings.resx)
+const FileCacheChoice kFileCacheChoices[6] = {
+    {"Auto", "Auto", "By the device's memory: a thirty-second of it, 64 MB to 512 MB.", 0},
+    {"Potato", "Potato (32 MB)", "For the oldest devices: pictures over 16 MB are read again each time.", 32},
+    {"Low", "Low (64 MB)", "Light: pictures over 32 MB are read again each time.", 64},
+    {"Medium", "Medium (128 MB)", "Pictures of up to 64 MB are kept.", 128},
+    {"High", "High (256 MB)", "The largest event pictures are kept too.", 256},
+    {"Max", "Max (512 MB)", "For devices with plenty of memory.", 512},
+};
+
+int64_t Settings::FileCacheBytes() const
+{
+    constexpr int64_t MB = int64_t(1) << 20;
+    int megabytes = kFileCacheChoices[std::clamp(FileCache, 0, 5)].Megabytes;
+    if (megabytes != 0)
+        return megabytes * MB;
+    // Auto (C# FileCachePresets.Auto): a thirty-second of the memory, in steps of 16 MB
+    u64 total = 0;
+    if (R_FAILED(svcGetInfo(&total, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0)) || total == 0)
+        return 64 * MB;
+    return std::clamp(int64_t(total) / 32 / (16 * MB) * (16 * MB), 64 * MB, 512 * MB);
+}
 
 namespace {
 
@@ -45,6 +69,10 @@ Settings Settings::Load(const std::string& path)
                 settings.PictureScaling = choice.Value;
     if (auto f = json.find("FsrSharpness"); f != json.end() && f->is_number_integer())
         settings.FsrSharpness = std::clamp(f->get<int>(), 1, 10);
+    if (auto c = json.find("FileCache"); c != json.end() && c->is_string())
+        for (int k = 0; k < 6; k++)
+            if (c->get<std::string>() == kFileCacheChoices[k].Name)
+                settings.FileCache = k;
     return settings;
 }
 
@@ -55,6 +83,7 @@ void Settings::Save(const std::string& path) const
         if (choice.Value == PictureScaling)
             json["Scaling"] = choice.Name;
     json["FsrSharpness"] = FsrSharpness;
+    json["FileCache"] = kFileCacheChoices[std::clamp(FileCache, 0, 5)].Name;
     std::string text = json.dump(2);
     if (std::FILE* f = Files::Open(path, "wb"))
     {
