@@ -64,6 +64,8 @@ public:
 
     /// The deko3d device (the GPU mode's compute queue is made on it too).
     dk::Device Device() { return m_device; }
+    /// deko3d's last error (its context, message and result), empty when none; the one who reads it clears it.
+    static inline std::string LastDeviceError;
 
     /// A texture of width x height, RGBA (or one byte a pixel: a glyph's coverage); zeroed.
     Texture CreateTexture(int width, int height, bool coverage = false);

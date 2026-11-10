@@ -32,7 +32,12 @@ constexpr uint32_t TextureBytes = 24u << 20, CodeBytes = 64u << 10;
 
 Renderer::Renderer()
 {
-    m_device = dk::DeviceMaker{}.create();
+    // deko3d's errors kept for the log (without a callback it may stop the program)
+    m_device = dk::DeviceMaker{}
+                   .setCbDebug([](void*, const char* context, DkResult result, const char* message) {
+                       LastDeviceError = std::string(context ? context : "") + ": " + (message ? message : "") + " (" + std::to_string(int(result)) + ")";
+                   })
+                   .create();
     m_queue = dk::QueueMaker{m_device}.setFlags(DkQueueFlags_Graphics).create();
 
     // The framebuffers and the swapchain

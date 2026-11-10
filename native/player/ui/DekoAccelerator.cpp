@@ -1,7 +1,13 @@
 // The GPU mode on the Switch (see DekoAccelerator.h)
 #include "ui/DekoAccelerator.h"
 
+#include <switch.h>
+
 #include <cstdio>
+#include <cstring>
+#include <format>
+
+#include "ui/Renderer.h"
 
 namespace openshiina::player {
 
@@ -102,6 +108,76 @@ DekoAccelerator::DekoAccelerator(dk::Device device) : m_device(device)
 DekoAccelerator::~DekoAccelerator()
 {
     m_queue.waitIdle();
+}
+
+std::string DekoAccelerator::ProbeScriptMemory(uint8_t* window, uint32_t bytes)
+{
+    auto since = [](uint64_t start) { return double(armTicksToNs(armGetSystemTick() - start)) / 1e6; };
+    auto error = [] {
+        std::string e = Renderer::LastDeviceError;
+        Renderer::LastDeviceError.clear();
+        return e.empty() ? std::string() : " (" + e + ")";
+    };
+    Renderer::LastDeviceError.clear();
+    uint64_t start = armGetSystemTick();
+    dk::UniqueMemBlock scripts = dk::MemBlockMaker{m_device, bytes}
+                                     .setFlags(DkMemBlockFlags_CpuCached | DkMemBlockFlags_GpuUncached)
+                                     .setStorage(window)
+                                     .create();
+    double made = since(start);
+    if (!scripts)
+        return std::format("no memory block on them{} ({:.2f} ms)", error(), made);
+    dk::UniqueMemBlock other = dk::MemBlockMaker{m_device, bytes}.setFlags(DkMemBlockFlags_CpuCached | DkMemBlockFlags_GpuUncached).create();
+    if (!other)
+        return "no memory block to compare with" + error();
+    auto* words = reinterpret_cast<uint32_t*>(window);
+    auto* otherWords = static_cast<uint32_t*>(other.getCpuAddr());
+    uint32_t count = bytes / 4;
+    for (uint32_t k = 0; k < count; k++)
+        words[k] = k * 2654435761u;
+    std::memset(otherWords, 0, bytes);
+    start = armGetSystemTick();
+    scripts.flushCpuCache(0, bytes);
+    double flushed = since(start);
+    other.flushCpuCache(0, bytes);
+    auto copy = [&](DkGpuAddr from, DkGpuAddr to) {
+        m_cmd.clear();
+        m_cmd.addMemory(m_dataMem, 0, CommandBytes);
+        m_cmd.copyBuffer(from, to, bytes);
+        m_cmd.barrier(DkBarrier_Full, DkInvalidateFlags_L2Cache);
+        m_queue.submitCommands(m_cmd.finishList());
+        m_queue.signalFence(m_fence);
+        m_queue.flush();
+        return m_fence.wait() == DkResult_Success;
+    };
+    // the GPU reads them
+    start = armGetSystemTick();
+    bool read = copy(scripts.getGpuAddr(), other.getGpuAddr());
+    double copied = since(start);
+    other.flushCpuCache(0, bytes);
+    uint32_t readWrong = 0;
+    for (uint32_t k = 0; k < count; k++)
+        readWrong += otherWords[k] != k * 2654435761u;
+    // the GPU writes them
+    for (uint32_t k = 0; k < count; k++)
+        otherWords[k] = ~(k * 2654435761u);
+    other.flushCpuCache(0, bytes);
+    bool wrote = copy(other.getGpuAddr(), scripts.getGpuAddr());
+    scripts.flushCpuCache(0, bytes);
+    uint32_t writeWrong = 0;
+    for (uint32_t k = 0; k < count; k++)
+        writeWrong += words[k] != ~(k * 2654435761u);
+    // what the CPU takes to copy them (the GPU mode's way now)
+    start = armGetSystemTick();
+    std::memcpy(otherWords, words, bytes);
+    double cpuCopy = since(start);
+    start = armGetSystemTick();
+    scripts = {};
+    double letGo = since(start);
+    return std::format("{} MB: made {:.2f} ms, CPU cache flushed {:.2f} ms, GPU read {} ({} words wrong, {:.2f} ms), GPU wrote {} ({} words wrong), "
+                       "let go {:.2f} ms; the CPU copies them in {:.2f} ms{}",
+                       bytes >> 20, made, flushed, read ? "done" : "failed", readWrong, copied, wrote ? "done" : "failed", writeWrong, letGo,
+                       cpuCopy, error());
 }
 
 scripting::IScnGpuKernel* DekoAccelerator::Kernel(const std::string& name)

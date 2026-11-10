@@ -28,6 +28,11 @@ public:
     std::string Name() const override { return "Tegra X1 (deko3d)"; }
     scripting::IScnGpuKernel* Kernel(const std::string& name) override;
 
+    /// Whether the GPU reads and writes the scripts' memory where it is (heap memory mapped into the
+    /// code-memory window): a memory block made on window's bytes, the GPU's copy of it read and
+    /// its copy into it, each step timed against the CPU copying the same bytes. For the log.
+    std::string ProbeScriptMemory(uint8_t* window, uint32_t bytes);
+
 private:
     class DekoKernel;
     friend class DekoKernel;

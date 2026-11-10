@@ -149,6 +149,8 @@ public:
     uint8_t* Bytes(int address, int length);
     /// The memory the scripts' parts of the 4 GB have been given, in bytes.
     int64_t ScriptMemoryBytes() const { return m_memory->CommittedBytes(); }
+    /// Script memory no region of the engine uses (above the high heap), for the players' own tests.
+    static constexpr uint32_t SpareRegion = 0xFF000000;
     /// [address, address + length) does not run past the top of the 4 GB.
     bool IsContiguous(int address, int length) const { return ScnAddressSpace::Contiguous(uint32_t(address), length) >= length; }
     /// The bytes [address, address + length) to read: in place, or copied into spare (made larger

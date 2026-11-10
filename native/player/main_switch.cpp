@@ -1307,6 +1307,24 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
         }
     }
     Log("GPU mode: %s\n", vm->Accelerator ? (vm->GpuCheck ? "on, checked against the CPU" : "on") : "off");
+    // Once a run: whether the GPU can read and write the scripts' memory where it is (no copies),
+    // on 8 MB that no region of the engine uses. They stay the game's (not given back: were the GPU
+    // still to hold them, the unmapping would fail and the heap get pages it cannot use)
+    static bool probed = false;
+    if (s_gpu && !probed)
+    {
+        probed = true;
+        constexpr int Probed = 8 << 20;
+        try
+        {
+            uint8_t* window = vm->Bytes(int(ScnVm::SpareRegion), Probed);
+            Log("[zero-copy] %s\n", s_gpu->ProbeScriptMemory(window, uint32_t(Probed)).c_str());
+        }
+        catch (const std::exception& e)
+        {
+            Log("[zero-copy] %s\n", e.what());
+        }
+    }
     // With text-check every glyph is drawn both in place and the way before, the bytes compared
     vm->TextCheck = SwitchOn(kTextCheck);
     if (vm->TextCheck)
