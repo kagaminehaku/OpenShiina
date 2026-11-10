@@ -354,13 +354,13 @@ bool IconOf(Ui& ui, const player::GameEntry& game, bool& readOne, player::Textur
     return true;
 }
 
-/// The settings, as the C# player has them ("Scaling" and "FSR sharpness" of its Graphics page, "File
-/// cache"; the file cache counts from the next game started):
+/// The settings, as the C# player has them ("Scaling", "FSR sharpness" and "Show the frame rate" of
+/// its Graphics page, "File cache"; the file cache counts from the next game started):
 /// up / down choose a row, left / right (or A, or a touch on the row's two halves) change it; B or
 /// X goes back, and the file is written if anything changed.
 void SettingsScreen(Ui& ui)
 {
-    constexpr int Rows = 3;
+    constexpr int Rows = 4;
     constexpr float RowHeight = 76, ListX = 380, ListY = 130, ListW = 860;
     constexpr int ScalingCount = int(std::size(player::kScalingChoices));
     player::Settings before = s_settings;
@@ -377,8 +377,10 @@ void SettingsScreen(Ui& ui)
             s_settings.PictureScaling = player::kScalingChoices[(scalingIndex() + step + ScalingCount) % ScalingCount].Value;
         else if (r == 1)
             s_settings.FsrSharpness = std::clamp(s_settings.FsrSharpness + step, 1, 10);
-        else
+        else if (r == 2)
             s_settings.FileCache = std::clamp(s_settings.FileCache + step, 0, int(std::size(player::kFileCacheChoices)) - 1);
+        else
+            s_settings.ShowFrameRate = !s_settings.ShowFrameRate;
     };
     while (appletMainLoop())
     {
@@ -413,8 +415,9 @@ void SettingsScreen(Ui& ui)
         const auto& scaling = player::kScalingChoices[scalingIndex()];
         const auto& cache = player::kFileCacheChoices[s_settings.FileCache];
         std::string cacheLabel = cache.Megabytes != 0 ? cache.Label : std::format("Auto ({} MB here)", s_settings.FileCacheBytes() >> 20);
-        std::string values[Rows] = {scaling.Label, std::to_string(s_settings.FsrSharpness), cacheLabel};
-        const char* names[Rows] = {"Scaling", "FSR sharpness", "File cache"};
+        std::string values[Rows] = {scaling.Label, std::to_string(s_settings.FsrSharpness), cacheLabel,
+                                    s_settings.ShowFrameRate ? "On" : "Off"};
+        const char* names[Rows] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate"};
         for (int r = 0; r < Rows; r++)
         {
             float y = ListY + float(r) * RowHeight;
@@ -425,7 +428,10 @@ void SettingsScreen(Ui& ui)
             ui.Text.Draw(value, ListX + ListW - 40 - ui.Text.Measure(value, 28), y + 16, 28, kText);
         }
         // what the chosen row's value does
-        const char* help = row == 0 ? scaling.Help : row == 1 ? "1 mild ... 10 strongest (for FSR 1 only)." : cache.Help;
+        const char* help = row == 0   ? scaling.Help
+                           : row == 1 ? "1 mild ... 10 strongest (for FSR 1 only)."
+                           : row == 2 ? cache.Help
+                                      : "Frames a second and the slowest frame, over the game's corner.";
         ui.Text.Draw(ui.Text.Fit(help, 24, ListW - 20), ListX + 8, ListY + Rows * RowHeight + 20, 24, kDim);
         if (row == 2)
             ui.Text.Draw("From the next game started.", ListX + 8, ListY + Rows * RowHeight + 56, 24, kDim);
@@ -435,7 +441,7 @@ void SettingsScreen(Ui& ui)
         s.End();
     }
     if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness
-        || s_settings.FileCache != before.FileCache)
+        || s_settings.FileCache != before.FileCache || s_settings.ShowFrameRate != before.ShowFrameRate)
         s_settings.Save(kSettings);
 }
 
@@ -1045,6 +1051,15 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
     uint64_t pictureVersion = 1, pointerShownUntil = 0;
     bool running = true, focused = true, touching = false;
+    // The frame rate shown (the setting "Show the frame rate"): frames a second and the slowest
+    // frame, once a second
+    uint64_t meterStart = started, lastFrame = started, meterSlowest = 0, meterFrames = 0;
+    std::string meterText;
+    // after the game stood still (the menu, HOME, a message box): the time it stood is no frame's
+    auto restartSpans = [&] {
+        spanStart = meterStart = lastFrame = armGetSystemTick();
+        spanFrames = spanScripts = meterFrames = meterSlowest = 0;
+    };
     // The game's picture: each of the two textures takes it again when it is behind
     auto drawGame = [&] {
         player::Texture& picture = ui.Screen.PictureTexture(setup.Width, setup.Height);
@@ -1087,8 +1102,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                 if (leave)
                     break;
                 vm->Notify(ScnEvent::Activate);
-                spanStart = armGetSystemTick();
-                spanFrames = spanScripts = 0;
+                restartSpans();
                 continue;
             }
             if (down & HidNpadButton_B)
@@ -1127,8 +1141,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             {
                 focused = inFocus;
                 vm->Notify(focused ? ScnEvent::Activate : ScnEvent::Deactivate);
-                spanStart = armGetSystemTick();
-                spanFrames = spanScripts = 0;
+                restartSpans();
             }
             if (!focused)
             {
@@ -1164,8 +1177,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                 }
                 if ((host.Buttons & 2) && !(held & HidNpadButton_B))
                     mouse(ScnMessage::RButtonUp, host.Buttons & ~2);
-                spanStart = armGetSystemTick();
-                spanFrames = spanScripts = 0;
+                restartSpans();
             }
             for (const auto& check : vm->GpuChecks)
                 Log("[gpu] %s\n", check.c_str());
@@ -1192,9 +1204,25 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                 ui.Screen.Fill({px - 9, py - 9, 18, 18}, Rgb(0, 0, 0, 160), 9);
                 ui.Screen.Fill({px - 6, py - 6, 12, 12}, kText, 6);
             }
+            if (s_settings.ShowFrameRate && !meterText.empty())
+            {
+                float w = ui.Text.Measure(meterText, 20);
+                ui.Screen.Fill({8, 8, w + 20, 32}, Rgb(0, 0, 0, 128), 6);
+                ui.Text.Draw(meterText, 18, 13, 20, Rgb(255, 255, 255));
+            }
             ui.Screen.End();
 
             uint64_t now = armGetSystemTick();
+            meterSlowest = std::max(meterSlowest, now - lastFrame);
+            lastFrame = now;
+            meterFrames++;
+            if (armTicksToNs(now - meterStart) >= 1000000000ull)
+            {
+                double seconds = double(armTicksToNs(now - meterStart)) / 1e9;
+                meterText = std::format("{:.0f} fps, slowest {:.1f} ms", double(meterFrames) / seconds, double(armTicksToNs(meterSlowest)) / 1e6);
+                meterStart = now;
+                meterFrames = meterSlowest = 0;
+            }
             if (armTicksToNs(now - spanStart) >= 2000000000ull)
             {
                 double seconds = double(armTicksToNs(now - spanStart)) / 1e9;
