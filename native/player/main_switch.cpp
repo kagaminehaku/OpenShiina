@@ -1,7 +1,8 @@
 // OpenShiina.nro: the player on the Switch. It shows its logo at once (ui/Renderer, deko3d), then the
 // games of sdmc:/OpenShiina/Games and of the console's storage to pick from (GameList; a folder
-// named as the first argument starts at once); X opens the settings (settings.json), R moves the game
-// chosen between the SD card and the console's storage (GameMove), and the game's
+// named as the first argument starts at once), the one played last first; X opens the settings
+// (settings.json), R moves the game chosen between the SD card and the console's storage (GameMove),
+// L opens its own screen (its play time and sizes, its scheme chosen, deleting it), and the game's
 // picture fills the screen as the setting "Scaling" says. Its
 // saves go to sdmc:/OpenShiina/Saves/<game>; Formats.Json, the opcode tables, the shaders and the
 // logo are in the romfs. What it prints goes to sdmc:/OpenShiina/player.log and, started by
@@ -26,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <format>
 #include <functional>
 #include <map>
@@ -66,6 +68,8 @@ constexpr const char* kGames = "sdmc:/OpenShiina/Games";
 // The console's own storage (DBI's "Nand USER"), mounted as user: when it can be (written only by a move)
 constexpr const char* kInternalGames = "user:/OpenShiina/Games";
 constexpr const char* kLibrary = "sdmc:/OpenShiina/library.tsv";
+// when each game was played last, for how long, the scheme chosen for it (GameList)
+constexpr const char* kPlayed = "sdmc:/OpenShiina/played.tsv";
 constexpr const char* kSettings = "sdmc:/OpenShiina/settings.json";
 constexpr const char* kGpuCheck = "sdmc:/OpenShiina/gpu-check";
 constexpr const char* kGpuOn = "sdmc:/OpenShiina/gpu";
@@ -151,6 +155,7 @@ constexpr const char* kButtonA = "\xEE\x83\xA0";
 constexpr const char* kButtonB = "\xEE\x83\xA1";
 constexpr const char* kButtonX = "\xEE\x83\xA2";
 constexpr const char* kButtonY = "\xEE\x83\xA3";
+constexpr const char* kButtonL = "\xEE\x83\xA4";
 constexpr const char* kButtonR = "\xEE\x83\xA5";
 // (arrows of the Japanese font: left, right)
 constexpr const char* kButtonLeftRight = "\xE2\x86\x90\xE2\x86\x92";
@@ -489,8 +494,62 @@ bool Ask(Ui& ui, const std::string& title, const std::vector<std::string>& lines
 std::string SizeText(int64_t bytes)
 {
     constexpr double MB = 1024.0 * 1024.0;
+    if (bytes < int64_t(1) << 20)
+        return std::format("{} KB", (bytes + 1023) / 1024);
     return bytes >= int64_t(1) << 30 ? std::format("{:.1f} GB", double(bytes) / (MB * 1024.0)) : std::format("{:.0f} MB", double(bytes) / MB);
 }
+
+/// A play time as the C# library tells it: "under a minute", "45 min", "14 h", "14 h 20 min".
+std::string DurationText(int64_t seconds)
+{
+    int64_t minutes = seconds / 60, hours = minutes / 60;
+    if (minutes == 0)
+        return "under a minute";
+    return hours == 0 ? std::format("{} min", minutes) : minutes % 60 == 0 ? std::format("{} h", hours) : std::format("{} h {} min", hours, minutes % 60);
+}
+
+/// The date of a time (seconds since 1970) on the console's clock in its own time zone (newlib's
+/// localtime knows no zone), as days since 1970.
+int64_t LocalDay(int64_t when, TimeCalendarTime& date)
+{
+    TimeCalendarAdditionalInfo info{};
+    if (R_FAILED(timeToCalendarTimeWithMyRule(u64(when), &date, &info)))
+    {
+        std::time_t t = std::time_t(when);
+        std::tm utc = *std::gmtime(&t);
+        date.year = u16(utc.tm_year + 1900);
+        date.month = u8(utc.tm_mon + 1);
+        date.day = u8(utc.tm_mday);
+    }
+    // (the days of a date, as Howard Hinnant's days_from_civil)
+    int y = date.year - (date.month <= 2 ? 1 : 0), m = date.month, d = date.day;
+    int era = (y >= 0 ? y : y - 399) / 400;
+    int yoe = y - era * 400, doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1, doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return int64_t(era) * 146097 + doe - 719468;
+}
+
+/// When a game was played last, as the C# library tells it: "just now", "2 hours ago", "yesterday",
+/// "5 days ago", then the date.
+std::string AgoText(int64_t when)
+{
+    int64_t now = int64_t(std::time(nullptr)), past = now - when;
+    if (past < 60)
+        return "just now";
+    if (past < 3600)
+        return past < 120 ? "a minute ago" : std::format("{} minutes ago", past / 60);
+    TimeCalendarTime today{}, day{};
+    int64_t days = LocalDay(now, today) - LocalDay(when, day);
+    if (days <= 0)
+        return past < 7200 ? "an hour ago" : std::format("{} hours ago", past / 3600);
+    if (days == 1)
+        return "yesterday";
+    if (days < 7)
+        return std::format("{} days ago", days);
+    return std::format("on {:04}-{:02}-{:02}", int(day.year), int(day.month), int(day.day));
+}
+
+/// Where the player keeps a game's saves (GameSetup::Read's folder).
+std::string SaveFolderOf(const player::GameEntry& game) { return Files::Combine(kSaves, game::GameSetup::FolderName(game.Name)); }
 
 /// Moves the game between the SD card and the console's storage (R in the list): measured, asked, the
 /// warning shown before the first one onto the console, copied with a bar (B cancels), then the old
@@ -603,8 +662,184 @@ bool MoveGame(Ui& ui, const player::GameEntry& game)
     return true;
 }
 
+/// A list to choose from beside the rail (the schemes for a game): the one chosen, or -1 for B.
+int ChooseFrom(Ui& ui, const std::string& title, const std::vector<std::string>& items)
+{
+    constexpr float RowHeight = 60, ListX = 380, ListY = 110, ListW = 860;
+    constexpr int Rows = 9;
+    size_t choice = 0, top = 0;
+    while (appletMainLoop())
+    {
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
+        if (down & (HidNpadButton_B | HidNpadButton_Plus))
+            return -1;
+        if (down & HidNpadButton_A)
+            return int(choice);
+        if ((down & HidNpadButton_AnyDown) && choice + 1 < items.size())
+            choice++;
+        if ((down & HidNpadButton_AnyUp) && choice > 0)
+            choice--;
+        if (choice < top)
+            top = choice;
+        if (choice >= top + Rows)
+            top = choice - Rows + 1;
+        player::Renderer& s = ui.Screen;
+        s.Begin(kBackground);
+        DrawRail(ui);
+        ui.Text.Draw(title, ListX, 48, 34, kText);
+        for (size_t k = top; k < items.size() && k < top + Rows; k++)
+        {
+            float y = ListY + float(k - top) * RowHeight;
+            if (k == choice)
+                s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kAccent, 12);
+            ui.Text.Draw(ui.Text.Fit(items[k], 28, ListW - 24), ListX + 8, y + 10, 28, kText);
+        }
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonA) + " Choose     " + kButtonB + " Back";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+    }
+    return -1;
+}
+
+/// The game's own screen (L in the list), as the C# library's page of a game: when it was played,
+/// for how long, its folder's size and its saves', and what can be done with it: play, choose its
+/// scheme (a game its .exe does not tell), delete it (its saves kept, or with them). Its answer:
+enum class GameAction
+{
+    Back,
+    Play,
+    Changed,    // deleted, or a scheme chosen: the list made again
+};
+
+GameAction GameScreen(Ui& ui, const player::GameEntry& game)
+{
+    ui.Splash("Measuring " + game.Name + "...");
+    auto folder = player::MeasureFolder(game.Path);
+    std::string saves = game.Known ? SaveFolderOf(game) : std::string();
+    int64_t saveBytes = saves.empty() ? 0 : player::MeasureFolder(saves).Bytes;
+    // the rows
+    enum Row
+    {
+        PlayRow,
+        SchemeRow,
+        DeleteRow,
+        DeleteAllRow,
+    };
+    std::vector<Row> rows;
+    if (game.Known)
+        rows.push_back(PlayRow);
+    // (a scheme to choose only where the .exe does not tell it)
+    if (!game.Known || !game.Scheme.empty())
+        rows.push_back(SchemeRow);
+    rows.push_back(DeleteRow);
+    if (saveBytes > 0)
+        rows.push_back(DeleteAllRow);
+    auto label = [&](Row r) -> std::string {
+        switch (r)
+        {
+        case PlayRow: return "Play";
+        case SchemeRow: return game.Scheme.empty() ? "Choose its scheme" : "Choose another scheme";
+        case DeleteRow: return "Delete the game (frees " + SizeText(folder.Bytes) + ")" + (saveBytes > 0 ? ", keep its saves" : "");
+        case DeleteAllRow: return "Delete the game and its saves (" + SizeText(saveBytes) + ")";
+        }
+        return {};
+    };
+    std::vector<std::string> facts = {game.LastPlayed != 0 ? "Played " + AgoText(game.LastPlayed) : "Not played yet"};
+    if (game.PlaySeconds > 0)
+        facts.push_back("Played for " + DurationText(game.PlaySeconds));
+    facts.push_back("Size " + SizeText(folder.Bytes) + ", " + (saveBytes > 0 ? "saves " + SizeText(saveBytes) : std::string("no saves yet")));
+    facts.push_back(std::string(game.Internal ? "On the console: " : "On the SD card: ") + game.Path);
+    if (!game.Scheme.empty())
+        facts.push_back("Scheme chosen: " + game.Scheme);
+    else if (!game.Known)
+        facts.push_back("Not recognised: its .exe does not tell the scheme.");
+
+    constexpr float RowHeight = 64, ListX = 380, ListW = 860;
+    float rowsY = 120 + float(facts.size()) * 40 + 30;
+    size_t choice = 0;
+    while (appletMainLoop())
+    {
+        padUpdate(&ui.Pad);
+        u64 down = padGetButtonsDown(&ui.Pad);
+        if (down & (HidNpadButton_B | HidNpadButton_Plus))
+            return GameAction::Back;
+        if ((down & HidNpadButton_AnyDown) && choice + 1 < rows.size())
+            choice++;
+        if ((down & HidNpadButton_AnyUp) && choice > 0)
+            choice--;
+        if (down & HidNpadButton_A)
+        {
+            Row r = rows[choice];
+            if (r == PlayRow)
+                return GameAction::Play;
+            if (r == SchemeRow)
+            {
+                ui.Splash("Trying the schemes on " + Files::FileName(game.Path) + "...");
+                auto candidates = player::DetectSchemes(game.Path);
+                Log("[schemes] %s: %zu fit\n", game.Path.c_str(), candidates.size());
+                if (candidates.empty())
+                {
+                    Ask(ui, "Choose its scheme", {"No scheme of Formats.Json decodes its archives' files."}, false);
+                    continue;
+                }
+                std::vector<std::string> names;
+                for (const auto& c : candidates)
+                    names.push_back(std::format("{}  ({} of {} files right)", c.Name, c.Right, c.Tried));
+                int picked = ChooseFrom(ui, "The schemes that decode it", names);
+                if (picked < 0)
+                    continue;
+                player::ChooseScheme(kPlayed, Files::FileName(game.Path), candidates[size_t(picked)].Name);
+                return GameAction::Changed;
+            }
+            bool all = r == DeleteAllRow;
+            std::vector<std::string> lines = {game.Name, game.Path, all ? "Its folder and its saves are deleted: they cannot be brought back."
+                                                                        : "Its folder is deleted: it cannot be brought back."};
+            if (!all && saveBytes > 0)
+                lines.push_back("Its saves are kept (" + saves + ").");
+            if (!Ask(ui, "Delete the game", lines, true))
+                continue;
+            // (C# GameLibrary.Delete's checks that hold here: a folder of the games' own, with archives)
+            if (!game::GameData::FindArchive(game.Path))
+            {
+                Ask(ui, "Delete the game", {"The folder has no .WAR archives in it any more, so it was left alone."}, false);
+                continue;
+            }
+            ui.Splash("Deleting " + game.Name + "...");
+            bool done = player::RemoveFolder(game.Path);
+            if (done && all)
+                done = player::RemoveFolder(saves);
+            Log("[delete] %s%s: %s\n", game.Path.c_str(), all ? " and its saves" : "", done ? "done" : "not all");
+            player::ForgetGame(kPlayed, Files::FileName(game.Path));
+            Ask(ui, "Delete the game",
+                {done ? game.Name + " was deleted: " + SizeText(folder.Bytes + (all ? saveBytes : 0)) + " freed." : "Not everything could be deleted."}, false);
+            return GameAction::Changed;
+        }
+
+        player::Renderer& s = ui.Screen;
+        s.Begin(kBackground);
+        DrawRail(ui);
+        ui.Text.Draw(ui.Text.Fit(game.Name, 34, ListW), ListX, 48, 34, kText);
+        for (size_t k = 0; k < facts.size(); k++)
+            ui.Text.Draw(ui.Text.Fit(facts[k], 24, ListW), ListX, 120 + float(k) * 40, 24, kDim);
+        for (size_t k = 0; k < rows.size(); k++)
+        {
+            float y = rowsY + float(k) * RowHeight;
+            if (k == choice)
+                s.Fill({ListX - 12, y, ListW, RowHeight - 10}, kAccent, 12);
+            ui.Text.Draw(ui.Text.Fit(label(rows[k]), 28, ListW - 24), ListX + 8, y + 12, 28, kText);
+        }
+        s.Fill({0, 672, 1280, 48}, kPanel);
+        std::string hints = std::string(kButtonA) + " OK     " + kButtonB + " Back";
+        ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
+        s.End();
+    }
+    return GameAction::Back;
+}
+
 /// The game to play from the list (its folder), kToHbmenu for −, or nothing for + (leave). Y looks
-/// at every folder again; R moves the game chosen to the other storage.
+/// at every folder again; R moves the game chosen to the other storage; L opens its own screen.
 std::string PickGame(Ui& ui, bool internal)
 {
     std::vector<std::pair<std::string, bool>> roots = {{kGames, false}};
@@ -614,7 +849,7 @@ std::string PickGame(Ui& ui, bool internal)
     // into its own folder changes it): a moment, shown, not a black screen
     ui.Splash("Looking at the games...");
     uint64_t looking = armGetSystemTick();
-    auto games = player::ListGames(roots, kLibrary, false);
+    auto games = player::ListGames(roots, kLibrary, kPlayed, false);
     Log("[list] %zu games (%.0f ms)\n", games.size(), double(armTicksToNs(armGetSystemTick() - looking)) / 1e6);
     constexpr float RowHeight = 60, ListX = 380, ListY = 110, ListW = 860, IconSize = 44;
     constexpr int Rows = 9;
@@ -635,14 +870,27 @@ std::string PickGame(Ui& ui, bool internal)
         if (internal && !games.empty() && (down & HidNpadButton_R) && MoveGame(ui, games[choice]))
         {
             ui.Splash("Looking at the games...");
-            games = player::ListGames(roots, kLibrary, false);
+            games = player::ListGames(roots, kLibrary, kPlayed, false);
             choice = std::min(choice, games.empty() ? size_t(0) : games.size() - 1);
             top = std::min(top, choice);
+        }
+        if (!games.empty() && (down & HidNpadButton_L))
+        {
+            GameAction action = GameScreen(ui, games[choice]);
+            if (action == GameAction::Play)
+                return games[choice].Path;
+            if (action == GameAction::Changed)
+            {
+                ui.Splash("Looking at the games...");
+                games = player::ListGames(roots, kLibrary, kPlayed, false);
+                choice = std::min(choice, games.empty() ? size_t(0) : games.size() - 1);
+                top = std::min(top, choice);
+            }
         }
         if (down & HidNpadButton_Y)
         {
             ui.Splash("Looking at the games...");
-            games = player::ListGames(roots, kLibrary, true);
+            games = player::ListGames(roots, kLibrary, kPlayed, true);
             choice = top = 0;
         }
         if ((down & (HidNpadButton_AnyDown)) && choice + 1 < games.size())
@@ -687,13 +935,22 @@ std::string PickGame(Ui& ui, bool internal)
             std::string name = game.Known ? game.Name : game.Name + "  (not recognised)";
             if (game.Internal)
                 name += "  - console";
-            float textX = ListX + IconSize + 16;
-            ui.Text.Draw(ui.Text.Fit(name, 28, ListX + ListW - 24 - textX), textX, y + 10, 28, game.Known ? kText : kDim);
+            float textX = ListX + IconSize + 16, right = ListX + ListW - 24;
+            // when it was played last, and for how long, at the row's end
+            if (game.LastPlayed != 0)
+            {
+                std::string played = AgoText(game.LastPlayed) + (game.PlaySeconds >= 60 ? ", " + DurationText(game.PlaySeconds) : "");
+                float w = ui.Text.Measure(played, 22);
+                ui.Text.Draw(played, right - w, y + 14, 22, k == choice ? kText : kDim);
+                right -= w + 24;
+            }
+            ui.Text.Draw(ui.Text.Fit(name, 28, right - textX), textX, y + 10, 28, game.Known ? kText : kDim);
         }
         // the buttons
         s.Fill({0, 672, 1280, 48}, kPanel);
         // (− only when a loader started the player: installed as its own title, there is no hbmenu to go to)
-        std::string hints = std::string(kButtonA) + " Play     " + (internal && !games.empty() ? std::string(kButtonR) + " Move     " : "")
+        std::string hints = std::string(kButtonA) + " Play     " + (!games.empty() ? std::string(kButtonL) + " Game     " : "")
+                            + (internal && !games.empty() ? std::string(kButtonR) + " Move     " : "")
                             + kButtonY + " Look again     " + kButtonX + " Settings     "
                             + (envHasNextLoad() ? std::string(kButtonMinus) + " hbmenu     " : "") + kButtonPlus + " Quit";
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
@@ -962,8 +1219,7 @@ int MessageDialog(Ui& ui, const std::function<void()>& drawGame, const std::stri
 void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
 {
     std::string folder = Files::FileName(path);
-    auto archive = game::GameData::FindArchive(path);
-    auto scheme = archive ? archives::FormatManager::Instance()->SchemeForArchive(*archive) : nullptr;
+    auto scheme = player::SchemeFor(path, kPlayed);
     if (!scheme)
     {
         Log("%s: not recognised (no .WAR archive, or no scheme in Formats.Json opens it)\n", folder.c_str());
@@ -976,6 +1232,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
         return;
     }
     ui.Splash(folder);
+    // played now: first in the list from here on, even if it never comes back
+    player::RecordPlay(kPlayed, folder, 0);
     LogMemory("before the game");
     auto data = game::GameData::Open(path, scheme);
     auto setup = game::GameSetup::Read(*data, kSaves);
@@ -1055,6 +1313,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     // frame, once a second
     uint64_t meterStart = started, lastFrame = started, meterSlowest = 0, meterFrames = 0;
     std::string meterText;
+    uint64_t playTicks = 0, lastTick = started;
     // after the game stood still (the menu, HOME, a message box): the time it stood is no frame's
     auto restartSpans = [&] {
         spanStart = meterStart = lastFrame = armGetSystemTick();
@@ -1090,6 +1349,11 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     {
         while (running && appletMainLoop())
         {
+            // the play time: while the game is in front (its menu and message boxes too)
+            uint64_t tick = armGetSystemTick();
+            if (focused)
+                playTicks += tick - lastTick;
+            lastTick = tick;
             padUpdate(&ui.Pad);
             u64 down = padGetButtonsDown(&ui.Pad), up = padGetButtonsUp(&ui.Pad);
             if (down & HidNpadButton_Plus)
@@ -1277,6 +1541,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
         Log("[gpu] %s: %lld calls compared, %lld differed; %.2f ms on the GPU against %.2f on the CPU a 100,000 pixels\n", routine.c_str(),
             (long long)c.Calls, (long long)c.Differed, c.GpuMs * 100000 / double(std::max<int64_t>(c.Pixels, 1)),
             c.CpuMs * 100000 / double(std::max<int64_t>(c.Pixels, 1)));
+    player::RecordPlay(kPlayed, folder, int64_t(armTicksToNs(playTicks) / 1000000000ull));
     if (sound != 0)
         SDL_CloseAudioDevice(sound);
     Log("[leave] the sound closed\n");
