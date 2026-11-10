@@ -9,6 +9,10 @@
 // its arguments, then "_DEVHOST_=<this .nro>" and the PC's address for nxlink -s, as hbmenu passes
 // it. A path that starts with '@' is a file for sdmc:/OpenShiina (a game's files sent over the
 // network: -p @Games/<folder>/<file>): it is saved there and the next upload waited for.
+// A connection that starts with "GETF" in place of a path's length reads instead (tools/devhost/
+// devget.ps1 on the PC): the path's length and a path of the SD card (sdmc:/...), then devhost
+// answers 0, the file's size (8 bytes) and the file as it is, or 1, a length and the folder's
+// entries ("D" or "F", a tab, the size, a tab, the name, a line each), or -1 when there is neither.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
 
@@ -25,9 +29,11 @@
 #include <vector>
 
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <switch.h>
 #include <unistd.h>
@@ -45,6 +51,7 @@ constexpr const char* kRoot = "sdmc:/switch";
 constexpr const char* kDataRoot = "sdmc:/OpenShiina";
 constexpr const char* kSelf = "sdmc:/switch/openshiina/devhost.nro";
 constexpr size_t kChunk = 16 * 1024; // the largest compressed chunk nxlink sends
+constexpr int32_t kGetMagic = 0x46544547; // "GETF" as the first 4 bytes, little-endian
 
 void Log(const char* format, ...)
 {
@@ -183,13 +190,94 @@ bool Inflate(int sock, std::FILE* file, size_t size, std::string& error)
     return error.empty();
 }
 
+/// A read ("GETF" already taken): the path's length and the path, then the file or the folder's
+/// entries, as the comment at the top tells. Only the SD card is read, nothing is written.
+bool Serve(int sock, std::string& path, std::string& error)
+{
+    int32_t length = 0;
+    if (!ReceiveInt(sock, length) || length <= 0 || length > 1024)
+    {
+        error = "a read without a path";
+        return false;
+    }
+    path.assign(size_t(length), '\0');
+    if (!ReceiveAll(sock, path.data(), path.size()))
+    {
+        error = "a read without a path";
+        return false;
+    }
+    if (path.rfind("sdmc:/", 0) != 0 || path.find("/..") != std::string::npos)
+    {
+        SendInt(sock, -1);
+        error = "not a path of the SD card: " + path;
+        return false;
+    }
+    struct stat info{};
+    if (stat(path.c_str(), &info) != 0)
+    {
+        SendInt(sock, -1);
+        error = "no " + path + ": " + std::strerror(errno);
+        return false;
+    }
+    if (S_ISDIR(info.st_mode))
+    {
+        std::string listing;
+        if (DIR* dir = opendir(path.c_str()))
+        {
+            std::string base = path.back() == '/' ? path : path + "/";
+            while (dirent* entry = readdir(dir))
+            {
+                std::string name = entry->d_name;
+                if (name == "." || name == "..")
+                    continue;
+                struct stat child{};
+                bool isDir = stat((base + name).c_str(), &child) == 0 && S_ISDIR(child.st_mode);
+                listing += std::string(isDir ? "D" : "F") + "\t" + std::to_string(isDir ? 0 : int64_t(child.st_size)) + "\t" + name + "\n";
+            }
+            closedir(dir);
+        }
+        if (!SendInt(sock, 1) || !SendInt(sock, int32_t(listing.size())) || !SendAll(sock, listing.data(), listing.size()))
+        {
+            error = "the connection stopped";
+            return false;
+        }
+        return true;
+    }
+    std::FILE* file = Files::Open(path, "rb");
+    if (!file)
+    {
+        SendInt(sock, -1);
+        error = "cannot read " + path + ": " + std::strerror(errno);
+        return false;
+    }
+    int64_t size = int64_t(info.st_size);
+    bool ok = SendInt(sock, 0) && SendAll(sock, &size, sizeof size);
+    std::vector<uint8_t> buffer(256 * 1024);
+    int64_t sent = 0;
+    while (ok && sent < size)
+    {
+        size_t got = std::fread(buffer.data(), 1, buffer.size(), file);
+        if (got == 0)
+            break;
+        ok = SendAll(sock, buffer.data(), got);
+        sent += int64_t(got);
+    }
+    std::fclose(file);
+    if (!ok || sent != size)
+    {
+        error = "sent " + std::to_string(sent) + " bytes of " + std::to_string(size);
+        return false;
+    }
+    return true;
+}
+
 /// One upload as hbmenu's netloader takes it: the path's length and the path, the file's size, a
 /// response (0, or -1 when the file cannot be made), the compressed file, a second response, then the
 /// arguments, each ending with a 0. The file is written next to its place and moved there at the end.
-bool Receive(int sock, Upload& upload, std::string& error)
+/// (The path's length is already read: it told an upload from a read.)
+bool Receive(int sock, int32_t nameLength, Upload& upload, std::string& error)
 {
-    int32_t nameLength = 0;
-    if (!ReceiveInt(sock, nameLength) || nameLength <= 0 || nameLength > 1024)
+    if (nameLength <= 0 || nameLength > 1024)
     {
         error = "not an nxlink upload";
         return false;
@@ -357,9 +445,21 @@ int main(int argc, char** argv)
         timeval limit{10, 0};
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof limit);
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &limit, sizeof limit);
-        Upload upload;
+        int32_t first = 0;
         std::string error;
-        bool received = Receive(sock, upload, error);
+        if (ReceiveInt(sock, first) && first == kGetMagic)
+        {
+            std::string path;
+            bool served = Serve(sock, path, error);
+            close(sock);
+            if (served)
+                Log("Sent %s to %s\n", path.c_str(), inet_ntoa(remote.sin_addr));
+            else
+                Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
+            continue;
+        }
+        Upload upload;
+        bool received = Receive(sock, first, upload, error);
         close(sock);
         if (!received)
         {
