@@ -1726,8 +1726,15 @@ void ScnVm::BitBlt(int dst, int x, int y, int width, int height, int src, int sx
         return;
     int dp = SurfaceField(dst, 10), sp = SurfaceField(src, 10);
     int d = SurfaceField(dst, 2) + y * dp + x * 3, s = SurfaceField(src, 2) + sy * sp + sx * 3;
+    static const std::string copyName = "bitblt";
+    TextTime copyTime(*this, copyName);
+    // A row read whole, then written: memmove where both are pieces of memory
+    int bytes = width * 3;
     for (int row = 0; row < height; row++, d += dp, s += sp)
-        WriteBytes(d, ReadBytes(s, width * 3));
+        if (IsContiguous(d, bytes) && IsContiguous(s, bytes))
+            std::memmove(Bytes(d, bytes), Bytes(s, bytes), size_t(bytes));
+        else
+            WriteBytes(d, ReadBytes(s, bytes));
 }
 
 void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::Bytes& ch, int length)
