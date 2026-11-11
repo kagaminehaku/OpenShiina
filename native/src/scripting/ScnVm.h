@@ -981,6 +981,7 @@ private:
     int ParseNumber(int rec);
     int NamedValue(int rec);
     void ReadField(int rec, int dst, int max);
+    bool ReadKinsoku(int rec, int dst);
     bool PrevIsComma(int rec);
     bool FindIn(int haystack, const openshiina::Bytes& needle);
     void SwapRecords(int other, int rec);

@@ -416,6 +416,34 @@ public sealed partial class ScnVm
         return value;
     }
 
+    /// <summary>
+    /// A kinsoku list of "_P" up to "//" (both eaten; true) or the end of the text (false), at most
+    /// 0xFE bytes kept, NUL-terminated: a "/" alone is one of its characters.
+    /// </summary>
+    private bool ReadKinsoku(int rec, int dst)
+    {
+        int n = 0;
+        while (true)
+        {
+            int p = G(rec, RPtr);
+            byte b = ReadByte(p);
+            if (b == 0)
+            {
+                WriteByte(dst + n, 0);
+                return false;
+            }
+            if (b == '/' && ReadByte(p + 1) == '/')
+            {
+                S(rec, RPtr, p + 2);
+                WriteByte(dst + n, 0);
+                return true;
+            }
+            S(rec, RPtr, p + 1);
+            if (n < 0xFE)
+                WriteByte(dst + n++, b);
+        }
+    }
+
     /// <summary>Copies up to "/" (eaten) or the end of the text into dst, at most max bytes, NUL-terminated.</summary>
     private void ReadField(int rec, int dst, int max)
     {
@@ -590,18 +618,13 @@ public sealed partial class ScnVm
                 S(rec, RBkMode, 2);
                 return;
             case (byte)'P':
-                // _Pnot-at-line-start//not-at-line-end//hanging/  (kinsoku lists)
-                ReadField(rec, rec + OKinsoku1, 0xFE);
-                if (ReadByte(G(rec, RPtr)) == '/')
-                {
-                    S(rec, RPtr, G(rec, RPtr) + 1);
-                    ReadField(rec, rec + OKinsoku2, 0xFE);
-                }
-                if (ReadByte(G(rec, RPtr)) == '/')
-                {
-                    S(rec, RPtr, G(rec, RPtr) + 1);
+                // _Pnot-at-line-start//not-at-line-end//hanging/  (kinsoku lists, apart by "//"). A
+                // "/" alone belongs to a list: Hana to Otome's first list is followed by "///", and
+                // lists read up to every "/" left the rest of the text read as text, a trail byte "_"
+                // of its kanji taken for "_n" (two records swapped: its save screen's text fell onto
+                // the game's picture)
+                if (ReadKinsoku(rec, rec + OKinsoku1) && ReadKinsoku(rec, rec + OKinsoku2))
                     ReadField(rec, rec + OKinsoku3, 0xFE);
-                }
                 return;
             case (byte)'R':
             case (byte)'Y':
