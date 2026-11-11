@@ -59,7 +59,7 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 149 games; 67 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 149 games; 88 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
 - [ ] **Keys for the 18 games without them** (compatibility.md, "No keys yet"), once their files
@@ -68,6 +68,11 @@ is mostly for slow phones, and should follow what their perf.log shows.
   `push 202` through GetProcAddress).
 - [ ] Other v2.34 games: the 11 opcodes with other operands than v2.47's (0686-068B, 055A, 055B,
   04EC, 0B7D), the 9 new ones (007D-0080, 060E-0610, 0614, 077B) and 03BF. Ao no Juuai uses none.
+- [ ] **The games of 2026-11-11** (compatibility.md, Notes): Chikan Densha Otoko Gaiden's train
+  part (S01A.TXT's end: a looping movie that waits for the player's moves) played by hand; Yakata
+  Jukujo (SCN modules) played through by hand; Yume Miru Egoist once a whole copy is found;
+  native versions of Entremets' own routines (637AD9C1, 4A0DB321, 90834B46) and of Tenki Ane's /
+  Ryoumaden's sepia build (C49F893E), which no sweep ran.
 - [ ] Opcode tables for 2.35, 2.38-2.43 and 2.48 (opscan on the game's executable; v2.31,
   v2.33, v2.34, v2.37 and v2.44 have theirs, 2.45 and 2.46 are v2.47's).
 - [ ] The ExtraCrypts (PostAdler, PreAdler, Count, AltCount, Ushimitsu, Nukitashi2,
@@ -90,6 +95,19 @@ is mostly for slow phones, and should follow what their perf.log shows.
   commands of its two scripts, read from ayakashiban.exe.
 
 ## Platforms
+
+- [ ] **Switch: devhost runs and times a routine by itself**: the player started from the
+  OpenShiina Loader title (it runs sdmc:/switch/openshiina/OpenShiina.nro, so no NSP to install
+  again) with arguments over nxlink: a bench mode that loads the files a routine needs from one
+  game and times it, without anyone opening a game on the console.
+- [ ] **Switch: `00C9`'s reads on the scripts' thread**: Re:Rem Plus's corridor loads its pictures
+  at once (615 ms for 8 files; the slow log names each read over 50 ms as "read: <file>"). Read
+  them ahead as `00CE` does.
+- [ ] **Switch: a movie's start** (1.4 s for Sorcery Jokers' opening: the whole file read, then
+  the ASF parsed): read its header only, the rest as it plays.
+- [ ] **Switch: Sorcery Jokers' first scenes** (4-12 frames a second: effects of 1920 x 1080
+  stacked); scale32's first column with its last pixel on the GPU (db3caab) still to be checked
+  on the console with gpu-check.
 
 - [ ] iOS player on `OpenShiina.App`.
 - [ ] The games on Linux and macOS (compatibility.md, Platforms), and the flat memory's `mmap`

@@ -1333,9 +1333,10 @@ the functions they call from the decompile. First findings:
   plays, `057F` the position (0 until it plays), `057E` the state (0x20E playing, 0x20D stopped),
   `057A` stops; `07BE` waits for a message, `09CF` chooses MCI or DirectShow. `03B6` is read as
   v2.34's clock reads (a second read in one frame waits for the next frame).
-- `04C8` / `04CB` before 2.40 (aoj.EXE 0x411290, YODUMA.EXE 0x41F79A): a missing frame is no
+- `04C8` / `04CB` up to 2.45 (aoj.EXE 0x411290, YODUMA.EXE 0x41F79A): a missing frame is no
   error; the handler stores a rectangle the lookup did not write, the last one found here.
-  Yoyogi's START asks for frames system.s25 lacks.
+  Yoyogi's START asks for frames system.s25 lacks; Engage Links (v2.45) asks for frame 401 of a
+  picture whose entry 401 is empty a few frames into many scenarios, which the shipped game plays.
 - v2.37 (Tekoire Princess!, read in YODUMA.EXE): `000E slot` / `0011 slot` set the slot's flags
   to 0 (it stops where it is) / 1 (it goes on from there; an error for a slot no label was
   given); `0263` is v2.33's; `06DD` / `06DE s, ms, d` are `06EC` with d and the target 100 / with

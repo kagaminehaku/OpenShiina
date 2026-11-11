@@ -755,16 +755,18 @@ public sealed partial class ScnVm
     private (int L, int T, int R, int B) m_lastFrameRect;
 
     /// <summary>
-    /// <see cref="FrameRect"/> as 04C8 and 04CB take it. Before 2.40 a missing frame is no error:
+    /// <see cref="FrameRect"/> as 04C8 and 04CB take it. Up to 2.45 a missing frame is no error:
     /// the handler (aoj.EXE 0x411290, v2.34; YODUMA.EXE 0x41F79A, v2.37) stores a rectangle on the
     /// stack that the frame lookup (0x40AA40; 0x40CF50) leaves unwritten, which here is the last
-    /// one found (Yoyogi Hitozuma Senmon Gakuin's START asks for frames system.s25 lacks).
+    /// one found (Yoyogi Hitozuma Senmon Gakuin's START asks for frames system.s25 lacks). Engage
+    /// Links (v2.45) asks for frame 401 of a picture whose entry 401 is empty a few frames into
+    /// many of its scenarios, which the shipped game plays: no error there either.
     /// </summary>
     public (int L, int T, int R, int B)? FrameRectOrLast(int slot, int frame)
     {
         if (FrameRect(slot, frame) is { } r)
             return m_lastFrameRect = r;
-        return EngineVersion < 240 ? m_lastFrameRect : null;
+        return EngineVersion <= 245 ? m_lastFrameRect : null;
     }
 
     // The sprite list 04C7 looked in last (-1: none yet)
@@ -1079,7 +1081,7 @@ public sealed partial class ScnVm
             return 0;
         });
         // 04C8 slot, frame, l, t, r, b: the frame's rectangle (its offset and size); 04CB slot,
-        // frame, w, h: its size (FUN_004116A0; a missing frame is a script error). Before 2.40 a
+        // frame, w, h: its size (FUN_004116A0; a missing frame is a script error). Up to 2.45 a
         // missing frame is no error (see FrameRectOrLast)
         Register(0x04C8, (vm, c, i) =>
         {

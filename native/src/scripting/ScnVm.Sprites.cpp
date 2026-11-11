@@ -1032,11 +1032,12 @@ std::optional<std::array<int, 4>> ScnVm::FrameRect(int slot, int frame)
 
 std::optional<std::array<int, 4>> ScnVm::FrameRectOrLast(int slot, int frame)
 {
-    // FrameRect as 04C8 and 04CB take it. Before 2.40 a missing frame is no error: the handler stores
-    // a rectangle on the stack that the frame lookup leaves unwritten, here the last one found
+    // FrameRect as 04C8 and 04CB take it. Up to 2.45 a missing frame is no error: the handler stores
+    // a rectangle on the stack that the frame lookup leaves unwritten, here the last one found (see
+    // the C# player: v2.34, v2.37, and Engage Links' v2.45, which asks for empty frames at once)
     if (auto r = FrameRect(slot, frame))
         return m_lastFrameRect = *r;
-    if (EngineVersion < 240)
+    if (EngineVersion <= 245)
         return m_lastFrameRect;
     return std::nullopt;
 }
@@ -1313,7 +1314,7 @@ void ScnVm::RegisterSprites()
         return 0;
     });
     // 04C8 slot, frame, l, t, r, b: the frame's rectangle; 04CB slot, frame, w, h: its size (a
-    // missing frame is a script error; before 2.40 no error, see FrameRectOrLast)
+    // missing frame is a script error; up to 2.45 no error, see FrameRectOrLast)
     Register(0x04C8, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         auto r = vm.FrameRectOrLast(vm.Value(c, i.Args[0]), vm.Value(c, i.Args[1]));
         if (!r)

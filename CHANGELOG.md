@@ -4,6 +4,43 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.8.3 (2026-11-12)
+
+- **21 more games play through** (87 games, 88 releases): Engage Links, Helter Skelter, Chikan
+  Circle 2, Chikan Densha Otoko 2, Oshikake! Entremets, Intruder, Zettai Zetsumei Shoujo, Tsuyoimo
+  x Yowaimo, Signalist Stars!!, Shuukatsu Katei Kyoushi, Kinpatsu Tarou Monogatari, Draculius,
+  Mahou Shoujo no Taisetsu na Koto, Shokuinshitsu, Onegan!, Son of a ☆ Bitch, Sensei! Shite
+  Ageru, Tenki Ane, Ryoumaden, Chou Saiminjutsu Gakuen and Saimin Paradise!; Yakata Jukujo and
+  Chikan Densha Otoko Gaiden play. Engines 2.38, 2.40 and 2.43 run now. What each needed (the
+  checksums of their start, four opcodes for every engine, the .exe names of six, their
+  routines' builds) is in [docs/compatibility.md](docs/compatibility.md), Notes.
+- Nukitashi 2's window size setting: after another size the clicks land where they should (the
+  game sizes its window with `0A00` and reads the mouse in that window's pixels).
+- A font the scripts add is found by any of its family names; the "_P" kinsoku lists are read
+  as the engine reads them (apart by "//", a "/" alone one of their characters).
+- StretchBlt (`051E`) copies its pixels by rows, not a byte at a time.
+- The Switch player:
+  - The GPU mode is on (`OpenShiina/gpu` holding "0" turns it off): the heavy pixel routines
+    (scale32's MMX and SSE2 builds, scale16, enlarge32, subpixel32 and the rest) run as compute
+    shaders on the scripts' memory in place, the same bytes as the CPU's (checked on the console
+    with `OpenShiina/gpu-check`).
+  - Faster on the CPU: the compositor's alpha pixels, `0562`'s rows and VC-1's motion
+    compensation and 8 x 8 transform in NEON, the text drawn on layers in place, `00A1`'s glyphs
+    drawn together, BitBlt by rows, scale32's SSE2 build 20 times faster.
+  - Movies: only the frame shown is made into a picture, on the scripts' thread; a movie behind
+    its clock catches up three frames a call, so Sorcery Jokers' opening no longer stands still
+    at its end.
+  - Re:Rem Plus's quick saves renamed by the file system (eleven at once took a quarter of a
+    second); the slow log names the pictures that took long to read.
+  - Settings: "Show the frame rate" and "File cache"; the screens in English or Vietnamese; the
+    game's own message boxes; the play time and the game played last first in the list; R moves
+    a game between the SD card and the console's storage.
+  - A touch that lifts no longer leaves a button lit as if the mouse were over it; a game the
+    player did not know (Draculius) is recognised again by a newer player, without asking which
+    game it is.
+  - devhost (the tool that puts builds and games on the console over Wi-Fi) sends files at the
+    speed of the Wi-Fi and reads the SD card's folders.
+
 ## 0.8.2.1 (2026-11-10)
 
 A hotfix of 0.8.2 for the Switch player (`OpenShiina-0.8.2.1-switch.nsp` / `.nro`); the Windows,

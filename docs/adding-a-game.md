@@ -1,6 +1,6 @@
 # Adding a game
 
-How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 67 releases
+How a ShiinaRio game OpenShiina has not played yet is tried, fixed and recorded. The 88 releases
 that play went through these steps; most of what goes wrong with a new one is in the table of
 symptoms below, with what fixed it before.
 
