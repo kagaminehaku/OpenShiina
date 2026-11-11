@@ -214,8 +214,9 @@ std::vector<GameEntry> ListGames(const std::vector<std::pair<std::string, bool>>
             auto record = played.find(folder);
             std::string chosen = record != played.end() ? record->second.Scheme : std::string();
             auto found = known.find(path);
-            // (a game not known before is recognised again once a scheme is chosen for it)
-            if (found != known.end() && found->second.Stamp == FolderTime(path) && (found->second.Known || chosen.empty()))
+            // (a game not known before is recognised again each time: a newer player may know it by
+            // its .exe, as Draculius by DRA.EXE, and ask nothing)
+            if (found != known.end() && found->second.Stamp == FolderTime(path) && found->second.Known)
             {
                 games.push_back(found->second);
                 games.back().Internal = internal;
