@@ -77,6 +77,7 @@ constexpr const char* kPlayed = "sdmc:/OpenShiina/played.tsv";
 constexpr const char* kSettings = "sdmc:/OpenShiina/settings.json";
 constexpr const char* kGpuCheck = "sdmc:/OpenShiina/gpu-check";
 constexpr const char* kGpuOn = "sdmc:/OpenShiina/gpu";
+constexpr const char* kGpuUncached = "sdmc:/OpenShiina/gpu-uncached";
 constexpr const char* kTextCheck = "sdmc:/OpenShiina/text-check";
 
 /// A switch file of the SD card: there and not starting with '0' (devhost can write one, not delete it).
@@ -1292,13 +1293,15 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     Log("File cache: %lld MB\n", (long long)(vm->FileCacheBytes >> 20));
     // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, on unless
     // sdmc:/OpenShiina/gpu starts with '0'; with gpu-check as well every call of them runs on both
-    // and the bytes are compared (the log tells). Without it (it cannot start) the CPU does them
+    // and the bytes are compared (the log tells); with gpu-uncached the GPU does not cache the scripts'
+    // memory (as before). Without it (it cannot start) the CPU does them
     if (!SwitchOff(kGpuOn))
     {
         try
         {
             if (!s_gpu)
                 s_gpu = std::make_unique<player::DekoAccelerator>(ui.Screen.Device());
+            s_gpu->SetScriptCaching(!SwitchOn(kGpuUncached));
             vm->Accelerator = s_gpu.get();
             vm->GpuCheck = SwitchOn(kGpuCheck);
         }
@@ -1307,7 +1310,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             Log("GPU mode: %s; the CPU draws\n", e.what());
         }
     }
-    Log("GPU mode: %s\n", vm->Accelerator ? (vm->GpuCheck ? "on, checked against the CPU" : "on") : "off");
+    Log("GPU mode: %s%s\n", vm->Accelerator ? (vm->GpuCheck ? "on, checked against the CPU" : "on") : "off",
+        vm->Accelerator && !s_gpu->ScriptCaching() ? ", the scripts' memory not cached by the GPU" : "");
     // With text-check every glyph is drawn both in place and the way before, the bytes compared
     vm->TextCheck = SwitchOn(kTextCheck);
     if (vm->TextCheck)

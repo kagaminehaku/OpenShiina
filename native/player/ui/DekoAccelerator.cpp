@@ -176,7 +176,7 @@ DekoAccelerator::ScriptBlock* DekoAccelerator::ScriptBlockFor(uint8_t* region, i
         m_scriptBlocks.erase(std::min_element(m_scriptBlocks.begin(), m_scriptBlocks.end(),
                                               [](const ScriptBlock& a, const ScriptBlock& b) { return a.Used < b.Used; }));
     dk::UniqueMemBlock memory = dk::MemBlockMaker{m_device, uint32_t(bytes)}
-                                    .setFlags(DkMemBlockFlags_CpuCached | DkMemBlockFlags_GpuUncached)
+                                    .setFlags(DkMemBlockFlags_CpuCached | (m_scriptGpuCached ? DkMemBlockFlags_GpuCached : DkMemBlockFlags_GpuUncached))
                                     .setStorage(region)
                                     .create();
     if (!memory)
@@ -191,6 +191,17 @@ void DekoAccelerator::Forget(uint8_t* from, int64_t bytes)
         if (kernel)
             kernel->ForgetScripts();
     std::erase_if(m_scriptBlocks, [&](const ScriptBlock& block) { return block.Start < from + bytes && from < block.Start + block.Bytes; });
+}
+
+void DekoAccelerator::SetScriptCaching(bool gpuCached)
+{
+    if (gpuCached == m_scriptGpuCached)
+        return;
+    for (auto& [name, kernel] : m_kernels)
+        if (kernel)
+            kernel->ForgetScripts();
+    m_scriptBlocks.clear();
+    m_scriptGpuCached = gpuCached;
 }
 
 scripting::IScnGpuKernel* DekoAccelerator::Kernel(const std::string& name)

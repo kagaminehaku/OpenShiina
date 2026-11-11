@@ -8,12 +8,13 @@
 //
 // A binding can also be on the scripts' memory itself (IScnGpuKernel::Memory, no copies): a memory
 // block made on the parts of the scripts' memory around it (heap pages mapped into the code-memory
-// window, which nvmap maps for the GPU as any other), cached by CPU, not by GPU, and kept for the
-// next calls (a picture's rows are where they were: making one takes about 1 ms for 8 MB, letting
-// it go 1.7). The bytes of the run are flushed from the CPU's cache before it (the GPU then reads
-// what the CPU wrote, and no dirty line can later land on what it writes) and after (the CPU reads
-// what the GPU wrote). Blocks go when the scripts give their parts back (Forget): unmapping memory
-// the GPU still has mapped would fail.
+// window, which nvmap maps for the GPU as any other), cached by the CPU and by the GPU (its L2:
+// invalidated before the dispatch, flushed by the full barrier after it; uncached by the GPU, as
+// before, with SetScriptCaching(false)), and kept for the next calls (a picture's rows are where
+// they were: making one takes about 1 ms for 8 MB, letting it go 1.7). The bytes of the run are
+// flushed from the CPU's cache before it (the GPU then reads what the CPU wrote, and no dirty line
+// can later land on what it writes) and after (the CPU reads what the GPU wrote). Blocks go when
+// the scripts give their parts back (Forget): unmapping memory the GPU still has mapped would fail.
 #pragma once
 
 #include <deko3d.hpp>
@@ -38,6 +39,9 @@ public:
     std::string Name() const override { return "Tegra X1 (deko3d)"; }
     scripting::IScnGpuKernel* Kernel(const std::string& name) override;
     void Forget(uint8_t* from, int64_t bytes) override;
+    /// Whether the GPU caches the blocks on the scripts' memory (the blocks made so far go when it changes).
+    void SetScriptCaching(bool gpuCached);
+    bool ScriptCaching() const { return m_scriptGpuCached; }
 
 private:
     class DekoKernel;
@@ -64,6 +68,7 @@ private:
     ScriptBlock* ScriptBlockFor(uint8_t* region, int64_t bytes);
     std::vector<ScriptBlock> m_scriptBlocks;
     uint64_t m_scriptUses = 0;
+    bool m_scriptGpuCached = true;
 };
 
 } // namespace openshiina::player
