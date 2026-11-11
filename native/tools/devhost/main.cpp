@@ -20,7 +20,8 @@
 // "PUTF" writes a file under sdmc:/OpenShiina as it is, not compressed (tools/devhost/devput.ps1: a
 // game's files, much faster than nxlink's zlib chunks of 16 KB): the path's length, a path under
 // sdmc:/OpenShiina as with '@' (Games/<folder>/<file>), the size (8 bytes); devhost answers 0 (or -1),
-// takes the bytes, written next to their place and moved there at the end, and answers 0 (or -1).
+// takes the bytes, written next to their place (on a thread of their own, while the next arrive) and
+// moved there at the end, and answers 0 (or -1).
 // The sockets have large TCP buffers: with libnx's 64 KB a transfer over Wi-Fi stopped at ~12 Mbit/s.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
@@ -34,8 +35,12 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <arpa/inet.h>
@@ -64,8 +69,9 @@ constexpr size_t kChunk = 16 * 1024; // the largest compressed chunk nxlink send
 constexpr int32_t kGetMagic = 0x46544547; // "GETF" as the first 4 bytes, little-endian
 constexpr int32_t kDeleteMagic = 0x464C4544; // "DELF"
 constexpr int32_t kPutMagic = 0x46545550; // "PUTF"
-// A file of PUTF is written to the SD card a block at a time
+// A file of PUTF is written to the SD card a block at a time, while the next blocks arrive
 constexpr size_t kWriteBlock = 4 * 1024 * 1024;
+constexpr int kWriteBlocks = 3;
 
 void Log(const char* format, ...)
 {
@@ -325,11 +331,46 @@ bool Put(int sock, std::string& path, int64_t& bytes, std::string& error)
         return false;
     }
     Log("Receiving %s, %lld bytes\n", path.c_str(), (long long)size);
-    std::vector<uint8_t> block(kWriteBlock);
+    // Blocks go round: the network fills one while a thread of its own writes the ones before to the
+    // SD card, so neither waits for the other
+    std::vector<std::vector<uint8_t>> blocks(kWriteBlocks, std::vector<uint8_t>(kWriteBlock));
+    std::deque<int> empty, filled;
+    std::vector<size_t> lengths(kWriteBlocks);
+    for (int b = 0; b < kWriteBlocks; b++)
+        empty.push_back(b);
+    std::mutex lock;
+    std::condition_variable changed;
+    bool received = false, written = true;
+    std::thread writer([&] {
+        std::unique_lock held(lock);
+        for (;;)
+        {
+            changed.wait(held, [&] { return !filled.empty() || received; });
+            if (filled.empty())
+                return;
+            int b = filled.front();
+            filled.pop_front();
+            held.unlock();
+            bool ok = std::fwrite(blocks[size_t(b)].data(), 1, lengths[size_t(b)], file) == lengths[size_t(b)];
+            held.lock();
+            written = written && ok;
+            empty.push_back(b);
+            changed.notify_all();
+        }
+    });
     bool ok = true;
     while (ok && bytes < size)
     {
-        // A block filled from the network, then written whole
+        int b;
+        {
+            std::unique_lock held(lock);
+            changed.wait(held, [&] { return !empty.empty() || !written; });
+            if (!written)
+                break;
+            b = empty.front();
+            empty.pop_front();
+        }
+        std::vector<uint8_t>& block = blocks[size_t(b)];
         size_t want = size_t(std::min<int64_t>(int64_t(block.size()), size - bytes)), have = 0;
         while (have < want)
         {
@@ -343,12 +384,22 @@ bool Put(int sock, std::string& path, int64_t& bytes, std::string& error)
             error = "the connection stopped";
             ok = false;
         }
-        if (have > 0 && std::fwrite(block.data(), 1, have, file) != have)
-        {
-            error = "cannot write the file";
-            ok = false;
-        }
+        std::lock_guard held(lock);
+        lengths[size_t(b)] = have;
+        filled.push_back(b);
+        changed.notify_all();
         bytes += int64_t(have);
+    }
+    {
+        std::lock_guard held(lock);
+        received = true;
+        changed.notify_all();
+    }
+    writer.join();
+    if (!written)
+    {
+        error = "cannot write the file";
+        ok = false;
     }
     ok = std::fclose(file) == 0 && ok;
     if (ok)
