@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 
 #include "formats/AsfAudio.h"
 #include "formats/AsfFile.h"
@@ -72,9 +73,23 @@ bool ScnVm::OpenMovie(Movie& movie)
 
 bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
 {
+    // With RoutineTimes: the steps of the opening under "movie open: ..." (the read, the file's
+    // streams parsed, the sound packed, the decoder started)
+    auto last = std::chrono::steady_clock::now();
+    auto step = [&](const char* part) {
+        auto now = std::chrono::steady_clock::now();
+        if (RoutineTimes)
+        {
+            auto& time = (*RoutineTimes)[std::string("movie open: ") + part];
+            time.Milliseconds += std::chrono::duration<double, std::milli>(now - last).count();
+            time.Calls++;
+        }
+        last = now;
+    };
     openshiina::Bytes data;
     if (!m_host.ReadLooseFile(name, data) && !ReadScriptFile(name, data))
         return false;
+    step("read");
     MovieSoundStop(movie);
     try
     {
@@ -83,8 +98,11 @@ bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
             auto file = std::make_unique<formats::AsfFile>(data);
             data.clear();
             data.shrink_to_fit();
+            step("parse");
             movie.Wave = Music() != nullptr ? formats::AsfAudio::Pack(*file) : openshiina::Bytes();
+            step("sound");
             movie.Video = std::make_unique<formats::MovieAhead>(std::make_unique<AsfMovie>(std::move(file)));
+            step("decoder");
         }
         else if (data.size() >= 4 && data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0xB3)
         {
@@ -98,8 +116,10 @@ bool ScnVm::OpenMovieFile(Movie& movie, const std::string& name)
             formats::MpegSystemStream stream(data);
             data.clear();
             data.shrink_to_fit();
+            step("parse");
             movie.Wave = std::move(stream.Audio);
             movie.Video = std::make_unique<formats::MovieAhead>(std::make_unique<formats::Mpeg1Video>(std::move(stream)));
+            step("decoder");
         }
     }
     catch (const InvalidDataError&)
@@ -201,6 +221,22 @@ void ScnVm::UpdateMovie(Movie& movie)
     if (movie.State != 3 || !movie.Video)
         return;
     formats::MovieAhead& video = *movie.Video;
+    // With RoutineTimes: the movie thread's frames ("movie: decoded", "movie: pictures made")
+    if (RoutineTimes)
+    {
+        double decoding = 0, pictures = 0;
+        int frames = 0;
+        video.TakeTimes(decoding, pictures, frames);
+        if (frames > 0)
+        {
+            auto& decoded = (*RoutineTimes)["movie: decoded"];
+            decoded.Milliseconds += decoding;
+            decoded.Calls += frames;
+            auto& made = (*RoutineTimes)["movie: pictures made"];
+            made.Milliseconds += pictures;
+            made.Calls += frames;
+        }
+    }
     uint32_t now = Clock();
     int64_t due = int64_t(double(now - movie.Start) * video.FrameRate() / 1000);
     const openshiina::Bytes* frame = nullptr;

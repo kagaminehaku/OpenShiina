@@ -16,6 +16,12 @@
 #include "scripting/ParallelRows.h"
 
 #include <algorithm>
+#include <format>
+#include <random>
+
+#if defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 namespace openshiina::scripting {
 
@@ -74,6 +80,87 @@ void Fill24(uint8_t* target, int length, uint8_t b, uint8_t g, uint8_t r)
         std::memmove(target + done, target, size_t(std::min(done, length - done)));
 }
 
+/// Method 4 of blend 0x40000000 (the alpha through table) from in (ABGR) to out (BGR), a pixel at a
+/// time: 0xFF copies the colour, else d + ((s - d) a >> 8) (0 leaves the picture).
+void AlphaPixelsTable(int n, const uint8_t* in, uint8_t* out, const uint8_t* table)
+{
+    for (int i = 0; i < n; i++, in += 4, out += 3)
+    {
+        int alpha = table[in[0]];
+        if (alpha == 0xFF)
+        {
+            out[0] = in[1];
+            out[1] = in[2];
+            out[2] = in[3];
+        }
+        else if (alpha != 0)
+        {
+            BlendByte(out, 0, in[1], alpha);
+            BlendByte(out, 1, in[2], alpha);
+            BlendByte(out, 2, in[3], alpha);
+        }
+    }
+}
+
+/// Method 5 of blend 0x40000000: one colour over n pixels at alpha, d + ((c - d) a >> 8) each.
+void ColourAlpha(int n, uint8_t* out, uint8_t b, uint8_t g, uint8_t r, int alpha)
+{
+    for (int i = 0; i < n; i++, out += 3)
+    {
+        BlendByte(out, 0, b, alpha);
+        BlendByte(out, 1, g, alpha);
+        BlendByte(out, 2, r, alpha);
+    }
+}
+
+#if defined(__aarch64__)
+// The two in NEON, eight pixels at a time (vld4 / vld3 part the channels): (s - d) a in 32-bit
+// lanes, shifted as a signed number as the scalar code's int is, so the bytes are the same
+// (ScnVm::CheckVectorLanes compares them on the console)
+
+inline uint8x8_t BlendNeon(uint8x8_t d, uint8x8_t s, uint8x8_t a)
+{
+    uint16x8_t sa = vmull_u8(s, a), da = vmull_u8(d, a);
+    int32x4_t low = vreinterpretq_s32_u32(vsubl_u16(vget_low_u16(sa), vget_low_u16(da)));
+    int32x4_t high = vreinterpretq_s32_u32(vsubl_u16(vget_high_u16(sa), vget_high_u16(da)));
+    int16x8_t part = vcombine_s16(vshrn_n_s32(low, 8), vshrn_n_s32(high, 8));
+    return vmovn_u16(vreinterpretq_u16_s16(vaddq_s16(part, vreinterpretq_s16_u16(vmovl_u8(d)))));
+}
+
+void AlphaPixelsTableNeon(int n, const uint8_t* in, uint8_t* out, const uint8_t* table)
+{
+    int i = 0;
+    for (; i + 8 <= n; i += 8, in += 32, out += 24)
+    {
+        uint8x8x4_t p = vld4_u8(in);
+        uint8_t alphas[8];
+        for (int k = 0; k < 8; k++)
+            alphas[k] = table[in[k * 4]];
+        uint8x8_t a = vld1_u8(alphas), full = vceq_u8(a, vdup_n_u8(0xFF));
+        uint8x8x3_t t = vld3_u8(out);
+        for (int c = 0; c < 3; c++)
+            t.val[c] = vbsl_u8(full, p.val[c + 1], BlendNeon(t.val[c], p.val[c + 1], a));
+        vst3_u8(out, t);
+    }
+    AlphaPixelsTable(n - i, in, out, table);
+}
+
+void ColourAlphaNeon(int n, uint8_t* out, uint8_t b, uint8_t g, uint8_t r, int alpha)
+{
+    int i = 0;
+    uint8x8_t a = vdup_n_u8(uint8_t(alpha)), cb = vdup_n_u8(b), cg = vdup_n_u8(g), cr = vdup_n_u8(r);
+    for (; i + 8 <= n; i += 8, out += 24)
+    {
+        uint8x8x3_t t = vld3_u8(out);
+        t.val[0] = BlendNeon(t.val[0], cb, a);
+        t.val[1] = BlendNeon(t.val[1], cg, a);
+        t.val[2] = BlendNeon(t.val[2], cr, a);
+        vst3_u8(out, t);
+    }
+    ColourAlpha(n - i, out, b, g, r, alpha);
+}
+#endif
+
 /// Pixels with an alpha each (method 4; the alpha through table for blend 0x40000000): 0xFF copies
 /// the colour, 0 leaves the picture, else d + ((s - d) a >> 8)
 void DrawAlphaPixels(int n, const uint8_t* src, int s, uint8_t* row, int d, const uint8_t* table)
@@ -96,22 +183,11 @@ void DrawAlphaPixels(int n, const uint8_t* src, int s, uint8_t* row, int d, cons
         }
         return;
     }
-    for (int i = 0; i < n; i++, s += 4, d += 3)
-    {
-        int alpha = table[src[s]];
-        if (alpha == 0xFF)
-        {
-            row[d] = src[s + 1];
-            row[d + 1] = src[s + 2];
-            row[d + 2] = src[s + 3];
-        }
-        else if (alpha != 0)
-        {
-            BlendByte(row, d, src[s + 1], alpha);
-            BlendByte(row, d + 1, src[s + 2], alpha);
-            BlendByte(row, d + 2, src[s + 3], alpha);
-        }
-    }
+#if defined(__aarch64__)
+    AlphaPixelsTableNeon(n, src + s, row + d, table);
+#else
+    AlphaPixelsTable(n, src + s, row + d, table);
+#endif
 }
 
 } // namespace
@@ -150,6 +226,43 @@ struct ScnVm::SpriteBlend
             TintPart[k] = T1[TintColor[k]];
     }
 };
+
+std::string ScnVm::CheckSpriteLanes()
+{
+#if defined(__aarch64__)
+    // The NEON blends of 04C4 against the scalar ones on random runs (lengths, tables, alphas)
+    std::mt19937 random(54321);
+    std::vector<uint8_t> in(4 * 40), before(3 * 40), neon, scalar;
+    uint8_t table[256];
+    int differed = 0;
+    std::string report;
+    for (int round = 0; round < 20000; round++)
+    {
+        for (auto& v : in)
+            v = uint8_t(random());
+        for (auto& v : before)
+            v = uint8_t(random());
+        for (auto& v : table)
+            v = uint8_t(random() % 4 == 0 ? (random() % 2 != 0 ? 0xFF : 0) : random());
+        int n = int(random() % 40), alpha = int(random() % 256);
+        neon = before;
+        scalar = before;
+        AlphaPixelsTableNeon(n, in.data(), neon.data(), table);
+        AlphaPixelsTable(n, in.data(), scalar.data(), table);
+        if (neon != scalar && differed++ < 3)
+            report += std::format(" alpha pixels of {};", n);
+        neon = before;
+        scalar = before;
+        ColourAlphaNeon(n, neon.data(), in[1], in[2], in[3], alpha);
+        ColourAlpha(n, scalar.data(), in[1], in[2], in[3], alpha);
+        if (neon != scalar && differed++ < 3)
+            report += std::format(" a colour of {} at {};", n, alpha);
+    }
+    return differed == 0 ? std::string() : std::format(" {} sprite runs differed:", differed) + report;
+#else
+    return {};
+#endif
+}
 
 int ScnVm::SpriteEntry(int list, int index) const { return TableAddress(list) + index * SpriteSize; }
 
@@ -551,13 +664,11 @@ void ScnVm::DrawRunAlpha(int method, int n, const uint8_t* src, int s, uint8_t* 
     default:
     {
         int alpha = blend.T1[src[s]];
-        uint8_t b0 = src[s + 1], g0 = src[s + 2], r0 = src[s + 3];
-        for (int i = 0; i < n; i++, d += 3)
-        {
-            BlendByte(row, d, b0, alpha);
-            BlendByte(row, d + 1, g0, alpha);
-            BlendByte(row, d + 2, r0, alpha);
-        }
+#if defined(__aarch64__)
+        ColourAlphaNeon(n, row + d, src[s + 1], src[s + 2], src[s + 3], alpha);
+#else
+        ColourAlpha(n, row + d, src[s + 1], src[s + 2], src[s + 3], alpha);
+#endif
         return;
     }
     }

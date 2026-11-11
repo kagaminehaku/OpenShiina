@@ -1,6 +1,8 @@
 // The GPU mode on the Switch (see DekoAccelerator.h)
 #include "ui/DekoAccelerator.h"
 
+#include <switch.h>
+
 #include <algorithm>
 #include <cstdio>
 
@@ -42,6 +44,8 @@ public:
     /// The bindings on the scripts' memory are for one run: none stays once their blocks may go.
     void ForgetScripts() { m_script.clear(); }
 
+    RunTimes LastRun() const override { return m_times; }
+
     bool Run(const void* parameters, size_t size, int groupsX, int groupsY) override
     {
         bool done = Dispatch(parameters, size, groupsX, groupsY);
@@ -54,12 +58,17 @@ private:
     {
         if (size > UniformBytes || groupsX <= 0 || groupsY <= 0)
             return false;
+        auto since = [](uint64_t start) { return double(armTicksToNs(armGetSystemTick() - start)) / 1e6; };
+        m_times = {};
+        uint64_t start = armGetSystemTick();
         // What the CPU wrote in memory, and nothing of the outputs left in the CPU's cache
         for (auto& [binding, b] : m_buffers)
             if (!m_script.count(binding))
                 b.Memory.flushCpuCache(0, b.Used);
         for (auto& [binding, s] : m_script)
             s.Block.flushCpuCache(s.Offset, s.Bytes);
+        m_times.Before = since(start);
+        start = armGetSystemTick();
         dk::CmdBuf& cmd = m_owner.m_cmd;
         cmd.clear();
         cmd.addMemory(m_owner.m_dataMem, 0, CommandBytes);
@@ -81,6 +90,8 @@ private:
         m_owner.m_queue.flush();
         if (m_owner.m_fence.wait() != DkResult_Success)
             return false;
+        m_times.Gpu = since(start);
+        start = armGetSystemTick();
         // The outputs as the GPU wrote them in memory
         for (auto& [binding, b] : m_buffers)
             if (b.Output && !m_script.count(binding))
@@ -88,6 +99,7 @@ private:
         for (auto& [binding, s] : m_script)
             if (s.Output)
                 s.Block.flushCpuCache(s.Offset, s.Bytes);
+        m_times.After = since(start);
         return true;
     }
 
@@ -130,6 +142,7 @@ private:
     dk::Shader m_shader;
     std::map<int, StorageBuffer> m_buffers;
     std::map<int, ScriptBinding> m_script;
+    RunTimes m_times;
 };
 
 DekoAccelerator::DekoAccelerator(dk::Device device) : m_device(device)

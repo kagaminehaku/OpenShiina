@@ -6,6 +6,7 @@
 
 #include "platform/Files.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <system_error>
@@ -171,8 +172,26 @@ bool ReadAll(const std::string& path, std::vector<uint8_t>& data)
     if (!file)
         return false;
     data.clear();
+    // The size first, so the bytes are read into one block in large pieces (a movie of 188 MB read
+    // 64 KB at a time into a growing vector took seconds on the Switch); a file that grows on goes on
+    // the same way
+#ifdef _WIN32
+    int64_t size = _fseeki64(file, 0, SEEK_END) == 0 ? _ftelli64(file) : -1;
+    _fseeki64(file, 0, SEEK_SET);
+#else
+    int64_t size = fseeko(file, 0, SEEK_END) == 0 ? int64_t(ftello(file)) : -1;
+    fseeko(file, 0, SEEK_SET);
+#endif
+    constexpr size_t Piece = 4 << 20;
+    size_t have = 0, got;
+    if (size > 0)
+    {
+        data.resize(size_t(size));
+        while (have < data.size() && (got = std::fread(data.data() + have, 1, std::min(Piece, data.size() - have), file)) > 0)
+            have += got;
+        data.resize(have);
+    }
     uint8_t buffer[65536];
-    size_t got;
     while ((got = std::fread(buffer, 1, sizeof buffer, file)) > 0)
         data.insert(data.end(), buffer, buffer + got);
     bool ok = !std::ferror(file);

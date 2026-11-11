@@ -461,6 +461,8 @@ public:
     /// lane after the other, on random values (ties and huge ones among them): what differed, empty
     /// when nothing (the Switch player tells it at its start: its NEON lanes are tried only there).
     static std::string CheckVectorLanes();
+    /// The NEON blends of the sprites (04C4) against the scalar ones (part of CheckVectorLanes).
+    static std::string CheckSpriteLanes();
     /// Ero-On! START 5E2D6: the scaling-down case of the first v2.49 build.
     bool Scale16(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb);
     /// Ero-On! START 5DFA5: its enlarging case, with its weight table at table.
@@ -1249,6 +1251,9 @@ private:
     /// After the run: a destination's buffer into the scripts' memory (GpuWrite); with GpuCheck the
     /// rows written in place are kept aside too, before the CPU writes over them.
     void GpuTargetDone(int dst, int dstPitch, int width, int height, const uint8_t* output);
+    /// With RoutineTimes: a GPU call's parts under "<routine> gpu: ..." - its bindings and tables made
+    /// (from started to ran), the kernel's run (LastRun), what was written back after it (to now).
+    void GpuTimes(const char* routine, int64_t started, int64_t ran, int64_t back, const IScnGpuKernel& kernel);
     /// Scale32Sse's tables (flags, count, first, last weights; the first source row or column of
     /// each) and the copy on the GPU (kernel scale32sse).
     /// Enlarge32's steps on the GPU (kernel enlarge32_csh). Rows: kind, source row (from src), the

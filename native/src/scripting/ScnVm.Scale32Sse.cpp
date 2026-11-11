@@ -601,7 +601,7 @@ std::string ScnVm::CheckVectorLanes()
     }
     if (floats + bytes + words != 0)
         report = std::format("{} stores, {} pixels, {} word operations differed:", floats, bytes, words) + report;
-    return report;
+    return report + CheckSpriteLanes();
 }
 
 } // namespace openshiina::scripting

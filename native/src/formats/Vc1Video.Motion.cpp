@@ -3,8 +3,16 @@
 // reference block is always copied with its coordinates clamped to the picture (FFmpeg's edge
 // emulation, also what its padded pictures give) before it is interpolated.
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
+#include <format>
+#include <random>
+#include <utility>
+
+#if defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 #include "formats/Vc1Video.h"
 
@@ -596,11 +604,174 @@ void Op(uint8_t* dst, int at, int value, bool avg)
     dst[at] = avg ? uint8_t((dst[at] + v + 1) >> 1) : v;
 }
 
+// MspelMc's kinds of block each written out (the filters' modes, the block's size, put or average)
+// with the same sums: loops of constants the compiler makes vector code of (NEON on the Switch),
+// where one loop for all of them chose the filter for every sample
+
+/// The four taps of a mode (1: 1/4, 2: 1/2, 3: 3/4) over p[-step], p[0], p[step], p[2 step].
+template <int Mode, typename T>
+inline int Taps(const T* p, int step)
+{
+    if constexpr (Mode == 1)
+        return -4 * p[-step] + 53 * p[0] + 18 * p[step] - 3 * p[2 * step];
+    else if constexpr (Mode == 2)
+        return -1 * p[-step] + 9 * p[0] + 9 * p[step] - 1 * p[2 * step];
+    else
+        return -3 * p[-step] + 18 * p[0] + 53 * p[step] - 4 * p[2 * step];
+}
+
+template <bool Avg>
+inline void Put(uint8_t* d, int value)
+{
+    uint8_t v = uint8_t(value < 0 ? 0 : value > 255 ? 255 : value);
+    *d = Avg ? uint8_t((*d + v + 1) >> 1) : v;
+}
+
+template <int H, int V, int Size, bool Avg>
+void Mspel(uint8_t* dst, int dstStride, const uint8_t* src, int srcStride, int rnd, int16_t* tmp)
+{
+    if constexpr (V != 0 && H != 0)
+    {
+        constexpr int shift = (kShiftValue[H] + kShiftValue[V]) >> 1;
+        constexpr int w = Size + 3;
+        const int r = (1 << (shift - 1)) + rnd - 1;
+        for (int j = 0; j < Size; j++)
+            for (int i = 0; i < w; i++)
+                tmp[j * w + i] = int16_t((Taps<V>(src - 1 + j * srcStride + i, srcStride) + r) >> shift);
+        const int r2 = 64 - rnd;
+        for (int j = 0; j < Size; j++)
+            for (int i = 0; i < Size; i++)
+                Put<Avg>(dst + j * dstStride + i, (Taps<H>(tmp + j * w + 1 + i, 1) + r2) >> 7);
+    }
+    else if constexpr (V != 0)
+    {
+        constexpr int shift = V == 2 ? 4 : 6;
+        const int r = (V == 2 ? 8 : 32) - (1 - rnd);
+        for (int j = 0; j < Size; j++)
+            for (int i = 0; i < Size; i++)
+                Put<Avg>(dst + j * dstStride + i, (Taps<V>(src + j * srcStride + i, srcStride) + r) >> shift);
+    }
+    else if constexpr (H != 0)
+    {
+        constexpr int shift = H == 2 ? 4 : 6;
+        const int r = (H == 2 ? 8 : 32) - rnd;
+        for (int j = 0; j < Size; j++)
+            for (int i = 0; i < Size; i++)
+                Put<Avg>(dst + j * dstStride + i, (Taps<H>(src + j * srcStride + i, 1) + r) >> shift);
+    }
+    else
+    {
+        for (int j = 0; j < Size; j++)
+            for (int i = 0; i < Size; i++)
+                Put<Avg>(dst + j * dstStride + i, src[j * srcStride + i]);
+    }
+}
+
+using MspelKind = void (*)(uint8_t*, int, const uint8_t*, int, int, int16_t*);
+
+/// The kinds of a size, put or average, by hmode + 4 vmode.
+template <int Size, bool Avg, int... K>
+constexpr std::array<MspelKind, 16> MspelKinds(std::integer_sequence<int, K...>)
+{
+    return {&Mspel<(K & 3), (K >> 2), Size, Avg>...};
+}
+
+constexpr auto kMspel8 = MspelKinds<8, false>(std::make_integer_sequence<int, 16>{});
+constexpr auto kMspel8Avg = MspelKinds<8, true>(std::make_integer_sequence<int, 16>{});
+constexpr auto kMspel16 = MspelKinds<16, false>(std::make_integer_sequence<int, 16>{});
+constexpr auto kMspel16Avg = MspelKinds<16, true>(std::make_integer_sequence<int, 16>{});
+
+#if defined(__aarch64__)
+// The kinds GCC leaves as they are (a filter along one axis, or none: blocks of 8 bytes) in NEON. A
+// filter's four taps of bytes lie in -1785..18105, so 16-bit lanes hold them, and the sum's
+// rounding, arithmetic shift and saturation to 0..255 (vqmovun) are the scalar code's
+// (Vc1Video::CheckVectorLanes compares them on the console).
+
+template <int Mode>
+inline int16x8_t TapsNeon(uint8x8_t before, uint8x8_t at, uint8x8_t next, uint8x8_t after)
+{
+    constexpr uint8_t c0 = Mode == 1 ? 4 : Mode == 2 ? 1 : 3, c1 = Mode == 1 ? 53 : Mode == 2 ? 9 : 18;
+    constexpr uint8_t c2 = Mode == 1 ? 18 : Mode == 2 ? 9 : 53, c3 = Mode == 1 ? 3 : Mode == 2 ? 1 : 4;
+    uint16x8_t sum = vmull_u8(at, vdup_n_u8(c1));
+    sum = vmlal_u8(sum, next, vdup_n_u8(c2));
+    sum = vmlsl_u8(sum, before, vdup_n_u8(c0));
+    sum = vmlsl_u8(sum, after, vdup_n_u8(c3));
+    return vreinterpretq_s16_u16(sum);
+}
+
+/// Eight samples of a one-axis filter at p (taps step apart), rounded by r.
+template <int Mode>
+inline uint8x8_t Filter8(const uint8_t* p, int step, int16x8_t r)
+{
+    constexpr int Shift = Mode == 2 ? 4 : 6;
+    int16x8_t sum = vaddq_s16(TapsNeon<Mode>(vld1_u8(p - step), vld1_u8(p), vld1_u8(p + step), vld1_u8(p + 2 * step)), r);
+    return vqmovun_s16(vshrq_n_s16(sum, Shift));
+}
+
+template <bool Avg>
+inline void Store8(uint8_t* d, uint8x8_t v)
+{
+    vst1_u8(d, Avg ? vrhadd_u8(vld1_u8(d), v) : v);
+}
+
+/// A block filtered along one axis (Vertical: the taps a row apart), or copied (Mode 0).
+template <int Mode, bool Vertical, int Size, bool Avg>
+void MspelAxisNeon(uint8_t* dst, int dstStride, const uint8_t* src, int srcStride, int rnd)
+{
+    const int step = Vertical ? srcStride : 1;
+    const int16x8_t r = vdupq_n_s16(int16_t((Mode == 2 ? 8 : 32) - (Vertical ? 1 - rnd : rnd)));
+    for (int j = 0; j < Size; j++, dst += dstStride, src += srcStride)
+        for (int i = 0; i < Size; i += 8)
+        {
+            if constexpr (Mode == 0)
+                Store8<Avg>(dst + i, vld1_u8(src + i));
+            else
+                Store8<Avg>(dst + i, Filter8<Mode>(src + i, step, r));
+        }
+}
+
+using MspelNeonKind = void (*)(uint8_t*, int, const uint8_t*, int, int);
+
+template <int Size, bool Avg>
+constexpr std::array<MspelNeonKind, 7> MspelNeonKinds()
+{
+    // 0: a copy; 1-3: horizontal modes; 4-6: vertical modes
+    return {&MspelAxisNeon<0, false, Size, Avg>, &MspelAxisNeon<1, false, Size, Avg>, &MspelAxisNeon<2, false, Size, Avg>,
+            &MspelAxisNeon<3, false, Size, Avg>, &MspelAxisNeon<1, true, Size, Avg>,  &MspelAxisNeon<2, true, Size, Avg>,
+            &MspelAxisNeon<3, true, Size, Avg>};
+}
+
+constexpr auto kNeon8 = MspelNeonKinds<8, false>(), kNeon8Avg = MspelNeonKinds<8, true>();
+constexpr auto kNeon16 = MspelNeonKinds<16, false>(), kNeon16Avg = MspelNeonKinds<16, true>();
+
+/// The NEON kind of a block, or null for one of both axes (GCC's vector code then).
+MspelNeonKind MspelNeon(int hmode, int vmode, int size, bool avg)
+{
+    if ((hmode != 0 && vmode != 0) || (size != 8 && size != 16))
+        return nullptr;
+    const auto& kinds = size == 8 ? (avg ? kNeon8Avg : kNeon8) : (avg ? kNeon16Avg : kNeon16);
+    return kinds[size_t(vmode != 0 ? 3 + vmode : hmode)];
+}
+#endif
+
 } // namespace
 
 void Vc1Video::MspelMc(uint8_t* dst, int d, int dstStride, const uint8_t* src, int s, int srcStride, int hmode, int vmode, int rnd, int size, bool avg)
 {
     // vc1_mspel_mc: bicubic interpolation of a size x size block (put or average)
+#if defined(__aarch64__)
+    if (MspelNeonKind kind = MspelNeon(hmode, vmode, size, avg))
+    {
+        kind(dst + d, dstStride, src + s, srcStride, rnd);
+        return;
+    }
+#endif
+    if (size == 8 || size == 16)
+    {
+        const auto& kinds = size == 8 ? (avg ? kMspel8Avg : kMspel8) : (avg ? kMspel16Avg : kMspel16);
+        kinds[size_t(hmode + 4 * vmode)](dst + d, dstStride, src + s, srcStride, rnd, m_mspelTemp.data());
+        return;
+    }
     if (vmode != 0)
     {
         if (hmode != 0)
@@ -659,20 +830,114 @@ void Vc1Video::HpelMc(uint8_t* dst, int d, int dstStride, const uint8_t* src, in
     }
 }
 
+namespace {
+
+/// ChromaMc put or averaged (a loop of eight the compiler makes vector code of).
+template <bool Avg>
+void Chroma8(uint8_t* dst, int dstStride, const uint8_t* src, int stride, int a, int b, int c, int e, int bias)
+{
+    for (int j = 0; j < 8; j++, dst += dstStride, src += stride)
+        for (int i = 0; i < 8; i++)
+        {
+            int v = (a * src[i] + b * src[i + 1] + c * src[i + stride] + e * src[i + stride + 1] + bias) >> 6;
+            dst[i] = Avg ? uint8_t((dst[i] + v + 1) >> 1) : uint8_t(v);
+        }
+}
+
+#if defined(__aarch64__)
+/// Chroma8 in NEON: the weights are at most 64 and their sum 64, so a sum of bytes times them holds
+/// in 16 bits and its >> 6 in a byte, as the scalar code's.
+template <bool Avg>
+void Chroma8Neon(uint8_t* dst, int dstStride, const uint8_t* src, int stride, int a, int b, int c, int e, int bias)
+{
+    uint8x8_t wa = vdup_n_u8(uint8_t(a)), wb = vdup_n_u8(uint8_t(b)), wc = vdup_n_u8(uint8_t(c)), we = vdup_n_u8(uint8_t(e));
+    uint16x8_t round = vdupq_n_u16(uint16_t(bias));
+    for (int j = 0; j < 8; j++, dst += dstStride, src += stride)
+    {
+        uint16x8_t sum = vmlal_u8(round, vld1_u8(src), wa);
+        sum = vmlal_u8(sum, vld1_u8(src + 1), wb);
+        sum = vmlal_u8(sum, vld1_u8(src + stride), wc);
+        sum = vmlal_u8(sum, vld1_u8(src + stride + 1), we);
+        Store8<Avg>(dst, vshrn_n_u16(sum, 6));
+    }
+}
+#endif
+
+} // namespace
+
 void Vc1Video::ChromaMc(uint8_t* dst, int d, int dstStride, const uint8_t* src, int x, int y, bool round, bool avg)
 {
     // 8x8 chroma bilinear interpolation in eighths (h264chroma when rounding, vc1dsp's no_rnd one otherwise)
     int a = (8 - x) * (8 - y), b = x * (8 - y), c = (8 - x) * y, e = x * y;
     int bias = round ? 32 : 28;
-    for (int j = 0; j < 8; j++)
+#if defined(__aarch64__)
+    if (avg)
+        Chroma8Neon<true>(dst + d, dstStride, src, ChromaEdgeStride, a, b, c, e, bias);
+    else
+        Chroma8Neon<false>(dst + d, dstStride, src, ChromaEdgeStride, a, b, c, e, bias);
+#else
+    if (avg)
+        Chroma8<true>(dst + d, dstStride, src, ChromaEdgeStride, a, b, c, e, bias);
+    else
+        Chroma8<false>(dst + d, dstStride, src, ChromaEdgeStride, a, b, c, e, bias);
+#endif
+}
+
+std::string Vc1Video::CheckVectorLanes()
+{
+#if defined(__aarch64__)
+    // The NEON kinds against the scalar ones on random blocks, every mode, size, rounding and average
+    std::mt19937 random(12345);
+    constexpr int Stride = 48;
+    std::array<uint8_t, Stride * Stride> source{}, before{}, neon{}, scalar{};
+    std::array<int16_t, 19 * 16> tmp{};
+    int differed = 0;
+    std::string report;
+    for (int round = 0; round < 2000; round++)
     {
-        int s = j * ChromaEdgeStride, o = d + j * dstStride;
-        for (int i = 0; i < 8; i++)
+        for (auto& v : source)
+            v = uint8_t(random());
+        for (auto& v : before)
+            v = uint8_t(random());
+        const uint8_t* src = source.data() + 4 * Stride + 4;
+        for (int size : {8, 16})
+            for (bool avg : {false, true})
+                for (int rnd : {0, 1})
+                    for (int mode = 0; mode < 7; mode++)
+                    {
+                        int hmode = mode < 4 ? mode : 0, vmode = mode < 4 ? 0 : mode - 3;
+                        neon = before;
+                        scalar = before;
+                        MspelNeon(hmode, vmode, size, avg)(neon.data(), Stride, src, Stride, rnd);
+                        const auto& kinds = size == 8 ? (avg ? kMspel8Avg : kMspel8) : (avg ? kMspel16Avg : kMspel16);
+                        kinds[size_t(hmode + 4 * vmode)](scalar.data(), Stride, src, Stride, rnd, tmp.data());
+                        if (neon != scalar && differed++ < 3)
+                            report += std::format(" mspel h{} v{} size {} avg {} rnd {};", hmode, vmode, size, avg, rnd);
+                    }
+        int x = int(random() % 8), y = int(random() % 8), bias = random() % 2 != 0 ? 32 : 28;
+        int a = (8 - x) * (8 - y), b = x * (8 - y), c = (8 - x) * y, e = x * y;
+        for (bool avg : {false, true})
         {
-            int v = (a * src[s + i] + b * src[s + i + 1] + c * src[s + i + ChromaEdgeStride] + e * src[s + i + ChromaEdgeStride + 1] + bias) >> 6;
-            dst[o + i] = avg ? uint8_t((dst[o + i] + v + 1) >> 1) : uint8_t(v);
+            neon = before;
+            scalar = before;
+            if (avg)
+            {
+                Chroma8Neon<true>(neon.data(), Stride, src, Stride, a, b, c, e, bias);
+                Chroma8<true>(scalar.data(), Stride, src, Stride, a, b, c, e, bias);
+            }
+            else
+            {
+                Chroma8Neon<false>(neon.data(), Stride, src, Stride, a, b, c, e, bias);
+                Chroma8<false>(scalar.data(), Stride, src, Stride, a, b, c, e, bias);
+            }
+            if (neon != scalar && differed++ < 3)
+                report += std::format(" chroma x{} y{} avg {};", x, y, avg);
         }
     }
+    return differed == 0 ? std::string() : std::format("{} blocks differed:", differed) + report;
+#else
+    return {};
+#endif
 }
 
 } // namespace openshiina::formats

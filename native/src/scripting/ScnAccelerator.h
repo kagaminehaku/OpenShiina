@@ -35,6 +35,13 @@ public:
     {
         return false;
     }
+    /// The last run's parts in milliseconds: the CPU's cache flushed before it, the GPU's work (made,
+    /// sent and waited for), the cache flushed after (for the slow log).
+    struct RunTimes
+    {
+        double Before = 0, Gpu = 0, After = 0;
+    };
+    virtual RunTimes LastRun() const { return {}; }
     /// Runs groupsX x groupsY work groups with the parameters (the shader's uniform block) and
     /// waits; false when it failed.
     virtual bool Run(const void* parameters, size_t size, int groupsX, int groupsY) = 0;

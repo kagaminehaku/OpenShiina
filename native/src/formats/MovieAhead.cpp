@@ -1,6 +1,8 @@
 // A movie decoded ahead (see MovieAhead.h)
 #include "formats/MovieAhead.h"
 
+#include <chrono>
+
 #ifdef __SWITCH__
 #include <switch.h>
 #endif
@@ -61,9 +63,11 @@ void MovieAhead::Run()
             slot = (m_read + m_ready) % slots;
         }
         const MpegFrame* frame = nullptr;
+        auto start = std::chrono::steady_clock::now(), decoded = start;
         try
         {
             frame = m_video->Next();
+            decoded = std::chrono::steady_clock::now();
             if (frame != nullptr)
                 frame->ToBgr24(m_pictures[size_t(slot)].data(), m_width * 3, m_width, m_height);
         }
@@ -72,15 +76,31 @@ void MovieAhead::Run()
             // a stream that breaks off ends there (in the C# player its error would stop the scripts)
             frame = nullptr;
         }
+        auto made = std::chrono::steady_clock::now();
         std::lock_guard lock(m_mutex);
+        m_decodingNs += std::chrono::duration_cast<std::chrono::nanoseconds>(decoded - start).count();
+        m_picturesNs += std::chrono::duration_cast<std::chrono::nanoseconds>(made - decoded).count();
         if (frame == nullptr)
             m_ended = true;
         else
+        {
             m_ready++;
+            m_frames++;
+        }
         m_changed.notify_all();
         if (m_ended)
             return;
     }
+}
+
+void MovieAhead::TakeTimes(double& decoding, double& pictures, int& frames)
+{
+    std::lock_guard lock(m_mutex);
+    decoding = double(m_decodingNs) / 1e6;
+    pictures = double(m_picturesNs) / 1e6;
+    frames = m_frames;
+    m_decodingNs = m_picturesNs = 0;
+    m_frames = 0;
 }
 
 const Bytes* MovieAhead::Next()

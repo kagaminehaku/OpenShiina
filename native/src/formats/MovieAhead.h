@@ -6,6 +6,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -32,6 +33,10 @@ public:
     /// Back to the first frame.
     void Rewind();
 
+    /// The thread's time since the last call (milliseconds decoding, making the pictures, and the
+    /// frames made), for the slow log.
+    void TakeTimes(double& decoding, double& pictures, int& frames);
+
 private:
     static constexpr int Ahead = 3;
 
@@ -48,6 +53,9 @@ private:
     // a ring of pictures: [m_read, m_read + m_ready) made, the one before m_read in use
     std::vector<Bytes> m_pictures = std::vector<Bytes>(Ahead + 1);
     int m_read = 0, m_ready = 0;
+    // (TakeTimes, under m_mutex)
+    int64_t m_decodingNs = 0, m_picturesNs = 0;
+    int m_frames = 0;
     bool m_holding = false, m_ended = false, m_stopping = false;
 };
 

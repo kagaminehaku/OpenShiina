@@ -170,8 +170,26 @@ void ScnVm::GpuTargetDone(int dst, int dstPitch, int width, int height, const ui
             GpuWrite(dst + r * dstPitch, output ? output + size_t(r) * size_t(width) * 4 : Bytes(dst + r * dstPitch, width * 4), width * 4);
 }
 
+void ScnVm::GpuTimes(const char* routine, int64_t started, int64_t ran, int64_t back, const IScnGpuKernel& kernel)
+{
+    if (!RoutineTimes)
+        return;
+    auto add = [&](const char* part, double ms) {
+        auto& time = (*RoutineTimes)[std::string(routine) + " gpu: " + part];
+        time.Milliseconds += ms;
+        time.Calls++;
+    };
+    IScnGpuKernel::RunTimes run = kernel.LastRun();
+    add("prepare", double(ran - started) / 1e6);
+    add("flush before", run.Before);
+    add("GPU", run.Gpu);
+    add("flush after", run.After);
+    add("write back", double(Now() - back) / 1e6);
+}
+
 bool ScnVm::SubpixelOnGpu(const std::vector<std::array<int, 3>>& rows, int srcPitch, int inPixels, int outPixels, SubpixelGpuParameters parameters)
 {
+    int64_t started = Now();
     IScnGpuKernel* kernel = Accelerator->Kernel("subpixel32");
     if (rows.empty() || srcPitch <= 0 || !kernel)
         return false;
@@ -204,9 +222,12 @@ bool ScnVm::SubpixelOnGpu(const std::vector<std::array<int, 3>>& rows, int srcPi
     parameters.RowCount = nr;
     parameters.OutPixels = outPixels;
     parameters.InPixels = inPixels;
+    int64_t ran = Now();
     if (!kernel->Run(&parameters, sizeof parameters, (outPixels + 15) / 16, (nr + 15) / 16))
         return false;
+    int64_t back = Now();
     GpuTargetDone(dst, dstPitch, outPixels, nr, output);
+    GpuTimes("subpixel32", started, ran, back, *kernel);
     return true;
 }
 
@@ -317,6 +338,7 @@ bool ScnVm::Enlarge16OnGpu(const std::vector<std::array<int, 4>>& rows, const st
 bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, const std::vector<std::array<uint32_t, 5>>& columns, int width, int height,
                             int src, int srcPitch, int dst, int dstPitch, float wholeX, float wholeY, float wholeXY)
 {
+    int64_t started = Now();
     // (the Switch's own kernels: the scripts' memory read and written in place where it can be)
     IScnGpuKernel* kernel = Accelerator->Kernel("scale32sse_csh");
     if (!kernel)
@@ -332,15 +354,19 @@ bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, co
         return false;
     std::memcpy(rowTable, rows.data(), size_t(nr) * 20);
     std::memcpy(columnTable, columns.data(), size_t(nc) * 20);
+    int64_t ran = Now();
     if (!kernel->Run(&parameters, sizeof parameters, (nc + 15) / 16, (nr + 15) / 16))
         return false;
+    int64_t back = Now();
     GpuTargetDone(dst, dstPitch, nc, nr, output);
+    GpuTimes("scale32 (SSE2 build)", started, ran, back, *kernel);
     return true;
 }
 
 bool ScnVm::Enlarge32OnGpu(const std::vector<std::array<uint32_t, 8>>& rows, const std::vector<std::array<uint32_t, 8>>& columns, int width, int height,
                            int src, int srcPitch, int dst, int dstPitch)
 {
+    int64_t started = Now();
     IScnGpuKernel* kernel = Accelerator->Kernel("enlarge32_csh");
     if (!kernel)
         return false;
@@ -355,9 +381,12 @@ bool ScnVm::Enlarge32OnGpu(const std::vector<std::array<uint32_t, 8>>& rows, con
         return false;
     std::memcpy(rowTable, rows.data(), size_t(nr) * 32);
     std::memcpy(columnTable, columns.data(), size_t(nc) * 32);
+    int64_t ran = Now();
     if (!kernel->Run(&parameters, sizeof parameters, (nc + 15) / 16, (nr + 15) / 16))
         return false;
+    int64_t back = Now();
     GpuTargetDone(dst, dstPitch, nc, nr, output);
+    GpuTimes("enlarge32", started, ran, back, *kernel);
     return true;
 }
 

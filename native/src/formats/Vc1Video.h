@@ -18,6 +18,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "formats/AsfFile.h"
@@ -25,6 +26,7 @@
 #include "formats/VlcTable.h"
 
 namespace openshiina::formats {
+
 
 class Vc1Video final : public IMovieVideo
 {
@@ -42,6 +44,10 @@ public:
     const MpegFrame* Next() override;
     /// Back to the first picture.
     void Rewind() override;
+
+    /// The NEON motion compensation against the scalar one on random blocks: empty when they agree
+    /// (the PC tests do not run it; empty there).
+    static std::string CheckVectorLanes();
 
 private:
     static constexpr int TypeI = 1, TypeP = 2, TypeB = 3, TypeBI = 4;
