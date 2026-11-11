@@ -254,6 +254,10 @@ private:
     static void PutPixelsClamped(const int16_t* block, uint8_t* plane, int dst, int linesize, bool isSigned);
     static void AddPixelsClamped(const int16_t* block, uint8_t* plane, int dst, int linesize);
     static void InvTrans8x8(int16_t* block);
+    // The scalar kinds of the two above (NEON on the Switch; CheckTransformLanes compares them)
+    static void AddPixelsClampedScalar(const int16_t* block, uint8_t* plane, int dst, int linesize);
+    static void InvTrans8x8Scalar(int16_t* block);
+    static std::string CheckTransformLanes();
     static void AddDc(uint8_t* plane, int dst, int linesize, int dc, int width, int height);
     static void InvTrans8x8Dc(uint8_t* plane, int dst, int linesize, const int16_t* block);
     static void InvTrans8x4Dc(uint8_t* plane, int dst, int linesize, int dc);

@@ -2,8 +2,16 @@
 // loops, macroblock layers of I, P and B pictures, DC / AC prediction, the coefficients and the
 // inverse transforms (vc1dsp.c).
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
+#include <format>
+#include <random>
+#include <string>
+
+#if defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 #include "formats/Vc1Tables.h"
 #include "formats/Vc1Video.Vlcs.h"
@@ -1333,16 +1341,147 @@ void Vc1Video::PutPixelsClamped(const int16_t* block, uint8_t* plane, int dst, i
             plane[dst + x] = Clip(block[y * 8 + x] + add);
 }
 
-void Vc1Video::AddPixelsClamped(const int16_t* block, uint8_t* plane, int dst, int linesize)
+void Vc1Video::AddPixelsClampedScalar(const int16_t* block, uint8_t* plane, int dst, int linesize)
 {
     for (int y = 0; y < 8; y++, dst += linesize)
         for (int x = 0; x < 8; x++)
             plane[dst + x] = Clip(plane[dst + x] + block[y * 8 + x]);
 }
 
-// ---- Inverse transforms (vc1dsp.c) ----
+#if defined(__aarch64__)
+
+namespace {
+
+// The 8x8 inverse transform and the adding of a block in NEON, the same numbers as the scalar code:
+// a pass works on the eight columns at once in 32 bits, its results cut to 16 bits as int16_t does,
+// and the picture's bytes plus the block clamped (a saturated 16-bit sum clamps the same way).
+
+/// The eight results of one pass of the transform (d the rounding, the +1 of the last four in pass 2).
+template <int Shift, int Round, int Last>
+inline void Pass(const int32x4_t (&s)[8], int32x4_t (&out)[8])
+{
+    int32x4_t t1 = vaddq_s32(vmulq_n_s32(vaddq_s32(s[0], s[4]), 12), vdupq_n_s32(Round));
+    int32x4_t t2 = vaddq_s32(vmulq_n_s32(vsubq_s32(s[0], s[4]), 12), vdupq_n_s32(Round));
+    int32x4_t t3 = vmlaq_n_s32(vmulq_n_s32(s[2], 16), s[6], 6);
+    int32x4_t t4 = vmlsq_n_s32(vmulq_n_s32(s[2], 6), s[6], 16);
+    int32x4_t t5 = vaddq_s32(t1, t3), t6 = vaddq_s32(t2, t4), t7 = vsubq_s32(t2, t4), t8 = vsubq_s32(t1, t3);
+    int32x4_t u1 = vmlaq_n_s32(vmlaq_n_s32(vmlaq_n_s32(vmulq_n_s32(s[1], 16), s[3], 15), s[5], 9), s[7], 4);
+    int32x4_t u2 = vmlsq_n_s32(vmlsq_n_s32(vmlsq_n_s32(vmulq_n_s32(s[1], 15), s[3], 4), s[5], 16), s[7], 9);
+    int32x4_t u3 = vmlaq_n_s32(vmlaq_n_s32(vmlsq_n_s32(vmulq_n_s32(s[1], 9), s[3], 16), s[5], 4), s[7], 15);
+    int32x4_t u4 = vmlsq_n_s32(vmlaq_n_s32(vmlsq_n_s32(vmulq_n_s32(s[1], 4), s[3], 9), s[5], 15), s[7], 16);
+    int32x4_t last = vdupq_n_s32(Last);
+    out[0] = vshrq_n_s32(vaddq_s32(t5, u1), Shift);
+    out[1] = vshrq_n_s32(vaddq_s32(t6, u2), Shift);
+    out[2] = vshrq_n_s32(vaddq_s32(t7, u3), Shift);
+    out[3] = vshrq_n_s32(vaddq_s32(t8, u4), Shift);
+    out[4] = vshrq_n_s32(vaddq_s32(vsubq_s32(t8, u4), last), Shift);
+    out[5] = vshrq_n_s32(vaddq_s32(vsubq_s32(t7, u3), last), Shift);
+    out[6] = vshrq_n_s32(vaddq_s32(vsubq_s32(t6, u2), last), Shift);
+    out[7] = vshrq_n_s32(vaddq_s32(vsubq_s32(t5, u1), last), Shift);
+}
+
+/// One pass over the eight columns of rows (rows[k]: lanes the columns): out[m] lane i the m-th
+/// result of column i, cut to 16 bits.
+template <int Shift, int Round, int Last>
+inline void Columns(const int16x8_t (&rows)[8], int16x8_t (&out)[8])
+{
+    int32x4_t lo[8], hi[8], loOut[8], hiOut[8];
+    for (int k = 0; k < 8; k++)
+    {
+        lo[k] = vmovl_s16(vget_low_s16(rows[k]));
+        hi[k] = vmovl_s16(vget_high_s16(rows[k]));
+    }
+    Pass<Shift, Round, Last>(lo, loOut);
+    Pass<Shift, Round, Last>(hi, hiOut);
+    for (int m = 0; m < 8; m++)
+        out[m] = vcombine_s16(vmovn_s32(loOut[m]), vmovn_s32(hiOut[m]));
+}
+
+/// The 8 x 8 matrix of rows v transposed.
+inline void Transpose(int16x8_t (&v)[8])
+{
+    int16x8x2_t a0 = vtrnq_s16(v[0], v[1]), a1 = vtrnq_s16(v[2], v[3]), a2 = vtrnq_s16(v[4], v[5]), a3 = vtrnq_s16(v[6], v[7]);
+    int32x4x2_t b0 = vtrnq_s32(vreinterpretq_s32_s16(a0.val[0]), vreinterpretq_s32_s16(a1.val[0]));
+    int32x4x2_t b1 = vtrnq_s32(vreinterpretq_s32_s16(a0.val[1]), vreinterpretq_s32_s16(a1.val[1]));
+    int32x4x2_t b2 = vtrnq_s32(vreinterpretq_s32_s16(a2.val[0]), vreinterpretq_s32_s16(a3.val[0]));
+    int32x4x2_t b3 = vtrnq_s32(vreinterpretq_s32_s16(a2.val[1]), vreinterpretq_s32_s16(a3.val[1]));
+    auto low = [](int32x4_t x, int32x4_t y) { return vreinterpretq_s16_s32(vcombine_s32(vget_low_s32(x), vget_low_s32(y))); };
+    auto high = [](int32x4_t x, int32x4_t y) { return vreinterpretq_s16_s32(vcombine_s32(vget_high_s32(x), vget_high_s32(y))); };
+    v[0] = low(b0.val[0], b2.val[0]);
+    v[1] = low(b1.val[0], b3.val[0]);
+    v[2] = low(b0.val[1], b2.val[1]);
+    v[3] = low(b1.val[1], b3.val[1]);
+    v[4] = high(b0.val[0], b2.val[0]);
+    v[5] = high(b1.val[0], b3.val[0]);
+    v[6] = high(b0.val[1], b2.val[1]);
+    v[7] = high(b1.val[1], b3.val[1]);
+}
+
+} // namespace
+
+void Vc1Video::AddPixelsClamped(const int16_t* block, uint8_t* plane, int dst, int linesize)
+{
+    for (int y = 0; y < 8; y++, dst += linesize)
+    {
+        int16x8_t sum = vqaddq_s16(vreinterpretq_s16_u16(vmovl_u8(vld1_u8(plane + dst))), vld1q_s16(block + y * 8));
+        vst1_u8(plane + dst, vqmovun_s16(sum));
+    }
+}
 
 void Vc1Video::InvTrans8x8(int16_t* block)
+{
+    // pass 1: the columns of the block, its results the rows of temp (out[k] lane i: temp[i][k]);
+    // pass 2: the columns of temp, its results the rows of the block
+    int16x8_t rows[8], out[8];
+    for (int k = 0; k < 8; k++)
+        rows[k] = vld1q_s16(block + 8 * k);
+    Columns<3, 4, 0>(rows, out);
+    Transpose(out);
+    Columns<7, 64, 1>(out, rows);
+    for (int k = 0; k < 8; k++)
+        vst1q_s16(block + 8 * k, rows[k]);
+}
+
+#else
+
+void Vc1Video::AddPixelsClamped(const int16_t* block, uint8_t* plane, int dst, int linesize) { AddPixelsClampedScalar(block, plane, dst, linesize); }
+void Vc1Video::InvTrans8x8(int16_t* block) { InvTrans8x8Scalar(block); }
+
+#endif
+
+std::string Vc1Video::CheckTransformLanes()
+{
+#if defined(__aarch64__)
+    // Random blocks of each size of coefficients (small, the decoder's, and any 16 bits)
+    std::mt19937 random(54321);
+    int differed = 0;
+    for (int round = 0; round < 6000; round++)
+    {
+        std::array<int16_t, 64> block{}, scalar{};
+        int range = round % 3 == 0 ? 64 : round % 3 == 1 ? 2048 : 65536;
+        for (auto& v : block)
+            v = int16_t(int(random() % uint32_t(range)) - range / 2);
+        scalar = block;
+        InvTrans8x8(block.data());
+        InvTrans8x8Scalar(scalar.data());
+        std::array<uint8_t, 8 * 24> picture{}, expected{};
+        for (auto& v : picture)
+            v = uint8_t(random());
+        expected = picture;
+        AddPixelsClamped(block.data(), picture.data(), 3, 24);
+        AddPixelsClampedScalar(scalar.data(), expected.data(), 3, 24);
+        if (block != scalar || picture != expected)
+            differed++;
+    }
+    return differed == 0 ? std::string() : std::format(" {} transforms differed;", differed);
+#else
+    return {};
+#endif
+}
+
+// ---- Inverse transforms (vc1dsp.c) ----
+
+void Vc1Video::InvTrans8x8Scalar(int16_t* block)
 {
     int16_t temp[64];
     for (int i = 0; i < 8; i++)

@@ -934,7 +934,10 @@ std::string Vc1Video::CheckVectorLanes()
                 report += std::format(" chroma x{} y{} avg {};", x, y, avg);
         }
     }
-    return differed == 0 ? std::string() : std::format("{} blocks differed:", differed) + report;
+    std::string transforms = CheckTransformLanes();
+    if (differed == 0 && transforms.empty())
+        return {};
+    return std::format("{} blocks differed:", differed) + report + transforms;
 #else
     return {};
 #endif
