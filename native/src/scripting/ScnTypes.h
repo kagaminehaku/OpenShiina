@@ -132,6 +132,17 @@ public:
     virtual bool ReadSaveFile(const std::string& name, Bytes& data) = 0;
     virtual void WriteSaveFile(const std::string& name, const Bytes& data) = 0;
     virtual void DeleteSaveFile(const std::string& name) = 0;
+    /// MoveFileA of a save file: renamed when it is there and the new name is not; false otherwise.
+    /// (By default read, written and deleted; a host with a file system renames it.)
+    virtual bool MoveSaveFile(const std::string& from, const std::string& to)
+    {
+        Bytes data, existing;
+        if (!ReadSaveFile(from, data) || ReadSaveFile(to, existing))
+            return false;
+        WriteSaveFile(to, data);
+        DeleteSaveFile(from);
+        return true;
+    }
 
     /// A message box; returns the button as Windows numbers it (1 OK, 2 cancel, 6 yes, 7 no).
     virtual int MessageBox(const std::string& text, const std::string& caption, int type) = 0;

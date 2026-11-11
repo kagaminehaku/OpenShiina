@@ -293,6 +293,15 @@ public:
 
     void DeleteSaveFile(const std::string& name) override { std::remove(SavePath(name).c_str()); }
 
+    bool MoveSaveFile(const std::string& from, const std::string& to) override
+    {
+        struct stat info;
+        std::string source = SavePath(from), target = SavePath(to);
+        if (stat(source.c_str(), &info) != 0 || stat(target.c_str(), &info) == 0)
+            return false;
+        return std::rename(source.c_str(), target.c_str()) == 0;
+    }
+
     /// MessageBoxA asked of the player (Play's MessageDialog); without it the answer is yes / OK.
     std::function<int(const std::string& text, const std::string& caption, int type)> AskPlayer;
 

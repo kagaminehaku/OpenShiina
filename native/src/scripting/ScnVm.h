@@ -786,6 +786,7 @@ private:
     bool ReadSave(const std::string& name, openshiina::Bytes& data) { return m_host.ReadSaveFile(name, data); }
     void WriteSave(const std::string& name, const openshiina::Bytes& data) { m_host.WriteSaveFile(name, data); }
     void DeleteSave(const std::string& name) { m_host.DeleteSaveFile(name); }
+    bool MoveSave(const std::string& from, const std::string& to) { return m_host.MoveSaveFile(from, to); }
     std::string m_iniFile;
     std::map<std::tuple<std::string, std::string, std::string>, std::string> m_iniWritten;
     std::unordered_map<int, OpenFile> m_files;

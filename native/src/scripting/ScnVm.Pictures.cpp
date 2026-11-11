@@ -7,6 +7,7 @@
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
+#include <chrono>
 
 namespace openshiina::scripting {
 
@@ -290,8 +291,17 @@ void ScnVm::RegisterPictures()
     Register(0x00C8, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         std::string file = vm.ReadString(vm.Value(c, i.Args[0]));
         openshiina::Bytes data;
+        auto started = std::chrono::steady_clock::now();
         if (!vm.ReadScriptFile(file, data))
             return 2;
+        // With RoutineTimes: a file that took long to read, by name ("read: <file>")
+        double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        if (vm.RoutineTimes && ms >= 50)
+        {
+            auto& time = (*vm.RoutineTimes)["read: " + file];
+            time.Milliseconds += ms;
+            time.Calls++;
+        }
         vm.EngineGlobals[0x4C4514] = int(data.size());
         vm.WriteBytes(vm.Value(c, i.Args[1]), data);
         return 0;

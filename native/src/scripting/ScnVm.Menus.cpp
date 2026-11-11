@@ -269,12 +269,10 @@ void ScnVm::RegisterMenus()
         if (!vm.FileWritesEnabled)
             return 0;
         auto from = vm.ResolvePath(join(a)), to = vm.ResolvePath(join(b));
-        openshiina::Bytes data, existing;
-        if (from && from->Save && to && to->Save && vm.ReadSave(from->Name, data) && !vm.ReadSave(to->Name, existing))
-        {
-            vm.WriteSave(to->Name, data);
-            vm.DeleteSave(from->Name);
-        }
+        // (renamed by the host: read, written and deleted on the Switch took 22 ms a file; Re: Rem
+        // Plus renames eleven at once)
+        if (from && from->Save && to && to->Save)
+            vm.MoveSave(from->Name, to->Name);
         return 0;
     });
     // 0294 base, count, width, slot: sorts count elements of width bytes (FUN_004174E0)
