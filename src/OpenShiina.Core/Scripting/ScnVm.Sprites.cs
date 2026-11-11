@@ -886,12 +886,31 @@ public sealed partial class ScnVm
             int fy = sy + (int)((long)row * sh / h);
             if (ty < 0 || ty >= dh || fy < 0 || fy >= shei)
                 continue;
+            // The two rows in place when they are pieces of memory (a pixel at a time, in the same
+            // order: the same bytes when they share some), else a byte at a time
+            int to = d0 + ty * dp, from = s0 + fy * spitch;
+            if (dw > 0 && swid > 0 && IsContiguous(to, dw * 3) && IsContiguous(from, swid * 3))
+            {
+                var target = Bytes(to, dw * 3);
+                var source = Bytes(from, swid * 3);
+                for (int col = 0; col < Math.Abs(w); col++)
+                {
+                    int tx = x + col, fx = sx + (int)((long)col * sw / w);
+                    if (tx < 0 || tx >= dw || fx < 0 || fx >= swid)
+                        continue;
+                    byte b = source[fx * 3], g = source[fx * 3 + 1], r = source[fx * 3 + 2];
+                    target[tx * 3] = b;
+                    target[tx * 3 + 1] = g;
+                    target[tx * 3 + 2] = r;
+                }
+                continue;
+            }
             for (int col = 0; col < Math.Abs(w); col++)
             {
                 int tx = x + col, fx = sx + (int)((long)col * sw / w);
                 if (tx < 0 || tx >= dw || fx < 0 || fx >= swid)
                     continue;
-                CopyPixel24(d0 + ty * dp + tx * 3, s0 + fy * spitch + fx * 3);
+                CopyPixel24(to + tx * 3, from + fx * 3);
             }
         }
     }
@@ -953,9 +972,36 @@ public sealed partial class ScnVm
         int srcPitch = SurfaceField(src, 10), dstPitch = SurfaceField(dst, 10);
         int srcBase = SurfaceField(src, 2) + skipX * 3 + srcPitch * sy;
         int dstRow = SurfaceField(dst, 2) + dstPitch * startY + startX * 3;
+        // Where each pixel of a row reads, from the row's first source byte: the same for every row,
+        // so a row goes in place (a pixel at a time, in the same order) when its bytes are pieces of
+        // memory, else a byte at a time
+        int pixels = Math.Max(endX - startX, 0), low = 0, high = 0;
+        var offsets = new int[pixels];
+        for (int k = 0, at = 0; k < pixels; k++)
+        {
+            at += table[startX + k];
+            offsets[k] = at;
+            low = Math.Min(low, at);
+            high = Math.Max(high, at);
+        }
         for (int y = startY; y < endY; y++, rowAcc += ystep, dstRow += dstPitch)
         {
             int p = (rowAcc >> 16) * srcPitch + srcBase, q = dstRow;
+            long first = (long)p + low;
+            if (pixels > 0 && first >= 0 && q >= 0 && IsContiguous((int)first, high - low + 3) && IsContiguous(q, pixels * 3))
+            {
+                var source = Bytes((int)first, high - low + 3);
+                var target = Bytes(q, pixels * 3);
+                for (int k = 0; k < pixels; k++)
+                {
+                    int at = offsets[k] - low;
+                    byte b = source[at], g = source[at + 1], r = source[at + 2];
+                    target[k * 3] = b;
+                    target[k * 3 + 1] = g;
+                    target[k * 3 + 2] = r;
+                }
+                continue;
+            }
             for (int x = startX; x < endX; x++, q += 3)
             {
                 p += table[x];
