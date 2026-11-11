@@ -208,13 +208,21 @@ if(NINTENDO_SWITCH)
         string(REPLACE "layout(push_constant) uniform" "layout(std140, binding = 0) uniform" text "${text}")
         string(REGEX REPLACE "([^A-Za-z_])packed\\(" "\\1packedLanes(" text "${text}")
         set(glsl "${CMAKE_CURRENT_BINARY_DIR}/gpu/${name}.glsl")
-        # subpixel32 reads and writes the scripts' memory in place (DekoAccelerator): its rows from a
-        # first word and a pitch, given after the C# player's parameters
+        # subpixel32 and scale read and write the scripts' memory in place (DekoAccelerator): their
+        # rows from a first word and a pitch, given after the C# player's parameters
+        set(pairs)
         if(name STREQUAL "subpixel32")
-            foreach(pair "source[row * inPixels + at]=source[sourceWord + row * sourcePitch + at]"
-                         "source[P * inPixels + s]=source[sourceWord + P * sourcePitch + s]"
-                         "pixels[r * outPixels + o]=pixels[outputWord + r * outputPitch + o]"
-                         "int copyAcross;=int copyAcross@ int sourceWord@ int sourcePitch@ int outputWord@ int outputPitch;")
+            set(pairs "source[row * inPixels + at]=source[sourceWord + row * sourcePitch + at]"
+                      "source[P * inPixels + s]=source[sourceWord + P * sourcePitch + s]"
+                      "pixels[r * outPixels + o]=pixels[outputWord + r * outputPitch + o]"
+                      "int copyAcross=int copyAcross@ int sourceWord@ int sourcePitch@ int outputWord@ int outputPitch")
+        elseif(name STREQUAL "scale")
+            set(pairs "y * width + x0=sourceWord + y * sourcePitch + x0"
+                      "pixels[r * columnCount + c]=pixels[outputWord + r * outputPitch + c]"
+                      "int mode=int mode@ int sourceWord@ int sourcePitch@ int outputWord@ int outputPitch")
+        endif()
+        if(pairs)
+            foreach(pair ${pairs})
                 string(FIND "${pair}" "=" at)
                 string(SUBSTRING "${pair}" 0 ${at} from)
                 math(EXPR at "${at} + 1")

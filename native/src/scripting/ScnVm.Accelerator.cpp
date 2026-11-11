@@ -31,6 +31,8 @@ struct ScaleGpuParameters
     int32_t RowCount, ColumnCount, Width;
     uint32_t FullRow, FullColumn;
     int32_t Mode;
+    // (the Switch's: where the source and the destination rows are, in words)
+    int32_t SourceWord, SourcePitch, OutputWord, OutputPitch;
 };
 
 struct Enlarge16GpuParameters
@@ -267,6 +269,7 @@ bool ScnVm::RotateZoomOnGpu(const std::vector<uint32_t>& source, int sw, int sh,
 bool ScnVm::ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, const std::vector<int>& rowFrom, const std::vector<std::array<int, 4>>& columns,
                        const std::vector<int>& columnFrom, int width, int src, int srcPitch, int dst, int dstPitch, uint32_t fullRow, uint32_t fullColumn)
 {
+    int64_t started = Now();
     IScnGpuKernel* kernel = Accelerator->Kernel("scale");
     if (!kernel)
         return false;
@@ -277,15 +280,18 @@ bool ScnVm::ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, co
         const auto& [flags, count, first, last] = rows[size_t(r)];
         sourceRows = std::max(sourceRows, rowFrom[size_t(r)] + ((flags & 0x80) != 0 ? 1 : 0) + count + ((flags & 0x40) != 0 ? 1 : 0));
     }
-    int rowBytes = width * 4;
-    uint8_t* source = kernel->Input(0, int64_t(sourceRows) * rowBytes);
+    // The source in place when it shares no bytes with the destination (else read before any is
+    // written, as a copy), the destination in place
+    ScaleGpuParameters parameters{nr, nc, width, fullRow, fullColumn, mode, 0, 0, 0, 0};
+    int64_t sourceEnd = src + int64_t(sourceRows - 1) * srcPitch + int64_t(width) * 4;
+    int64_t targetEnd = dst + int64_t(nr - 1) * dstPitch + int64_t(nc) * 4;
+    bool apart = dstPitch > 0 && (sourceEnd <= dst || targetEnd <= src);
     auto* rowTable = reinterpret_cast<int32_t*>(kernel->Input(1, int64_t(nr) * 20));
     auto* columnTable = reinterpret_cast<int32_t*>(kernel->Input(2, int64_t(nc) * 20));
-    uint8_t* output = kernel->Output(3, int64_t(nr) * nc * 4);
-    if (!output || !source || !rowTable || !columnTable)
+    uint8_t* output = nullptr;
+    if (!rowTable || !columnTable || !GpuSource(kernel, 0, src, srcPitch, width, sourceRows, parameters.SourceWord, parameters.SourcePitch, apart)
+        || !GpuTarget(kernel, 3, dst, dstPitch, nc, nr, parameters.OutputWord, parameters.OutputPitch, output))
         return false;
-    for (int r = 0; r < sourceRows; r++)
-        ReadBytes(src + r * srcPitch, source + size_t(r) * size_t(rowBytes), rowBytes);
     for (int r = 0; r < nr; r++)
     {
         const auto& [flags, count, first, last] = rows[size_t(r)];
@@ -298,11 +304,12 @@ bool ScnVm::ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, co
         int32_t* entry = columnTable + c * 5;
         entry[0] = columnFrom[size_t(c)], entry[1] = flags & 0xC0, entry[2] = count, entry[3] = first, entry[4] = last;
     }
-    ScaleGpuParameters parameters{nr, nc, width, fullRow, fullColumn, mode};
+    int64_t ran = Now();
     if (!kernel->Run(&parameters, sizeof parameters, (nc + 15) / 16, (nr + 15) / 16))
         return false;
-    for (int r = 0; r < nr; r++)
-        GpuWrite(dst + r * dstPitch, output + size_t(r) * size_t(nc) * 4, nc * 4);
+    int64_t back = Now();
+    GpuTargetDone(dst, dstPitch, nc, nr, output);
+    GpuTimes(mode == 0 ? "scale32" : "scale16", started, ran, back, *kernel);
     return true;
 }
 
