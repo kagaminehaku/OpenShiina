@@ -1272,7 +1272,8 @@ private:
                          bool keep, int colour, int64_t u0, int64_t v0, int64_t dux, int64_t dvx, int64_t duy, int64_t dvy, int dstBase, int dstStride);
     /// Entries: flags, count, first, last (ScaleEntry) of rows and of columns.
     bool ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, const std::vector<int>& rowFrom, const std::vector<std::array<int, 4>>& columns,
-                    const std::vector<int>& columnFrom, int width, int src, int srcPitch, int dst, int dstPitch, uint32_t fullRow, uint32_t fullColumn);
+                    const std::vector<int>& columnFrom, int width, int src, int srcPitch, int dst, int dstPitch, uint32_t fullRow, uint32_t fullColumn,
+                    const std::optional<std::pair<uint32_t, uint32_t>>& firstLast = std::nullopt);
     /// Rows: source, mixed, upper, lower; columns: source pixel, mixed, the four words left, the four right.
     bool Enlarge16OnGpu(const std::vector<std::array<int, 4>>& rows, const std::vector<std::array<int, 10>>& columns, int width, int src, int srcPitch,
                         int dst, int dstPitch);

@@ -31,8 +31,10 @@ struct ScaleGpuParameters
     int32_t RowCount, ColumnCount, Width;
     uint32_t FullRow, FullColumn;
     int32_t Mode;
-    // (the Switch's: where the source and the destination rows are, in words)
+    // (the Switch's: where the source and the destination rows are, in words; Can Fes!'s first column)
     int32_t SourceWord, SourcePitch, OutputWord, OutputPitch;
+    int32_t FirstLastOn;
+    uint32_t FirstLastLo, FirstLastHi;
 };
 
 struct Enlarge16GpuParameters
@@ -267,7 +269,8 @@ bool ScnVm::RotateZoomOnGpu(const std::vector<uint32_t>& source, int sw, int sh,
 }
 
 bool ScnVm::ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, const std::vector<int>& rowFrom, const std::vector<std::array<int, 4>>& columns,
-                       const std::vector<int>& columnFrom, int width, int src, int srcPitch, int dst, int dstPitch, uint32_t fullRow, uint32_t fullColumn)
+                       const std::vector<int>& columnFrom, int width, int src, int srcPitch, int dst, int dstPitch, uint32_t fullRow, uint32_t fullColumn,
+                       const std::optional<std::pair<uint32_t, uint32_t>>& firstLast)
 {
     int64_t started = Now();
     IScnGpuKernel* kernel = Accelerator->Kernel("scale");
@@ -282,7 +285,8 @@ bool ScnVm::ScaleOnGpu(int mode, const std::vector<std::array<int, 4>>& rows, co
     }
     // The source in place when it shares no bytes with the destination (else read before any is
     // written, as a copy), the destination in place
-    ScaleGpuParameters parameters{nr, nc, width, fullRow, fullColumn, mode, 0, 0, 0, 0};
+    ScaleGpuParameters parameters{nr, nc, width, fullRow, fullColumn, mode, 0, 0, 0, 0, firstLast ? 1 : 0, firstLast ? firstLast->first : 0u,
+                                  firstLast ? firstLast->second : 0u};
     int64_t sourceEnd = src + int64_t(sourceRows - 1) * srcPitch + int64_t(width) * 4;
     int64_t targetEnd = dst + int64_t(nr - 1) * dstPitch + int64_t(nc) * 4;
     bool apart = dstPitch > 0 && (sourceEnd <= dst || targetEnd <= src);

@@ -209,7 +209,9 @@ if(NINTENDO_SWITCH)
         string(REGEX REPLACE "([^A-Za-z_])packed\\(" "\\1packedLanes(" text "${text}")
         set(glsl "${CMAKE_CURRENT_BINARY_DIR}/gpu/${name}.glsl")
         # subpixel32 and scale read and write the scripts' memory in place (DekoAccelerator): their
-        # rows from a first word and a pitch, given after the C# player's parameters
+        # rows from a first word and a pitch, given after the C# player's parameters. scale also takes
+        # Can Fes!'s first column with its last source pixel (ScnVm.Scale32.cpp, firstLast): that
+        # pixel's lanes 0 and 2 and 1 and 3 with weights of their own, counted in the opaque test
         set(pairs)
         if(name STREQUAL "subpixel32")
             set(pairs "source[row * inPixels + at]=source[sourceWord + row * sourcePitch + at]"
@@ -219,7 +221,17 @@ if(NINTENDO_SWITCH)
         elseif(name STREQUAL "scale")
             set(pairs "y * width + x0=sourceWord + y * sourcePitch + x0"
                       "pixels[r * columnCount + c]=pixels[outputWord + r * outputPitch + c]"
-                      "int mode=int mode@ int sourceWord@ int sourcePitch@ int outputWord@ int outputPitch")
+                      "int mode=int mode@ int sourceWord@ int sourcePitch@ int outputWord@ int outputPitch@ int firstLastOn@ uint firstLastLo@ uint firstLastHi"
+                      "addPixel(at, weight(last, wy), true)=addPixel(at, weight(last, wy), true)@
+    if (c == 0 && firstLastOn != 0)
+    {
+        uint p = source[at]@
+        uint lo = weight(firstLastLo, wy), hi = weight(firstLastHi, wy)@
+        sums += uvec4((p & 0xFFu) * lo, ((p >> 8) & 0xFFu) * hi, ((p >> 16) & 0xFFu) * lo, (p >> 24) * hi)@
+        if ((p >> 24) != 0xFFu)
+            notOpaque++@
+    }
+   ")
         endif()
         if(pairs)
             foreach(pair ${pairs})
