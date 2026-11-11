@@ -77,8 +77,8 @@ public:
     /// The frame drawn so far goes to the screen (at the next vertical blank).
     void End();
 
-    /// The texture of the game's picture for this frame (one of two, made the first time with the
-    /// game's size): written by the caller between Begin and Picture.
+    /// The texture of the game's picture for this frame (one of two, made again when the game's size
+    /// is another): written by the caller between Begin and Picture.
     Texture& PictureTexture(int width, int height);
     /// The game's picture into dst with a scaling; fsrSharpness: FSR's sharpening, 1 (mild) to 10
     /// (AMD's strongest), 0 none (the C# player's setting "FSR sharpness").
@@ -141,7 +141,14 @@ private:
     uint32_t m_vertexUsed = 0;
     std::vector<Vertex> m_batch;
     int m_batchTexture = -1;
+    // The game's pictures: memory blocks of their own, made again for another size (in the
+    // textures' memory, which is never given back, a game of another size after the first ran out
+    // of it), each on a slot of its own
     std::array<Texture, Frames> m_pictures;
+    std::array<dk::UniqueMemBlock, Frames> m_pictureMem;
+    std::array<int, Frames> m_pictureSlots{-1, -1};
+    void InitializeTexture(Texture& t, int slot, int width, int height, bool coverage, dk::MemBlock memory, uint32_t at);
+    static dk::ImageLayout TextureLayout(dk::Device device, int width, int height, bool coverage, uint32_t& stride);
 };
 
 } // namespace openshiina::player

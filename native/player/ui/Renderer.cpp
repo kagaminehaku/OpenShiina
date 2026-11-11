@@ -147,36 +147,49 @@ uint32_t Renderer::Allocate(uint32_t size, uint32_t alignment)
     return at;
 }
 
-Texture Renderer::CreateTexture(int width, int height, bool coverage)
+dk::ImageLayout Renderer::TextureLayout(dk::Device device, int width, int height, bool coverage, uint32_t& stride)
 {
-    // (the last slot is FSR's picture)
-    if (m_nextSlot >= MaxTextures - 1)
-        throw std::runtime_error("Too many textures");
-    uint32_t bytes = coverage ? 1 : 4;
-    uint32_t stride = Align(uint32_t(width) * bytes, DK_IMAGE_LINEAR_STRIDE_ALIGNMENT);
+    stride = Align(uint32_t(width) * (coverage ? 1 : 4), DK_IMAGE_LINEAR_STRIDE_ALIGNMENT);
     dk::ImageLayout layout;
-    dk::ImageLayoutMaker{m_device}
+    dk::ImageLayoutMaker{device}
         .setFlags(DkImageFlags_PitchLinear)
         .setFormat(coverage ? DkImageFormat_R8_Unorm : DkImageFormat_RGBA8_Unorm)
         .setDimensions(uint32_t(width), uint32_t(height))
         .setPitchStride(stride)
         .initialize(layout);
-    uint32_t at = Allocate(uint32_t(layout.getSize()), layout.getAlignment());
-    int slot = m_nextSlot++;
+    return layout;
+}
+
+void Renderer::InitializeTexture(Texture& t, int slot, int width, int height, bool coverage, dk::MemBlock memory, uint32_t at)
+{
+    uint32_t stride = 0;
+    dk::ImageLayout layout = TextureLayout(m_device, width, height, coverage, stride);
     dk::Image& image = m_images[size_t(slot)];
-    image.initialize(layout, m_textureMem, at);
+    image.initialize(layout, memory, at);
     dk::ImageView view{image};
     dk::ImageDescriptor descriptor;
     descriptor.initialize(view);
     auto* data = static_cast<uint8_t*>(m_dataMem.getCpuAddr());
     std::memcpy(data + m_imageDescriptors + size_t(slot) * sizeof(DkImageDescriptor), &descriptor, sizeof(DkImageDescriptor));
-    Texture t;
+    t = {};
     t.Slot = slot;
     t.Width = width;
     t.Height = height;
     t.Stride = stride;
-    t.Pixels = static_cast<uint8_t*>(m_textureMem.getCpuAddr()) + at;
+    t.Pixels = static_cast<uint8_t*>(memory.getCpuAddr()) + at;
     std::memset(t.Pixels, 0, size_t(stride) * size_t(height));
+}
+
+Texture Renderer::CreateTexture(int width, int height, bool coverage)
+{
+    // (the last slot is FSR's picture)
+    if (m_nextSlot >= MaxTextures - 1)
+        throw std::runtime_error("Too many textures");
+    uint32_t stride = 0;
+    dk::ImageLayout layout = TextureLayout(m_device, width, height, coverage, stride);
+    uint32_t at = Allocate(uint32_t(layout.getSize()), layout.getAlignment());
+    Texture t;
+    InitializeTexture(t, m_nextSlot++, width, height, coverage, m_textureMem, at);
     return t;
 }
 
@@ -200,14 +213,36 @@ Texture Renderer::LoadImage(const std::string& path)
 
 Texture& Renderer::PictureTexture(int width, int height)
 {
-    Texture& t = m_pictures[size_t(m_frame % Frames)];
-    if (!t.Valid() || t.Width != width || t.Height != height)
-        t = CreateTexture(width, height);
+    size_t f = size_t(m_frame % Frames);
+    Texture& t = m_pictures[f];
+    if (t.Valid() && t.Width == width && t.Height == height)
+        return t;
+    if (m_pictureSlots[f] < 0)
+    {
+        if (m_nextSlot >= MaxTextures - 1)
+            throw std::runtime_error("Too many textures");
+        m_pictureSlots[f] = m_nextSlot++;
+    }
+    // the old one may still be read by the other frame in flight (its slot is its own, but this one
+    // was drawn last by the frame before the other)
+    m_queue.waitIdle();
+    uint32_t stride = 0;
+    dk::ImageLayout layout = TextureLayout(m_device, width, height, false, stride);
+    m_pictureMem[f] = dk::MemBlockMaker{m_device, Align(uint32_t(layout.getSize()), DK_MEMBLOCK_ALIGNMENT)}
+                          .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image)
+                          .create();
+    if (!m_pictureMem[f])
+        throw std::runtime_error("Out of memory for the game's picture");
+    InitializeTexture(t, m_pictureSlots[f], width, height, false, m_pictureMem[f], 0);
     return t;
 }
 
 void Renderer::Begin(uint32_t clear)
 {
+    // A frame begun and never ended (an error thrown while it was drawn) is ended first: its
+    // swapchain image would otherwise never go back
+    if (m_framebuffer >= 0)
+        End();
     int f = m_frame % Frames;
     m_fences[size_t(f)].wait();
     m_cmd.clear();
@@ -282,6 +317,7 @@ void Renderer::End()
     m_queue.submitCommands(m_cmd.finishList());
     m_queue.signalFence(m_fences[size_t(f)]);
     m_queue.presentImage(m_swapchain, m_framebuffer);
+    m_framebuffer = -1;
     m_frame++;
 }
 
