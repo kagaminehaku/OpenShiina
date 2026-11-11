@@ -49,7 +49,9 @@ void ScnVm::RegisterNativeRoutines()
     // SSE2...) into l[0] and into the dword before the routine (gCPUID). The CPU the interpreter
     // reports (an Intel with MMX, no SSE) gives 0x11, so START takes its routines without SSE2. A
     // START that will not run without SSE2 is told SSE and SSE2 as well (0x71)
-    RegisterNative({"B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F"}, "cpuid",
+    // (Tenki Ane 66724 and Ryoumaden 679C4: the same, the dword before it reached by an add)
+    RegisterNative({"B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F",
+                    "7D1E7B64EF418410F6DABE10BF9F76C14E607314"}, "cpuid",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
                        static const std::string noSse2 = Text::Utf8ToCp932("SSE2 をサポートしていません");
                        static const std::string noSse2Jp = Text::Utf8ToCp932("ＣＰＵが《ＳＳＥ２》に対応していません");
@@ -271,6 +273,23 @@ void ScnVm::RegisterNativeRoutines()
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x69BE0); });
     RegisterNative("1EB7C3A5BABAEC65C179ACD912C8032A77D690BC", "xor stream",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x6089C); });
+    // The games of 2026-11-11 (the same code with other numbers; see the C# player): xor streams,
+    // thumbnails, their blocks and Intruder's 24 to 32 bits
+    RegisterNative("D3F10A5331FAED973E0D5C4ADBC0C17AC61C85D8", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x718FC); });
+    RegisterNative("58F7EC0154230F9EE4D7824F55E494E5FC977CCD", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0xB4456); });
+    RegisterNative("5A0F18D1D20B4C9ADBD9C1FB5192362A4710377A", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0xA6124); });
+    RegisterNative("BDD786F14B5585729034ECF5BFA499AD594E9AF8", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x6C7E0); });
+    RegisterNative("2C78CF811E6E950792D2AA44E958A75DD65EBB93", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x6B400); });
+    RegisterNative("B92CFBBFE981CBC4DE6AB5295ED8BC95845A764D", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 3, 228, 171); });
+    RegisterNative("3921567C66959F8FBD5645C33784193E86699A85", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 7, 176, 99, 3840); });
+    RegisterNative("913817CA94DE3A84D624A9047C4F36FE533497E6", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 10, 76, 57); });
+    RegisterNative("86B517E8D48A7D8B821797BA9CDFE991A5FE1A30", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 6, 128, 96); });
+    RegisterNative("43862B03B539BDA7DBE46167C012CC16EE5201EE", "block", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 171, 684, 2400); });
+    RegisterNative("43DB3C7C5C48ECE26C893C11BC799DDD277F798E", "block", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 96, 384, 2400); });
+    RegisterNative("488E0AD30804471203F455834EE0B05BEBAD18F9", "block", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 57, 228, 2400); });
+    RegisterNative("ED1030CF4AA1E917815C2F5727CA53CCB0FC85A6", "block", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 99, 528, vm.NativeArg(a, 2)); });
+    RegisterNative("A494DC6C32A1CEC57CE2343846C1FEA3CC1BA360", "block", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 78, 312, vm.NativeArg(a, 2)); });
+    RegisterNative("1584AA75FAEC7B2EC1DF81043D8F455F30423D21", "24 to 32 bits", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.To32Bits(c, a, 228, 171); });
     // Raillore EFCLIB 92F0 (Tori Colony 666C): l[1] dwords at l[0] inverted; a count under 1 runs as x86
     RegisterNative({"F79705977D2B17A02E3A733E04EF5BA87A031A92", "C4E79AD74DF00F25B64339C72CF808E9E7627276"}, "invert dwords",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {

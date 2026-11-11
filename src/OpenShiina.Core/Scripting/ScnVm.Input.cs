@@ -192,6 +192,16 @@ public sealed partial class ScnVm
         // Chiccha na Hanayome's START hides it after 3 s without a move (gHCAdoing)
         Register(0x0460, (vm, c, i) => { vm.m_host.ShowPointer(true); return 0; });
         Register(0x0461, (vm, c, i) => { vm.m_host.ShowPointer(false); return 0; });
+        // 044C n, file (TRAIN2.EXE 0x415E60 -> 0x40BE70): cursor n loaded from file (Chikan Densha
+        // Otoko 2's "d\hand.cur"), 2 when it cannot be; 046A v (0x415F90, CLEAVAGE.EXE 0x417D00):
+        // the cursor shape v (-1: none) - SetCursor of cursor v. The host draws its own pointer
+        Register(0x044C, (vm, c, i) =>
+        {
+            vm.Value(c, i.Args[0]);
+            vm.Value(c, i.Args[1]);
+            return 0;
+        });
+        Register(0x046A, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
         // 0492 x, y: window point -> picture point (x - offset) / scale, both in and out; the
         // host shows the picture at (0, 0) at its own size, so only a window 0A00 sized changes
         // them

@@ -391,6 +391,14 @@ void ScnVm::RegisterMovie()
         vm.Store(c, i.Args[1], movie->State == 2 ? 0x211 : movie->State == 3 ? 0x20E : 0x20D);
         return 0;
     });
+    // 05BA n, v: v = the position in ms, -1 when neither playing nor paused (see the C# player)
+    Register(0x05BA, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        Movie* movie = vm.MovieSlot(vm.Value(c, i.Args[0]));
+        if (movie == nullptr)
+            return 2;
+        vm.Store(c, i.Args[1], movie->State == 3 ? int(vm.Clock() - movie->Start) : movie->State == 2 ? int(movie->PausedAt - movie->Start) : -1);
+        return 0;
+    });
     // 05BC n, v: v = how many times the movie started again
     Register(0x05BC, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         Movie* movie = vm.MovieSlot(vm.Value(c, i.Args[0]));

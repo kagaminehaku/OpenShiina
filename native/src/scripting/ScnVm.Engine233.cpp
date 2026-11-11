@@ -1,7 +1,7 @@
 // C# Scripting/ScnVm.Engine233.cs: engine v2.33 (Cleavage's CLEAVAGE.EXE, 2005; Vanquish's VANQ.EXE is
 // the same build; the table is Data/ScnOps/ops_v233.tsv, v2.34's but for 06EC): the opcodes its
 // scripts use that Ao no Juuai's (v2.34) do not. Registered for the engines before 2.40 only
-// (Register234); the handlers named are CLEAVAGE.EXE's.
+// (Register234), but for 050A, which later engines keep; the handlers named are CLEAVAGE.EXE's.
 //
 // Its movies: RIO.INI's MovieMode 2 plays them with DirectDraw and DirectShow streams (05B5,
 // ScnVm.Movie), 0 and 1 in a window of their own over the game's (MCI or DirectShow, 0578-057F, the
@@ -53,11 +53,6 @@ void ScnVm::RegisterEngine233()
         vm.Value(c, i.Args[0]);
         return 0;
     });
-    // 046A v (0x417D00): the cursor shape v (-1: none) - SetCursor; the host draws its own
-    Register234(0x046A, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        vm.Value(c, i.Args[0]);
-        return 0;
-    });
     // 073E v (0x41B430): v = the screen has a mode of the window's size at its colour depth
     // (EnumDisplaySettings), full screen being possible
     Register234(0x073E, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
@@ -103,8 +98,9 @@ void ScnVm::RegisterEngine233()
     // the window painted at each step: each byte (from * (255 - t) + to * t) / 255, t the part of ms
     // passed out of 255. The engine waits in its own loop until ms have passed; here the task waits a
     // frame at a time. At the end surface 0 is to. Vanquish's START draws the new screen, keeps it in
-    // surface 1, puts the old one back on the screen and runs 050A 1, old
-    Register234(0x050A, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    // surface 1, puts the old one back on the screen and runs 050A 1, old. Later engines keep it
+    // (Chikan Densha Otoko 2's TRAIN2.EXE, v2.43: 0x41C51E -> 0x40C680): every engine has it
+    Register(0x050A, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         int to = vm.Value(c, i.Args[0]), from = vm.Value(c, i.Args[1]), ms = vm.Value(c, i.Args[2]);
         vm.Value(c, i.Args[3]);
         auto found = vm.m_crossfades.find(c.Slot);

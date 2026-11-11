@@ -155,6 +155,12 @@ std::optional<int> ExeChecksum(const std::string& game)
         {"Imouto Smile", 306723180 ^ 969238634},
         {"Yokorenbo ~Immoral Mother~", 306723180 ^ -1396214426},
         {"Hana to Otome ni Shukufuku o", 306723180 ^ 222200098},
+        {"Engage Links", 306723180 ^ 1224645659},
+        {"Chikan Densha Otoko 2", 306723180 ^ 741346554},
+        {"Chikan Densha Otoko Gaiden", 306723180 ^ -1138810104},
+        {"Tsuyoimo x Yowaimo", 306723180 ^ -770208518},
+        {"Mahou Shoujo no Taisetsu na Koto", 306723180 ^ -1545457906},
+        {"Shokuinshitsu", 306723180 ^ -661847700},
     };
     for (const auto& [name, value] : checksums)
         if (Text::EqualsIgnoreCase(name, game))

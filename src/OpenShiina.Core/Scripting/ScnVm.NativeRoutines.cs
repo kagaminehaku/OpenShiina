@@ -45,8 +45,10 @@ public sealed partial class ScnVm
         // will not run without SSE2 (Bitch Nee-chan's "SSE2 をサポートしていません", Sorcery
         // Jokers' "CPU does not supported to SSE2"; "ＣＰＵが《ＳＳＥ２》に対応していません" is a
         // game's that none of the games here has, found by the retrom-project fork) is told SSE
-        // and SSE2 as well (0x71)
-        RegisterNative(["B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F"], "cpuid", (vm, c, a) =>
+        // and SSE2 as well (0x71). Tenki Ane 66724 and Ryoumaden 679C4: the same, the dword before it
+        // reached by an add instead of a displacement
+        RegisterNative(["B6FF80115E4E2727617C10E780653984637EDB0D", "9C94055F3764EB20CCEA440A6A01BE9363DBC93F",
+                        "7D1E7B64EF418410F6DABE10BF9F76C14E607314"], "cpuid", (vm, c, a) =>
         {
             var code = vm.ReadBytes(c.CodeBase, c.CodeSize).AsSpan();
             int features = code.IndexOf(Encodings.cp932.GetBytes("SSE2 をサポートしていません")) >= 0
@@ -268,6 +270,29 @@ public sealed partial class ScnVm
         RegisterNative("A470F7A6AA684E2AF9F1EBF445D60C63C4269657", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x141C20));
         RegisterNative("6CDD92F21FABE3FBF5353F8D5A210AED96E9EF86", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x69BE0));
         RegisterNative("1EB7C3A5BABAEC65C179ACD912C8032A77D690BC", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x6089C));
+        // The games of 2026-11-11 (the same code with other numbers): xor streams of Oshikake!
+        // Entremets 66D2D (465,148 dwords), Helter Skelter 2C7D1 (738,390), Mahou Shoujo no Taisetsu na
+        // Koto 649AC (680,228), Tenki Ane 668DE and Ryoumaden 67B7E (444,384), Sensei! Shite Ageru
+        // 818D7 (439,296, "ret"); thumbnails of Intruder 8C20F (228 x 171 from blocks of 3 x 3),
+        // Kinpatsu Tarou Monogatari 85B0F (176 x 99 from 7 x 7, rows of 3,840 bytes), Mahou Shoujo
+        // 648C0 (76 x 57 from 10 x 10), Onegan! 8038F (128 x 96 from 6 x 6); their blocks (Intruder
+        // 8C4A3, Onegan! 806C1, Mahou Shoujo 64C33, 2400 apart; Kinpatsu 85DEE, Tenki Ane 66BB0 and
+        // Ryoumaden 67E50, l[2] apart); Intruder 8C53E: 228 x 171 to 32 bits
+        RegisterNative("D3F10A5331FAED973E0D5C4ADBC0C17AC61C85D8", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x718FC));
+        RegisterNative("58F7EC0154230F9EE4D7824F55E494E5FC977CCD", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0xB4456));
+        RegisterNative("5A0F18D1D20B4C9ADBD9C1FB5192362A4710377A", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0xA6124));
+        RegisterNative("BDD786F14B5585729034ECF5BFA499AD594E9AF8", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x6C7E0));
+        RegisterNative("2C78CF811E6E950792D2AA44E958A75DD65EBB93", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x6B400));
+        RegisterNative("B92CFBBFE981CBC4DE6AB5295ED8BC95845A764D", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 3, 228, 171));
+        RegisterNative("3921567C66959F8FBD5645C33784193E86699A85", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 7, 176, 99, 3840));
+        RegisterNative("913817CA94DE3A84D624A9047C4F36FE533497E6", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 76, 57));
+        RegisterNative("86B517E8D48A7D8B821797BA9CDFE991A5FE1A30", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 6, 128, 96));
+        RegisterNative("43862B03B539BDA7DBE46167C012CC16EE5201EE", "block", (vm, c, a) => vm.BlockCopy(c, a, 171, 684, 2400));
+        RegisterNative("43DB3C7C5C48ECE26C893C11BC799DDD277F798E", "block", (vm, c, a) => vm.BlockCopy(c, a, 96, 384, 2400));
+        RegisterNative("488E0AD30804471203F455834EE0B05BEBAD18F9", "block", (vm, c, a) => vm.BlockCopy(c, a, 57, 228, 2400));
+        RegisterNative("ED1030CF4AA1E917815C2F5727CA53CCB0FC85A6", "block", (vm, c, a) => vm.BlockCopy(c, a, 99, 528, vm.NativeArg(a, 2)));
+        RegisterNative("A494DC6C32A1CEC57CE2343846C1FEA3CC1BA360", "block", (vm, c, a) => vm.BlockCopy(c, a, 78, 312, vm.NativeArg(a, 2)));
+        RegisterNative("1584AA75FAEC7B2EC1DF81043D8F455F30423D21", "24 to 32 bits", (vm, c, a) => vm.To32Bits(c, a, 228, 171));
         // Raillore EFCLIB 92F0 (Tojita Sekai no Tori Colony EFCLIB 666C, other padding): l[1] dwords at
         // l[0] inverted (XOR FFFFFFFF); a count under 1 runs as x86 code
         RegisterNative(["F79705977D2B17A02E3A733E04EF5BA87A031A92", "C4E79AD74DF00F25B64339C72CF808E9E7627276"], "invert dwords", (vm, c, a) =>

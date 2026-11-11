@@ -89,7 +89,10 @@ void ScnVm::RegisterNativeKernels()
     // paddw). l[0] dst, l[1] src, l[2] / l[3] their row strides, l[4] width, l[5] height, l[6] fx,
     // l[7] fy (sixteenths). Counts of 0 or less run as x86 code. Saimin Seikatsu START 72C9E: a build
     // with a loop of its own for each of fx and fy 0 or not (a plain copy when both are 0), the same bytes
-    RegisterNative({"5763B8B12978519D193DA1B8FA85C2C96E97DB7D", "F88736CDB18021E599B041F6292C7AF13E8A3A62"}, "shift32",
+    // (Tenki Ane 67028 and Ryoumaden 682C8: Saimin Seikatsu's build with other padding)
+    RegisterNative({"5763B8B12978519D193DA1B8FA85C2C96E97DB7D", "F88736CDB18021E599B041F6292C7AF13E8A3A62",
+                    "3DE0BCE4BBB357845B1904CC42BB34A763AE9FA2"},
+                   "shift32",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
                        int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1), sd = vm.NativeArg(a, 2), ss = vm.NativeArg(a, 3);
                        int width = vm.NativeArg(a, 4), height = vm.NativeArg(a, 5), fx = vm.NativeArg(a, 6), fy = vm.NativeArg(a, 7);
@@ -163,7 +166,8 @@ void ScnVm::RegisterNativeKernels()
     // ScnVm.Enlarge32.cpp. Arguments as scale32's; rectangles the C++ version does not take run as x86 code (RunX86)
     RegisterNative({"67FD294324E188D2D3891314AB51537274147A92", "5F055480EAF613D53B5AAF6EE2475EA9FF247A76",
                     "E17C33CA39A48D249E621A1EB13D0FBE757B99D8", "F420A46FA68357CAF25DF581DD343F81250B5636",
-                    "7F07033B27136BB4DD8136A878743AAE486A98B9", "3D545DD87ACBF3246E61ECA4D4FFEF7464931B44"},
+                    "7F07033B27136BB4DD8136A878743AAE486A98B9", "3D545DD87ACBF3246E61ECA4D4FFEF7464931B44",
+                    "F7817C5CFB9F8541961DD7DE03D0EC12EE3FF7A2"},
                    "enlarge32", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
                        if (!vm.Enlarge32(vm.NativeArg(a, 0), vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 3), vm.NativeArg(a, 4),
                                          vm.NativeArg(a, 5), vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9),

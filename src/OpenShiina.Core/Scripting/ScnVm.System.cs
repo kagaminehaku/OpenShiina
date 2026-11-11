@@ -104,7 +104,12 @@ public sealed partial class ScnVm
     // Trilogy's Miko Dashi (MIKODS.EXE, v2.47: START 0x0037A wants v ^ 306723180 = 228471671), Imouto
     // Smile (IMOSMILE.EXE, v2.47: START 0x003C4 wants v ^ 306723180 = 969238634), Yokorenbo
     // (YOKOREN.EXE, v2.44: START 0x00352 wants v ^ 306723180 = -1396214426, 555116478 with f[257] bit 1),
-    // Hana to Otome ni Shukufuku o (HANAOTO.EXE, v2.46: START 0x0037E wants v ^ 306723180 = 222200098)
+    // Hana to Otome ni Shukufuku o (HANAOTO.EXE, v2.46: START 0x0037E wants v ^ 306723180 = 222200098),
+    // and, the value without f[257] bit 1 as for Yokorenbo: Engage Links (v2.45: START 0x0039B wants
+    // 1224645659), Chikan Densha Otoko 2 (v2.43: 0x005F5, 741346554), Chikan Densha Otoko Gaiden
+    // (v2.47: 0x003CB, -1138810104), Tsuyoimo x Yowaimo (IMOIMO.EXE, v2.45: 0x00322, -770208518),
+    // Mahou Shoujo no Taisetsu na Koto (v2.47: 0x003E2, -1545457906; with f[257] bit 1 none is asked),
+    // Shokuinshitsu (TEACH.exe, v2.46: 0x00369, -661847700; -75841587 with f[257] bit 1)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -117,6 +122,12 @@ public sealed partial class ScnVm
         ["Imouto Smile"] = 306723180 ^ 969238634,
         ["Yokorenbo ~Immoral Mother~"] = 306723180 ^ -1396214426,
         ["Hana to Otome ni Shukufuku o"] = 306723180 ^ 222200098,
+        ["Engage Links"] = 306723180 ^ 1224645659,
+        ["Chikan Densha Otoko 2"] = 306723180 ^ 741346554,
+        ["Chikan Densha Otoko Gaiden"] = 306723180 ^ -1138810104,
+        ["Tsuyoimo x Yowaimo"] = 306723180 ^ -770208518,
+        ["Mahou Shoujo no Taisetsu na Koto"] = 306723180 ^ -1545457906,
+        ["Shokuinshitsu"] = 306723180 ^ -661847700,
     };
 
     private void RegisterSystem()

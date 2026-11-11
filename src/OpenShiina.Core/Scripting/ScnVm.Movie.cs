@@ -348,6 +348,20 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[1], movie.State switch { 2 => 0x211, 3 => 0x20E, _ => 0x20D });
             return 0;
         });
+        // 05BA n, v: v = the position in ms (TRAIN2.EXE 0x41DCE2 -> 0x40A9C0: IMediaSeeking's
+        // GetCurrentPosition / 10000), -1 when neither playing nor paused (05CE of the other player)
+        Register(0x05BA, (vm, c, i) =>
+        {
+            if (vm.MovieSlot(vm.Value(c, i.Args[0])) is not { } movie)
+                return 2;
+            vm.Store(c, i.Args[1], movie.State switch
+            {
+                3 => (int)(vm.Clock - movie.Start),
+                2 => (int)(movie.PausedAt - movie.Start),
+                _ => -1,
+            });
+            return 0;
+        });
         // 05BC n, v: v = how many times the movie started again
         Register(0x05BC, (vm, c, i) =>
         {

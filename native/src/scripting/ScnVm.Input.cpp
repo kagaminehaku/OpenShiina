@@ -212,6 +212,17 @@ void ScnVm::RegisterInput()
         vm.m_host.ShowPointer(false);
         return 0;
     });
+    // 044C n, file: cursor n loaded from file; 046A v: the cursor shape v (-1: none). The host draws
+    // its own pointer (see the C# player)
+    Register(0x044C, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.Value(c, i.Args[0]);
+        vm.Value(c, i.Args[1]);
+        return 0;
+    });
+    Register(0x046A, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.Value(c, i.Args[0]);
+        return 0;
+    });
     // 0492 x, y: window point -> picture point; the host shows the picture at (0, 0) at its own
     // size, so only a window 0A00 sized changes them
     Register(0x0492, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
