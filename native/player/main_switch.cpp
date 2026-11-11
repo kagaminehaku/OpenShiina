@@ -49,6 +49,7 @@
 #include "audio/ScnMusic.h"
 #include "audio/ScnSound.h"
 #include "formats/ExeIcon.h"
+#include "formats/Vc1Video.h"
 #include "game/GameData.h"
 #include "game/GameSetup.h"
 #include "platform/DibShapes.h"
@@ -1351,6 +1352,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
     uint64_t pictureVersion = 1, pointerShownUntil = 0;
     bool running = true, focused = true, touching = false;
+    // frames until the pointer leaves the picture after a touch lifts (0: it stays)
+    int awayIn = 0;
     // The frame rate shown (the setting "Show the frame rate"): frames a second and the slowest
     // frame, once a second
     uint64_t meterStart = started, lastFrame = started, meterSlowest = 0, meterFrames = 0;
@@ -1430,7 +1433,16 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             if (touch && !touching)
                 mouse(ScnMessage::LButtonDown, host.Buttons | 1);
             else if (!touch && touching)
+            {
                 mouse(ScnMessage::LButtonUp, host.Buttons & ~1);
+                awayIn = 2;
+            }
+            // Once the game has had the button up where the finger was, the pointer leaves the
+            // picture: a finger is not a mouse that stays, and a button under it would stay lit
+            if (touch)
+                awayIn = 0;
+            else if (awayIn > 0 && --awayIn == 0)
+                host.MouseX = host.MouseY = -1;
             touching = touch;
             // the left stick moves the pointer, faster the further it is pushed
             HidAnalogStickState stick = padGetStickPos(&ui.Pad, 0);
@@ -1712,6 +1724,8 @@ int main(int argc, char** argv)
         // (the NEON lanes of the pixel routines, which the PC tests do not run)
         std::string lanes = ScnVm::CheckVectorLanes();
         Log("Vector lanes: %s\n", lanes.empty() ? "as the x86 code" : lanes.c_str());
+        std::string movieLanes = formats::Vc1Video::CheckVectorLanes();
+        Log("Movie lanes: %s\n", movieLanes.empty() ? "as the scalar code" : movieLanes.c_str());
     }
     catch (const std::exception& e)
     {
