@@ -12,8 +12,7 @@ namespace openshiina::formats {
 MovieAhead::MovieAhead(std::unique_ptr<IMovieVideo> video)
     : m_video(std::move(video)), m_width(m_video->Width()), m_height(m_video->Height()), m_rate(m_video->FrameRate())
 {
-    for (auto& picture : m_pictures)
-        picture.resize(size_t(m_width) * 3 * size_t(m_height));
+    m_picture.resize(size_t(m_width) * 3 * size_t(m_height));
     Start();
 }
 
@@ -23,6 +22,8 @@ void MovieAhead::Start()
 {
     m_read = m_ready = 0;
     m_holding = m_ended = m_stopping = false;
+    m_taken = nullptr;
+    m_pictureMade = false;
     m_thread = std::thread([this] { Run(); });
 }
 
@@ -50,7 +51,7 @@ void MovieAhead::Run()
     // Cores 1 and 2, beside the scripts' thread on core 0
     svcSetThreadCoreMask(CUR_THREAD_HANDLE, 2, 6);
 #endif
-    const int slots = int(m_pictures.size());
+    const int slots = int(m_frames.size());
     for (;;)
     {
         int slot;
@@ -63,29 +64,34 @@ void MovieAhead::Run()
             slot = (m_read + m_ready) % slots;
         }
         const MpegFrame* frame = nullptr;
-        auto start = std::chrono::steady_clock::now(), decoded = start;
+        auto start = std::chrono::steady_clock::now();
         try
         {
+            // the decoder's frame copied: the decoder writes the next ones into its own
             frame = m_video->Next();
-            decoded = std::chrono::steady_clock::now();
             if (frame != nullptr)
-                frame->ToBgr24(m_pictures[size_t(slot)].data(), m_width * 3, m_width, m_height);
+            {
+                auto& kept = m_frames[size_t(slot)];
+                if (!kept)
+                    kept = std::make_unique<MpegFrame>(*frame);
+                else
+                    *kept = *frame;
+            }
         }
         catch (const std::exception&)
         {
             // a stream that breaks off ends there (in the C# player its error would stop the scripts)
             frame = nullptr;
         }
-        auto made = std::chrono::steady_clock::now();
+        auto decoded = std::chrono::steady_clock::now();
         std::lock_guard lock(m_mutex);
         m_decodingNs += std::chrono::duration_cast<std::chrono::nanoseconds>(decoded - start).count();
-        m_picturesNs += std::chrono::duration_cast<std::chrono::nanoseconds>(made - decoded).count();
         if (frame == nullptr)
             m_ended = true;
         else
         {
             m_ready++;
-            m_frames++;
+            m_decoded++;
         }
         m_changed.notify_all();
         if (m_ended)
@@ -93,34 +99,52 @@ void MovieAhead::Run()
     }
 }
 
-void MovieAhead::TakeTimes(double& decoding, double& pictures, int& frames)
+void MovieAhead::TakeTimes(double& decoding, int& frames, double& pictures, int& made)
 {
     std::lock_guard lock(m_mutex);
     decoding = double(m_decodingNs) / 1e6;
     pictures = double(m_picturesNs) / 1e6;
-    frames = m_frames;
+    frames = m_decoded;
+    made = m_made;
     m_decodingNs = m_picturesNs = 0;
-    m_frames = 0;
+    m_decoded = m_made = 0;
 }
 
-const Bytes* MovieAhead::Next()
+const Bytes& MovieAhead::Picture()
+{
+    if (m_taken != nullptr && !m_pictureMade)
+    {
+        auto start = std::chrono::steady_clock::now();
+        m_taken->ToBgr24(m_picture.data(), m_width * 3, m_width, m_height);
+        m_pictureMade = true;
+        auto made = std::chrono::steady_clock::now();
+        std::lock_guard lock(m_mutex);
+        m_picturesNs += std::chrono::duration_cast<std::chrono::nanoseconds>(made - start).count();
+        m_made++;
+    }
+    return m_picture;
+}
+
+const MpegFrame* MovieAhead::Next()
 {
     std::unique_lock lock(m_mutex);
-    const int slots = int(m_pictures.size());
+    const int slots = int(m_frames.size());
     if (m_holding)
     {
         // the picture taken last is let go
         m_holding = false;
         m_changed.notify_all();
     }
+    m_taken = nullptr;
+    m_pictureMade = false;
     m_changed.wait(lock, [&] { return m_ready > 0 || m_ended; });
     if (m_ready == 0)
         return nullptr;
-    const Bytes* picture = &m_pictures[size_t(m_read)];
+    m_taken = m_frames[size_t(m_read)].get();
     m_read = (m_read + 1) % slots;
     m_ready--;
     m_holding = true;
-    return picture;
+    return m_taken;
 }
 
 } // namespace openshiina::formats

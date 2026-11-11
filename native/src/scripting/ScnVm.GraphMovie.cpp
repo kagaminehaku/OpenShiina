@@ -34,7 +34,7 @@ bool ScnVm::AdvanceGraphMovie(Movie& movie)
     formats::MovieAhead& video = *movie.Video;
     uint32_t now = Clock();
     int64_t due = int64_t(double(now - movie.Start) * video.FrameRate() / 1000);
-    const openshiina::Bytes* frame = nullptr;
+    const formats::MpegFrame* frame = nullptr;
     while (movie.Decoded <= due)
     {
         frame = video.Next();
@@ -44,7 +44,8 @@ bool ScnVm::AdvanceGraphMovie(Movie& movie)
     }
     if (frame != nullptr)
     {
-        movie.LastRows.assign(frame->begin(), frame->begin() + size_t(video.Width()) * size_t(video.Height()) * 3);
+        const openshiina::Bytes& picture = video.Picture();
+        movie.LastRows.assign(picture.begin(), picture.begin() + size_t(video.Width()) * size_t(video.Height()) * 3);
         return true;
     }
     if (movie.Decoded <= due)

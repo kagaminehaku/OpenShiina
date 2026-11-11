@@ -1,4 +1,4 @@
-// moviecheck <movie> [frames] [--fast | --sound]: decodes an MPEG-1 movie (a system stream, or a video stream
+// moviecheck <movie> [frames] [--fast | --sound | --ahead]: decodes an MPEG-1 movie (a system stream, or a video stream
 // alone) with formats/MpegVideo, or a Windows Media one (ASF) with formats/Vc1Video, and prints, for each frame in display order, the SHA-256 of its
 // picture as 24-bit BGR, and the frames' count and the decoding errors at the end. The C# player's
 // decoder gives the same lines for the same movie (Formats/MpegVideo.cs, Vc1Video.cs): compare them. The times
@@ -9,6 +9,10 @@
 //
 // --fast: the fast inverse DCT (the Switch's) against the C# player's, frame by frame: the largest
 // difference of a byte, how many bytes differ, and the PSNR of each frame (the lowest and the mean).
+//
+// --ahead: formats/MovieAhead (the players' decoding thread) against the decoder alone: frames are
+// taken as a movie behind its time takes them (one to four at a time, only the last made into a
+// picture), and each picture made is compared with the decoder's own of that frame.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -23,6 +27,7 @@
 
 #include "formats/AsfAudio.h"
 #include "formats/AsfFile.h"
+#include "formats/MovieAhead.h"
 #include "formats/MpegVideo.h"
 #include "formats/Vc1Video.h"
 #include "platform/Files.h"
@@ -116,6 +121,55 @@ AnyMovie OpenAny(const Bytes& data)
     return movie;
 }
 
+int CheckAhead(const Bytes& data, int limit)
+{
+    AnyMovie direct = OpenAny(data), ahead = OpenAny(data);
+    formats::IMovieVideo* video = direct.Video.get();
+    int w = video->Width(), h = video->Height();
+    formats::MovieAhead thread(std::move(ahead.Video));
+    Bytes bgr(size_t(w) * 3 * size_t(h));
+    uint32_t seed = 12345;
+    int frames = 0, made = 0, differed = 0;
+    bool ended = false;
+    while (!ended && frames < limit)
+    {
+        // a few frames due at once, as when the movie is behind
+        seed = seed * 1103515245u + 12345u;
+        int take = 1 + int((seed >> 16) % 4);
+        const formats::MpegFrame* expected = nullptr;
+        const formats::MpegFrame* got = nullptr;
+        for (int k = 0; k < take; k++)
+        {
+            expected = video->Next();
+            got = thread.Next();
+            if ((expected == nullptr) != (got == nullptr))
+            {
+                std::printf("frame %d: one ended, the other did not\n", frames);
+                return 1;
+            }
+            if (expected == nullptr)
+            {
+                ended = true;
+                break;
+            }
+            frames++;
+        }
+        if (ended)
+            break;
+        expected->ToBgr24(bgr.data(), w * 3, w, h);
+        const Bytes& picture = thread.Picture();
+        made++;
+        if (!std::equal(bgr.begin(), bgr.end(), picture.begin()))
+        {
+            differed++;
+            if (differed <= 10)
+                std::printf("frame %d: the picture differs\n", frames - 1);
+        }
+    }
+    std::printf("%d frames, %d pictures made and compared, %d differed\n", frames, made, differed);
+    return differed == 0 ? 0 : 1;
+}
+
 int CheckSound(const Bytes& data)
 {
     formats::AsfFile file(data);
@@ -155,16 +209,18 @@ int Run(int argc, std::string* argv)
 {
     if (argc < 2)
     {
-        std::fprintf(stderr, "moviecheck <movie> [frames] [--fast | --sound]\n");
+        std::fprintf(stderr, "moviecheck <movie> [frames] [--fast | --sound | --ahead]\n");
         return 2;
     }
-    bool compareFast = false, sound = false;
+    bool compareFast = false, sound = false, ahead = false;
     int limit = 1 << 30;
     for (int k = 2; k < argc; k++)
         if (argv[k] == "--fast")
             compareFast = true;
         else if (argv[k] == "--sound")
             sound = true;
+        else if (argv[k] == "--ahead")
+            ahead = true;
         else
             limit = std::atoi(argv[k].c_str());
     Bytes data;
@@ -179,6 +235,8 @@ int Run(int argc, std::string* argv)
             return CompareFast(data, limit);
         if (sound)
             return CheckSound(data);
+        if (ahead)
+            return CheckAhead(data, limit);
         AnyMovie movie = OpenAny(data);
         formats::IMovieVideo* video = movie.Video.get();
         std::printf("%dx%d, %.3f frames a second\n", video->Width(), video->Height(), video->FrameRate());

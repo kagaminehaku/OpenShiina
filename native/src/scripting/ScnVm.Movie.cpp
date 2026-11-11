@@ -225,21 +225,25 @@ void ScnVm::UpdateMovie(Movie& movie)
     if (RoutineTimes)
     {
         double decoding = 0, pictures = 0;
-        int frames = 0;
-        video.TakeTimes(decoding, pictures, frames);
+        int frames = 0, made = 0;
+        video.TakeTimes(decoding, frames, pictures, made);
         if (frames > 0)
         {
             auto& decoded = (*RoutineTimes)["movie: decoded"];
             decoded.Milliseconds += decoding;
             decoded.Calls += frames;
-            auto& made = (*RoutineTimes)["movie: pictures made"];
-            made.Milliseconds += pictures;
-            made.Calls += frames;
+        }
+        if (made > 0)
+        {
+            auto& pictureTimes = (*RoutineTimes)["movie: pictures made"];
+            pictureTimes.Milliseconds += pictures;
+            pictureTimes.Calls += made;
         }
     }
     uint32_t now = Clock();
     int64_t due = int64_t(double(now - movie.Start) * video.FrameRate() / 1000);
-    const openshiina::Bytes* frame = nullptr;
+    // (the frames passed over are not made into pictures)
+    const formats::MpegFrame* frame = nullptr;
     while (movie.Decoded <= due)
     {
         frame = video.Next();
@@ -248,9 +252,9 @@ void ScnVm::UpdateMovie(Movie& movie)
         movie.Decoded++;
     }
     if (frame != nullptr && movie.Window)
-        DrawMovieToWindow(*frame, video.Width(), video.Height(), *movie.Window);
+        DrawMovieToWindow(video.Picture(), video.Width(), video.Height(), *movie.Window);
     else if (frame != nullptr)
-        DrawMovieFrame(movie, *frame);
+        DrawMovieFrame(movie, video.Picture());
     else if (movie.Decoded <= due)
     {
         // The end of the stream
@@ -272,7 +276,7 @@ void ScnVm::UpdateMovie(Movie& movie)
 
 void ScnVm::DrawMovieFrame(const Movie& movie, const openshiina::Bytes& frame)
 {
-    // frame: the picture as BGR, made on the movie's own thread (formats/MovieAhead)
+    // frame: the picture as BGR, made of the frame drawn (formats/MovieAhead::Picture)
     int s = movie.Surface;
     int pixels = SurfaceField(s, 2);
     if (pixels == 0)
