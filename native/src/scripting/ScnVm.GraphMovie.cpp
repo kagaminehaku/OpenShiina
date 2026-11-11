@@ -34,8 +34,10 @@ bool ScnVm::AdvanceGraphMovie(Movie& movie)
     formats::MovieAhead& video = *movie.Video;
     uint32_t now = Clock();
     int64_t due = int64_t(double(now - movie.Start) * video.FrameRate() / 1000);
+    // (a movie behind its clock catches up a few frames a call, as UpdateMovie's)
+    constexpr int CatchUp = 3;
     const formats::MpegFrame* frame = nullptr;
-    while (movie.Decoded <= due)
+    for (int taken = 0; movie.Decoded <= due && taken < CatchUp; taken++)
     {
         frame = video.Next();
         if (frame == nullptr)

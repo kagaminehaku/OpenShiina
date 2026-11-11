@@ -242,9 +242,12 @@ void ScnVm::UpdateMovie(Movie& movie)
     }
     uint32_t now = Clock();
     int64_t due = int64_t(double(now - movie.Start) * video.FrameRate() / 1000);
-    // (the frames passed over are not made into pictures)
+    // (the frames passed over are not made into pictures). A movie behind its clock (the decoder
+    // slower than the frames for a while) catches up a few frames a call, not all at once: every
+    // frame it is behind is decoded, and Sorcery Jokers' opening stood still 2.3 s for 17 of them
+    constexpr int CatchUp = 3;
     const formats::MpegFrame* frame = nullptr;
-    while (movie.Decoded <= due)
+    for (int taken = 0; movie.Decoded <= due && taken < CatchUp; taken++)
     {
         frame = video.Next();
         if (frame == nullptr)
