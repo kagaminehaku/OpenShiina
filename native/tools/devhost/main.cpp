@@ -17,12 +17,18 @@
 // entries ("D" or "F", a tab, the size, a tab, the name, a line each), or -1 when there is neither.
 // "DELF" in its place deletes a file under sdmc:/OpenShiina (the files sent with '@'; never a
 // folder, nothing elsewhere): devhost answers 0, or -1 when it cannot.
+// "PUTF" writes a file under sdmc:/OpenShiina as it is, not compressed (tools/devhost/devput.ps1: a
+// game's files, much faster than nxlink's zlib chunks of 16 KB): the path's length, a path under
+// sdmc:/OpenShiina as with '@' (Games/<folder>/<file>), the size (8 bytes); devhost answers 0 (or -1),
+// takes the bytes, written next to their place and moved there at the end, and answers 0 (or -1).
+// The sockets have large TCP buffers: with libnx's 64 KB a transfer over Wi-Fi stopped at ~12 Mbit/s.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
 
 // gethostid and timeval: BSD and POSIX, which a strict C++20 build leaves out unless asked for
 #define _DEFAULT_SOURCE
 
+#include <algorithm>
 #include <cerrno>
 #include <cinttypes>
 #include <cstdarg>
@@ -57,6 +63,9 @@ constexpr const char* kSelf = "sdmc:/switch/openshiina/devhost.nro";
 constexpr size_t kChunk = 16 * 1024; // the largest compressed chunk nxlink sends
 constexpr int32_t kGetMagic = 0x46544547; // "GETF" as the first 4 bytes, little-endian
 constexpr int32_t kDeleteMagic = 0x464C4544; // "DELF"
+constexpr int32_t kPutMagic = 0x46545550; // "PUTF"
+// A file of PUTF is written to the SD card a block at a time
+constexpr size_t kWriteBlock = 4 * 1024 * 1024;
 
 void Log(const char* format, ...)
 {
@@ -278,6 +287,85 @@ bool Serve(int sock, std::string& path, std::string& error)
     return true;
 }
 
+/// A write ("PUTF" already taken): the path's length and the path, the size, then the bytes as they
+/// are, as the comment at the top tells. bytes: how many arrived.
+bool Put(int sock, std::string& path, int64_t& bytes, std::string& error)
+{
+    bytes = 0;
+    int32_t length = 0;
+    std::string name;
+    int64_t size = -1;
+    if (!ReceiveInt(sock, length) || length <= 0 || length > 1024)
+    {
+        error = "a write without a path";
+        return false;
+    }
+    name.assign(size_t(length), '\0');
+    if (!ReceiveAll(sock, name.data(), name.size()) || !ReceiveAll(sock, &size, sizeof size) || size < 0)
+    {
+        error = "a write without a path or a size";
+        return false;
+    }
+    path = TargetPath("@" + name);
+    std::string part = path + ".part";
+    std::FILE* file = nullptr;
+    if (path.empty())
+        error = "only a file under sdmc:/OpenShiina is written: " + name;
+    else if (!Files::CreateDirectories(Files::DirectoryName(path)) || !(file = Files::Open(part, "wb")))
+        error = "cannot write " + part + ": " + std::strerror(errno);
+    if (!SendInt(sock, file ? 0 : -1) || !file)
+    {
+        if (file)
+        {
+            std::fclose(file);
+            unlink(part.c_str());
+        }
+        if (error.empty())
+            error = "the connection stopped";
+        return false;
+    }
+    Log("Receiving %s, %lld bytes\n", path.c_str(), (long long)size);
+    std::vector<uint8_t> block(kWriteBlock);
+    bool ok = true;
+    while (ok && bytes < size)
+    {
+        // A block filled from the network, then written whole
+        size_t want = size_t(std::min<int64_t>(int64_t(block.size()), size - bytes)), have = 0;
+        while (have < want)
+        {
+            ssize_t got = recv(sock, block.data() + have, want - have, 0);
+            if (got <= 0)
+                break;
+            have += size_t(got);
+        }
+        if (have != want)
+        {
+            error = "the connection stopped";
+            ok = false;
+        }
+        if (have > 0 && std::fwrite(block.data(), 1, have, file) != have)
+        {
+            error = "cannot write the file";
+            ok = false;
+        }
+        bytes += int64_t(have);
+    }
+    ok = std::fclose(file) == 0 && ok;
+    if (ok)
+    {
+        unlink(path.c_str());
+        if (rename(part.c_str(), path.c_str()) != 0)
+        {
+            error = "cannot move " + part + ": " + std::strerror(errno);
+            ok = false;
+        }
+    }
+    if (!ok)
+        unlink(part.c_str());
+    SendInt(sock, ok ? 0 : -1);
+    return ok;
+}
+
 /// A deletion ("DELF" already taken): the path's length and the path, a file under sdmc:/OpenShiina.
 bool Delete(int sock, std::string& path, std::string& error)
 {
@@ -417,6 +505,17 @@ int Listen(int type)
     return sock;
 }
 
+// libnx's defaults with TCP buffers that grow to 4 MB (from 64 KB / 256 KB): what a transfer over
+// Wi-Fi can have in flight is what it gets a round trip
+const SocketInitConfig kSockets = [] {
+    SocketInitConfig config = *socketGetDefaultInitConfig();
+    config.tcp_tx_buf_size = 0x40000;
+    config.tcp_rx_buf_size = 0x100000;
+    config.tcp_tx_buf_max_size = 0x400000;
+    config.tcp_rx_buf_max_size = 0x400000;
+    return config;
+}();
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -431,7 +530,7 @@ int main(int argc, char** argv)
     int udp = -1, tcp = -1;
     if (!envHasNextLoad())
         Log("devhost needs hbmenu's loader (hbloader) to start other programs.\n");
-    else if (!(network = R_SUCCEEDED(socketInitializeDefault())))
+    else if (!(network = R_SUCCEEDED(socketInitialize(&kSockets)) || R_SUCCEEDED(socketInitializeDefault())))
         Log("No network.\n");
     else if ((udp = Listen(SOCK_DGRAM)) < 0 || (tcp = Listen(SOCK_STREAM)) < 0)
         Log("Cannot listen on port %d: %s\n", kServerPort, std::strerror(errno));
@@ -479,6 +578,9 @@ int main(int argc, char** argv)
         timeval limit{10, 0};
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof limit);
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &limit, sizeof limit);
+        int window = 0x400000;
+        setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &window, sizeof window);
+        setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &window, sizeof window);
         int32_t first = 0;
         std::string error;
         if (ReceiveInt(sock, first) && first == kGetMagic)
@@ -488,6 +590,20 @@ int main(int argc, char** argv)
             close(sock);
             if (served)
                 Log("Sent %s to %s\n", path.c_str(), inet_ntoa(remote.sin_addr));
+            else
+                Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
+            continue;
+        }
+        if (first == kPutMagic)
+        {
+            std::string path;
+            int64_t bytes = 0;
+            uint64_t start = armGetSystemTick();
+            bool put = Put(sock, path, bytes, error);
+            close(sock);
+            double seconds = double(armTicksToNs(armGetSystemTick() - start)) / 1e9;
+            if (put)
+                Log("Saved %s (%.1f MB/s)\n", path.c_str(), seconds > 0 ? double(bytes) / 1048576.0 / seconds : 0.0);
             else
                 Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
             continue;
