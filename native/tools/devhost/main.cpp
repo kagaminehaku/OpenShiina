@@ -26,6 +26,9 @@
 // the player, no 13 MB upload for each): the path's length, a path under sdmc:/switch as nxlink's
 // (openshiina/OpenShiina.nro), the arguments' length and the arguments, each ended by a zero byte;
 // devhost answers 0 and starts it, or -1 when there is no such .nro.
+// "SLEP" puts the Switch to sleep (tools/devhost/devsleep.ps1: at the end of a night's runs): devhost
+// answers 0, then asks for it (appletRequestToSleep, an application's on 10.0.0+; a refusal is on its
+// screen) and goes on waiting once it wakes.
 // The sockets have large TCP buffers: with libnx's 64 KB a transfer over Wi-Fi stopped at ~12 Mbit/s.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
@@ -74,6 +77,7 @@ constexpr int32_t kGetMagic = 0x46544547; // "GETF" as the first 4 bytes, little
 constexpr int32_t kDeleteMagic = 0x464C4544; // "DELF"
 constexpr int32_t kPutMagic = 0x46545550; // "PUTF"
 constexpr int32_t kRunMagic = 0x464E5552; // "RUNF"
+constexpr int32_t kSleepMagic = 0x50454C53; // "SLEP"
 // A file of PUTF is written to the SD card a block at a time, while the next blocks arrive
 constexpr size_t kWriteBlock = 4 * 1024 * 1024;
 constexpr int kWriteBlocks = 3;
@@ -713,6 +717,19 @@ int main(int argc, char** argv)
                 Log("Deleted %s\n", path.c_str());
             else
                 Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
+            continue;
+        }
+        if (first == kSleepMagic)
+        {
+            // (answered first, the network going with the sleep; sleep allowed again for it, then
+            // kept off as before once the Switch wakes)
+            SendInt(sock, 0);
+            close(sock);
+            appletSetMediaPlaybackState(false);
+            Result rc = appletRequestToSleep();
+            if (R_FAILED(rc))
+                Log("Cannot sleep: 2%03d-%04d\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            appletSetMediaPlaybackState(true);
             continue;
         }
         Upload upload;
