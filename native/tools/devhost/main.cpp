@@ -22,6 +22,10 @@
 // sdmc:/OpenShiina as with '@' (Games/<folder>/<file>), the size (8 bytes); devhost answers 0 (or -1),
 // takes the bytes, written next to their place (on a thread of their own, while the next arrive) and
 // moved there at the end, and answers 0 (or -1).
+// "RUNF" starts an .nro already on the SD card, with arguments (tools/devhost/devrun.ps1: a test run of
+// the player, no 13 MB upload for each): the path's length, a path under sdmc:/switch as nxlink's
+// (openshiina/OpenShiina.nro), the arguments' length and the arguments, each ended by a zero byte;
+// devhost answers 0 and starts it, or -1 when there is no such .nro.
 // The sockets have large TCP buffers: with libnx's 64 KB a transfer over Wi-Fi stopped at ~12 Mbit/s.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
@@ -69,6 +73,7 @@ constexpr size_t kChunk = 16 * 1024; // the largest compressed chunk nxlink send
 constexpr int32_t kGetMagic = 0x46544547; // "GETF" as the first 4 bytes, little-endian
 constexpr int32_t kDeleteMagic = 0x464C4544; // "DELF"
 constexpr int32_t kPutMagic = 0x46545550; // "PUTF"
+constexpr int32_t kRunMagic = 0x464E5552; // "RUNF"
 // A file of PUTF is written to the SD card a block at a time, while the next blocks arrive
 constexpr size_t kWriteBlock = 4 * 1024 * 1024;
 constexpr int kWriteBlocks = 3;
@@ -157,6 +162,21 @@ struct Upload
     bool data = false;
     std::vector<std::string> arguments;
 };
+
+/// The arguments as nxlink sends them, each ended by a zero byte.
+std::vector<std::string> SplitArguments(const std::string& arguments)
+{
+    std::vector<std::string> list;
+    for (size_t start = 0; start < arguments.size();)
+    {
+        size_t end = arguments.find('\0', start);
+        if (end == std::string::npos)
+            end = arguments.size();
+        list.push_back(arguments.substr(start, end - start));
+        start = end + 1;
+    }
+    return list;
+}
 
 /// The rest of an upload once its file is open: the zlib stream in chunks, each after its size,
 /// written to file; true when it ends with exactly size bytes.
@@ -513,18 +533,43 @@ bool Receive(int sock, int32_t nameLength, Upload& upload, std::string& error)
         unlink(part.c_str());
         return false;
     }
-    for (size_t start = 0; start < arguments.size();)
-    {
-        size_t end = arguments.find('\0', start);
-        if (end == std::string::npos)
-            end = arguments.size();
-        upload.arguments.push_back(arguments.substr(start, end - start));
-        start = end + 1;
-    }
+    upload.arguments = SplitArguments(arguments);
     return true;
 }
 
 std::string Quoted(const std::string& argument) { return "\"" + argument + "\""; }
+
+/// A run ("RUNF" already taken): the .nro under sdmc:/switch and its arguments; answers 0 when it is
+/// there, -1 when not.
+bool ReceiveRun(int sock, Upload& run, std::string& error)
+{
+    int32_t length = 0;
+    std::string name, arguments;
+    if (!ReceiveInt(sock, length) || length <= 0 || length > 1024)
+    {
+        error = "no path";
+        return false;
+    }
+    name.resize(size_t(length));
+    int32_t argumentsLength = 0;
+    if (!ReceiveAll(sock, name.data(), name.size()) || !ReceiveInt(sock, argumentsLength) || argumentsLength < 0 || argumentsLength > 4096)
+    {
+        error = "no arguments after the path";
+        return false;
+    }
+    arguments.resize(size_t(argumentsLength));
+    if (!ReceiveAll(sock, arguments.data(), arguments.size()))
+    {
+        error = "no arguments after the path";
+        return false;
+    }
+    run.path = !name.empty() && (name[0] == '@' || name[0] == '+') ? std::string() : TargetPath(name);
+    bool there = !run.path.empty() && Files::IsFile(run.path);
+    if (!there)
+        error = "no .nro " + name + " under sdmc:/switch";
+    run.arguments = SplitArguments(arguments);
+    return SendInt(sock, there ? 0 : -1) && there;
+}
 
 /// This .nro's path as hbloader takes it, for the programs it runs to come back to.
 std::string SelfPath(int argc, char** argv)
@@ -671,7 +716,9 @@ int main(int argc, char** argv)
             continue;
         }
         Upload upload;
-        bool received = Receive(sock, first, upload, error);
+        // (a run started from the PC without nxlink has no nxlink -s to send its output to)
+        bool fromNxlink = first != kRunMagic;
+        bool received = fromNxlink ? Receive(sock, first, upload, error) : ReceiveRun(sock, upload, error);
         close(sock);
         if (!received)
         {
@@ -688,7 +735,9 @@ int main(int argc, char** argv)
             line += " " + Quoted(argument);
         char nxlink[17];
         std::snprintf(nxlink, sizeof nxlink, "%08" PRIx32 "_NXLINK_", uint32_t(remote.sin_addr.s_addr));
-        line += " " + Quoted("_DEVHOST_=" + self) + " " + Quoted(nxlink);
+        line += " " + Quoted("_DEVHOST_=" + self);
+        if (fromNxlink)
+            line += " " + Quoted(nxlink);
         Result rc = envSetNextLoad(upload.path.c_str(), line.c_str());
         if (R_FAILED(rc))
         {

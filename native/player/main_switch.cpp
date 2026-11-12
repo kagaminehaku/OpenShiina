@@ -43,6 +43,7 @@
 #include "GameMove.h"
 #include "Strings.h"
 #include "Settings.h"
+#include "TestRun.h"
 #include "ui/DekoAccelerator.h"
 #include "archives/FormatManager.h"
 #include "audio/ScnMixer.h"
@@ -68,6 +69,7 @@ using player::Trf;
 
 namespace {
 
+constexpr const char* kDataRoot = "sdmc:/OpenShiina";
 constexpr const char* kGames = "sdmc:/OpenShiina/Games";
 // The console's own storage (DBI's "Nand USER"), mounted as user: when it can be (written only by a move)
 constexpr const char* kInternalGames = "user:/OpenShiina/Games";
@@ -275,7 +277,17 @@ public:
         return int64_t(info.st_size);
     }
 
-    uint32_t Milliseconds() override { return uint32_t(armTicksToNs(armGetSystemTick()) / 1000000); }
+    // (a test run with the fixed clock: 1/60 s a frame, as scnrun's)
+    uint32_t Milliseconds() override
+    {
+        if (Test && Test->FixedClock)
+            return uint32_t(int64_t(Frame) * 1000 / 60);
+        return uint32_t(armTicksToNs(armGetSystemTick()) / 1000000);
+    }
+
+    /// A test run (TestRun.h): its input in place of the controls', frame by frame.
+    const player::TestRun* Test = nullptr;
+    int Frame = 0;
     void SetTitle(const std::string& title) override { Log("[title] %s\n", Text::Cp932ToUtf8(title).c_str()); }
     void SetFullScreen(bool) override {}
     std::string SaveFolder() override { return m_saves; }
@@ -318,9 +330,14 @@ public:
     void PauseSound(bool paused) override { m_mixer.Paused = paused; }
     IScnMusic* Music() override { return &m_music; }
     IScnFonts* Fonts() override { return m_fonts.Ready() ? &m_fonts : nullptr; }
-    bool KeyDown(int virtualKey) override { return virtualKey >= 0 && virtualKey < 256 && Keys[virtualKey]; }
-    int MouseButtons() override { return Buttons; }
-    std::pair<int, int> MousePosition() override { return {MouseX, MouseY}; }
+    bool KeyDown(int virtualKey) override
+    {
+        if (Test)
+            return Test->KeyDown(virtualKey, Frame);
+        return virtualKey >= 0 && virtualKey < 256 && Keys[virtualKey];
+    }
+    int MouseButtons() override { return Test ? Test->MouseButtons(Frame) : Buttons; }
+    std::pair<int, int> MousePosition() override { return Test ? Test->MousePosition(Frame) : std::pair{MouseX, MouseY}; }
 
     void SetMousePosition(int x, int y) override
     {
@@ -1268,8 +1285,9 @@ int MessageDialog(Ui& ui, const std::function<void()>& drawGame, const std::stri
     return cancel;
 }
 
-/// frameLimit: leave after that many frames (0: when the player leaves; for tests over nxlink).
-void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
+/// frameLimit: leave after that many frames (0: when the player leaves; for tests over nxlink); test:
+/// a test run (TestRun.h), its script's input and pictures, its saves apart.
+void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player::TestRun* test = nullptr)
 {
     std::string folder = Files::FileName(path);
     auto scheme = player::SchemeFor(path, kPlayed);
@@ -1289,10 +1307,21 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
     player::RecordPlay(kPlayed, folder, 0);
     LogMemory("before the game");
     auto data = game::GameData::Open(path, scheme);
-    auto setup = game::GameSetup::Read(*data, kSaves);
+    // (a test run's saves in its own folder, emptied: it starts from none, as scnrun's)
+    std::string savesRoot = kSaves;
+    if (test)
+    {
+        player::RemoveFolder(test->Folder);
+        savesRoot = Files::Combine(test->Folder, "Saves");
+        Files::CreateDirectories(savesRoot);
+        Log("[test] %s: %s, %llu frames, clock %s, pictures every %d frames into %s\n", test->Name.c_str(), test->Game.c_str(),
+            (unsigned long long)test->Frames, test->FixedClock ? "fixed" : "real", test->Every, test->Folder.c_str());
+    }
+    auto setup = game::GameSetup::Read(*data, savesRoot);
     Log("%s: %s, engine v%s, %dx%d, first script %s\n", folder.c_str(), setup.Game.c_str(), setup.Version.c_str(), setup.Width, setup.Height,
         setup.StartScript.c_str());
     SwitchHost host(*data, setup.SaveFolder);
+    host.Test = test;
     auto vm = setup.CreateVm(host, kData);
     // HOME (or the console asleep) stops the game where it is, its clock and its sound too, whatever
     // RIO.INI's Background says (on Windows a game may go on behind other windows)
@@ -1403,6 +1432,9 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
         askedTicks += armGetSystemTick() - start;
         return answer;
     };
+    // (a test run answers as scnrun does: yes / OK, no one to ask)
+    if (test)
+        host.AskPlayer = nullptr;
     try
     {
         while (running && appletMainLoop())
@@ -1414,7 +1446,15 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             lastTick = tick;
             padUpdate(&ui.Pad);
             u64 down = padGetButtonsDown(&ui.Pad), up = padGetButtonsUp(&ui.Pad);
-            if (down & HidNpadButton_Plus)
+            // A test run: its script's input for this frame (+ stops it)
+            if (test && (down & HidNpadButton_Plus))
+                break;
+            if (test)
+            {
+                host.Frame = int(frames);
+                test->SendMessages(int(frames), *vm);
+            }
+            else if (down & HidNpadButton_Plus)
             {
                 // The menu, the game standing still behind it as when HOME is pressed
                 vm->Notify(ScnEvent::Deactivate);
@@ -1427,6 +1467,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                 restartSpans();
                 continue;
             }
+            if (test)
+                down = up = 0;
             if (down & HidNpadButton_B)
                 mouse(ScnMessage::RButtonDown, host.Buttons | 2);
             if (up & HidNpadButton_B)
@@ -1440,7 +1482,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
                 }
             // a touch: the mouse there, the left button held
             float tx, ty;
-            bool touch = ui.Touch(tx, ty);
+            bool touch = !test && ui.Touch(tx, ty);
             if (touch)
                 toGame(tx, ty);
             if (touch && !touching)
@@ -1459,7 +1501,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             touching = touch;
             // the left stick moves the pointer, faster the further it is pushed
             HidAnalogStickState stick = padGetStickPos(&ui.Pad, 0);
-            if (std::abs(stick.x) > 6000 || std::abs(stick.y) > 6000)
+            if (!test && (std::abs(stick.x) > 6000 || std::abs(stick.y) > 6000))
             {
                 host.MouseX = std::clamp(host.MouseX + stick.x / 4096, 0, setup.Width - 1);
                 host.MouseY = std::clamp(host.MouseY - stick.y / 4096, 0, setup.Height - 1);
@@ -1482,10 +1524,21 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
 
             uint64_t before = armGetSystemTick();
             if (frameLimit != 0 && frames >= frameLimit)
+            {
+                if (test)
+                {
+                    // (and the last picture, as scnrun's: of the frame after the last one run)
+                    Log("Still running after %llu frames.\n", (unsigned long long)frames);
+                    if (test->Every > 0)
+                        test->SavePicture(*vm, int(frames));
+                }
                 break;
+            }
             if (!vm->RunFrame())
             {
                 Log("The scripts quit after %llu frames.\n", (unsigned long long)frames);
+                if (test && test->Every > 0)
+                    test->SavePicture(*vm, int(frames));
                 break;
             }
             uint64_t scripts = armGetSystemTick() - before - askedTicks;
@@ -1518,6 +1571,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0)
             vm->TextChecks.clear();
             slowest = std::max(slowest, scripts);
             spanScripts += scripts;
+            if (test && test->Every > 0 && frames % uint64_t(test->Every) == 0)
+                test->SavePicture(*vm, int(frames));
             frames++;
             spanFrames++;
             if (vm->ScreenInvalidated)
@@ -1753,16 +1808,30 @@ int main(int argc, char** argv)
     // A game folder named on the command line (nxlink ... OpenShiina.nro <folder>) starts at once;
     // else the list of games, back to it after each one (the title on the HOME menu starts here)
     std::string folder;
-    // (and a number after it: leave after that many frames, for tests)
+    // (and a number after it: leave after that many frames, for tests; "test:<name>": a test run,
+    // TestRun.h, as devhost's RUNF starts it from devrun.ps1)
     uint64_t frameLimit = 0;
+    std::optional<player::TestRun> test;
     for (int k = 1; k < argc; k++)
-        if (argv[k] && argv[k][0] != '_')
+        if (argv[k] && std::string(argv[k]).rfind("test:", 0) == 0)
+        {
+            std::string error;
+            test = player::TestRun::Read(kDataRoot, argv[k] + 5, error);
+            if (!test)
+                Log("[test] %s\n", error.c_str());
+        }
+        else if (argv[k] && argv[k][0] != '_')
         {
             if (folder.empty())
                 folder = argv[k];
             else if (frameLimit == 0)
                 frameLimit = std::strtoull(argv[k], nullptr, 10);
         }
+    if (test)
+    {
+        folder = test->Game;
+        frameLimit = test->Frames;
+    }
     bool named = !folder.empty();
     if (named)
         folder = Files::Combine(kGames, folder);
@@ -1774,6 +1843,9 @@ int main(int argc, char** argv)
         fsFsClose(&userFs);
         internal = false;
     }
+    // (a game named that is not on the card may be in the console's storage)
+    if (named && internal && !Files::IsDirectory(folder) && Files::IsDirectory(Files::Combine(kInternalGames, Files::FileName(folder))))
+        folder = Files::Combine(kInternalGames, Files::FileName(folder));
     while (ui)
     {
         if (!named)
@@ -1787,7 +1859,7 @@ int main(int argc, char** argv)
             break;
         try
         {
-            Play(*ui, folder, frameLimit);
+            Play(*ui, folder, frameLimit, test ? &*test : nullptr);
         }
         catch (const std::exception& e)
         {
