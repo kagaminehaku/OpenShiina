@@ -52,6 +52,7 @@ struct Scale32SseGpuParameters
 {
     int32_t RowCount, ColumnCount, SourceWord, SourcePitch, OutputWord, OutputPitch;
     float WholeX, WholeY, WholeXY;
+    int32_t MaxCount;
 };
 
 struct RotateZoomGpuParameters
@@ -355,7 +356,10 @@ bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, co
     if (!kernel)
         return false;
     int nr = int(rows.size()), nc = int(columns.size());
-    Scale32SseGpuParameters parameters{nr, nc, 0, 0, 0, 0, wholeX, wholeY, wholeXY};
+    int32_t maxCount = 0;
+    for (const auto& column : columns)
+        maxCount = std::max(maxCount, int32_t(column[1]));
+    Scale32SseGpuParameters parameters{nr, nc, 0, 0, 0, 0, wholeX, wholeY, wholeXY, maxCount};
     if (!GpuSource(kernel, 0, src, srcPitch, width, height, parameters.SourceWord, parameters.SourcePitch))
         return false;
     auto* rowTable = kernel->Input(1, int64_t(nr) * 20);
@@ -366,7 +370,8 @@ bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, co
     std::memcpy(rowTable, rows.data(), size_t(nr) * 20);
     std::memcpy(columnTable, columns.data(), size_t(nc) * 20);
     int64_t ran = Now();
-    if (!kernel->Run(&parameters, sizeof parameters, (nc + 15) / 16, (nr + 15) / 16))
+    // (groups of 32 x 8: a warp is a destination row)
+    if (!kernel->Run(&parameters, sizeof parameters, (nc + 31) / 32, (nr + 7) / 8))
         return false;
     int64_t back = Now();
     GpuTargetDone(dst, dstPitch, nc, nr, output);
