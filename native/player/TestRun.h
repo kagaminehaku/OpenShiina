@@ -9,6 +9,11 @@
 //   every=<n>                       the game's picture saved every n frames, and at the end
 //   clock=fixed | real              fixed (the default): 1/60 s a frame, as scnrun, so that the
 //                                   pictures are those of the PC; real: the console's clock
+//   loads=background | sync         background (the default): the background loader (00CE) and
+//                                   the reads ahead on their threads, as the player plays; sync: the
+//                                   files read when asked, as scnrun reads them, so that a scene
+//                                   does not wait for the SD card a few frames more than on the PC
+//                                   (for pictures to compare with scnrun's)
 //   times=<from>:<to>               the time of the scripts, of each embedded routine and opcode
 //                                   in those frames, told in the log ("[times]") when they end: the
 //                                   same frames of the same script are the same scene each run, so
@@ -43,6 +48,8 @@ public:
     uint64_t Frames = 0;
     int Every = 0;
     bool FixedClock = true;
+    /// loads=sync: no background loader nor reads ahead.
+    bool SyncLoads = false;
     /// The frames timed (times=), -1 when none.
     int TimesFrom = -1, TimesTo = -1;
     /// saves=: "game" or a folder under the root; empty: none.

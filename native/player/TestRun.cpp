@@ -69,6 +69,8 @@ std::optional<TestRun> TestRun::Read(const std::string& root, const std::string&
                 run.Every = std::stoi(value);
             else if (key == "clock")
                 run.FixedClock = value != "real";
+            else if (key == "loads")
+                run.SyncLoads = value == "sync";
             else if (key == "times")
             {
                 size_t colon = value.find(':');

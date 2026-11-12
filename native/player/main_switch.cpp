@@ -1337,6 +1337,13 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
     SwitchHost host(*data, setup.SaveFolder);
     host.Test = test;
     auto vm = setup.CreateVm(host, kData);
+    // (a test run with loads=sync: the files read when asked, as scnrun)
+    if (test && test->SyncLoads)
+    {
+        vm->LoadInBackground = false;
+        vm->ReadAhead = false;
+        Log("[test] files read when asked (loads=sync)\n");
+    }
     // HOME (or the console asleep) stops the game where it is, its clock and its sound too, whatever
     // RIO.INI's Background says (on Windows a game may go on behind other windows)
     vm->SetPauseInBackground(true);
