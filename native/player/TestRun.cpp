@@ -69,6 +69,16 @@ std::optional<TestRun> TestRun::Read(const std::string& root, const std::string&
                 run.Every = std::stoi(value);
             else if (key == "clock")
                 run.FixedClock = value != "real";
+            else if (key == "times")
+            {
+                size_t colon = value.find(':');
+                if (colon == std::string::npos)
+                    throw std::invalid_argument(value);
+                run.TimesFrom = std::stoi(value.substr(0, colon));
+                run.TimesTo = std::stoi(value.substr(colon + 1));
+            }
+            else if (key == "saves")
+                run.Saves = value;
             else if (key == "press")
                 // scnrun's SCNRUN_PRESS: "frame:key[:frames],..." keys held from that frame
                 for (const std::string& item : Items(value, ','))
@@ -164,6 +174,30 @@ void TestRun::SendMessages(int frame, scripting::ScnVm& vm) const
             if (m.To + 1 == frame)
                 vm.WindowMessage(up, 0, Point(x, y));
         }
+}
+
+std::vector<std::string> TestRun::Report(const Times& times) const
+{
+    std::vector<std::string> lines;
+    lines.push_back(std::format("[times] frames {}-{} ({} run): scripts {:.1f} ms, {:.2f} ms a frame", TimesFrom, TimesTo, times.Frames, times.ScriptsMs,
+                                times.Frames > 0 ? times.ScriptsMs / times.Frames : 0.0));
+    std::vector<std::pair<std::string, scripting::ScnVm::RoutineTime>> routines(times.Routines.begin(), times.Routines.end());
+    std::sort(routines.begin(), routines.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
+    for (size_t k = 0; k < routines.size() && k < 20; k++)
+    {
+        const auto& [name, time] = routines[k];
+        lines.push_back(std::format("[times] routine {}: {:.1f} ms, {} calls, {:.3f} ms a call", name, time.Milliseconds, time.Calls,
+                                    time.Calls > 0 ? time.Milliseconds / time.Calls : 0.0));
+    }
+    std::vector<std::pair<int, scripting::ScnVm::RoutineTime>> ops(times.Ops.begin(), times.Ops.end());
+    std::sort(ops.begin(), ops.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
+    for (size_t k = 0; k < ops.size() && k < 20; k++)
+    {
+        const auto& [op, time] = ops[k];
+        lines.push_back(std::format("[times] opcode {:04X}: {:.1f} ms, {} calls, {:.3f} ms a call", op, time.Milliseconds, time.Calls,
+                                    time.Calls > 0 ? time.Milliseconds / time.Calls : 0.0));
+    }
+    return lines;
 }
 
 void TestRun::SavePicture(scripting::ScnVm& vm, int frame) const

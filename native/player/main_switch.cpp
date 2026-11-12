@@ -1318,6 +1318,20 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             (unsigned long long)test->Frames, test->FixedClock ? "fixed" : "real", test->Every, test->Folder.c_str());
     }
     auto setup = game::GameSetup::Read(*data, savesRoot);
+    // (saves=: the run starts with those saves)
+    if (test && !test->Saves.empty())
+    {
+        std::string from = test->Saves == "game" ? Files::Combine(kSaves, Files::FileName(setup.SaveFolder)) : Files::Combine(kDataRoot, test->Saves);
+        std::string error;
+        player::RemoveFolder(setup.SaveFolder);
+        if (player::CopyFolder(from, setup.SaveFolder, [](int64_t) { return true; }, error))
+            Log("[test] the saves of %s\n", from.c_str());
+        else
+        {
+            Log("[test] no saves from %s: %s\n", from.c_str(), error.c_str());
+            Files::CreateDirectories(setup.SaveFolder);
+        }
+    }
     Log("%s: %s, engine v%s, %dx%d, first script %s\n", folder.c_str(), setup.Game.c_str(), setup.Version.c_str(), setup.Width, setup.Height,
         setup.StartScript.c_str());
     SwitchHost host(*data, setup.SaveFolder);
@@ -1391,6 +1405,16 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
     std::unordered_map<int, ScnVm::RoutineTime> opTimes;
     vm->RoutineTimes = &routineTimes;
     vm->OpTimes = &opTimes;
+    // A test run's timed frames (times=): their own maps while they run, told when they end
+    player::TestRun::Times timed;
+    bool timing = false;
+    auto endTiming = [&] {
+        timing = false;
+        vm->RoutineTimes = &routineTimes;
+        vm->OpTimes = &opTimes;
+        for (const auto& line : test->Report(timed))
+            Log("%s\n", line.c_str());
+    };
     uint64_t frames = 0, started = armGetSystemTick(), slowest = 0, spanStart = started, spanFrames = 0, spanScripts = 0;
     uint64_t pictureVersion = 1, pointerShownUntil = 0;
     bool running = true, focused = true, touching = false;
@@ -1531,14 +1555,24 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
                     Log("Still running after %llu frames.\n", (unsigned long long)frames);
                     if (test->Every > 0)
                         test->SavePicture(*vm, int(frames));
+                    if (timing)
+                        endTiming();
                 }
                 break;
+            }
+            if (test && int64_t(frames) == test->TimesFrom)
+            {
+                timing = true;
+                vm->RoutineTimes = &timed.Routines;
+                vm->OpTimes = &timed.Ops;
             }
             if (!vm->RunFrame())
             {
                 Log("The scripts quit after %llu frames.\n", (unsigned long long)frames);
                 if (test && test->Every > 0)
                     test->SavePicture(*vm, int(frames));
+                if (timing)
+                    endTiming();
                 break;
             }
             uint64_t scripts = armGetSystemTick() - before - askedTicks;
@@ -1571,10 +1605,17 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             vm->TextChecks.clear();
             slowest = std::max(slowest, scripts);
             spanScripts += scripts;
+            if (timing)
+            {
+                timed.ScriptsMs += double(armTicksToNs(scripts)) / 1e6;
+                timed.Frames++;
+            }
             if (test && test->Every > 0 && frames % uint64_t(test->Every) == 0)
                 test->SavePicture(*vm, int(frames));
             frames++;
             spanFrames++;
+            if (timing && int64_t(frames) > test->TimesTo)
+                endTiming();
             if (vm->ScreenInvalidated)
             {
                 vm->ScreenInvalidated = false;

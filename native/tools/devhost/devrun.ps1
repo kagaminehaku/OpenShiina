@@ -1,7 +1,7 @@
 param([Parameter(Mandatory)] [string]$Address, [Parameter(Mandatory)] [string]$Script, [string]$Out,
       [string]$Nro = 'openshiina/OpenShiina.nro', [int]$Wait = 1800, [string]$Compare)
 # A test run of the player on the Switch with no one at the console (player/TestRun.h): the script
-# (game=, frames=, mouse=, press=, every=, clock=) goes to sdmc:/OpenShiina/Tests/<name>.txt
+# (game=, frames=, mouse=, press=, every=, clock=, times=, saves=) goes to sdmc:/OpenShiina/Tests/<name>.txt
 # (devput.ps1), devhost starts the player with "test:<name>" ("RUNF", main.cpp), and when devhost
 # answers again (the player went back to it) its log and pictures come back into -Out:
 #   devrun.ps1 -Address <Switch IP> -Script nuki2.txt -Out runs\nuki2
@@ -65,7 +65,7 @@ foreach ($picture in $pictures) {
     & $devget -Address $Address -Path "sdmc:/OpenShiina/Tests/$name/$($picture.Name)" -Out (Join-Path $Out $picture.Name) | Out-Null
 }
 Write-Host "$($pictures.Count) pictures and player.log in $Out"
-Get-Content -LiteralPath (Join-Path $Out 'player.log') | Select-String '^\[test\]|^\[memory\] before|Still running|quit after|error|Error|Out of memory' |
+Get-Content -LiteralPath (Join-Path $Out 'player.log') | Select-String '^\[test\]|^\[times\]|^\[memory\] before|Still running|quit after|error|Error|Out of memory' |
     ForEach-Object { $_.Line }
 if ($Compare -and $pictures.Count -gt 0) {
     $comparer = Join-Path $PSScriptRoot '..\scnrun\screencompare.py'
