@@ -250,6 +250,13 @@ public:
 
     bool ReadFile(const std::string& name, Bytes& data) override { return m_data.Read(Slashes(Text::Cp932ToUtf8(name)), data); }
     std::optional<int64_t> ArchiveFileSize(const std::string& name) override { return m_data.Size(Slashes(Text::Cp932ToUtf8(name))); }
+    std::vector<std::string> ArchiveFileNames(const std::string& extension) override
+    {
+        std::vector<std::string> names;
+        for (const auto& name : m_data.Names(extension))
+            names.push_back(Text::Utf8ToCp932(name));
+        return names;
+    }
     std::optional<int64_t> ArchiveFileSize(const std::string& archive, const std::string& name) override
     {
         return m_data.Size(Text::Cp932ToUtf8(archive), Slashes(Text::Cp932ToUtf8(name)));

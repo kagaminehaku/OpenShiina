@@ -296,6 +296,18 @@ std::optional<int64_t> GameData::Size(const std::string& path, std::initializer_
     return int64_t(found->Entry->UnpackedSize);
 }
 
+std::vector<std::string> GameData::Names(const std::string& extension) const
+{
+    std::vector<std::string> names;
+    std::set<std::string> seen;
+    for (const auto& stem : m_stems)
+        if (auto found = m_byStem.find(stem); found != m_byStem.end())
+            for (const auto& c : found->second)
+                if (Text::EqualsIgnoreCase(Extension(c.Entry->Name), extension) && seen.insert(Fold(c.Entry->Name)).second)
+                    names.push_back(c.Entry->Name);
+    return names;
+}
+
 std::optional<int64_t> GameData::Size(const std::string& archive, const std::string& path)
 {
     if (Trim(path).empty())

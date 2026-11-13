@@ -406,7 +406,9 @@ bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
     for (size_t r = 0; r < nr; r++)
         work.RowY[r + 1] = work.RowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
 
-    if (UseGpu("scale32", int64_t(nr) * int64_t(nc)))
+    // (the work is the source's pixels as much as the destination's: a save's thumbnail of a whole
+    // screen, few pixels made from many, went to the CPU at 23-41 ms on the Switch)
+    if (UseGpu("scale32", std::max(int64_t(nr) * int64_t(nc), int64_t(width) * int64_t(work.RowY[nr]))))
     {
         std::vector<std::array<int, 4>> rowEntries, columnEntries;
         std::vector<int> rowFrom(work.RowY.begin(), work.RowY.begin() + ptrdiff_t(nr)), columnFrom(nc);

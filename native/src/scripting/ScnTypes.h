@@ -91,6 +91,9 @@ public:
         return ReadFile(name, data) ? std::optional<int64_t>(int64_t(data.size())) : std::nullopt;
     }
 
+    /// The names of the archives' files with that extension (".TXT"), each once; none without a list.
+    virtual std::vector<std::string> ArchiveFileNames(const std::string& /*extension*/) { return {}; }
+
     /// The length of a file of one archive of the game (its file name, "BITCHES3_PA.WAR"), without
     /// reading it; none when that archive is missing or does not have the file. Without a better
     /// answer: any archive's file, when that archive is in the game folder.

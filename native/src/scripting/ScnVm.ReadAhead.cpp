@@ -9,6 +9,13 @@
 // While the game skips, its voices are not read ahead: once three sounds of a folder read ahead
 // were passed by unread, that folder's sounds wait until the scripts read one of them again.
 //
+// Shared files: a file many scenarios name (Re:Rem Plus's corridor, b\bg01_01.S25, scrolled at the
+// start of each of its eight days) is read where the scenario starts, too soon for the read ahead,
+// and 4 MB take some 300 ms to unpack on the Switch: the scene held each time the game was started
+// anew. From the first file the scripts read on, a reader thread reads every scenario of the
+// archives and lists the files three or more of them name, those most named first, up to
+// SharedBytes; they are read on the reader threads and kept in the file cache as they come.
+//
 // The C# player finds the names with a regular expression on the decoded text whose \b ends a
 // name before a character that is not a letter or digit in Unicode's sense; here the end is
 // looked for by hand, Japanese letters counted as letters and its punctuation not. Which files
@@ -26,6 +33,9 @@ namespace {
 
 // How many of a scenario's next files are read ahead
 constexpr int AheadFiles = 6;
+// Shared files: named by this many scenarios or more, up to this many bytes in all
+constexpr int SharedScenarios = 3;
+constexpr int64_t SharedBytes = int64_t(96) << 20;
 // The reader threads
 constexpr int ReaderThreads = 2;
 
@@ -139,6 +149,102 @@ bool ScnVm::TakeAhead(const std::string& name, openshiina::Bytes& data)
 {
     auto read = TakeAheadRead(name);
     return read && read->Wait(data);
+}
+
+void ScnVm::ReadShared()
+{
+    if (!LoadInBackground || !ReadAhead)
+        return;
+    if (!m_sharedStarted)
+    {
+        m_sharedStarted = true;
+        if (!m_reader)
+            m_reader = std::make_unique<BackgroundReader>(ReaderThreads);
+        int64_t budget = std::min(SharedBytes, FileCacheBytes / 4), largest = FileCacheBytes / 2;
+        // (the list as the read's bytes: the names, a line each)
+        m_sharedList = m_reader->Post(
+            [this, budget, largest](openshiina::Bytes& list) {
+                std::unordered_map<std::string, std::pair<std::string, int>> named;
+                for (const auto& scenario : m_host.ArchiveFileNames(".TXT"))
+                {
+                    openshiina::Bytes text;
+                    if (!ReadArchiveFile(scenario, text))
+                        continue;
+                    std::unordered_map<std::string, std::string> here;
+                    for (const auto& file : MediaNames(Text::Cp932ToUtf8(text.data(), text.size())))
+                        here.emplace(SjisFold(file), file);
+                    for (const auto& [key, file] : here)
+                    {
+                        auto& n = named.try_emplace(key, file, 0).first->second;
+                        n.second++;
+                    }
+                }
+                std::vector<std::pair<int, std::string>> often;
+                for (const auto& [key, n] : named)
+                    if (n.second >= SharedScenarios)
+                        often.emplace_back(n.second, n.first);
+                std::sort(often.begin(), often.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first > b.first : a.second < b.second; });
+                int64_t total = 0;
+                for (const auto& [count, file] : often)
+                {
+                    auto size = m_host.ArchiveFileSize(file);
+                    if (!size || *size > largest || total + *size > budget)
+                        continue;
+                    total += *size;
+                    list.insert(list.end(), file.begin(), file.end());
+                    list.push_back('\n');
+                }
+                return true;
+            },
+            false);
+        return;
+    }
+    // The list made: its files read
+    if (m_sharedList && m_sharedList->Done())
+    {
+        openshiina::Bytes list;
+        if (m_sharedList->Wait(list))
+        {
+            size_t at = 0;
+            while (at < list.size())
+            {
+                size_t end = at;
+                while (end < list.size() && list[end] != '\n')
+                    end++;
+                std::string file(list.begin() + std::ptrdiff_t(at), list.begin() + std::ptrdiff_t(end));
+                std::string key = SjisFold(file);
+                if (!m_fileCache.count(key) && !m_ahead.count(key) && !m_shared.count(key))
+                    m_shared[key] = {file, ReadInBackground(file, false)};
+                at = end + 1;
+            }
+        }
+        m_sharedList.reset();
+    }
+    // Those read: into the file cache
+    for (auto s = m_shared.begin(); s != m_shared.end();)
+        if (s->second.second->Done())
+        {
+            openshiina::Bytes data;
+            if (s->second.second->Wait(data))
+            {
+                m_sharedRead++;
+                m_sharedBytes += int64_t(data.size());
+                Kept(s->second.first, data);
+            }
+            s = m_shared.erase(s);
+        }
+        else
+            ++s;
+}
+
+bool ScnVm::TakeShared(const std::string& name, openshiina::Bytes& data)
+{
+    auto found = m_shared.find(SjisFold(name));
+    if (found == m_shared.end())
+        return false;
+    auto read = std::move(found->second.second);
+    m_shared.erase(found);
+    return read->Wait(data);
 }
 
 void ScnVm::LearnScenario(const std::string& name, const openshiina::Bytes& text)

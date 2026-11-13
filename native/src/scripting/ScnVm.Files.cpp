@@ -173,6 +173,8 @@ bool ScnVm::ReadScriptFile(const std::string& path, openshiina::Bytes& data, boo
         return false;
     if (p->Save)
         return ReadSave(p->Name, data);
+    // (the files many scenarios name, read on the reader threads: their list made, those read kept)
+    ReadShared();
     if (const auto* module = ModuleFile(p->Name))
     {
         data = *module;
@@ -187,7 +189,7 @@ bool ScnVm::ReadScriptFile(const std::string& path, openshiina::Bytes& data, boo
             LearnScenario(p->Name, data);
         return true;
     }
-    if (!TakeAhead(p->Name, data) && !ReadArchiveFile(p->Name, data))
+    if (!TakeShared(p->Name, data) && !TakeAhead(p->Name, data) && !ReadArchiveFile(p->Name, data))
         return m_host.ReadLooseFile(p->Name, data);
     ReadAheadAfter(p->Name);
     Kept(p->Name, data);

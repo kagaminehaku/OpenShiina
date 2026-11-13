@@ -387,6 +387,8 @@ public:
     bool ReadAhead = true;
     /// Files read ahead, and of those the scripts then read.
     std::pair<int, int> ReadAheadCounts() const { return {m_aheadRead, m_aheadUsed}; }
+    /// The shared files read (ReadShared): how many, their bytes.
+    std::pair<int, int64_t> SharedCounts() const { return {m_sharedRead, m_sharedBytes}; }
 
     // ---- Accelerator (ScnVm.Accelerator.cs) ----
 
@@ -1214,6 +1216,16 @@ private:
     std::unordered_map<std::string, int> m_soundsPassed;
     std::string m_scenarioName;
     int m_aheadRead = 0, m_aheadUsed = 0;
+    /// The files many scenarios name, read on the reader threads from the first file the scripts
+    /// read on and kept (ScnVm.ReadAhead.cpp, "Shared files"); TakeShared gives one still being read.
+    void ReadShared();
+    bool TakeShared(const std::string& name, openshiina::Bytes& data);
+    bool m_sharedStarted = false;
+    int m_sharedRead = 0;
+    int64_t m_sharedBytes = 0;
+    // The list of them being made (the scenarios read and searched), then the reads by folded name
+    std::shared_ptr<BackgroundRead> m_sharedList;
+    std::unordered_map<std::string, std::pair<std::string, std::shared_ptr<BackgroundRead>>> m_shared;
     // ---- Accelerator ----
 public:
     // The kernels' parameters, as their uniform blocks lay them out (ints and uints, 4 bytes each)

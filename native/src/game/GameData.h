@@ -51,6 +51,10 @@ public:
     /// The size Read gives for a script path, from the archive's index, or none.
     std::optional<int64_t> Size(const std::string& path, std::initializer_list<const char*> extensions = {});
 
+    /// The names (UTF-8) of the archives' files with the extension (".TXT"), each once, in the order
+    /// first met.
+    std::vector<std::string> Names(const std::string& extension) const;
+
     /// The size of a file of one archive, named by its file ("BITCHES3_PA.WAR"), or none.
     std::optional<int64_t> Size(const std::string& archive, const std::string& path);
 

@@ -245,6 +245,13 @@ public:
     {
         return m_data.Size(Utf8(archive), Slashes(Utf8(name)));
     }
+    std::vector<std::string> ArchiveFileNames(const std::string& extension) override
+    {
+        std::vector<std::string> names;
+        for (const auto& name : m_data.Names(extension))
+            names.push_back(Text::Utf8ToCp932(name));
+        return names;
+    }
     bool MountArchive(const std::string& archive, bool mounted) override { return m_data.Mount(Utf8(archive), mounted); }
     bool ExecutableCopy(const std::string& name, Bytes& data) override { return m_data.ExecutableCopy(LooseFileSize(name), data); }
 
@@ -488,6 +495,7 @@ int Run(int argc, std::string* argv)
     std::printf("%d frames in %.2f s, script memory %lld MB\n", frame, seconds, (long long)(vm.ScriptMemoryBytes() >> 20));
     if (vm.LoadInBackground)
         std::printf("  read ahead: %d files, %d of them used\n", vm.ReadAheadCounts().first, vm.ReadAheadCounts().second);
+        std::printf("  shared files read: %d, %lld MB\n", vm.SharedCounts().first, (long long)(vm.SharedCounts().second >> 20));
     if (vm.RoutineTimes)
     {
         std::vector<std::pair<std::string, ScnVm::RoutineTime>> times(routineTimes.begin(), routineTimes.end());
