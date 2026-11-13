@@ -150,6 +150,27 @@ void LogMemory(const char* when)
         (unsigned long long)(total >> 20), HeapInUse() >> 20);
 }
 
+/// The clocks the console runs at now (CPU, GPU, memory, in MHz), for timings to be compared: the
+/// same scene takes twice as long at the handheld GPU's 307 MHz as at 768. Through clkrst, as
+/// sys-clk reads them; nothing when the service is not there.
+void LogClocks(const char* when)
+{
+    if (R_FAILED(clkrstInitialize()))
+        return;
+    auto rate = [](PcvModuleId module) {
+        ClkrstSession session;
+        u32 hz = 0;
+        if (R_SUCCEEDED(clkrstOpenSession(&session, module, 3)))
+        {
+            clkrstGetClockRate(&session, &hz);
+            clkrstCloseSession(&session);
+        }
+        return hz / 1000000;
+    };
+    Log("[clocks] %s: CPU %u MHz, GPU %u MHz, memory %u MHz\n", when, rate(PcvModuleId_CpuBus), rate(PcvModuleId_GPU), rate(PcvModuleId_EMC));
+    clkrstExit();
+}
+
 /// A colour as the Renderer takes it, 0xAABBGGRR.
 constexpr uint32_t Rgb(uint32_t r, uint32_t g, uint32_t b, uint32_t a = 255) { return a << 24 | b << 16 | g << 8 | r; }
 
@@ -1376,6 +1397,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             Log("GPU mode: %s; the CPU draws\n", e.what());
         }
     }
+    LogClocks("the game starts");
     Log("GPU mode: %s%s\n", vm->Accelerator ? (vm->GpuCheck ? "on, checked against the CPU" : "on") : "off",
         vm->Accelerator && !s_gpu->ScriptCaching() ? ", the scripts' memory not cached by the GPU" : "");
     // With text-check every glyph is drawn both in place and the way before, the bytes compared
@@ -1426,6 +1448,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
         timing = false;
         vm->RoutineTimes = &routineTimes;
         vm->OpTimes = &opTimes;
+        LogClocks("the timed frames end");
         for (const auto& line : test->Report(timed))
             Log("%s\n", line.c_str());
     };
