@@ -647,7 +647,12 @@ public class Nukitashi2Crypt(byte[] key) : IDecryptExtra
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(at, System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(at) ^ length);
     }
 
-    public void Encrypt(byte[] data, int index, uint length, uint flags) => throw new NotImplementedException();
+    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    {
+        if ((flags & 0x102) != 0x102)
+            return;
+        Decrypt(data, index, length, 0x202);
+    }
 }
 
 /// <summary>Nukitashi2Crypt with the length at +0x104: Chou Saiminjutsu Gakuen.</summary>
