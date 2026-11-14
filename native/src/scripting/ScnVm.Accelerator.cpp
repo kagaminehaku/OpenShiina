@@ -65,6 +65,8 @@ struct RotateZoomGpuParameters
 
 } // namespace
 
+int64_t ScnVm::GpuNow() { return Now(); }
+
 bool ScnVm::UseGpu(const char* routine, int64_t pixels)
 {
     if (!Accelerator || m_gpuFailed.count(routine))

@@ -403,6 +403,8 @@ public:
     /// The setting "Fast zoom": scale32's SSE2 build on the GPU in fewer steps, not to the byte
     /// (scale32fast_csh); off for tests and with GpuCheck.
     bool GpuFastZoom = false;
+    /// The setting "Sprites on the GPU": 04C4 / 04C5 drawn by the GPU mode (compose24_csh), to the byte.
+    bool GpuSprites = false;
     /// GpuCheck: the first call of each routine and the calls whose bytes differed; the reader may clear it.
     std::vector<std::string> GpuChecks;
     /// GpuCheck: per routine the calls compared, how many of them differed, the pixels, and the
@@ -826,6 +828,10 @@ private:
     int SpriteEntry(int list, int index) const;
     static bool SpriteDrawable(int& flags);
     void DrawSprite(int entry, int flags, const void* target);
+    /// Compose's sprites (in order, with their flags) drawn by the GPU; false when the CPU draws
+    /// them (with GpuCheck always, after the GPU's bytes were kept to compare).
+    bool ComposeOnGpu(const std::vector<std::pair<uint64_t, int>>& order, int sprites, const void* target);
+    static constexpr const char* ComposeRoutine = "sprites (04C4)";
     RunHeader ReadRun(int p);
     const uint8_t* ReadRow(int p, int dst, int bytes, int pixels);
     void DrawRowPlain(int p, int dst, int skip, int visible, const SpriteBlend* blend);
@@ -1271,6 +1277,8 @@ private:
     /// With RoutineTimes: a GPU call's parts under "<routine> gpu: ..." - its bindings and tables made
     /// (from started to ran), the kernel's run (LastRun), what was written back after it (to now).
     void GpuTimes(const char* routine, int64_t started, int64_t ran, int64_t back, const IScnGpuKernel& kernel);
+    /// The clock GpuTimes takes (nanoseconds).
+    static int64_t GpuNow();
     /// Scale32Sse's tables (flags, count, first, last weights; the first source row or column of
     /// each) and the copy on the GPU (kernel scale32sse).
     /// Enlarge32's steps on the GPU (kernel enlarge32_csh). Rows: kind, source row (from src), the

@@ -297,8 +297,268 @@ void ScnVm::Compose(int sprites, int count, int pixels, int width, int height, i
         order.emplace_back(uint64_t(uint32_t(Read32(e + 0xC))) << 32 | uint32_t(i), flags);
     }
     std::sort(order.begin(), order.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    // The GPU mode draws them when it can (with GpuCheck it draws, the picture is put back and the
+    // CPU draws it again, the two compared)
+    if (Accelerator && GpuSprites && ComposeOnGpu(order, sprites, &target))
+        return;
     for (const auto& [key, flags] : order)
         DrawSprite(sprites + int(uint32_t(key)) * SpriteSize, flags, &target);
+    GpuDone(ComposeRoutine);
+}
+
+bool ScnVm::ComposeOnGpu(const std::vector<std::pair<uint64_t, int>>& order, int sprites, const void* targetPointer)
+{
+    // The sprites' parts as compose24_csh takes them (see there): DrawSprite's clipping and
+    // DrawRowPlain's walk through the runs, their segments listed instead of drawn. Only the plain
+    // path and blend 0x40000000; a picture whose rows are not whole words, a source sharing bytes
+    // with the picture, or more than six places of sources: the CPU draws
+    const auto& target = *static_cast<const ComposeTarget*>(targetPointer);
+    int width = target.Width, height = target.Height, pitch = target.Pitch;
+    if (width <= 0 || height <= 0 || (width * 3) % 4 != 0 || pitch <= 0 || pitch % 4 != 0 || (target.Pixels & 3) != 0)
+        return false;
+    int64_t targetStart = target.Pixels, targetEnd = target.Pixels + int64_t(height - 1) * pitch + int64_t(width) * 3;
+    constexpr int MaxSources = 6;
+    struct Source
+    {
+        int64_t Start, End;
+    };
+    std::vector<Source> sources;
+    std::vector<uint32_t> spriteWords, tableWords, rowWords;
+    std::vector<std::array<uint32_t, 4>> segments;
+    // the segments' sources by sprite until the places are known
+    std::vector<int> segmentSprite, spriteSource;
+    int64_t pixels = 0;
+    for (const auto& [key, flags] : order)
+    {
+        int entry = sprites + int(uint32_t(key)) * SpriteSize;
+        int mode;
+        if ((flags & 0x0C000000) != 0)
+            return false;
+        if ((flags & 0x70000000) == 0)
+            mode = 0;
+        else if ((flags & 0x70000000) == 0x40000000)
+            mode = 1;
+        else
+            return false;
+        // As DrawSprite
+        int picture = Picture(Read32(entry));
+        uint32_t frameIndex = uint32_t(Read32(entry + 4));
+        if (picture == 0 || frameIndex >= uint32_t(Read32(picture + 4)))
+            continue;
+        int frame = Read32(picture + 8 + 4 * int(frameIndex));
+        if (frame == 0 || Read32(frame) == 0)
+            continue;
+        int frameWidth = Read32(frame), rows = Read32(frame + 4);
+        int y = Read32(entry + 0x14) - target.OriginY + Read32(frame + 0xC);
+        int bottom = rows + y, row, top;
+        if (y < 0)
+        {
+            if (bottom <= 0)
+                continue;
+            rows += y;
+            row = frame + 0x14 - y * 4;
+            top = 0;
+        }
+        else
+        {
+            if (y >= target.Height)
+                continue;
+            row = frame + 0x14;
+            top = y;
+        }
+        if (bottom - target.Height > 0)
+            rows -= bottom - target.Height;
+        int x = Read32(entry + 0x10) - target.OriginX + Read32(frame + 8);
+        int right = frameWidth + x - 1;
+        int skip, visible, left;
+        if (x < 0)
+        {
+            if (right < 0)
+                continue;
+            skip = -x;
+            visible = right >= target.Width ? target.Width : frameWidth - skip;
+            left = 0;
+        }
+        else
+        {
+            skip = 0;
+            if (x >= target.Width)
+                continue;
+            visible = right >= target.Width ? frameWidth + target.Width - right - 1 : frameWidth;
+            left = x * 3;
+        }
+        if (visible <= 0 || rows <= 0)
+            continue;
+        int index = int(spriteWords.size() / 8);
+        int64_t low = INT64_MAX, high = 0;
+        auto add = [&](int method, int n, int data, int at) {
+            int bytes = method == 2 ? n * 3 : method == 3 ? 3 : method == 4 ? n * 4 : 4;
+            low = std::min<int64_t>(low, data);
+            high = std::max<int64_t>(high, int64_t(data) + bytes);
+            segments.push_back({uint32_t(left + at) | uint32_t(method) << 16, uint32_t(n), uint32_t(data), 0});
+            segmentSprite.push_back(index);
+            pixels += n;
+        };
+        uint32_t rowsAt = uint32_t(rowWords.size() / 2);
+        for (int i = 0; i < rows; i++)
+        {
+            // As DrawRowPlain, with absolute addresses
+            int p = Read32(row + i * 4);
+            uint32_t first = uint32_t(segments.size());
+            int o = p + 2, d = 0, remaining = visible, s = skip;
+            while (s > 0)
+            {
+                auto run = ReadRun(o);
+                o = RunEnd(run.Method, run.Count, run.Data);
+                s -= run.Count;
+                if (s > 0)
+                    continue;
+                if (s == 0)
+                    break;
+                int part = -s, start = run.Count - part;
+                int at = run.Method == 2 ? run.Data + start * 3 : run.Method == 4 ? run.Data + start * 4 : run.Data;
+                if (run.Method < 2)
+                {
+                    d += part * 3;
+                    remaining -= part;
+                }
+                else
+                {
+                    int n = std::min(part, remaining);
+                    add(run.Method, n, at, d);
+                    d += n * 3;
+                    remaining -= n;
+                }
+                break;
+            }
+            while (remaining > 0)
+            {
+                auto run = ReadRun(o);
+                o = RunEnd(run.Method, run.Count, run.Data);
+                if (run.Count <= 0)
+                    return false;
+                if (run.Method < 2)
+                {
+                    d += run.Count * 3;
+                    remaining -= run.Count;
+                    continue;
+                }
+                int n = std::min(run.Count, remaining);
+                add(run.Method, n, run.Data, d);
+                d += n * 3;
+                remaining -= n;
+            }
+            rowWords.push_back(first);
+            rowWords.push_back(uint32_t(segments.size()) - first);
+        }
+        if (high <= low)
+            low = high = 0;
+        else if (low < targetEnd && targetStart < high)
+            return false;
+        // The sprite's source: with one whose parts it shares or touches, or a place of its own
+        int source = -1;
+        if (high > low)
+        {
+            for (int k = 0; k < int(sources.size()) && source < 0; k++)
+                if (low <= sources[size_t(k)].End + (int64_t(1) << 20) && sources[size_t(k)].Start <= high + (int64_t(1) << 20))
+                {
+                    sources[size_t(k)].Start = std::min(sources[size_t(k)].Start, low);
+                    sources[size_t(k)].End = std::max(sources[size_t(k)].End, high);
+                    source = k;
+                }
+            if (source < 0)
+            {
+                if (int(sources.size()) == MaxSources)
+                    return false;
+                source = int(sources.size());
+                sources.push_back({low, high});
+            }
+        }
+        spriteSource.push_back(source);
+        uint32_t tables = 0;
+        int alpha = flags & 0x1FF;
+        if (mode == 1)
+        {
+            // T1 and T2 as SpriteBlend makes them, after the sprites' words
+            uint8_t t[512];
+            StepTable(t, alpha, 256);
+            StepTable(t + 256, 256 - alpha, 256);
+            tables = uint32_t(tableWords.size());
+            for (int k = 0; k < 512; k += 4)
+                tableWords.push_back(uint32_t(t[k]) | uint32_t(t[k + 1]) << 8 | uint32_t(t[k + 2]) << 16 | uint32_t(t[k + 3]) << 24);
+        }
+        spriteWords.insert(spriteWords.end(), {uint32_t(top), uint32_t(rows), rowsAt, uint32_t(mode), uint32_t(alpha), uint32_t(std::max(source, 0)), tables, 0});
+    }
+    int count = int(spriteWords.size() / 8);
+    if (count == 0 || !UseGpu(ComposeRoutine, pixels))
+        return false;
+    int64_t started = GpuNow();
+    IScnGpuKernel* kernel = Accelerator->Kernel("compose24_csh");
+    if (!kernel)
+        return false;
+    // The places: the target, the sources (their starts on a word), the segments' data in them
+    uint32_t targetWord = 0;
+    if (!GpuMemory(kernel, 0, target.Pixels, targetEnd - targetStart, true, targetWord))
+        return false;
+    std::vector<int64_t> sourceBase(sources.size());
+    for (size_t k = 0; k < sources.size(); k++)
+    {
+        int64_t start = sources[k].Start & ~int64_t(3);
+        uint32_t word = 0;
+        if (!GpuMemory(kernel, 4 + int(k), int(start), sources[k].End - start, false, word))
+            return false;
+        sourceBase[k] = int64_t(word) * 4 - start;
+    }
+    for (size_t k = 0; k < segments.size(); k++)
+    {
+        int source = spriteSource[size_t(segmentSprite[k])];
+        segments[k][2] = uint32_t(int64_t(segments[k][2]) + sourceBase[size_t(std::max(source, 0))]);
+    }
+    // (bindings of sources not used: the first one again)
+    for (size_t k = sources.size(); k < MaxSources && !sources.empty(); k++)
+    {
+        uint32_t word = 0;
+        int64_t start = sources[0].Start & ~int64_t(3);
+        if (!GpuMemory(kernel, 4 + int(k), int(start), sources[0].End - start, false, word))
+            return false;
+    }
+    for (int k = 0; k < count; k++)
+        if (spriteWords[size_t(k) * 8 + 3] == 1)
+            spriteWords[size_t(k) * 8 + 6] += uint32_t(count) * 8;
+    spriteWords.insert(spriteWords.end(), tableWords.begin(), tableWords.end());
+    if (segments.empty())
+        segments.push_back({0xFFFF, 0, 0, 0});
+    auto* spriteBuffer = kernel->Input(1, int64_t(spriteWords.size()) * 4);
+    auto* rowBuffer = kernel->Input(2, int64_t(std::max<size_t>(rowWords.size(), 2)) * 4);
+    auto* segmentBuffer = kernel->Input(3, int64_t(segments.size()) * 16);
+    if (!spriteBuffer || !rowBuffer || !segmentBuffer)
+        return false;
+    std::memcpy(spriteBuffer, spriteWords.data(), spriteWords.size() * 4);
+    std::memcpy(rowBuffer, rowWords.data(), rowWords.size() * 4);
+    std::memcpy(segmentBuffer, segments.data(), segments.size() * 16);
+    int rowWordsCount = width * 3 / 4;
+    struct
+    {
+        int32_t RowWords, RowCount, TargetWord, TargetPitch, SpriteCount, AddressMod8, PitchMod8;
+    } parameters{rowWordsCount, height, int32_t(targetWord), pitch / 4, count, target.Pixels & 7, pitch & 7};
+    // GpuCheck: the picture as it was, to draw it again on the CPU
+    openshiina::Bytes before;
+    if (GpuCheck)
+        before = ReadBytes(target.Pixels, int(targetEnd - targetStart));
+    int64_t ran = GpuNow();
+    if (!kernel->Run(&parameters, sizeof parameters, (rowWordsCount + 31) / 32, (height + 7) / 8))
+    {
+        GpuFailed(ComposeRoutine);
+        return false;
+    }
+    int64_t back = GpuNow();
+    GpuTimes(ComposeRoutine, started, ran, back, *kernel);
+    if (!GpuCheck)
+        return true;
+    for (int r = 0; r < height; r++)
+        GpuWrite(target.Pixels + r * pitch, Bytes(target.Pixels + r * pitch, width * 3), width * 3);
+    WriteBytes(target.Pixels, before.data(), int(before.size()));
+    return false;
 }
 
 bool ScnVm::SpriteDrawable(int& flags)

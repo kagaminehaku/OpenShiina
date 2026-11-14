@@ -187,7 +187,7 @@ if(NINTENDO_SWITCH)
     # The shaders, compiled for the Tegra X1 when the player is built (uam), into the romfs; *_csh:
     # the GPU mode's kernels of the Switch's own
     set(PLAYER_SHADERS)
-    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag scale32sse_csh:comp scale32fast_csh:comp enlarge32_csh:comp)
+    foreach(shader ui_vsh:vert ui_fsh:frag picture_fsh:frag easu_fsh:frag rcas_fsh:frag scale32sse_csh:comp scale32fast_csh:comp enlarge32_csh:comp compose24_csh:comp)
         string(REPLACE ":" ";" parts "${shader}")
         list(GET parts 0 name)
         list(GET parts 1 stage)
