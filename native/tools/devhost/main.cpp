@@ -32,11 +32,15 @@
 // The sockets have large TCP buffers: with libnx's 64 KB a transfer over Wi-Fi stopped at ~12 Mbit/s.
 // A connection that sends something else is closed and the next one waited for. + goes back to
 // hbmenu.
+// GETF, PUTF and DELF go on threads of their own (up to kFileWorkers at once, libnx's BSD sessions
+// enough for each to wait on its socket), so that a game being copied does not keep devhost from a
+// log read or an .nro sent meanwhile; starting a program, or leaving, waits for them to end first.
 
 // gethostid and timeval: BSD and POSIX, which a strict C++20 build leaves out unless asked for
 #define _DEFAULT_SOURCE
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cinttypes>
 #include <cstdarg>
@@ -45,6 +49,7 @@
 #include <condition_variable>
 #include <cstring>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -81,9 +86,37 @@ constexpr int32_t kSleepMagic = 0x50454C53; // "SLEP"
 // A file of PUTF is written to the SD card a block at a time, while the next blocks arrive
 constexpr size_t kWriteBlock = 4 * 1024 * 1024;
 constexpr int kWriteBlocks = 3;
+// GETF / PUTF / DELF at once on threads of their own (more wait their turn on the main one)
+constexpr int kFileWorkers = 4;
+
+// The console's text, written by the main thread and the file threads
+std::mutex s_console;
+std::atomic<int> s_fileWorkers{0};
+
+// The file threads, joined by the main thread once done (libnx's threads cannot be detached)
+struct FileWorker
+{
+    std::thread Thread;
+    std::shared_ptr<std::atomic<bool>> Done;
+};
+std::vector<FileWorker> s_workers;
+
+/// The file threads that ended, joined (all of them with wait).
+void JoinFileWorkers(bool wait)
+{
+    for (auto it = s_workers.begin(); it != s_workers.end();)
+        if (wait || it->Done->load())
+        {
+            it->Thread.join();
+            it = s_workers.erase(it);
+        }
+        else
+            ++it;
+}
 
 void Log(const char* format, ...)
 {
+    std::lock_guard lock(s_console);
     va_list args;
     va_start(args, format);
     std::vprintf(format, args);
@@ -605,6 +638,50 @@ int Listen(int type)
     return sock;
 }
 
+/// A GETF, PUTF or DELF connection (its first word read), served and closed.
+void ServeFile(int sock, in_addr from, int32_t first)
+{
+    std::string path, error;
+    if (first == kGetMagic)
+    {
+        bool served = Serve(sock, path, error);
+        close(sock);
+        if (served)
+            Log("Sent %s to %s\n", path.c_str(), inet_ntoa(from));
+        else
+            Log("From %s: %s\n", inet_ntoa(from), error.c_str());
+    }
+    else if (first == kPutMagic)
+    {
+        int64_t bytes = 0;
+        uint64_t start = armGetSystemTick();
+        bool put = Put(sock, path, bytes, error);
+        close(sock);
+        double seconds = double(armTicksToNs(armGetSystemTick() - start)) / 1e9;
+        if (put)
+            Log("Saved %s (%.1f MB/s)\n", path.c_str(), seconds > 0 ? double(bytes) / 1048576.0 / seconds : 0.0);
+        else
+            Log("From %s: %s\n", inet_ntoa(from), error.c_str());
+    }
+    else
+    {
+        bool deleted = Delete(sock, path, error);
+        close(sock);
+        if (deleted)
+            Log("Deleted %s\n", path.c_str());
+        else
+            Log("From %s: %s\n", inet_ntoa(from), error.c_str());
+    }
+}
+
+/// Before a program starts or devhost leaves: the file threads' copies end first.
+void WaitForFiles()
+{
+    if (s_fileWorkers.load() > 0)
+        Log("Waiting for %d file transfer(s) to end...\n", s_fileWorkers.load());
+    JoinFileWorkers(true);
+}
+
 // libnx's defaults with TCP buffers that grow to 4 MB (from 64 KB / 256 KB): what a transfer over
 // Wi-Fi can have in flight is what it gets a round trip
 const SocketInitConfig kSockets = [] {
@@ -613,6 +690,8 @@ const SocketInitConfig kSockets = [] {
     config.tcp_rx_buf_size = 0x100000;
     config.tcp_tx_buf_max_size = 0x400000;
     config.tcp_rx_buf_max_size = 0x400000;
+    // (a session for each file thread waiting on its socket, and the main thread's)
+    config.num_bsd_sessions = kFileWorkers + 4;
     return config;
 }();
 
@@ -669,7 +748,11 @@ int main(int argc, char** argv)
         int sock = tcp >= 0 ? accept(tcp, reinterpret_cast<sockaddr*>(&remote), &remoteLength) : -1;
         if (sock < 0)
         {
-            consoleUpdate(nullptr);
+            JoinFileWorkers(false);
+            {
+                std::lock_guard lock(s_console);
+                consoleUpdate(nullptr);
+            }
             svcSleepThread(50'000'000);
             continue;
         }
@@ -683,40 +766,25 @@ int main(int argc, char** argv)
         setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &window, sizeof window);
         int32_t first = 0;
         std::string error;
-        if (ReceiveInt(sock, first) && first == kGetMagic)
+        bool got = ReceiveInt(sock, first);
+        if (got && (first == kGetMagic || first == kPutMagic || first == kDeleteMagic))
         {
-            std::string path;
-            bool served = Serve(sock, path, error);
-            close(sock);
-            if (served)
-                Log("Sent %s to %s\n", path.c_str(), inet_ntoa(remote.sin_addr));
+            // on a thread of its own when there is one free, else here
+            JoinFileWorkers(false);
+            if (s_fileWorkers.load() < kFileWorkers)
+            {
+                s_fileWorkers++;
+                in_addr from = remote.sin_addr;
+                auto done = std::make_shared<std::atomic<bool>>(false);
+                s_workers.push_back({std::thread([sock, from, first, done] {
+                                         ServeFile(sock, from, first);
+                                         s_fileWorkers--;
+                                         done->store(true);
+                                     }),
+                                     done});
+            }
             else
-                Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
-            continue;
-        }
-        if (first == kPutMagic)
-        {
-            std::string path;
-            int64_t bytes = 0;
-            uint64_t start = armGetSystemTick();
-            bool put = Put(sock, path, bytes, error);
-            close(sock);
-            double seconds = double(armTicksToNs(armGetSystemTick() - start)) / 1e9;
-            if (put)
-                Log("Saved %s (%.1f MB/s)\n", path.c_str(), seconds > 0 ? double(bytes) / 1048576.0 / seconds : 0.0);
-            else
-                Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
-            continue;
-        }
-        if (first == kDeleteMagic)
-        {
-            std::string path;
-            bool deleted = Delete(sock, path, error);
-            close(sock);
-            if (deleted)
-                Log("Deleted %s\n", path.c_str());
-            else
-                Log("From %s: %s\n", inet_ntoa(remote.sin_addr), error.c_str());
+                ServeFile(sock, remote.sin_addr, first);
             continue;
         }
         if (first == kSleepMagic)
@@ -755,6 +823,7 @@ int main(int argc, char** argv)
         line += " " + Quoted("_DEVHOST_=" + self);
         if (fromNxlink)
             line += " " + Quoted(nxlink);
+        WaitForFiles();
         Result rc = envSetNextLoad(upload.path.c_str(), line.c_str());
         if (R_FAILED(rc))
         {
@@ -766,6 +835,7 @@ int main(int argc, char** argv)
         break;
     }
 
+    WaitForFiles();
     if (tcp >= 0)
     {
         close(tcp);
