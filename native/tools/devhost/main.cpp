@@ -35,6 +35,8 @@
 // GETF, PUTF and DELF go on threads of their own (up to kFileWorkers at once, libnx's BSD sessions
 // enough for each to wait on its socket), so that a game being copied does not keep devhost from a
 // log read or an .nro sent meanwhile; starting a program, or leaving, waits for them to end first.
+// The USB port is an MTP device as well (Mtp.cpp): sdmc:/OpenShiina in Windows' Explorer, files over the
+// cable while the network goes on.
 
 // gethostid and timeval: BSD and POSIX, which a strict C++20 build leaves out unless asked for
 #define _DEFAULT_SOURCE
@@ -65,6 +67,7 @@
 #include <switch.h>
 #include <unistd.h>
 
+#include "Mtp.h"
 #include "miniz.h"
 #include "platform/Files.h"
 
@@ -680,6 +683,9 @@ void WaitForFiles()
     if (s_fileWorkers.load() > 0)
         Log("Waiting for %d file transfer(s) to end...\n", s_fileWorkers.load());
     JoinFileWorkers(true);
+    // (and MTP's, counted there too)
+    while (s_fileWorkers.load() > 0)
+        svcSleepThread(100'000'000);
 }
 
 // libnx's defaults with TCP buffers that grow to 4 MB (from 64 KB / 256 KB): what a transfer over
@@ -724,6 +730,7 @@ int main(int argc, char** argv)
         Log("devhost %s\nWaiting on %s:%d. From the PC:\n  nxlink -s -a %s <name>.nro\n+ goes back to hbmenu.\n\n",
             self.c_str(), inet_ntoa(host), kServerPort, inet_ntoa(host));
     }
+    devhost::StartMtp([](const std::string& line) { Log("%s\n", line.c_str()); }, &s_fileWorkers);
 
     while (appletMainLoop())
     {
@@ -766,8 +773,14 @@ int main(int argc, char** argv)
         setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &window, sizeof window);
         int32_t first = 0;
         std::string error;
-        bool got = ReceiveInt(sock, first);
-        if (got && (first == kGetMagic || first == kPutMagic || first == kDeleteMagic))
+        if (!ReceiveInt(sock, first))
+        {
+            // a connection that sends nothing (the PC's scripts looking whether devhost is there):
+            // closed, not told
+            close(sock);
+            continue;
+        }
+        if ((first == kGetMagic || first == kPutMagic || first == kDeleteMagic))
         {
             // on a thread of its own when there is one free, else here
             JoinFileWorkers(false);

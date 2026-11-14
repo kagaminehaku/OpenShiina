@@ -144,7 +144,7 @@ endif()
 
 if(NINTENDO_SWITCH)
     # devhost.nro: runs the .nro files nxlink sends, and the programs it runs come back to it
-    add_executable(devhost tools/devhost/main.cpp)
+    add_executable(devhost tools/devhost/main.cpp tools/devhost/Mtp.cpp)
     target_link_libraries(devhost PRIVATE openshiina_core)
     target_compile_options(devhost PRIVATE -Wall -Wextra)
     nx_generate_nacp(devhost.nacp NAME "OpenShiina devhost" AUTHOR "kagaminehaku" VERSION "0.1.0")
