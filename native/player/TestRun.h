@@ -21,6 +21,8 @@
 //   saves=game | <folder>           the game starts with these saves (the player's own of the game,
 //                                   or a folder under sdmc:/OpenShiina) in place of none: a script
 //                                   that loads one gets to a scene in a few hundred frames
+//   fastzoom=1                      the setting "Fast zoom" as the player has it (else off: the
+//                                   pictures to the byte, as scnrun's), to time it
 //
 // Lines starting with '#' are comments. The pictures go to sdmc:/OpenShiina/Tests/<name>/ as
 // frame_NNNN.png (scnrun's names); the game's saves to its Saves folder there, emptied first, so that
@@ -54,6 +56,8 @@ public:
     int TimesFrom = -1, TimesTo = -1;
     /// saves=: "game" or a folder under the root; empty: none.
     std::string Saves;
+    /// fastzoom=1: the setting "Fast zoom" kept.
+    bool FastZoom = false;
 
     /// The timed frames' times: the embedded routines', the opcodes', the scripts' in all.
     struct Times

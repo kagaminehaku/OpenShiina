@@ -4,7 +4,7 @@
 // writes the file. The file cache is High (256 MB) when the file does not say: the C# player's Auto
 // would give the Switch 96 MB, too little for the large pictures of the 1600 x 900 games. The
 // Switch's own: "ConsoleStorageWarned", the warning before the first game moved onto the console's
-// storage shown.
+// storage shown; "FastZoom", the GPU's zooms in fewer steps.
 #pragma once
 
 #include <cstdint>
@@ -24,6 +24,8 @@ struct Settings
     int FileCache = 4;
     /// Frames a second and the slowest frame over the game's corner (C# ShowFrameRate).
     bool ShowFrameRate = true;
+    /// The GPU mode's zooms (scale32's SSE2 build) in fewer steps, not to the byte (ScnVm::GpuFastZoom).
+    bool FastZoom = true;
     /// The language of the player's screens (C# Language): "" (the console's), "en" or "vi".
     std::string Language;
     /// The warning before the first game moved onto the console's storage was shown and accepted.

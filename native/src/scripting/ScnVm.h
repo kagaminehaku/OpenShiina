@@ -400,6 +400,9 @@ public:
     /// GPU's compared with them, both timed (GpuChecks, GpuCheckCounts): the Switch's check of its
     /// kernels, and how the size from which a call goes to the GPU was chosen.
     bool GpuCheck = false;
+    /// The setting "Fast zoom": scale32's SSE2 build on the GPU in fewer steps, not to the byte
+    /// (scale32fast_csh); off for tests and with GpuCheck.
+    bool GpuFastZoom = false;
     /// GpuCheck: the first call of each routine and the calls whose bytes differed; the reader may clear it.
     std::vector<std::string> GpuChecks;
     /// GpuCheck: per routine the calls compared, how many of them differed, the pixels, and the

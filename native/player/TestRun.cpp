@@ -71,6 +71,8 @@ std::optional<TestRun> TestRun::Read(const std::string& root, const std::string&
                 run.FixedClock = value != "real";
             else if (key == "loads")
                 run.SyncLoads = value == "sync";
+            else if (key == "fastzoom")
+                run.FastZoom = value == "1";
             else if (key == "times")
             {
                 size_t colon = value.find(':');

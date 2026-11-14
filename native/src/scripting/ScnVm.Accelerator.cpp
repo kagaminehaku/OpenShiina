@@ -53,6 +53,8 @@ struct Scale32SseGpuParameters
     int32_t RowCount, ColumnCount, SourceWord, SourcePitch, OutputWord, OutputPitch;
     float WholeX, WholeY, WholeXY;
     int32_t MaxCount;
+    // (scale32fast_csh: the source rectangle's size in pixels)
+    int32_t SourceWidth, SourceHeight;
 };
 
 struct RotateZoomGpuParameters
@@ -351,15 +353,17 @@ bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, co
                             int src, int srcPitch, int dst, int dstPitch, float wholeX, float wholeY, float wholeXY)
 {
     int64_t started = Now();
-    // (the Switch's own kernels: the scripts' memory read and written in place where it can be)
-    IScnGpuKernel* kernel = Accelerator->Kernel("scale32sse_csh");
+    // (the Switch's own kernels: the scripts' memory read and written in place where it can be;
+    // with "Fast zoom" the one that is not to the byte)
+    bool fast = GpuFastZoom && !GpuCheck;
+    IScnGpuKernel* kernel = Accelerator->Kernel(fast ? "scale32fast_csh" : "scale32sse_csh");
     if (!kernel)
         return false;
     int nr = int(rows.size()), nc = int(columns.size());
     int32_t maxCount = 0;
     for (const auto& column : columns)
         maxCount = std::max(maxCount, int32_t(column[1]));
-    Scale32SseGpuParameters parameters{nr, nc, 0, 0, 0, 0, wholeX, wholeY, wholeXY, maxCount};
+    Scale32SseGpuParameters parameters{nr, nc, 0, 0, 0, 0, wholeX, wholeY, wholeXY, maxCount, width, height};
     if (!GpuSource(kernel, 0, src, srcPitch, width, height, parameters.SourceWord, parameters.SourcePitch))
         return false;
     auto* rowTable = kernel->Input(1, int64_t(nr) * 20);
@@ -375,7 +379,7 @@ bool ScnVm::Scale32SseOnGpu(const std::vector<std::array<uint32_t, 5>>& rows, co
         return false;
     int64_t back = Now();
     GpuTargetDone(dst, dstPitch, nc, nr, output);
-    GpuTimes("scale32 (SSE2 build)", started, ran, back, *kernel);
+    GpuTimes(fast ? "scale32 (SSE2 build, fast)" : "scale32 (SSE2 build)", started, ran, back, *kernel);
     return true;
 }
 

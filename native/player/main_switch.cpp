@@ -478,12 +478,12 @@ constexpr bool kLanguages = false;
 
 /// The settings, as the C# player has them ("Scaling", "FSR sharpness" and "Show the frame rate" of
 /// its Graphics page, "File cache", "Language" with kLanguages; the file cache counts from the next
-/// game started):
+/// game started), and the Switch's "Fast zoom":
 /// up / down choose a row, left / right (or A, or a touch on the row's two halves) change it; B or
 /// X goes back, and the file is written if anything changed.
 void SettingsScreen(Ui& ui)
 {
-    constexpr int Rows = kLanguages ? 5 : 4;
+    constexpr int Rows = kLanguages ? 6 : 5;
     constexpr float RowHeight = 76, ListX = 380, ListY = 120, ListW = 860;
     constexpr int LanguageCount = int(std::size(player::kLanguageChoices));
     constexpr int ScalingCount = int(std::size(player::kScalingChoices));
@@ -503,7 +503,7 @@ void SettingsScreen(Ui& ui)
         return 0;
     };
     auto change = [&](int r, int step) {
-        if (r == 4)
+        if (r == 5)
         {
             s_settings.Language = player::kLanguageChoices[(languageIndex() + step + LanguageCount) % LanguageCount].Code;
             player::SetLanguage(s_settings.Language);
@@ -516,6 +516,8 @@ void SettingsScreen(Ui& ui)
             s_settings.FileCache = std::clamp(s_settings.FileCache + step, 0, int(std::size(player::kFileCacheChoices)) - 1);
         else if (r == 3)
             s_settings.ShowFrameRate = !s_settings.ShowFrameRate;
+        else if (r == 4)
+            s_settings.FastZoom = !s_settings.FastZoom;
     };
     while (appletMainLoop())
     {
@@ -550,9 +552,10 @@ void SettingsScreen(Ui& ui)
         const auto& scaling = player::kScalingChoices[scalingIndex()];
         const auto& cache = player::kFileCacheChoices[s_settings.FileCache];
         std::string cacheLabel = cache.Megabytes != 0 ? Tr(cache.Label) : Trf("Auto ({} MB here)", s_settings.FileCacheBytes() >> 20);
-        std::string values[5] = {Tr(scaling.Label), std::to_string(s_settings.FsrSharpness), cacheLabel,
-                                 Tr(s_settings.ShowFrameRate ? "On" : "Off"), Tr(player::kLanguageChoices[languageIndex()].Name)};
-        const char* names[5] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate", "Language"};
+        std::string values[6] = {Tr(scaling.Label), std::to_string(s_settings.FsrSharpness), cacheLabel,
+                                 Tr(s_settings.ShowFrameRate ? "On" : "Off"), Tr(s_settings.FastZoom ? "On" : "Off"),
+                                 Tr(player::kLanguageChoices[languageIndex()].Name)};
+        const char* names[6] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate", "Fast zoom", "Language"};
         for (int r = 0; r < Rows; r++)
         {
             float y = ListY + float(r) * RowHeight;
@@ -567,6 +570,7 @@ void SettingsScreen(Ui& ui)
                            : row == 1 ? "1 mild ... 10 strongest (for FSR 1 only)."
                            : row == 2 ? cache.Help
                            : row == 3 ? "Frames a second and the slowest frame, over the game's corner."
+                           : row == 4 ? "Zooms of the picture on the GPU in fewer steps: faster, very slightly different from the PC."
                                       : "The words of OpenShiina's own screens. The games keep their own.";
         float helpY = ListY + Rows * RowHeight + 12;
         for (const auto& line : WrapText(ui, Tr(help), 24, ListW - 20))
@@ -582,7 +586,8 @@ void SettingsScreen(Ui& ui)
         s.End();
     }
     if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness
-        || s_settings.FileCache != before.FileCache || s_settings.ShowFrameRate != before.ShowFrameRate || s_settings.Language != before.Language)
+        || s_settings.FileCache != before.FileCache || s_settings.ShowFrameRate != before.ShowFrameRate || s_settings.FastZoom != before.FastZoom
+        || s_settings.Language != before.Language)
         s_settings.Save(kSettings);
 }
 
@@ -1123,12 +1128,12 @@ void CopyPicture(const Bytes& window, int width, int height, player::Texture& t)
 }
 
 /// The menu + opens while a game plays, over its picture (the game stands still meanwhile): back
-/// to the game, the scaling and FSR's sharpness (the settings, written when they changed), or
-/// leave the game. True: leave.
+/// to the game, the scaling, FSR's sharpness and the fast zoom (the settings, written when they
+/// changed), or leave the game. True: leave.
 bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
 {
     // the rows
-    constexpr int Back = 0, ScalingRow = 1, Sharpness = 2, Leave = 3, Rows = 4;
+    constexpr int Back = 0, ScalingRow = 1, Sharpness = 2, FastZoomRow = 3, Leave = 4, Rows = 5;
     constexpr float RowHeight = 64, MenuW = 620, MenuX = (1280 - MenuW) / 2, MenuY = 170;
     constexpr int ScalingCount = int(std::size(player::kScalingChoices));
     player::Settings before = s_settings;
@@ -1145,6 +1150,8 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
             s_settings.PictureScaling = player::kScalingChoices[(scalingIndex() + step + ScalingCount) % ScalingCount].Value;
         else if (r == Sharpness)
             s_settings.FsrSharpness = std::clamp(s_settings.FsrSharpness + step, 1, 10);
+        else if (r == FastZoomRow)
+            s_settings.FastZoom = !s_settings.FastZoom;
     };
     while (appletMainLoop())
     {
@@ -1166,7 +1173,7 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
         if (touch && !touching && tx >= MenuX && tx < MenuX + MenuW && ty >= MenuY && ty < MenuY + Rows * RowHeight)
         {
             int r = int((ty - MenuY) / RowHeight);
-            if (r == ScalingRow || r == Sharpness)
+            if (r == ScalingRow || r == Sharpness || r == FastZoomRow)
                 change(r, tx < MenuX + MenuW / 2 ? -1 : 1);
             else
                 chosen = r == row;
@@ -1191,14 +1198,14 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
         ui.Text.Draw(Tr("Paused"), MenuX, MenuY - 56, 30, kText);
         const auto& scaling = player::kScalingChoices[scalingIndex()];
         std::string labels[Rows] = {Tr("Back to the game"), Trf("Scaling: {}", Tr(scaling.Label)), Trf("FSR sharpness: {}", s_settings.FsrSharpness),
-                                    Tr("Leave the game")};
+                                    Trf("Fast zoom: {}", Tr(s_settings.FastZoom ? "On" : "Off")), Tr("Leave the game")};
         for (int r = 0; r < Rows; r++)
         {
             float y = MenuY + float(r) * RowHeight;
             if (r == row)
                 s.Fill({MenuX - 12, y, MenuW + 24, RowHeight - 10}, kAccent, 12);
             std::string text = labels[r];
-            if (r == ScalingRow || r == Sharpness)
+            if (r == ScalingRow || r == Sharpness || r == FastZoomRow)
                 text = std::string("<  ") + text + "  >";
             ui.Text.Draw(text, MenuX + 8, y + 12, 28, kText);
         }
@@ -1207,7 +1214,7 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
         ui.Text.Draw(hints, 1280 - 40 - ui.Text.Measure(hints, 24), 682, 24, kText);
         s.End();
     }
-    if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness)
+    if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness || s_settings.FastZoom != before.FastZoom)
         s_settings.Save(kSettings);
     return leave;
 }
@@ -1391,6 +1398,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             s_gpu->SetScriptCaching(!SwitchOn(kGpuUncached));
             vm->Accelerator = s_gpu.get();
             vm->GpuCheck = SwitchOn(kGpuCheck);
+            // (test runs compare their pictures with the PC's: to the byte)
+            vm->GpuFastZoom = s_settings.FastZoom && (!test || test->FastZoom);
         }
         catch (const std::exception& e)
         {
@@ -1521,6 +1530,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
                 vm->Notify(ScnEvent::Deactivate);
                 bool leave = GameMenu(ui, drawGame);
                 scaling = s_settings.PictureScaling;
+                vm->GpuFastZoom = s_settings.FastZoom && (!test || test->FastZoom);
                 place = player::Renderer::Placement(scaling, setup.Width, setup.Height);
                 if (leave)
                     break;
