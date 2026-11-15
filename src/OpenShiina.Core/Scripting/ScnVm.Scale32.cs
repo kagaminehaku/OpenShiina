@@ -269,7 +269,9 @@ public sealed partial class ScnVm
         rowY[0] = 0;
         for (int r = 0; r < nr; r++)
             rowY[r + 1] = rowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
-        var timing = ChooseGpu("scale32", (long)nr * nc);
+        // (the work is the source's pixels as much as the destination's: a save's thumbnail of a
+        // whole screen, few pixels made from many, went to the CPU at 23-41 ms on the Switch)
+        var timing = ChooseGpu("scale32", Math.Max((long)nr * nc, (long)width * rowY[nr]));
         if (timing.Gpu && firstLast == null)
         {
             if (ScaleOnGpu(Accelerator!, 0, rows, rowY, cols, colFrom, width, srcX, srcPitch, dstRow, dstPitch, fullRow, fullCol))

@@ -33,6 +33,9 @@ public interface IScnHost
     /// </summary>
     long? ArchiveFileSize(string archive, string name) => LooseFileSize(archive) != null ? ArchiveFileSize(name) : null;
 
+    /// <summary>The names of the archives' files with that extension (".TXT"), each once; none without a list.</summary>
+    IReadOnlyList<string> ArchiveFileNames(string extension) => [];
+
     /// <summary>
     /// The scripts mount (00DD) or unmount (00DF) an archive ("CHIPPANA_T.WAR"): a file in
     /// several archives then comes from a mounted one. True when that changed anything.

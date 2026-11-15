@@ -128,6 +128,7 @@ public sealed class GameSession : IDisposable
         public byte[]? ReadFile(string name) => m_session.Data.Read(name);
         public long? ArchiveFileSize(string name) => m_session.Data.Size(name);
         public long? ArchiveFileSize(string archive, string name) => m_session.Data.Size(archive, name);
+        public IReadOnlyList<string> ArchiveFileNames(string extension) => m_session.Data.Names(extension);
         public bool MountArchive(string archive, bool mounted) => m_session.Data.Mount(archive, mounted);
         public byte[]? ExecutableCopy(string name) => m_session.Data.ExecutableCopy(LooseFileSize(name));
 

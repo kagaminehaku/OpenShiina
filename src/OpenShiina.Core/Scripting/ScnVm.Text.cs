@@ -1555,8 +1555,14 @@ public sealed partial class ScnVm
             return;
         int dp = SurfaceField(dst, 10), sp = SurfaceField(src, 10);
         int d = SurfaceField(dst, 2) + y * dp + x * 3, s = SurfaceField(src, 2) + sy * sp + sx * 3;
+        // A row read whole, then written: copied in place (as memmove) where both are pieces of
+        // memory, with no array a row (a movie's frames: 720 rows of 3840 bytes a call)
+        int bytes = width * 3;
         for (int row = 0; row < height; row++, d += dp, s += sp)
-            WriteBytes(d, ReadBytes(s, width * 3));
+            if (IsContiguous(d, bytes) && IsContiguous(s, bytes))
+                Bytes(s, bytes).CopyTo(Bytes(d, bytes));
+            else
+                WriteBytes(d, ReadBytes(s, bytes));
     }
 
     /// <summary>The buttons that skip text waits ("_s" keys): FUN_00413810(0x100, FUN_00413630()), as op_03EA.</summary>
@@ -1739,6 +1745,25 @@ public sealed partial class ScnVm
         int width = Read32(f), height = Read32(f + 4);
         uint r = (uint)G(rec, RTextR), g = (uint)G(rec, RTextG), b = (uint)G(rec, RTextB);
         uint opaque = r << 24 | g << 16 | b << 8 | 0xFF;
+        if (firstCol >= endCol)
+            return;
+        // The columns inside the frame (a column outside would write into a row header: Bitch
+        // Nee-chan draws each character into a 28 x 29 frame)
+        int colFrom = Math.Max(0, -left), colTo = (int)Math.Min(endCol - firstCol, (uint)Math.Max(0, width - left));
+        if (colTo <= colFrom)
+            return;
+        // Each row in place when it is one piece of the scripts' memory and the glyph has all its
+        // coverage bytes (the same bytes, in the same order, as Read32 / Write32 a pixel at a time:
+        // 00A1 16% faster on a PC); else the rows after it a pixel at a time
+        for (int count = colTo - colFrom; firstRow < endRow; firstRow++, src += glyph.Pitch, top++)
+        {
+            if (top < 0 || top >= height)
+                continue;
+            int p = Read32(f + 0x14 + 4 * top) + 8 + (left + colFrom) * 4;
+            if (src + colTo > glyph.Bits.Length || !IsContiguous(p, count * 4))
+                break;
+            DrawLayerRow(Bytes(p, count * 4), glyph.Bits.AsSpan(src + colFrom, count), opaque, r << 16 | b, g * 0x10000, (uint)alpha);
+        }
         for (uint gy = firstRow; gy < endRow; gy++, src += glyph.Pitch, top++)
         {
             if (top < 0 || top >= height || firstCol >= endCol)
@@ -1768,6 +1793,38 @@ public sealed partial class ScnVm
                     + s_layerAlpha![index]);
                 Write32(p, (int)value);
             }
+        }
+    }
+
+    /// <summary>
+    /// A row of a glyph over a row of a layer: the coverage bytes over the pixels (alpha, blue,
+    /// green, red), in the colour <paramref name="opaque"/> (r &lt;&lt; 16 | b and g &lt;&lt; 16
+    /// apart for the blend) at <paramref name="alpha"/>; full coverage writes it as it is.
+    /// </summary>
+    private static void DrawLayerRow(Span<byte> pixels, ReadOnlySpan<byte> bits, uint opaque, uint rb, uint g16, uint alpha)
+    {
+        var share = s_layerShare!;
+        var alphas = s_layerAlpha!;
+        var row = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels);
+        for (int col = 0; col < bits.Length && col < row.Length; col++)
+        {
+            uint v = bits[col];
+            if (v == 0)
+                continue;
+            uint a16 = (v * 0xFF >> 6) * alpha & 0xFF00;
+            if (a16 == 0xFF00)
+            {
+                row[col] = BitConverter.IsLittleEndian ? opaque : System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(opaque);
+                continue;
+            }
+            uint d = BitConverter.IsLittleEndian ? row[col] : System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(row[col]);
+            uint index = (d & 0xFF) | a16;
+            uint t = share[index];
+            uint drb = (d >> 8) & 0xFF00FF;
+            uint value = unchecked((((rb - drb) * t >> 8) + drb & 0xFF00FF) * 0x100
+                + (((g16 - (d & 0xFF0000)) * t >> 8) + (d & 0xFF0000) & 0xFF0000)
+                + alphas[index]);
+            row[col] = BitConverter.IsLittleEndian ? value : System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(value);
         }
     }
 

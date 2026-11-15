@@ -192,6 +192,9 @@ public sealed partial class ScnVm
             Music?.SetVolume(movie.Sound, s_musicVolumes[Math.Clamp(volume, 0, 100)]);
     }
 
+    /// <summary>The frames a movie behind its clock decodes at most a call (UpdateMovie, AdvanceGraphMovie).</summary>
+    private const int MovieCatchUp = 3;
+
     /// <summary>IStreamSample::Update: draws the latest frame that is due; handles the end.</summary>
     private void UpdateMovie(Movie movie)
     {
@@ -199,8 +202,11 @@ public sealed partial class ScnVm
             return;
         uint now = Clock;
         long due = (long)((now - movie.Start) * video.FrameRate / 1000);
+        // A movie behind its clock (the decoder slower than the frames for a while, on a phone)
+        // catches up a few frames a call, not all at once: every frame it is behind is decoded,
+        // and Sorcery Jokers' opening stood still 2.3 s for 17 of them on the Switch
         MpegFrame? frame = null;
-        while (movie.Decoded <= due)
+        for (int taken = 0; movie.Decoded <= due && taken < MovieCatchUp; taken++)
         {
             frame = video.Next();
             if (frame == null)

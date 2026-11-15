@@ -76,18 +76,25 @@ public sealed partial class ScnVm
             dst += x * 4;
             visible = right >= targetWidth ? width + targetWidth - right - 1 : width;
         }
+        // (on one thread: shared out between the cores, as the Switch player does, it was 20% slower
+        // on a Galaxy S7, whose cores are not all alike)
         for (; rows > 0; rows--, row += 4, dst += pitch)
             DrawRow32(Read32(row), dst, skip, visible);
     }
 
     private void DrawRow32(int p, int dst, int skip, int visible)
     {
-        p += 2;
+        // The row and the target's pixels in place (the row copied when it shares bytes with them)
+        if (visible <= 0)
+            return;
+        var src = ReadRow(p, dst, visible * 4, skip + visible);
+        var target = Bytes(dst, visible * 4);
+        int o = 2, d = 0;
         int remaining = visible;
         while (skip > 0)
         {
-            var (method, count, data) = ReadRun(p);
-            p = RunEnd(method, count, data);
+            var (method, count, data) = ReadRun(src, p, o);
+            o = RunEnd(method, count, data);
             skip -= count;
             if (skip > 0)
                 continue;
@@ -97,14 +104,14 @@ public sealed partial class ScnVm
             int at = method switch { 2 => data + start * 3, 4 => data + start * 4, _ => data };
             if (method < 2)
             {
-                dst += part * 4;
+                d += part * 4;
                 remaining -= part;
             }
             else
             {
                 int n = Math.Min(part, remaining);
-                DrawRun32(method, n, at, dst);
-                dst += n * 4;
+                DrawRun32(method, n, src[at..], target[d..]);
+                d += n * 4;
                 remaining -= n;
             }
             if (remaining <= 0)
@@ -113,36 +120,32 @@ public sealed partial class ScnVm
         }
         while (remaining > 0)
         {
-            var (method, count, data) = ReadRun(p);
-            p = RunEnd(method, count, data);
+            var (method, count, data) = ReadRun(src, p, o);
+            o = RunEnd(method, count, data);
             if (method < 2)
             {
-                dst += count * 4;
+                d += count * 4;
                 remaining -= count;
                 continue;
             }
             int n = Math.Min(count, remaining);
-            DrawRun32(method, n, data, dst);
-            dst += n * 4;
+            DrawRun32(method, n, src[data..], target[d..]);
+            d += n * 4;
             remaining -= n;
         }
     }
 
-    // A run's source bytes when they cannot be read in place (they share bytes with the target)
-    private byte[]? m_runSource;
-
     /// <summary>A run drawn straight into the picture (pixels read and written unaligned).</summary>
-    private void DrawRun32(int method, int n, int data, int dst)
+    private static void DrawRun32(int method, int n, ReadOnlySpan<byte> source, Span<byte> target)
     {
         if (n <= 0)
             return;
-        var target = Bytes(dst, n * 4);
+        target = target[..(n * 4)];
         switch (method)
         {
             case 2:
             {
                 // 3-byte colours, opaque
-                var source = ReadView(data, n * 3, ref m_runSource, dst, n * 4);
                 for (int i = 0, s = 0; i < target.Length; i += 4, s += 3)
                 {
                     target[i] = 0xFF;
@@ -155,7 +158,7 @@ public sealed partial class ScnVm
             case 3:
             {
                 // One opaque colour
-                uint color = (uint)(Read32(data) << 8 | 0xFF);
+                uint color = BinaryPrimitives.ReadUInt32LittleEndian(source) << 8 | 0xFF;
                 for (int i = 0; i < target.Length; i += 4)
                     BinaryPrimitives.WriteUInt32LittleEndian(target[i..], color);
                 break;
@@ -163,7 +166,6 @@ public sealed partial class ScnVm
             case 4:
             {
                 // ABGR colours over the target
-                var source = ReadView(data, n * 4, ref m_runSource, dst, n * 4);
                 for (int i = 0; i < target.Length; i += 4)
                     BinaryPrimitives.WriteUInt32LittleEndian(target[i..],
                         Over(BinaryPrimitives.ReadUInt32LittleEndian(target[i..]), BinaryPrimitives.ReadUInt32LittleEndian(source[i..])));
@@ -172,13 +174,16 @@ public sealed partial class ScnVm
             default:
             {
                 // One ABGR colour over the target
-                uint color = (uint)Read32(data);
+                uint color = BinaryPrimitives.ReadUInt32LittleEndian(source);
                 for (int i = 0; i < target.Length; i += 4)
                     BinaryPrimitives.WriteUInt32LittleEndian(target[i..], Over(BinaryPrimitives.ReadUInt32LittleEndian(target[i..]), color));
                 break;
             }
         }
     }
+
+    // 2^24 / a for each a of Over (its division done once)
+    private static readonly uint[] s_inverses = Enumerable.Range(0, 256).Select(a => a == 0 ? 0u : 0x1000000u / (uint)a).ToArray();
 
     /// <summary>One source pixel (alpha, blue, green, red from the low byte up) over a destination pixel.</summary>
     private static uint Over(uint dst, uint source)
@@ -192,7 +197,7 @@ public sealed partial class ScnVm
         uint a = unchecked((0xFE01 - (0xFF - sa) * (0xFF - da)) * 0x10203) >> 24;
         if (a == 0)
             return dst & 0xFFFFFF00;
-        uint inverse = 0x1000000 / a, result = a;
+        uint inverse = s_inverses[a], result = a;
         for (int k = 8; k <= 24; k += 8)
         {
             uint s = (source >> k) & 0xFF, d = (dst >> k) & 0xFF;

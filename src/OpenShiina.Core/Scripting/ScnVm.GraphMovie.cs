@@ -40,8 +40,9 @@ public sealed partial class ScnVm
             return false;
         uint now = Clock;
         long due = (long)((now - movie.Start) * video.FrameRate / 1000);
+        // (a movie behind its clock catches up a few frames a call, as UpdateMovie's)
         MpegFrame? frame = null;
-        while (movie.Decoded <= due)
+        for (int taken = 0; movie.Decoded <= due && taken < MovieCatchUp; taken++)
         {
             frame = video.Next();
             if (frame == null)

@@ -23,6 +23,7 @@ public sealed class PerfMeter : IDisposable
     private int m_frames, m_rounds;
     private bool m_alphaLogged;
     private (int Read, int Used) m_readAhead;
+    private (int Read, long Bytes) m_shared;
 
     private PerfMeter(ScnVm vm, string name, StreamWriter? log, bool title)
     {
@@ -104,6 +105,11 @@ public sealed class PerfMeter : IDisposable
             {
                 m_readAhead = m_vm.ReadAheadCounts;
                 m_log.WriteLine($"  read ahead so far: {m_readAhead.Read} files, {m_readAhead.Used} of them used");
+            }
+            if (m_vm.SharedCounts != m_shared)
+            {
+                m_shared = m_vm.SharedCounts;
+                m_log.WriteLine($"  shared files read so far: {m_shared.Read}, {m_shared.Bytes >> 10} KB");
             }
             if (!m_alphaLogged && ScnVm.AlphaVectors is { Length: > 0 } alpha)
             {

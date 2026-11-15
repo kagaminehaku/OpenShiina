@@ -148,6 +148,8 @@ public sealed partial class ScnVm
             return null;
         if (p.Save)
             return ReadSave(p.Name);
+        // (the files many scenarios name, read on pool threads: their list made, those read kept)
+        ReadShared();
         if (ModuleFile(p.Name) is { } module)
             return module;
         // "Play from here": the scenario put in place of the one asked for (ScnVm.Warp.cs)
@@ -166,7 +168,7 @@ public sealed partial class ScnVm
             return kept.Value.Data;
         }
         long started = System.Diagnostics.Stopwatch.GetTimestamp();
-        if ((TakeAhead(p.Name, out string how) ?? ReadArchiveFile(p.Name)) is not { } data)
+        if ((TakeShared(p.Name, out string how) ?? TakeAhead(p.Name, out how) ?? ReadArchiveFile(p.Name)) is not { } data)
             return m_host.ReadLooseFile(p.Name);
         ReadAheadAfter(p.Name);
         data = Kept(p.Name, data);
@@ -252,6 +254,7 @@ public sealed partial class ScnVm
             return;
         ForgetKept(_ => true);
         m_ahead.Clear();
+        m_shared.Clear();
     }
 
     /// <summary>

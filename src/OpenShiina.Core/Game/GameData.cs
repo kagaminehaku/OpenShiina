@@ -180,6 +180,18 @@ public sealed class GameData : IDisposable
         return found == null ? null : WarcOpener.OpenEntry(found.Value.Archive, found.Value.Entry);
     }
 
+    /// <summary>The names of the archives' files with that extension (".TXT"), each once, in the archives' order.</summary>
+    public IReadOnlyList<string> Names(string extension)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var warc in m_archives)
+            foreach (var entry in warc.Entries)
+                if (Path.GetExtension(entry.Name).Equals(extension, StringComparison.OrdinalIgnoreCase) && seen.Add(entry.Name))
+                    names.Add(entry.Name);
+        return names;
+    }
+
     /// <summary>The size <see cref="Read"/> gives for a script path, from the archive's index (nothing is decoded), or null.</summary>
     public long? Size(string path, params string[] extensions) => Find(path, extensions)?.Entry.UnpackedSize;
 

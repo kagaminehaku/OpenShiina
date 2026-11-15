@@ -403,7 +403,10 @@ if (ScnVm.AlphaVectors.Length > 0)
     Console.WriteLine("  " + ScnVm.AlphaVectors);
 Console.WriteLine($"  file cache {vm.FileCacheBytes >> 20} MB (memory {FileCachePresets.TotalMemory() >> 20} MB)");
 if (vm.LoadInBackground)
+{
     Console.WriteLine($"  read ahead: {vm.ReadAheadCounts.Read} files, {vm.ReadAheadCounts.Used} of them used");
+    Console.WriteLine($"  shared files read: {vm.SharedCounts.Read} ({vm.SharedCounts.Bytes >> 10} KB)");
+}
 foreach (string read in vm.SlowReads.Take(12))
     Console.WriteLine($"  slow file read: {read}");
 if (vm.OpTimes != null)
@@ -570,6 +573,7 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     }
     public long? ArchiveFileSize(string name) => Swap(name) is { } swap ? new FileInfo(swap).Length : data.Size(name.Replace('/', '\\'));
     public long? ArchiveFileSize(string archive, string name) => data.Size(archive, name.Replace('/', '\\'));
+    public IReadOnlyList<string> ArchiveFileNames(string extension) => data.Names(extension);
     public bool MountArchive(string archive, bool mounted) => data.Mount(archive, mounted);
     public byte[]? ExecutableCopy(string name) => data.ExecutableCopy(LooseFileSize(name));
 
