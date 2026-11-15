@@ -360,9 +360,24 @@ public static class PlayerFolders
         Environment.GetEnvironmentVariable("OPENSHIINA_DATA") is { Length: > 0 } root ? root
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenShiina");
 
-    public static string For(string kind, string game) => Path.Combine(Root, kind, FolderName(game));
+    public static string For(string kind, string game)
+    {
+        string folder = Path.Combine(Root, kind, FolderName(game));
+        // A folder made before under the name as the system took it (Android and Linux keep ':'
+        // and the like) stays that game's while there is none under the new name, if anything
+        // was written in it (Android's shared storage makes such a folder but no file in it)
+        string before = Path.Combine(Root, kind, string.Concat(game.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)));
+        return before != folder && !Directory.Exists(folder) && Directory.Exists(before) && Directory.EnumerateFileSystemEntries(before).Any()
+            ? before : folder;
+    }
 
-    /// <summary>A game's name as a folder name: characters a file name cannot hold become '_' ("Re: Rem Plus" -> "Re_ Rem Plus").</summary>
+    /// <summary>
+    /// A game's name as a folder name: characters a file name cannot hold on Windows (or on a FAT
+    /// card, or in Android's shared storage, which refuses them) become '_' ("Re: Rem Plus" -> "Re_
+    /// Rem Plus"), the same name on every system.
+    /// </summary>
     public static string FolderName(string game) =>
-        string.Concat(game.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        string.Concat(game.Select(c => c < ' ' || NotInNames.Contains(c) || Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+
+    private const string NotInNames = "\"*/:<>?\\|";
 }

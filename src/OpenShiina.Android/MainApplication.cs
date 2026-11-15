@@ -128,7 +128,10 @@ public sealed class MainApplication : AvaloniaAndroidApplication<OpenShiinaAppli
                 return;
             foreach (string file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
             {
-                string target = Path.Combine(to, Path.GetRelativePath(from, file));
+                // (a folder named with ':' and the like, which the app's own folder takes and the
+                // shared one refuses, comes under the name PlayerFolders gives it now)
+                string relative = string.Join('/', Path.GetRelativePath(from, file).Split('/').Select(Game.PlayerFolders.FolderName));
+                string target = Path.Combine(to, relative);
                 if (File.Exists(target))
                     continue;
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
