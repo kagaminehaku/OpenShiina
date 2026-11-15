@@ -365,6 +365,10 @@ public class AlcotCrypt : IDecryptExtra
     }
 }
 
+/// <summary>
+/// The first bytes packed by an RLE (signature 0x718E958D, unpacked over them), then the length XORed
+/// into the dword at +0x200 (flags 0x204). Encrypting leaves them unpacked (see PackedHeader).
+/// </summary>
 public class DodakureCrypt : IDecryptExtra
 {
     public void Decrypt(byte[] data, int index, uint length, uint flags)
@@ -412,9 +416,30 @@ public class DodakureCrypt : IDecryptExtra
         }
     }
 
-    public void Encrypt(byte[] data, int index, uint length, uint flags)
+    public void Encrypt(byte[] data, int index, uint length, uint flags) => PackedHeader.Encrypt(data, index, length, flags);
+}
+
+/// <summary>
+/// The way back of DodakureCrypt and BinboCrypt (flags 0x104, before the entry is packed): the length
+/// XORed into the dword at +0x200, the first bytes left as they are. Reading unpacks them only when
+/// they start with the signature 0x718E958D (as the games' own code does), so bytes left unpacked
+/// read back as they were; packing them would hide them, not change what is read. Bytes that start
+/// with the signature themselves cannot be stored that way: they would be unpacked as if packed.
+/// </summary>
+internal static class PackedHeader
+{
+    internal const uint Signature = 0x718E958D;
+
+    internal static void Encrypt(byte[] data, int index, uint length, uint flags)
     {
-        throw new NotImplementedException();
+        if (length < 0x200 || (flags & 0x104) != 0x104)
+            return;
+        if (LittleEndian.ToUInt32(data, index) == Signature)
+            throw new InvalidDataException("the entry starts with 0x718E958D, the sign of a packed header: it would be read back unpacked");
+        // the XOR of Decrypt, which comes after the unpacking there and so before packing here
+        for (int k = 0; k < 4; k++)
+            if (length > 0x200 + (uint)k)
+                data[index + 0x200 + k] ^= (byte)(length >> (8 * k));
     }
 }
 
@@ -465,7 +490,7 @@ public class PreAdlerCrypt : IDecryptExtra
 
 /// <summary>
 /// Hin wa Bokura no Fuku no Kami: the first 0x200 bytes LZ-packed (signature 0x718E958D), then
-/// the length XORed into the dword at +0x200.
+/// the length XORed into the dword at +0x200. Encrypting leaves them unpacked (see PackedHeader).
 /// </summary>
 public class BinboCrypt : IDecryptExtra
 {
@@ -492,11 +517,7 @@ public class BinboCrypt : IDecryptExtra
         }
     }
 
-    public void Encrypt(byte[] data, int index, uint length, uint flags)
-    {
-        if (length >= 0x200 && (flags & 0x104) == 0x104)
-            throw new NotImplementedException();
-    }
+    public void Encrypt(byte[] data, int index, uint length, uint flags) => PackedHeader.Encrypt(data, index, length, flags);
 
     private sealed class LzComp(byte[] input, int index)
     {
