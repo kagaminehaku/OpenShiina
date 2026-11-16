@@ -250,7 +250,8 @@ public class FormatManager
 
         // Check archive file name against game map or scheme names
         string fileName = Path.GetFileNameWithoutExtension(arcPath);
-        foreach (var kvp in GameMap)
+        var gameMap = GameMap.OrderByDescending(kvp => Path.GetFileNameWithoutExtension(kvp.Key).Length);
+        foreach (var kvp in gameMap)
         {
             if (fileName.Contains(Path.GetFileNameWithoutExtension(kvp.Key), StringComparison.OrdinalIgnoreCase))
                 return kvp.Value;
