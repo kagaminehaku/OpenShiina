@@ -423,7 +423,7 @@ public sealed partial class ScnVm
             vm.BitBlt(dst, v[1], v[2], v[3], v[4], src, v[6], v[7]);
             if (dst == vm.DisplaySurface)
             {
-                vm.PresentedByDirect3D(v[1], v[2], v[1] + v[3], v[2] + v[4]);
+                vm.PresentSurfaceCopy(v[1], v[2], v[1] + v[3], v[2] + v[4]);
                 vm.FrameShown = true;
             }
             return 0;
