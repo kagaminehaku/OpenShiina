@@ -4,6 +4,24 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.8.4 (2026-11-19)
+
+- **12 more games play through** (99 games, 100 releases): Mimi o Sumaseba, Saint ~Aa Shu yo,
+  Toriko no Chigiri, Chikan Circle 3, Niwaka Ane, Kiki Mimi, Danchi Wife, Najimi no Oba-chan,
+  You~Gaku, Vestige, and both Majime to Sasayakareru games (Majikan 01 and 02, the second a new
+  scheme); **EDEN IV** (2003, engine 2.20, the oldest yet) plays. What each needed is in
+  [docs/compatibility.md](docs/compatibility.md), Notes.
+- A script error no longer stops a game unless the game asked the engine to report them, as the
+  engine does (Danchi Wife loads a background its files lack and goes on).
+- `ScnTools datefind` also checks the rows of S25 pictures, which tells more games' DecodeBin
+  date.
+- The games are told apart by the longest name that matches their archives' (Chou Saiminjutsu
+  Gakuen's trial was taken for Saimin Seikatsu), and on Linux the library's icons follow the
+  case of the files' names (contributed by Furry-Monster).
+- Switch: the game list shows where each game is (an SD card or the console) at the end of its
+  row, and the chosen game's whole name, place and play time under the logo; devhost no longer
+  crashes the program it starts (its MTP thread is ended first).
+
 ## 0.8.3 (2026-11-12)
 
 - **21 more games play through** (87 games, 88 releases): Engage Links, Helter Skelter, Chikan

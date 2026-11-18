@@ -852,8 +852,18 @@ public sealed partial class ScnVm : IDisposable
             int result = Execute(c, ins);
             if (OpTimes != null)
                 OpTimes[ins.Op] = OpTimes.GetValueOrDefault(ins.Op) + System.Diagnostics.Stopwatch.GetTimestamp() - started;
+            // A script error stops the game only once 078B turned the engine's reports on; else the
+            // engine's main loop passes over it: the task yields, and goes on at the next instruction
+            // the next frame (Oreimo Plus 0x42D9F0: 2 is told only while 0x483058 is set). Danchi
+            // Wife's A0704B-2 loads a background its archives lack (bg25d.S25): 04B0 fails, the
+            // picture slot stays empty, the scene goes on.
             if (result == 2)
-                throw Error(c, $"Script error in opcode {ins.Op:X4}");
+            {
+                if (ScriptErrorReports != 0)
+                    throw Error(c, $"Script error in opcode {ins.Op:X4}");
+                ScriptErrorPassed?.Invoke(Error(c, $"Script error in opcode {ins.Op:X4}").Message);
+                return 0;
+            }
             if (result != 0)
             {
                 if (result == 1)

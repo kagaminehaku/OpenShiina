@@ -17,10 +17,10 @@ row when something changes (see [Updating](#updating) at the end).
 Every game whose archives OpenShiina can open: the eleven GRAND†CROSS "Plus" games it started
 with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archives open, every
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
-version. The interpreter runs engine versions 2.31, 2.33, 2.34, 2.37, 2.38, 2.40, 2.43 and 2.44
+version. The interpreter runs engine versions 2.20, 2.31, 2.33, 2.34, 2.37, 2.38, 2.40, 2.43 and 2.44
 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 87 games, 88 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 99 games, 100 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -44,6 +44,7 @@ of those versions it does not list.
 | Shi-Ka-E-Shi | シ・カ・エ・シ | 2002-01-25 | [v5574](https://vndb.org/v5574) | v2.15 | ⚪ Not tried |  |
 | Hana no Kioku 7 | 花の記憶 ～第七章～ | 2002-12-20 | [v8713](https://vndb.org/v8713) | v2.18 | ⚪ Not tried |  |
 | Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ⚪ Not tried |  |
+| EDEN IV | ＥＤＥＮ４ | 2003-03-28 | [v4601](https://vndb.org/v4601) | v2.20 | 🟢 Plays | 2026-11-19 |
 | STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | ⚪ Not tried |  |
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ⚪ Not tried |  |
@@ -100,33 +101,33 @@ of those versions it does not list.
 | Chikan Circle 2 | 痴漢サークル2 | 2009-07-03 | [v2102](https://vndb.org/v2102) | v2.47 | ✅ Plays through | 2026-11-12 |
 | Chikan Densha Otoko Gaiden | 痴漢電車男外伝 ～伝説へのチェイサー～ | 2009-07-10 | [v1997](https://vndb.org/v1997) | v2.47 | 🟢 Plays | 2026-11-12 |
 | Onedari Onapet | おねだりオナペット | 2009-07-31 | [v2213](https://vndb.org/v2213) | v2.47 | ⚪ Not tried |  |
-| Chikan Circle 3 | 痴漢サークル3 | 2009-08-21 | [v2424](https://vndb.org/v2424) | v2.47 | ⚪ Not tried |  |
-| Mimi o Sumaseba | みみをすませば | 2009-08-28 | [v2208](https://vndb.org/v2208) | v2.47 | ⚪ Not tried |  |
+| Chikan Circle 3 | 痴漢サークル3 | 2009-08-21 | [v2424](https://vndb.org/v2424) | v2.47 | ✅ Plays through | 2026-11-19 |
+| Mimi o Sumaseba | みみをすませば | 2009-08-28 | [v2208](https://vndb.org/v2208) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Mahou Shoujo no Taisetsu na Koto | 魔法少女の大切なこと。 | 2009-09-25 | [v2616](https://vndb.org/v2616) | v2.47 | ✅ Plays through | 2026-11-12 |
 | Rin x Sen | RIN×SEN～白濁女教師と野郎ども～ | 2009-09-25 | [v2611](https://vndb.org/v2611) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Nakadashi Trilogy | なかだしトリロジー | 2009-10-30 | [r5241](https://vndb.org/r5241) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Sadistic Little | サディスティックりとる | 2009-11-06 | [v2850](https://vndb.org/v2850) | v2.47 | ✅ Plays through | 2026-11-05 |
 | Last Waltz ~Hakudaku Mamire no Natsu Gasshuku~ | Last Waltz ～白濁まみれの夏合宿～ | 2009-11-27 | [v2864](https://vndb.org/v2864) | v2.47 | ✅ Plays through | 2026-11-04 |
 | Imouto Smile | 妹スマイル | 2009-11-27 | [v2847](https://vndb.org/v2847) | v2.47 | ✅ Plays through | 2026-11-05 |
-| Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ⚪ Not tried |  |
+| Niwaka Ane | にわか姉 | 2009-12-11 | [v3005](https://vndb.org/v3005) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Hana to Otome ni Shukufuku o Royal Bouquet | 花と乙女に祝福を ロイヤルブーケ | 2010-01-29 | [v3110](https://vndb.org/v3110) | v2.47 | ✅ Plays through | 2026-10-24 |
 | Iyashinbo The Motion | 癒しん母 The Motion ～世界で一番好きなひと～ | 2010-02-19 | [r6772](https://vndb.org/r6772) | v2.47 | ✅ Plays through | 2026-10-20 |
 | Pure Love! | ぴゅあらっ！ | 2010-02-19 | [v2930](https://vndb.org/v2930) | v2.47 | ✅ Plays through | 2026-10-15 |
 | Saimin Seikatsu | 催眠生活 ～校則だから仕方ない！？～ | 2010-02-26 | [v3370](https://vndb.org/v3370) | v2.47 | ✅ Plays through | 2026-10-31 |
-| Najimi no Oba-chan | 馴染みのオバちゃん | 2010-03-19 | [v3815](https://vndb.org/v3815) | v2.47 | ⚪ Not tried |  |
-| Danchi Wife ~Hitozuma Nude Model no Kenshin~ | 団地ワイフ～人妻ヌードモデルの献身～ | 2010-04-23 | [v3917](https://vndb.org/v3917) | v2.47 | ⚪ Not tried |  |
+| Najimi no Oba-chan | 馴染みのオバちゃん | 2010-03-19 | [v3815](https://vndb.org/v3815) | v2.47 | ✅ Plays through | 2026-11-19 |
+| Danchi Wife ~Hitozuma Nude Model no Kenshin~ | 団地ワイフ～人妻ヌードモデルの献身～ | 2010-04-23 | [v3917](https://vndb.org/v3917) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Ero-On! | えろおん！ | 2010-04-29 | [v11473](https://vndb.org/v11473) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Yume Miru Egoist | 夢みるエゴイスト | 2010-05-14 | [v4045](https://vndb.org/v4045) | v2.47 | ⚪ Not tried |  |
 | Oshikake! Entremets | おしかけ！アントルメ | 2010-05-28 | [v3824](https://vndb.org/v3824) | v2.47 | ✅ Plays through | 2026-11-12 |
-| You~Gaku | よう∽ガク | 2010-05-28 | [v3810](https://vndb.org/v3810) | v2.47 | ⚪ Not tried |  |
+| You~Gaku | よう∽ガク | 2010-05-28 | [v3810](https://vndb.org/v3810) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Can Fes! ~Itazura Majo to Naisho no Gakuensai~ | きゃん☆フェス！～いたずら魔女とナイショの学園祭～ | 2010-06-25 | [v4143](https://vndb.org/v4143) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Tenki Ane | 天気姉 | 2010-07-09 | [v4543](https://vndb.org/v4543) | v2.47 | ✅ Plays through | 2026-11-12 |
 | Ran→Sem | RAN→SEM～白濁デルモ妻のミイラ捕り～ | 2010-07-23 | [v4645](https://vndb.org/v4645) | v2.47 | ✅ Plays through | 2026-11-04 |
-| Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ⚪ Not tried |  |
+| Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | Vestige ―刃に残るは君の面影― | 2010-07-30 | [v3822](https://vndb.org/v3822) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Azu Plus | アズプラス | 2010-08-15 | [v7579](https://vndb.org/v7579) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Ryoumaden ~Houkago no Rakuen~ | 凌魔伝 ～放課後の楽園～ | 2010-10-15 | [v5325](https://vndb.org/v5325) | v2.47 | ✅ Plays through | 2026-11-12 |
 | Ren'ai Saimin ~Tsun na Kanojo ga dereru Saimin~ | 恋愛催眠～ツンな彼女がデレる催眠～ | 2010-11-26 | [v5108](https://vndb.org/v5108) | v2.47 | ✅ Plays through | 2026-10-31 |
-| Saint ~Aa Shu yo | セイント ～あぁ主よ、教え子達に堕とされた私をお許し下さい～ | 2010-12-10 | [v5773](https://vndb.org/v5773) | v2.47 | ⚪ Not tried |  |
+| Saint ~Aa Shu yo | セイント ～あぁ主よ、教え子達に堕とされた私をお許し下さい～ | 2010-12-10 | [v5773](https://vndb.org/v5773) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Oreimo Plus | 俺妹プラス | 2010-12-31 | [v6035](https://vndb.org/v6035) | v2.47 | ✅ Plays through | 2026-10-13 |
 | Bloody Rondo | BLOODY†RONDO | 2011-01-28 | [v5349](https://vndb.org/v5349) | v2.48 | ✅ Plays through | 2026-11-04 |
 | Damatte Watashi no Muko ni Nare! | 黙って私のムコになれ！ | 2011-01-28 | [v5289](https://vndb.org/v5289) | v2.48 | ✅ Plays through | 2026-10-20 |
@@ -149,14 +150,15 @@ of those versions it does not list.
 | Boku Igai no Otoko o Shiranai Kanojo | 僕以外の男を知らない彼女が他の男に抱かれていた | 2012-08-31 | [v10816](https://vndb.org/v10816) | v2.49 | ✅ Plays through | 2026-11-04 |
 | Son of a ☆ Bitch | サノバ☆ビッチ ～早乙女野薔薇ちゃん、マジ天使!～ | 2012-09-07 | [v11089](https://vndb.org/v11089) | v2.49 | ✅ Plays through | 2026-11-12 |
 | Zettai Zetsumei Shoujo | 絶体絶命少女 | 2012-09-28 | [v10217](https://vndb.org/v10217) | v2.49 | ✅ Plays through | 2026-11-12 |
-| Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | 2012-12-14 | [v11603](https://vndb.org/v11603) | v2.49 | ⚪ Not tried |  |
+| Toriko no Chigiri | 虜ノ契 ～家族のために身体を差し出す姉と妹～ | 2012-12-14 | [v11603](https://vndb.org/v11603) | v2.49 | ✅ Plays through | 2026-11-19 |
 | Rikka Plus | 六花プラス | 2012-12-31 | [v11902](https://vndb.org/v11902) | v2.49 | ✅ Plays through | 2026-10-13 |
 | Gensou no Idea ~Oratorio Phantasm Historia~ | 幻創のイデア～Oratorio Phantasm Historia～ | 2013-06-28 | [v11881](https://vndb.org/v11881) | v2.49 | ✅ Plays through | 2026-10-21 |
 | Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ✅ Plays through | 2026-10-24 |
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | Love＆Piss ～少女のガマンが世界を救う～ | 2013-08-30 | [v12613](https://vndb.org/v12613) | v2.49 | ✅ Plays through | 2026-11-04 |
 | S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | v2.49 | ✅ Plays through | 2026-11-05 |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | 2014-05-30 | [v14614](https://vndb.org/v14614) | v2.50 | ✅ Plays through | 2026-11-12 |
-| Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ⚪ Not tried |  |
+| Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ✅ Plays through | 2026-11-19 |
+| Majime to Sasayakareru Ore o Jimi Kyonyuu no Nazuna | 真面目と囁かれるオレを地味巨乳のなずなが性的な意味も込めて陥落していく話 | 2014-09-12 | [v16038](https://vndb.org/v16038) | v2.50 | ✅ Plays through | 2026-11-19 |
 | Kanojo ga Ore ni Kureta Mono | 彼女が俺にくれたもの。俺が彼女にあげるもの。 | 2014-09-26 | [v14321](https://vndb.org/v14321) | v2.50 | ✅ Plays through | 2026-10-24 |
 | Kinpatsu Tarou Monogatari | 金髪太郎物語 | 2014-10-03 | [v16102](https://vndb.org/v16102) | v2.50 | ✅ Plays through | 2026-11-12 |
 | Gyaku Katei Kyoushi | 逆家庭教師 ～彼女は僕の先生にして奴隷～ | 2014-12-12 | [v16306](https://vndb.org/v16306) | v2.50 | ✅ Plays through | 2026-10-15 |
@@ -179,7 +181,7 @@ of those versions it does not list.
 | Chuuni Hime no Teikoku | 厨二姫の帝国 | 2018-02-23 | [v17900](https://vndb.org/v17900) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Re:Rem Plus | Re:レムプラス | 2018-03-31 | [v22991](https://vndb.org/v22991) | v2.50 | ✅ Plays through | 2026-10-13 |
 | Nukige Mitai na Shima ni Sunderu [Trial] | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 体験版 | 2018-06-22 | [r57518](https://vndb.org/r57518) | v2.50 | ⚪ Not tried |  |
-| Kiki Mimi | ききミミ | 2018-07-26 | [v23506](https://vndb.org/v23506) | v2.50 | ⚪ Not tried |  |
+| Kiki Mimi | ききミミ | 2018-07-26 | [v23506](https://vndb.org/v23506) | v2.50 | ✅ Plays through | 2026-11-19 |
 | Nukige Mitai na Shima ni Sunderu | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? | 2018-07-27 | [v22899](https://vndb.org/v22899) | v2.50 | ✅ Plays through | 2026-11-04 |
 | Saimin Paradise! | 催眠ぱらだいす! ～催眠術でツゴウノイイ美少女学園性活～ | 2018-09-28 | [v23063](https://vndb.org/v23063) | v2.50 | ✅ Plays through | 2026-11-12 |
 | Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ✅ Plays through | 2026-11-05 |
@@ -867,6 +869,38 @@ each) needed 150,000 frames. Yume Miru Egoist was not tried: the copy lacks RIO.
 EGOIST_S.WAR / EGOIST_T.WAR. The C++ player runs the same opcodes as the C# one in all of them
 (3,000 frames each from the start).
 
+**The games of 2026-11-19**: Mimi o Sumaseba, Saint, Toriko no Chigiri, Chikan Circle 3, Kiki Mimi
+and both Majime to Sasayakareru games play through as they are; Niwaka Ane, Danchi Wife, Najimi
+no Oba-chan, You~Gaku and Vestige needed:
+- Danchi Wife's DecodeBin date, 0x20100405 (the scheme had 0x20080214): six S25 had a row of
+  their table of rows outside the file. `ScnTools datefind` checks such rows now (a row starts
+  where the one before it ends), which tells the date of this game; the dates of the games known
+  before come out as they were.
+- GameMap: NAZIMI~.exe and YOUGAKU.EXE (both opened by their schemes, found by trying them).
+  You~Gaku's OGV.OGV in YOUGAKU_D.WAR is a copy of its .exe, not a sound.
+- `03C2`'s checksums of Vestige (START 0x00618, 1510342675) and You~Gaku (0x004A8, 1682722154),
+  and Vestige's `03ED` / `03EE` (the keyboard as DirectInput reads it; START reads Z and X).
+- Native versions of the builds of known routines (Danchi Wife's enlarge16, Niwaka Ane's scale16
+  and opaque enlarge16) and of Niwaka Ane's "mix two" (two pictures mixed by their shares, a
+  pixel of first byte 0 taking the other's colour), the same as its x86 code (SCNBOOT_VERIFY_NATIVE).
+- A script error stops the game only once `078B` asks the engine to report them, as the engine
+  does: Danchi Wife's A0704B-2.TXT loads a background its archives lack (bg25d.S25, "the summer
+  night sky" by the script's own comment) twice; 04B0 fails, the screen stays black under the
+  point-of-view caption and the scene goes on, as in the shipped game.
+Majime to Sasayakareru Ore o Jimi Kyonyuu no Nazuna (MAJIKAN02.EXE, v2.50, 2014) is a new scheme:
+its HelperKey the 20 bytes 12 after the first IEND, its image the common JPEG and the bytes after
+it to 44,145 (`mov eax, 0AC71h`), its plug-in Nukitashi 2's byte for byte (Nukitashi2Crypt, the
+same key); all 2,074 files whole.
+
+**EDEN IV** (Forester, EDEN4.EXE, 2003, engine v2.20: the oldest tried) opens with Ao no Juuai's
+keys (a scheme of its own now). Its opcode table came from its executable (engine-notes.md,
+"Engine builds"); `0580` (a movie's time, not done: the player's movies do not seek), `0581` (how
+many times a looping movie came to its end) and `0654` were new, and `0579`'s second operand
+loops the movie. Its story is in E4MAIN.SCN and 129 MPEG movies in m\: run from its title it
+plays its movies and their scenes where the player clicks a part of the picture (`0456` and a
+table of rectangles); the bot's clicks find some of them and the movies change, but not the way
+on, so it was not played through.
+
 ## Sweeping
 
 `tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through ScnBoot, each from
@@ -986,6 +1020,18 @@ Miko Dashi and Nukige Mitai na Shima ni Sunderu... 2 on 2026-11-05; the games of
 | Ryoumaden ~Houkago no Rakuen~ | 117 | 99.8% |
 | Chou Saiminjutsu Gakuen | 104 | 99.7% |
 | Saimin Paradise! | 43 | 99.9% |
+| Mimi o Sumaseba | 138 | 99.7% |
+| Saint ~Aa Shu yo | 31 | 96.9% |
+| Toriko no Chigiri | 189 | 61.0% (as Rin x Sen) |
+| Chikan Circle 3 | 45 | 54.5% (as Rin x Sen) |
+| Niwaka Ane | 155 | 99.7% |
+| Kiki Mimi | 9 | 99.5% |
+| Danchi Wife ~Hitozuma Nude Model no Kenshin~ | 179 | 62.9% (as Rin x Sen) |
+| Najimi no Oba-chan | 124 | 57.3% (as Rin x Sen) |
+| Majime to Sasayakareru Ore o Osananajimi no Risa | 13 | 99.9% |
+| Majime to Sasayakareru Ore o Jimi Kyonyuu no Nazuna | 43 | 100% |
+| You~Gaku | 173 | 99.8% |
+| Vestige -Yaiba ni Nokoru wa Kimi no Omokage- | 184 | 98.4% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

@@ -322,8 +322,10 @@ public sealed partial class ScnVm
         // right, bottom (1/16 pixels), l[12] / l[13] the column / row weights, l[14] / l[15] the
         // column / row entries (24 bytes each). The x86 code makes the row entries before the
         // column tables: where those run into them, it runs as x86 code instead. Saimin Seikatsu
-        // (v2.47) START 732A8 is another build of it, the same bytes
-        RegisterNative(["31DAD459219DC78270C7147720CA1959DFEA5AFB", "28E03A81F50DA1148767337586B04780E33409B6"], "scale16", (vm, c, a) =>
+        // (v2.47) START 732A8 is another build of it, the same bytes; Niwaka Ane's START 5D793, other
+        // padding, ending in "ret 4"
+        RegisterNative(["31DAD459219DC78270C7147720CA1959DFEA5AFB", "28E03A81F50DA1148767337586B04780E33409B6",
+                        "021A108AD93383E4DFF119DBD1AC39B5083ECE8B"], "scale16", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), dr = vm.NativeArg(a, 4), db = vm.NativeArg(a, 5);
@@ -348,17 +350,19 @@ public sealed partial class ScnVm
         // l[6] src, l[7] its stride, l[8..11] src left, top, right, bottom (1/16 pixels), l[12] the
         // weight table. Rectangles it does not enlarge run as x86 code. Saimin Seikatsu (v2.47)
         // START 72F77 is another build of it, the same bytes; Ran→Sem's (v2.47) START 9C8AA, Boku Igai
-        // no Otoko o Shiranai Kanojo's (v2.49) 6BDFE and Tanetsuke Mura's (v2.48) E89B3, other padding
+        // no Otoko o Shiranai Kanojo's (v2.49) 6BDFE, Tanetsuke Mura's (v2.48) E89B3 and Danchi Wife's
+        // (v2.47) 9887B, other padding
         RegisterNative(["27A535558D763B2B8F0008F2476F0FA14EB45AAB", "1C0B5DBD306E520A9EB62FA41DF3484C397A4C39",
                         "B36E81F1360892F4CD8E7B6FE2C8AA0765B2FF23", "91176C1C026354F51ED12B93A2BB29146DD8F02D",
-                        "9DFA1CCFC1A847CDC5187D8F50D2C764D14068DC"], "enlarge16",
+                        "9DFA1CCFC1A847CDC5187D8F50D2C764D14068DC", "7D3557134327F511D131356BAA8B0659C3FA3245"], "enlarge16",
                        (vm, c, a) => vm.Enlarge16Native(c, a, 257, opaque: false));
         // Hana to Otome ni Shukufuku o Royal Bouquet START 4D062 (v2.47): the same but for its weight
         // table, i * 256 / sW, and the first byte of each pixel it mixes, made FF (por with 0xFF
         // after packuswb); the pixels it copies keep theirs. Arguments as above. Imouto Smile START
-        // 6DB16 (v2.47), other padding; Gakushoku no Oba-san The Motion 60A42, ending in "ret"
+        // 6DB16 (v2.47), other padding; Gakushoku no Oba-san The Motion 60A42, ending in "ret";
+        // Niwaka Ane's START 5D437, other padding
         RegisterNative(["D6BC2828FE749484BEC89684F01FD4469FF9BA0C", "0169B9BC91EFAFDFFF4DD7F9D7796D093E121ED9",
-                        "AF7B6BFFD4E08A2B87186278BDAEE944BE215278"], "enlarge16 (opaque)",
+                        "AF7B6BFFD4E08A2B87186278BDAEE944BE215278", "B5745F19F56244981D895C895BC7568D668802F7"], "enlarge16 (opaque)",
                        (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: true));
         // Nakadashi Trilogy's Miko Dashi START 64396 (v2.47): that weight table, nothing made opaque
         RegisterNative("39773A9714C8846EA6402C83B201C0FEA2A58775", "enlarge16", (vm, c, a) => vm.Enlarge16Native(c, a, 256, opaque: false));

@@ -559,6 +559,65 @@ public sealed partial class ScnVm
             vm.SetL(a, 3, (int)n);
         });
 
+        // Niwaka Ane START 5DD3A (MMX): two pictures mixed into a third. l[0] dst, l[1] / l[2] the
+        // two sources, l[3..5] their strides (dst, first, second), l[6] / l[7] the width (pixels) and
+        // height, l[8] / l[9] the second's and the first's shares: each byte = (A * a + B * (257 - a))
+        // >> 8 with a = l[9] * 257 / (l[8] + l[9]) (nothing when the sum or the size is 0). A pixel
+        // whose first byte is 0 takes the other picture's three other bytes (its own first byte
+        // kept), so a transparent pixel mixes as the other one's colour. Pictures that overlap other
+        // than in place run as x86 code
+        RegisterNative("9C8566BF089AE3AB9F1DE17F5F127B29EAE11E0D", "mix two", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), first = vm.NativeArg(a, 1), second = vm.NativeArg(a, 2);
+            int dstStride = vm.NativeArg(a, 3), firstStride = vm.NativeArg(a, 4), secondStride = vm.NativeArg(a, 5);
+            uint width = (uint)vm.NativeArg(a, 6), height = (uint)vm.NativeArg(a, 7);
+            uint shareB = (uint)vm.NativeArg(a, 8), shareA = (uint)vm.NativeArg(a, 9);
+            uint sum = shareA + shareB;
+            if (width == 0 || height == 0 || sum == 0)
+                return;
+            if (width > 0x4000 || height > 0x4000)
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            long rowBytes = width * 4L;
+            var d = RowsSpan(dst, dstStride, (int)height, rowBytes);
+            var f = RowsSpan(first, firstStride, (int)height, rowBytes);
+            var s = RowsSpan(second, secondStride, (int)height, rowBytes);
+            if (!(dst == first && dstStride == firstStride || Apart(d.Start, d.Length, f.Start, f.Length))
+                || !(dst == second && dstStride == secondStride || Apart(d.Start, d.Length, s.Start, s.Length)))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            uint wa = (uint)((ulong)shareA * 257 / sum), wb = 257 - wa;
+            using var verify = vm.VerifyRegion(c, a, (int)d.Start, (int)d.Length);
+            var rowA = ArrayPool<byte>.Shared.Rent((int)rowBytes);
+            var rowB = ArrayPool<byte>.Shared.Rent((int)rowBytes);
+            for (uint y = 0; y < height; y++)
+            {
+                var pa = rowA.AsSpan(0, (int)rowBytes);
+                var pb = rowB.AsSpan(0, (int)rowBytes);
+                vm.ReadBytes(first + (int)(y * firstStride), pa);
+                vm.ReadBytes(second + (int)(y * secondStride), pb);
+                for (int k = 0; k < pa.Length; k += 4)
+                {
+                    bool clearA = pa[k] == 0, clearB = pb[k] == 0;
+                    for (int j = 0; j < 4; j++)
+                    {
+                        // (the first byte stays each picture's own; the other three come from the
+                        // other picture where this one's first byte is 0)
+                        uint va = j > 0 && clearA ? pb[k + j] : pa[k + j];
+                        uint vb = j > 0 && clearB ? pa[k + j] : pb[k + j];
+                        pa[k + j] = (byte)Math.Min(255u, (va * wa + vb * wb) >> 8);
+                    }
+                }
+                vm.WriteBytes(dst + (int)(y * dstStride), pa);
+            }
+            ArrayPool<byte>.Shared.Return(rowA);
+            ArrayPool<byte>.Shared.Return(rowB);
+        });
+
         // START 76042 / 76490 / 85920 (MMX): sepia of BGR pixels, l[2] bytes (rounded down to 24)
         // from l[1] to l[0]: y = (151 b0 + 77 b1 + 29 b2) >> 8 of each pixel's bytes, then its
         // bytes (y * 145, y * 200, y * 240) >> 8

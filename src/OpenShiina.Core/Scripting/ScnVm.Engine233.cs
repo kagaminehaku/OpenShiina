@@ -141,17 +141,18 @@ public sealed partial class ScnVm
             vm.m_windowMovieArea = new ScreenArea(x, y, x + w, y + h);
             return 0;
         });
-        // 0579 file, v (0x413C40): open the movie (a file of the game folder) and play it in the
-        // window (FUN_00413AD0 0, 1); v is kept with it (0 in Cleavage's scripts). A movie that
-        // cannot be played here is as one played to its end
+        // 0579 file, loop (0x413C40): open the movie (a file of the game folder) and play it in the
+        // window (FUN_00413AD0 0, 1); loop 1: it starts again at its end (0 in Cleavage's scripts;
+        // EDEN4's START plays a movie n times with it, counting with 0581). A movie that cannot be
+        // played here is as one played to its end
         Register234(0x0579, (vm, c, i) =>
         {
             string name = vm.ReadString(vm.Value(c, i.Args[0]));
-            vm.Value(c, i.Args[1]);
+            int loop = vm.Value(c, i.Args[1]);
             var movie = vm.m_windowMovie;
             vm.MovieSoundStop(movie);
             movie.Name = name;
-            movie.Loop = 0;
+            movie.Loop = loop;
             movie.LoopCount = 0;
             movie.Video = null;
             movie.Window = vm.m_windowMovieArea;
@@ -189,6 +190,26 @@ public sealed partial class ScnVm
             vm.Store(c, i.Args[0], movie.State switch { 3 => Math.Max(1, (int)(vm.Clock - movie.Start)), 0 => 0, _ => 1 });
             return 0;
         });
+        // 0580 seconds (EDEN4's v2.20, 0x40DB70 -> FUN_00405DE0): the movie put at that time
+        // (DirectShow's IMediaPosition::put_CurrentPosition); the player's movies do not seek, so
+        // it is told and passed over
+        Register234(0x0580, (vm, c, i) =>
+        {
+            int seconds = vm.Value(c, i.Args[0]);
+            vm.Trace?.Add($"f{vm.m_frameNumber} 0580 {seconds}: not done");
+            return 0;
+        });
+        // 0581 v (0x40DBD0): v = how many times the looping movie came to its end (0x44CE3C: 0 when
+        // it opens, -1 once closed); EDEN4's START plays a movie n times by waiting for it to reach n
+        Register234(0x0581, (vm, c, i) =>
+        {
+            var movie = vm.m_windowMovie;
+            vm.UpdateMovie(movie);
+            vm.Store(c, i.Args[0], movie.State == 0 ? -1 : movie.LoopCount);
+            return 0;
+        });
+        // 0654 v (0x40E7A0): an engine setting (0x686A2C, read at 0x402DB5) the player has no use for
+        Register234(0x0654, (vm, c, i) => { vm.EngineGlobals[0x686A2C] = vm.Value(c, i.Args[0]); return 0; });
     }
 
     // 050A's crossfades by task: when they started

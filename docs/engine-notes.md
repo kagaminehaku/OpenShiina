@@ -287,6 +287,14 @@ other opcode 2 (417FDE): `ScnTools opscan KATEI.EXE 417340 41736d 0 417fde 40b02
 operands, which they have as in v2.33 (the scripts decode only so), so the table takes v2.33's
 operands for them.
 
+**v2.20** (EDEN IV's EDEN4.EXE, 2003, not packed; table Data/ScnOps/ops_v220.tsv): laid out as
+v2.31 (the interpreter FUN_004147D0 takes the slot, the current one at 6868F0, the tasks 0x40 bytes
+from 681664, GetVar 409AD0, SetVar 409670, GetVarAdr 409980, any other opcode 2 at 4153FB), but a
+`pop esi` sits between the compare and the first jump of the dispatch, which opscan takes for a
+handler: on a copy with that byte moved before the `and` (the same code) `ScnTools opscan <copy>
+4147d0 414802 0 4153fb 409ad0 409670 409980 <out> 0 None None 681664` gives 445 opcodes, v2.31's
+but for `0795` (no operand) and `FE11` (one); the jumps take v2.31's operands, as there.
+
 **v2.44** (Yokorenbo's YOKOREN.EXE, 2008, not packed; table Data/ScnOps/ops_v244.tsv): laid out
 as v2.45's (`ScnTools opscan YOKOREN.EXE 41cca0 41ccfc 41ccc3 422d96 412630 4120f0 4124a0 <out>
 41cd4e EBX EDI`, the addresses found by matching Chuuchuu Nurse's functions' first bytes): 661
@@ -1321,6 +1329,19 @@ the functions they call from the decompile. First findings:
   decoding by a row and a column; the order is the same (overlap: vertical edges, then
   horizontal; loop filter: horizontal, then vertical; macroblocks in raster order). A 1280 x 720
   frame takes 8-13 ms on one core.
+
+### The games of 2026-11-19 (ScnVm)
+
+- A script error (a handler's 2) stops the game only while `078B v` has v non-zero (Oreimo Plus
+  0x483058, read by its main loop 0x42D9F0): else the task yields and goes on at the next
+  instruction the next frame. The players pass over it so; ScnBoot and the Switch player's log
+  tell it ("[script error passed]").
+- `03ED buffer` / `03EE buffer` (Oreimo Plus 0x4250F3 / 0x425126): DirectInput's GetDeviceState,
+  256 bytes by scan code (0x80 held, all 0 with the window inactive); 03EE runs each key through
+  `03EA`'s key repeat with its scan code as the caller.
+- v2.20 (EDEN IV): `0579 file, loop` loops the movie when loop is 1; `0581 v` = how many times it
+  came to its end (0x44CE3C: 0 when it opens, -1 once closed); `0580 seconds` puts it at that time
+  (IMediaPosition::put_CurrentPosition; not done); `0654 v` keeps an engine setting (0x686A2C).
 
 ### The games of 2026-11-04 (ScnVm)
 

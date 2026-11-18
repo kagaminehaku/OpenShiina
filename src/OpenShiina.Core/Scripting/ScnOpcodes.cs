@@ -42,6 +42,7 @@ public sealed class ScnOpcodes
         ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v233"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v231"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v220"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v250"] = new() { [0x009C] = ["GLYPH250"] },
     };
 
@@ -103,6 +104,7 @@ public sealed class ScnOpcodes
             : version.StartsWith("2.34") ? "ops_v234"
             : version.StartsWith("2.33") ? "ops_v233"
             : version.StartsWith("2.31") ? "ops_v231"
+            : version.StartsWith("2.20") ? "ops_v220"
             : version.StartsWith("2.37") ? "ops_v237"
             : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
 

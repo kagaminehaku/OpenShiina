@@ -159,7 +159,12 @@ static class DateFind
         return Math.Min(p, d.Length);
     }
 
-    /// <summary>The changed dwords that are index slots: 0, or a frame whose header and rows fit.</summary>
+    /// <summary>
+    /// The changed dwords that are index slots: 0, or a frame whose header and rows fit; those in a
+    /// frame's table of rows: a row that starts where the one before it ends and ends where the one
+    /// after it starts (the rows are back to back: a 16-bit length, then the row; Danchi Wife's
+    /// pictures have their date in a row's offset, not in the index).
+    /// </summary>
     static bool S25Slots(byte[] d, List<int> dwords)
     {
         long frames = BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan(4));
@@ -167,7 +172,11 @@ static class DateFind
         {
             int slot = 0x200 + 4 * i;
             if (slot >= 8 + 4 * frames)
-                continue;   // frame data: nothing to check it by
+            {
+                if (!RowFits(d, frames, slot))
+                    return false;
+                continue;
+            }
             long at = BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan(slot));
             if (at == 0)
                 continue;
@@ -177,6 +186,38 @@ static class DateFind
             long height = BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan((int)at + 4));
             if (width > 0x4000 || height > 0x4000 || at + 0x14 + 4 * height > d.Length)
                 return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// A dword of frame data that is a row's offset (in a frame's table of rows): the row is in the
+    /// file and starts where the row before it ends, or ends where the row after it starts. Any other
+    /// dword: true (nothing to check it by).
+    /// </summary>
+    static bool RowFits(byte[] d, long frames, int slot)
+    {
+        if (8 + 4 * frames > d.Length)
+            return true;
+        for (int f = 0; f < frames; f++)
+        {
+            long at = BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan(8 + 4 * f));
+            if (at == 0 || at + 0x14 > d.Length)
+                continue;
+            long height = BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan((int)at + 4));
+            long table = at + 0x14;
+            if (height > 0x4000 || slot < table || slot >= table + 4 * height || table + 4 * height > d.Length)
+                continue;
+            long row = (slot - table) / 4;
+            long Offset(long r) => BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan((int)(table + 4 * r)));
+            long End(long off) => off + 2 > d.Length ? -1 : off + 2 + BinaryPrimitives.ReadUInt16LittleEndian(d.AsSpan((int)off));
+            long here = Offset(row);
+            if (here + 2 > d.Length || End(here) > d.Length)
+                return false;
+            // (either side is enough: the row before or after may itself be one the date changed)
+            bool afterBefore = row > 0 && End(Offset(row - 1)) == here;
+            bool beforeNext = row + 1 < height && End(here) == Offset(row + 1);
+            return afterBefore || beforeNext || row == 0 && height == 1;
         }
         return true;
     }

@@ -109,7 +109,9 @@ public sealed partial class ScnVm
     // 1224645659), Chikan Densha Otoko 2 (v2.43: 0x005F5, 741346554), Chikan Densha Otoko Gaiden
     // (v2.47: 0x003CB, -1138810104), Tsuyoimo x Yowaimo (IMOIMO.EXE, v2.45: 0x00322, -770208518),
     // Mahou Shoujo no Taisetsu na Koto (v2.47: 0x003E2, -1545457906; with f[257] bit 1 none is asked),
-    // Shokuinshitsu (TEACH.exe, v2.46: 0x00369, -661847700; -75841587 with f[257] bit 1)
+    // Shokuinshitsu (TEACH.exe, v2.46: 0x00369, -661847700; -75841587 with f[257] bit 1), VESTIGE
+    // (VESTIGE.exe, v2.47: 0x00618, 1510342675; none with f[257] bit 1), You~Gaku (YOUGAKU.EXE,
+    // v2.47: 0x004A8, 1682722154; none with f[257] bit 1)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -128,6 +130,8 @@ public sealed partial class ScnVm
         ["Tsuyoimo x Yowaimo"] = 306723180 ^ -770208518,
         ["Mahou Shoujo no Taisetsu na Koto"] = 306723180 ^ -1545457906,
         ["Shokuinshitsu"] = 306723180 ^ -661847700,
+        ["Vestige -Yaiba ni Nokoru wa Kimi no Omokage-"] = 306723180 ^ 1510342675,
+        ["You~Gaku"] = 306723180 ^ 1682722154,
     };
 
     private void RegisterSystem()

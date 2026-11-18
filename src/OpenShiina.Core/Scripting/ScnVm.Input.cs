@@ -30,6 +30,21 @@ public sealed partial class ScnVm
     /// </summary>
     public bool? Joypad { get; set; }
 
+    /// <summary>
+    /// The keyboard as DirectInput's GetDeviceState gives it (03ED / 03EE): 256 bytes by DIK scan
+    /// code (the keys of s_dikToVk, as 03EC reads them), 0x80 for a key held; all 0 when the window
+    /// is not in front.
+    /// </summary>
+    private void KeyboardState(Span<byte> keys)
+    {
+        keys.Clear();
+        if (!m_host.Active)
+            return;
+        foreach (var (dik, virtualKey) in s_dikToVk)
+            if (KeyHeld(virtualKey))
+                keys[dik] = 0x80;
+    }
+
     /// <summary>FUN_00413630: the buttons held now (0 when the window is not in front).</summary>
     public int Buttons()
     {
@@ -217,6 +232,27 @@ public sealed partial class ScnVm
         Register(0x03E9, (vm, c, i) => { vm.Store(c, i.Args[0], vm.Buttons()); return 0; });
         // 03EA v: the buttons with key repeat
         Register(0x03EA, (vm, c, i) => { vm.Store(c, i.Args[0], vm.RepeatButtons(0x100, vm.Buttons())); return 0; });
+        // 03ED buffer (Oreimo Plus 0x4250F3 -> FUN_00403D20): the keyboard as DirectInput's
+        // GetDeviceState gives it, 256 bytes by DIK scan code, 0x80 for a key held (all 0 when the
+        // window is not in front). VESTIGE's START reads Z (0x2C) and X (0x2D) from it
+        Register(0x03ED, (vm, c, i) =>
+        {
+            Span<byte> keys = stackalloc byte[256];
+            vm.KeyboardState(keys);
+            vm.WriteBytes(vm.Value(c, i.Args[0]), keys);
+            return 0;
+        });
+        // 03EE buffer (0x425126): the same, each key through the key repeat of 03EA
+        // (FUN_00413810) with its scan code as the caller
+        Register(0x03EE, (vm, c, i) =>
+        {
+            Span<byte> keys = stackalloc byte[256];
+            vm.KeyboardState(keys);
+            for (int k = 0; k < 256; k++)
+                keys[k] = (byte)vm.RepeatButtons(k, keys[k] & 0x80);
+            vm.WriteBytes(vm.Value(c, i.Args[0]), keys);
+            return 0;
+        });
         // 03EB mask: wait until every button is let go, then until one of mask is pressed
         // (the executable loops inside the opcode with Sleep(10); here the task yields instead)
         Register(0x03EB, (vm, c, i) =>

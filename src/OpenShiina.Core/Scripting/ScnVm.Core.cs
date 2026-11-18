@@ -258,6 +258,8 @@ public sealed partial class ScnVm
         // D382 / AA82: switches set to their own opcode number; AA82 lets the scripts write files
         Register(0xD382, (vm, c, i) => { vm.SwitchD382 = 0xD382; return 0; });
         Register(0xAA82, (vm, c, i) => { vm.FileWritesEnabled = true; return 0; });
+        // 078B v (Oreimo Plus FUN_0041D8A0): script errors reported (v != 0) or passed over (ScnVm.Run)
+        Register(0x078B, (vm, c, i) => { vm.ScriptErrorReports = vm.Value(c, i.Args[0]); return 0; });
         // 0048: two engine globals (0x13B5198 / 0x13B519C) take the opcode number, which is in EAX there
         Register(0x0048, (vm, c, i) => { vm.Global13B5198 = vm.Global13B519C = 0x48; return 0; });
         // 0034: wait for the next frame (the scheduler yields after it)
@@ -798,6 +800,15 @@ public sealed partial class ScnVm
     /// the places the scripts compare the mouse with (ScnBoot's SCNBOOT_SWEEP_CLICKS=auto).
     /// </summary>
     public Action<int, int, int>? CompareSeen { get; set; }
+
+    /// <summary>Engine switch 0x483058 (op_078B v): script errors stop the game while it is not 0.</summary>
+    public int ScriptErrorReports { get; private set; }
+
+    /// <summary>
+    /// A script error passed over as the engine does while its reports are off (its message): for
+    /// the tests and logs, which still want to see it.
+    /// </summary>
+    public Action<string>? ScriptErrorPassed { get; set; }
 
     private int If(ScnContext c, ScnInstruction i, int mode)
     {

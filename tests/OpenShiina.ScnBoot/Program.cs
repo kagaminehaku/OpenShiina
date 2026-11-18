@@ -156,6 +156,8 @@ int sweepTotal = 0, sweepLastNew = 0, sweepLastBlock = int.MaxValue;
 bool sweepReachedEnd = false;
 long slowestMs = 0, heapPeak = 0;
 var sweepSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+// (a script error the engine passes over, as its reports are off: told, the run goes on)
+vm.ScriptErrorPassed = message => Console.WriteLine($"  [script error passed] Frame {host.Frame}: {message}");
 if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && playFrom.LastIndexOf(':') is > 0 and int colon)
 {
     var scenarios = ScenarioText.ReadScenarios(folder, scheme);
