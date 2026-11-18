@@ -12,7 +12,8 @@ namespace OpenShiina.App;
 
 public static class GameIcons
 {
-    private static readonly Dictionary<string, Task<(Bitmap? Icon, Color? Colour)>> s_icons = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, Task<(Bitmap? Icon, Color? Colour)>> s_icons = new(
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     /// <summary>The icon of <paramref name="exe"/> and its colour (nulls when it has none).</summary>
     public static Task<(Bitmap? Icon, Color? Colour)> Of(string? exe)
