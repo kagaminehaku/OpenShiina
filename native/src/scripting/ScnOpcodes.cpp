@@ -47,6 +47,7 @@ const std::map<std::string, std::map<int, Items>>& VersionOverrides()
         {"ops_v234", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v233", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v231", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v220", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v250", {{0x009C, {"GLYPH250"}}}},
     };
     return overrides;
@@ -139,6 +140,7 @@ std::string ScnOpcodes::TableName(const std::string& version)
         : StartsWith(version, "2.34") ? "ops_v234"
         : StartsWith(version, "2.33") ? "ops_v233"
         : StartsWith(version, "2.31") ? "ops_v231"
+        : StartsWith(version, "2.20") ? "ops_v220"
         : StartsWith(version, "2.37") ? "ops_v237"
         : StartsWith(version, "2.50") ? "ops_v250"
         : "ops_v249";

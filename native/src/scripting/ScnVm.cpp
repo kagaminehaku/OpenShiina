@@ -499,8 +499,17 @@ int ScnVm::Run(ScnContext& c)
             (*HotSpots)[HotSpot(c.Slot, c.Base, at - c.Base, ins.Op)]++;
         OpCounts[size_t(ins.Op & 0xFFFF)]++;
         int result = Execute(c, ins);
+        // A script error stops the game only once 078B turned the engine's reports on; else the
+        // engine's main loop passes over it: the task yields, and goes on at the next instruction
+        // the next frame (ScnVm.Run of the C# player)
         if (result == 2)
-            throw Error(c, std::format("Script error in opcode {:04X}", ins.Op));
+        {
+            if (ScriptErrorReports != 0)
+                throw Error(c, std::format("Script error in opcode {:04X}", ins.Op));
+            if (ScriptErrorPassed)
+                ScriptErrorPassed(Error(c, std::format("Script error in opcode {:04X}", ins.Op)).what());
+            return 0;
+        }
         if (result != 0)
         {
             if (result == 1)

@@ -594,14 +594,44 @@ void SettingsScreen(Ui& ui)
         s_settings.Save(kSettings);
 }
 
+/// Where the rail's wordmark ends (the list's screen writes the chosen game's facts under it).
+float WordmarkBottom(Ui& ui)
+{
+    float wh = ui.Wordmark.Valid() ? 280 * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
+    return 240 + wh;
+}
+
 /// The rail of the list's screens: the logo and the wordmark.
 void DrawRail(Ui& ui)
 {
     player::Renderer& s = ui.Screen;
     s.Fill({0, 0, 340, 720}, kPanel);
     s.Image(ui.Logo, {90, 60, 160, 160});
-    float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
-    s.Image(ui.Wordmark, {30, 240, ww, wh});
+    s.Image(ui.Wordmark, {30, 240, 280, WordmarkBottom(ui) - 240});
+}
+
+/// The size of the storage icons (a square).
+constexpr float kStorageIcon = 28;
+
+/// Where a game is, as a small picture in a kStorageIcon square at (x, y): the console (its screen
+/// between its two controllers) or an SD card (its cut corner and its contacts). Drawn in color; the
+/// cut-outs in under, the colour behind it.
+void DrawStorageIcon(player::Renderer& s, bool internal, float x, float y, uint32_t color, uint32_t under)
+{
+    if (internal)
+    {
+        s.Fill({x, y + 7, 6, 14}, color, 3);
+        s.Fill({x + 22, y + 7, 6, 14}, color, 3);
+        s.Fill({x + 7, y + 7, 14, 14}, color, 1);
+        s.Fill({x + 9, y + 9, 10, 10}, under);
+    }
+    else
+    {
+        s.Fill({x + 4, y + 2, 20, 24}, color, 3);
+        s.Fill({x + 18, y + 1, 7, 7}, under);
+        for (int k = 0; k < 3; k++)
+            s.Fill({x + 8 + 3.5f * float(k), y + 5, 2, 5}, under);
+    }
 }
 
 /// A title and its lines beside the rail (each wrapped to the width): true for A, false for B (or + /
@@ -984,6 +1014,44 @@ GameAction GameScreen(Ui& ui, const player::GameEntry& game)
     return GameAction::Back;
 }
 
+/// The chosen game's facts on the rail, under the wordmark: its whole name (up to three lines),
+/// where it is, when it was played last and for how long. The list's rows keep only its name and
+/// where it is (an icon), so a long name has their width.
+void DrawGameFacts(Ui& ui, const player::GameEntry& game)
+{
+    constexpr float X = 30, W = 280, NameSize = 26, FactSize = 22;
+    player::Renderer& s = ui.Screen;
+    float y = WordmarkBottom(ui) + 28;
+    s.Fill({X, y, W, 2}, kAccent);
+    y += 20;
+    auto lines = WrapText(ui, game.Name, NameSize, W);
+    // (a name of more lines: the third ends with "…")
+    if (lines.size() > 3)
+    {
+        lines[2] = ui.Text.Fit(lines[2] + " " + lines[3], NameSize, W);
+        lines.resize(3);
+    }
+    for (const auto& line : lines)
+    {
+        ui.Text.Draw(line, X, y, NameSize, game.Known ? kText : kDim);
+        y += 36;
+    }
+    if (!game.Known)
+    {
+        ui.Text.Draw(Tr("(not recognised)"), X, y, FactSize, kDim);
+        y += 32;
+    }
+    y += 10;
+    // where it is: the row's icon, and in words
+    DrawStorageIcon(ui.Screen, game.Internal, X, y + (FactSize - kStorageIcon) / 2 + 2, kText, kPanel);
+    ui.Text.Draw(Tr(game.Internal ? "On the console" : "On the SD card"), X + kStorageIcon + 10, y, FactSize, kText);
+    y += 36;
+    ui.Text.Draw(game.LastPlayed != 0 ? Trf("Played {}", AgoText(game.LastPlayed)) : std::string(Tr("Not played yet")), X, y, FactSize, kDim);
+    y += 32;
+    if (game.PlaySeconds >= 60)
+        ui.Text.Draw(Trf("Played for {}", DurationText(game.PlaySeconds)), X, y, FactSize, kDim);
+}
+
 /// The game to play from the list (its folder), kToHbmenu for −, or nothing for + (leave). Y looks
 /// at every folder again; R moves the game chosen to the other storage; L opens its own screen.
 std::string PickGame(Ui& ui, bool internal)
@@ -1064,6 +1132,8 @@ std::string PickGame(Ui& ui, bool internal)
         player::Renderer& s = ui.Screen;
         s.Begin(kBackground);
         DrawRail(ui);
+        if (!games.empty())
+            DrawGameFacts(ui, games[choice]);
         // the games: the icon, the name (dim for a folder no scheme opens)
         ui.Text.Draw(Tr("Games"), ListX, 48, 34, kText);
         if (games.empty())
@@ -1079,17 +1149,11 @@ std::string PickGame(Ui& ui, bool internal)
             if (IconOf(ui, game, readOne, icon) && icon.Valid())
                 s.Image(icon, {ListX, y + (RowHeight - 8 - IconSize) / 2, IconSize, IconSize});
             std::string name = game.Known ? game.Name : game.Name + "  " + Tr("(not recognised)");
-            if (game.Internal)
-                name += std::string("  - ") + Tr("console");
-            float textX = ListX + IconSize + 16, right = ListX + ListW - 24;
-            // when it was played last, and for how long, at the row's end
-            if (game.LastPlayed != 0)
-            {
-                std::string played = AgoText(game.LastPlayed) + (game.PlaySeconds >= 60 ? ", " + DurationText(game.PlaySeconds) : "");
-                float w = ui.Text.Measure(played, 22);
-                ui.Text.Draw(played, right - w, y + 14, 22, k == choice ? kText : kDim);
-                right -= w + 24;
-            }
+            // where it is at the row's end (its words and when it was played are under the logo)
+            float textX = ListX + IconSize + 16, right = ListX + ListW - 24 - kStorageIcon;
+            DrawStorageIcon(s, game.Internal, right, y + (RowHeight - 8 - kStorageIcon) / 2, k == choice ? kText : kDim,
+                            k == choice ? kAccent : kBackground);
+            right -= 16;
             ui.Text.Draw(ui.Text.Fit(name, 28, right - textX), textX, y + 10, 28, game.Known ? kText : kDim);
         }
         // the buttons
@@ -1390,6 +1454,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
     // RIO.INI's Background says (on Windows a game may go on behind other windows)
     vm->SetPauseInBackground(true);
     // The decoded files kept (the setting "File cache")
+    vm->ScriptErrorPassed = [](const std::string& message) { Log("[script error passed] %s\n", message.c_str()); };
     vm->FileCacheBytes = s_settings.FileCacheBytes();
     Log("File cache: %lld MB\n", (long long)(vm->FileCacheBytes >> 20));
     // The GPU mode (ui/DekoAccelerator): the heavy pixel routines as compute shaders, on unless

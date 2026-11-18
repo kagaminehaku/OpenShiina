@@ -249,6 +249,10 @@ public:
     int SwitchD382 = 0;
     /// Engine switch 0x4B3E0C (op_AA82): without it the engine's file writes do nothing.
     bool FileWritesEnabled = false;
+    /// Engine switch 0x483058 (op_078B v): script errors stop the game while it is not 0.
+    int ScriptErrorReports = 0;
+    /// A script error passed over as the engine does while its reports are off (its message).
+    std::function<void(const std::string&)> ScriptErrorPassed;
     /// Engine globals 0x13B5198 / 0x13B519C (op_0048 sets them).
     int Global13B5198 = 0, Global13B519C = 0;
 

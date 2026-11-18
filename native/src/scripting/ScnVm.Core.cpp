@@ -266,6 +266,8 @@ void ScnVm::RegisterCore()
     // D382 / AA82: switches set to their own opcode number; AA82 lets the scripts write files
     Register(0xD382, [](ScnVm& vm, ScnContext&, const ScnInstruction&) { vm.SwitchD382 = 0xD382; return 0; });
     Register(0xAA82, [](ScnVm& vm, ScnContext&, const ScnInstruction&) { vm.FileWritesEnabled = true; return 0; });
+    // 078B v: script errors reported (v != 0) or passed over (ScnVm::Run)
+    Register(0x078B, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { vm.ScriptErrorReports = vm.Value(c, i.Args[0]); return 0; });
     // 0048: two engine globals take the opcode number, which is in EAX there
     Register(0x0048, [](ScnVm& vm, ScnContext&, const ScnInstruction&) { vm.Global13B5198 = vm.Global13B519C = 0x48; return 0; });
     // 0034: wait for the next frame (the scheduler yields after it)

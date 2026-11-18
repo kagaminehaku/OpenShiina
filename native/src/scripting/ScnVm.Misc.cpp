@@ -7,6 +7,7 @@
 // has none, so the player always answers for a disc of its own.
 #include "scripting/ScnVm.h"
 
+#include <algorithm>
 #include <unordered_map>
 
 #include "text/Text.h"
@@ -150,6 +151,31 @@ void ScnVm::RegisterMisc()
         auto vk = kDikToVk.find(key & 0xFF);
         int held = vk != kDikToVk.end() && vm.KeyHeld(vk->second) ? 0x80 : 0;
         vm.Store(c, i.Args[1], vm.RepeatButtons(key, held));
+        return 0;
+    });
+    // 03ED buffer: the keyboard as DirectInput's GetDeviceState gives it, 256 bytes by scan code,
+    // 0x80 for a key held (all 0 when the window is inactive); 03EE buffer: the same, each key
+    // through the key repeat with its scan code as the caller (ScnVm.Input.cs of the C# player)
+    // (static: the handlers are plain functions and cannot capture it)
+    static const auto keyboard = [](ScnVm& vm, uint8_t* keys) {
+        std::fill(keys, keys + 256, uint8_t(0));
+        if (vm.m_host.Active())
+            for (const auto& [dik, vk] : kDikToVk)
+                if (vm.KeyHeld(vk))
+                    keys[dik & 0xFF] = 0x80;
+    };
+    Register(0x03ED, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        uint8_t keys[256];
+        keyboard(vm, keys);
+        vm.WriteBytes(vm.Value(c, i.Args[0]), keys, 256);
+        return 0;
+    });
+    Register(0x03EE, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        uint8_t keys[256];
+        keyboard(vm, keys);
+        for (int k = 0; k < 256; k++)
+            keys[k] = uint8_t(vm.RepeatButtons(k, keys[k] & 0x80));
+        vm.WriteBytes(vm.Value(c, i.Args[0]), keys, 256);
         return 0;
     });
     // 00CE file: load a file in the background (at once without LoadInBackground, or when it is

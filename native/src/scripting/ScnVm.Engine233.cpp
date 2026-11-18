@@ -148,11 +148,13 @@ void ScnVm::RegisterEngine233()
     // here is as one played to its end
     Register234(0x0579, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         std::string name = vm.ReadString(vm.Value(c, i.Args[0]));
-        vm.Value(c, i.Args[1]);
+        // (the second operand: 1, the movie starts again at its end; EDEN4's START plays a movie n
+        // times with it, counting with 0581)
+        int loop = vm.Value(c, i.Args[1]);
         Movie& movie = vm.m_windowMovie;
         vm.MovieSoundStop(movie);
         movie.Name = name;
-        movie.Loop = 0;
+        movie.Loop = loop;
         movie.LoopCount = 0;
         movie.Video.reset();
         movie.Window = vm.m_windowMovieArea;
@@ -185,6 +187,25 @@ void ScnVm::RegisterEngine233()
         vm.UpdateMovie(movie);
         int position = movie.State == 3 ? std::max(1, int(vm.Clock() - movie.Start)) : movie.State == 0 ? 0 : 1;
         vm.Store(c, i.Args[0], position);
+        return 0;
+    });
+    // 0580 seconds (EDEN4's v2.20, 0x40DB70): the movie put at that time (IMediaPosition); the
+    // player's movies do not seek, so it is passed over
+    Register234(0x0580, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.Value(c, i.Args[0]);
+        return 0;
+    });
+    // 0581 v (0x40DBD0): v = how many times the looping movie came to its end (0 when it opens, -1
+    // once closed); EDEN4's START plays a movie n times by waiting for it to reach n
+    Register234(0x0581, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        Movie& movie = vm.m_windowMovie;
+        vm.UpdateMovie(movie);
+        vm.Store(c, i.Args[0], movie.State == 0 ? -1 : movie.LoopCount);
+        return 0;
+    });
+    // 0654 v (0x40E7A0): an engine setting (0x686A2C) the player has no use for
+    Register234(0x0654, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.EngineGlobals[0x686A2C] = vm.Value(c, i.Args[0]);
         return 0;
     });
 }

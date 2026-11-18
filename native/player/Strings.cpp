@@ -81,7 +81,8 @@ constexpr std::pair<const char*, const char*> kVietnamese[] = {
     {"Looking at the games...", "Đang tìm game..."},
     {"No game folder in {} yet", "Chưa có thư mục game nào trong {}"},
     {"(not recognised)", "(không nhận ra)"},
-    {"console", "bộ nhớ máy"},
+    {"On the console", "Trong bộ nhớ máy"},
+    {"On the SD card", "Trên thẻ SD"},
 
     // a game's own screen
     {"Measuring {}...", "Đang đo {}..."},

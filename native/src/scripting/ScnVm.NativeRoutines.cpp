@@ -569,6 +569,53 @@ void ScnVm::RegisterNativeRoutines()
                        vm.SetL(a, 3, int(n));
                    });
 
+    // Niwaka Ane START 5DD3A (MMX): two pictures mixed into a third. l[0] dst, l[1] / l[2] the two
+    // sources, l[3..5] their strides, l[6] / l[7] width and height, l[8] / l[9] the second's and the
+    // first's shares: each byte = (A * a + B * (257 - a)) >> 8 with a = l[9] * 257 / (l[8] + l[9]);
+    // a pixel whose first byte is 0 takes the other picture's three other bytes (ScnVm.NativeRoutines.cs)
+    RegisterNative({"9C8566BF089AE3AB9F1DE17F5F127B29EAE11E0D"}, "mix two",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
+                       int dst = vm.NativeArg(a, 0), first = vm.NativeArg(a, 1), second = vm.NativeArg(a, 2);
+                       int dstStride = vm.NativeArg(a, 3), firstStride = vm.NativeArg(a, 4), secondStride = vm.NativeArg(a, 5);
+                       uint32_t width = uint32_t(vm.NativeArg(a, 6)), height = uint32_t(vm.NativeArg(a, 7));
+                       uint32_t shareB = uint32_t(vm.NativeArg(a, 8)), shareA = uint32_t(vm.NativeArg(a, 9));
+                       uint32_t sum = shareA + shareB;
+                       if (width == 0 || height == 0 || sum == 0)
+                           return;
+                       if (width > 0x4000 || height > 0x4000)
+                       {
+                           vm.RunX86(c, a);
+                           return;
+                       }
+                       int64_t rowBytes = int64_t(width) * 4;
+                       auto d = RowsSpan(dst, dstStride, int(height), rowBytes);
+                       auto f = RowsSpan(first, firstStride, int(height), rowBytes);
+                       auto s = RowsSpan(second, secondStride, int(height), rowBytes);
+                       if (!((dst == first && dstStride == firstStride) || Apart(d, f)) || !((dst == second && dstStride == secondStride) || Apart(d, s)))
+                       {
+                           vm.RunX86(c, a);
+                           return;
+                       }
+                       uint32_t wa = uint32_t(uint64_t(shareA) * 257 / sum), wb = 257 - wa;
+                       openshiina::Bytes rowA(static_cast<size_t>(rowBytes)), rowB(static_cast<size_t>(rowBytes));
+                       for (uint32_t y = 0; y < height; y++)
+                       {
+                           vm.ReadBytes(first + int(int64_t(y) * firstStride), rowA.data(), int(rowBytes));
+                           vm.ReadBytes(second + int(int64_t(y) * secondStride), rowB.data(), int(rowBytes));
+                           for (size_t k = 0; k < size_t(rowBytes); k += 4)
+                           {
+                               bool clearA = rowA[k] == 0, clearB = rowB[k] == 0;
+                               for (size_t j = 0; j < 4; j++)
+                               {
+                                   uint32_t va = j > 0 && clearA ? rowB[k + j] : rowA[k + j];
+                                   uint32_t vb = j > 0 && clearB ? rowA[k + j] : rowB[k + j];
+                                   rowA[k + j] = uint8_t(std::min<uint32_t>(255, (va * wa + vb * wb) >> 8));
+                               }
+                           }
+                           vm.WriteBytes(dst + int(int64_t(y) * dstStride), rowA.data(), int(rowBytes));
+                       }
+                   });
+
     // START 76042 / 76490 / 85920 (MMX): sepia of BGR pixels, l[2] bytes (rounded down to 24) from
     // l[1] to l[0]: y = (151 b0 + 77 b1 + 29 b2) >> 8, then its bytes (y * 145, y * 200, y * 240) >> 8
     RegisterNative({"B9D719E48EB9DD041EA49683ADA8C7F1602FB1FC", "649843201017621317B4493924B9AF51F5FDD445"}, "sepia",

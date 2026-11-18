@@ -161,6 +161,8 @@ std::optional<int> ExeChecksum(const std::string& game)
         {"Tsuyoimo x Yowaimo", 306723180 ^ -770208518},
         {"Mahou Shoujo no Taisetsu na Koto", 306723180 ^ -1545457906},
         {"Shokuinshitsu", 306723180 ^ -661847700},
+        {"Vestige -Yaiba ni Nokoru wa Kimi no Omokage-", 306723180 ^ 1510342675},
+        {"You~Gaku", 306723180 ^ 1682722154},
     };
     for (const auto& [name, value] : checksums)
         if (Text::EqualsIgnoreCase(name, game))
