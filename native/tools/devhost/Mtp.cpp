@@ -41,6 +41,9 @@ constexpr const char* kRoot = "sdmc:/OpenShiina";
 constexpr uint32_t kStorage = 0x00010001;
 constexpr size_t kBlock = 4 << 20;   // a bulk transfer of a file's data
 constexpr int kBlocks = 3;           // the ring between the cable and the SD card
+// A data phase or a response that does not move for this long is given up (the PC cancelled a
+// copy, or went): the responder goes back to waiting for a command
+constexpr int kDataLimit = 15;
 constexpr size_t kSmall = 0x10000;   // commands, responses, small data phases
 
 // Container types and codes (PTP / MTP)
@@ -314,11 +317,26 @@ public:
 
     bool Setup();
     void Run();
+    ~Responder()
+    {
+        std::free(m_small);
+        for (auto* block : m_blocks)
+            std::free(block);
+    }
+
+    /// Asks Run to end (within about a second: its waits are in steps of one).
+    void Stop() { m_stop = true; }
+    /// Setup opened the USB device service (usbDsExit closes it).
+    bool UsbOpen() const { return m_usbOpen; }
 
 private:
+    std::atomic<bool> m_stop{false};
+    bool m_usbOpen = false;
+
     // ---- USB ----
-    bool Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done);
-    bool Read(void* buffer, size_t size, size_t& done);
+    /// limit: seconds the transfer may take without ending (0: none, while waiting for a command)
+    bool Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done, int limit);
+    bool Read(void* buffer, size_t size, size_t& done, int limit = kDataLimit);
     bool Write(const void* buffer, size_t size, bool last);
     bool Configured()
     {
@@ -392,6 +410,7 @@ bool Responder::Setup()
             return false;
     if (!m_small || hosversionBefore(5, 0, 0) || R_FAILED(usbDsInitialize()))
         return false;
+    m_usbOpen = true;
     static const u16 languages[] = {0x0409};
     u8 manufacturer = 0, product = 0, serial = 0, interfaceName = 0;
     if (R_FAILED(usbDsAddUsbLanguageStringDescriptor(nullptr, languages, 1)) || R_FAILED(usbDsAddUsbStringDescriptor(&manufacturer, "OpenShiina"))
@@ -437,14 +456,14 @@ bool Responder::Setup()
     return ok;
 }
 
-bool Responder::Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done)
+bool Responder::Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done, int limit)
 {
-    // waited for in steps, so that a cable pulled out ends the transfer
-    for (;;)
+    // waited for in steps, so that a cable pulled out (or a data phase the PC left) ends the transfer
+    for (int waited = 0;; waited++)
     {
         if (R_SUCCEEDED(eventWait(&ep->CompletionEvent, 1'000'000'000)))
             break;
-        if (!Configured())
+        if (m_stop || !Configured() || (limit > 0 && waited + 1 >= limit))
         {
             usbDsEndpoint_Cancel(ep);
             eventWait(&ep->CompletionEvent, 1'000'000'000);
@@ -461,10 +480,10 @@ bool Responder::Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done)
     return true;
 }
 
-bool Responder::Read(void* buffer, size_t size, size_t& done)
+bool Responder::Read(void* buffer, size_t size, size_t& done, int limit)
 {
     u32 urb = 0;
-    return R_SUCCEEDED(usbDsEndpoint_PostBufferAsync(m_out, buffer, size, &urb)) && Finish(m_out, urb, done);
+    return R_SUCCEEDED(usbDsEndpoint_PostBufferAsync(m_out, buffer, size, &urb)) && Finish(m_out, urb, done, limit);
 }
 
 bool Responder::Write(const void* buffer, size_t size, bool last)
@@ -478,7 +497,8 @@ bool Responder::Write(const void* buffer, size_t size, bool last)
     }
     u32 urb = 0;
     size_t done = 0;
-    return R_SUCCEEDED(usbDsEndpoint_PostBufferAsync(m_in, const_cast<void*>(buffer), size, &urb)) && Finish(m_in, urb, done) && done == size;
+    return R_SUCCEEDED(usbDsEndpoint_PostBufferAsync(m_in, const_cast<void*>(buffer), size, &urb)) && Finish(m_in, urb, done, kDataLimit)
+           && done == size;
 }
 
 bool Responder::SendData(uint16_t code, const std::vector<uint8_t>& payload)
@@ -1038,54 +1058,86 @@ void Responder::Handle(const uint8_t* command, size_t size)
 
 void Responder::Run()
 {
-    for (;;)
+    // (every wait in steps of a second, so that Stop ends it: devhost leaves for the next .nro in
+    // this same process, and a thread left running there runs in memory the next one is loaded over)
+    while (!m_stop)
     {
-        if (R_FAILED(usbDsWaitReady(UINT64_MAX)))
-        {
-            svcSleepThread(1'000'000'000);
+        if (R_FAILED(usbDsWaitReady(1'000'000'000)))
             continue;
-        }
         UsbDeviceSpeed speed = UsbDeviceSpeed_High;
         usbDsGetSpeed(&speed);
         m_packet = speed == UsbDeviceSpeed_Super ? 1024 : speed == UsbDeviceSpeed_High ? 512 : 64;
         m_log("MTP: connected over USB");
-        while (Configured())
+        while (!m_stop && Configured())
         {
             size_t done = 0;
-            if (!Read(m_small, kSmall, done))
-                break;
+            if (!Read(m_small, kSmall, done, 0))
+            {
+                if (m_stop || !Configured())
+                    break;
+                continue;
+            }
             // (a zero-length packet left from a data phase, or anything not a command: passed over)
             if (done < 12 || Read16(m_small + 4) != Command)
                 continue;
             std::vector<uint8_t> command(m_small, m_small + done);
             Handle(command.data(), command.size());
         }
-        m_log("MTP: the cable went");
+        if (!m_stop)
+            m_log("MTP: the cable went");
         m_pending = 0;
     }
 }
 
 void ThreadMain(void* argument) { static_cast<Responder*>(argument)->Run(); }
 
+// The responder and its thread while it runs
+Responder* s_responder = nullptr;
+Thread s_thread;
+bool s_threadRuns = false;
+
 } // namespace
 
 bool StartMtp(std::function<void(const std::string&)> log, std::atomic<int>* busy)
 {
-    // (never freed: the responder runs until devhost ends)
-    auto* responder = new Responder(log, busy);
-    if (!responder->Setup())
+    // (the USB service is opened by Setup, so StopMtp closes it whether or not the rest worked)
+    s_responder = new Responder(log, busy);
+    if (!s_responder->Setup())
     {
         log("MTP: the USB device could not be set up");
         return false;
     }
-    static Thread thread;
-    if (R_FAILED(threadCreate(&thread, ThreadMain, responder, nullptr, 0x40000, 0x2C, -2)) || R_FAILED(threadStart(&thread)))
+    if (R_FAILED(threadCreate(&s_thread, ThreadMain, s_responder, nullptr, 0x40000, 0x2C, -2)))
     {
         log("MTP: no thread for it");
         return false;
     }
+    if (R_FAILED(threadStart(&s_thread)))
+    {
+        threadClose(&s_thread);
+        log("MTP: no thread for it");
+        return false;
+    }
+    s_threadRuns = true;
     log("MTP: files over USB too (sdmc:/OpenShiina shows in Windows' Explorer)");
     return true;
+}
+
+void StopMtp()
+{
+    if (!s_responder)
+        return;
+    s_responder->Stop();
+    if (s_threadRuns)
+    {
+        threadWaitForExit(&s_thread);
+        threadClose(&s_thread);
+        s_threadRuns = false;
+    }
+    if (s_responder->UsbOpen())
+        usbDsExit();
+    delete s_responder;
+    s_responder = nullptr;
 }
 
 } // namespace openshiina::devhost

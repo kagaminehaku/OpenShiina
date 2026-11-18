@@ -849,6 +849,7 @@ int main(int argc, char** argv)
     }
 
     WaitForFiles();
+    devhost::StopMtp();
     if (tcp >= 0)
     {
         close(tcp);
