@@ -11,11 +11,14 @@
 // The data of methods 3, 4 and 5 starts at a multiple of 4 (as in the games' files). In an
 // incremental frame the bytes of a run of method 2 or 4 after its first pixel are each the
 // difference from the byte one pixel before: the engine adds them up in place when it loads the
-// picture (FUN_00403430), once for each time a row is named, so a row with such runs is never
-// shared; other rows the same as one before are written once and named again.
+// picture (FUN_00403430), once for each time a row is named. A row the same as another is
+// written once and named again, as the games' files do; one with such runs, named n times by
+// incremental frames, is written with the differences taken n times, so that it is right after
+// the n sums (the games' packer did so too: their files decode only so).
 //
 // Every pixel the decoder gives comes back: all four bytes 0 is a transparent run, alpha 255
-// opaque (methods 2 / 3), any other (alpha 0 with a colour too) methods 4 / 5.
+// opaque (methods 2 / 3), any other (alpha 0 with a colour too) methods 4 / 5; a run of one
+// colour from 12 pixels, as in the games' files.
 
 using System.IO;
 
@@ -29,6 +32,13 @@ public static class S25Encoder
     private const int MaxRun = 0x7FF;
 
     /// <summary>
+    /// The fewest pixels of one colour written as a run of one colour (methods 3 / 5): the
+    /// games' files have none shorter (the rest stay among the pixels of methods 2 / 4, whose
+    /// differences pack better).
+    /// </summary>
+    private const int OneColour = 12;
+
+    /// <summary>
     /// An S25 file of <paramref name="slots"/> slots with these frames (each in its own slot,
     /// the others empty).
     /// </summary>
@@ -39,25 +49,46 @@ public static class S25Encoder
         if (frames.Select(f => f.Slot).Distinct().Count() != frames.Count)
             throw new ArgumentException("Two frames are in the same slot.");
 
+        // The rows of every frame first: how many times each is named decides how it is written
+        var ordered = frames.OrderBy(f => f.Slot).ToList();
+        var rows = new EncodedRow[ordered.Count][];
+        // Rows with runs of method 2 / 4 in incremental frames (summed once for each time they
+        // are named), and the others (never changed): kept apart, as the engine sums only the former
+        var summed = new Dictionary<RowKey, int>();
+        for (int f = 0; f < ordered.Count; f++)
+        {
+            var frame = ordered[f];
+            var image = frame.Image.Layout == PixelLayout.Bgra32 ? frame.Image : ToBgra(frame.Image);
+            int width = image.Width, height = image.Height;
+            if (width <= 0 || height <= 0 || width > 16384 || height > 16384)
+                throw new ArgumentException($"Slot {frame.Slot}: a frame of {width} x {height} pixels.");
+            rows[f] = new EncodedRow[height];
+            for (int y = 0; y < height; y++)
+            {
+                var row = EncodeRow(image.Pixels.AsSpan(y * width * 4, width * 4), frame.Incremental);
+                rows[f][y] = row;
+                if (frame.Incremental && row.Literal.Count > 0)
+                    summed[row.Key] = summed.GetValueOrDefault(row.Key) + 1;
+            }
+        }
+
         var output = new MemoryStream();
         var writer = new BinaryWriter(output);
         writer.Write("S25\0"u8);
         writer.Write(slots);
         var slotOffsets = new uint[slots];
         output.Position = 8 + 4L * slots;
-        // Rows written already that may be named again: their bytes -> offset
-        var written = new Dictionary<RowKey, uint>();
+        // Rows written already: their bytes -> offset
+        var writtenSummed = new Dictionary<RowKey, uint>();
+        var writtenOther = new Dictionary<RowKey, uint>();
 
-        foreach (var frame in frames.OrderBy(f => f.Slot))
+        for (int f = 0; f < ordered.Count; f++)
         {
-            var image = frame.Image.Layout == PixelLayout.Bgra32 ? frame.Image : ToBgra(frame.Image);
-            int width = image.Width, height = image.Height;
-            if (width <= 0 || height <= 0 || width > 16384 || height > 16384)
-                throw new ArgumentException($"Slot {frame.Slot}: a frame of {width} x {height} pixels.");
+            var frame = ordered[f];
+            int height = rows[f].Length;
             Align(output, 4);
-            uint at = (uint)output.Position;
-            slotOffsets[frame.Slot] = at;
-            writer.Write(width);
+            slotOffsets[frame.Slot] = (uint)output.Position;
+            writer.Write(frame.Image.Width);
             writer.Write(height);
             writer.Write(frame.OffsetX);
             writer.Write(frame.OffsetY);
@@ -67,22 +98,29 @@ public static class S25Encoder
             var rowOffsets = new uint[height];
             for (int y = 0; y < height; y++)
             {
-                var (row, literal) = EncodeRow(image.Pixels.AsSpan(y * width * 4, width * 4), frame.Incremental);
-                var key = new RowKey(row);
-                if (!literal || !frame.Incremental)
+                var row = rows[f][y];
+                bool isSummed = frame.Incremental && row.Literal.Count > 0;
+                var written = isSummed ? writtenSummed : writtenOther;
+                if (written.TryGetValue(row.Key, out uint same))
                 {
-                    if (written.TryGetValue(key, out uint same))
-                    {
-                        rowOffsets[y] = same;
-                        continue;
-                    }
+                    rowOffsets[y] = same;
+                    continue;
+                }
+                byte[] bytes = row.Bytes;
+                if (isSummed && summed[row.Key] > 1)
+                {
+                    // Named n times, summed n times: the differences taken n - 1 times more
+                    bytes = (byte[])bytes.Clone();
+                    foreach (var (at, length, step) in row.Literal)
+                        for (int pass = 1; pass < summed[row.Key]; pass++)
+                            for (int k = at + length - 1; k >= at + step; k--)
+                                bytes[k] -= bytes[k - step];
                 }
                 Align(output, 4);
                 uint rowAt = (uint)output.Position;
-                writer.Write(row);
+                writer.Write(bytes);
                 rowOffsets[y] = rowAt;
-                if (!literal || !frame.Incremental)
-                    written[key] = rowAt;
+                written[row.Key] = rowAt;
             }
             long end = output.Position;
             output.Position = table;
@@ -90,12 +128,12 @@ public static class S25Encoder
                 writer.Write(r);
             output.Position = end;
         }
-        long length = output.Length;
+        long fileLength = output.Length;
         output.Position = 8;
         foreach (uint o in slotOffsets)
             writer.Write(o);
         writer.Flush();
-        return output.ToArray().AsSpan(0, (int)length).ToArray();
+        return output.ToArray().AsSpan(0, (int)fileLength).ToArray();
     }
 
     /// <summary>
@@ -120,14 +158,20 @@ public static class S25Encoder
     }
 
     /// <summary>
-    /// A row: its length and runs, laid out from an offset that is a multiple of 4; and whether it
-    /// has runs of method 2 or 4 (changed in place in an incremental frame).
+    /// A row: its length and runs, laid out from an offset that is a multiple of 4, and where the
+    /// data of its runs of method 2 or 4 is (index, bytes, bytes a pixel), which an incremental
+    /// frame's load changes in place.
     /// </summary>
-    private static (byte[] Row, bool Literal) EncodeRow(ReadOnlySpan<byte> pixels, bool incremental)
+    private sealed record EncodedRow(byte[] Bytes, List<(int At, int Length, int Step)> Literal)
+    {
+        public RowKey Key { get; } = new(Bytes);
+    }
+
+    private static EncodedRow EncodeRow(ReadOnlySpan<byte> pixels, bool incremental)
     {
         int width = pixels.Length / 4;
         var row = new List<byte>(pixels.Length + 16) { 0, 0 };
-        bool literal = false;
+        var literal = new List<(int, int, int)>();
         int x = 0;
         while (x < width)
         {
@@ -141,7 +185,7 @@ public static class S25Encoder
                 x += same;
                 continue;
             }
-            if (same >= 3)
+            if (same >= OneColour)
             {
                 // One colour for the run
                 int p = x * 4;
@@ -152,11 +196,10 @@ public static class S25Encoder
                 x += same;
                 continue;
             }
-            // Pixels one by one, until the kind changes or a run of three of one colour starts (at
-            // most 2,047, a header's count: each run is coded from its own first pixel)
+            // Pixels one by one, until the kind changes or a run of one colour starts (at most
+            // 2,047, a header's count: each run is coded from its own first pixel)
             int end = x + 1;
-            while (end < width && end - x < MaxRun && Kind(pixels, end) == kind
-                   && !(end + 2 < width && Same(pixels, end, end + 1) && Same(pixels, end, end + 2)))
+            while (end < width && end - x < MaxRun && Kind(pixels, end) == kind && !OneColourAt(pixels, end, width))
                 end++;
             int count = end - x, bytes = kind == 2 ? 3 : 4;
             var data = new byte[count * bytes];
@@ -181,7 +224,7 @@ public static class S25Encoder
                 for (int k = data.Length - 1; k >= bytes; k--)
                     data[k] -= data[k - bytes];
             Run(row, kind == 2 ? 2 : 4, count, data);
-            literal = true;
+            literal.Add((row.Count - data.Length, data.Length, bytes));
             x = end;
         }
         int length = row.Count - 2;
@@ -189,7 +232,7 @@ public static class S25Encoder
             throw new ArgumentException($"A row of {width} pixels takes {length} bytes, more than an S25 row holds (65,535).");
         row[0] = (byte)length;
         row[1] = (byte)(length >> 8);
-        return (row.ToArray(), literal);
+        return new EncodedRow(row.ToArray(), literal);
     }
 
     /// <summary>
@@ -225,6 +268,17 @@ public static class S25Encoder
         if (a == 255)
             return 2;
         return a == 0 && pixels[p] == 0 && pixels[p + 1] == 0 && pixels[p + 2] == 0 ? 0 : 4;
+    }
+
+    /// <summary>Whether <see cref="OneColour"/> pixels of one colour start at <paramref name="x"/>.</summary>
+    private static bool OneColourAt(ReadOnlySpan<byte> pixels, int x, int width)
+    {
+        if (x + OneColour > width)
+            return false;
+        for (int i = 1; i < OneColour; i++)
+            if (!Same(pixels, x, x + i))
+                return false;
+        return true;
     }
 
     private static bool Same(ReadOnlySpan<byte> pixels, int a, int b) =>

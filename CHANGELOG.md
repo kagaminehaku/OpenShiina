@@ -10,8 +10,9 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   its scene list and plays on with no error; the last ends the game.
 - OpenShiina Tools packs pictures back: an .S25 can be given to Repack as PNG files of its
   frames, named as extraction names them, and the frames whose pixels changed are written
-  into a new S25 (compressed as the games' own: runs, one-colour runs and the "incremental"
-  rows), so menus, buttons and titles can be edited.
+  into a new S25, compressed as the games' own (runs, one-colour runs, the "incremental" rows
+  and the rows they share; about the size of the original), so menus, buttons and titles can
+  be edited.
 
 ## 0.8.4 (2026-11-19)
 
