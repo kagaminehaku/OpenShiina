@@ -1535,7 +1535,10 @@ void ScnVm::RegisterSprites()
         return 0;
     });
     // 04BD slot, frame, flags, priority, x, y, a, b: add an entry (FUN_00411FE0)
+    // (one read as v2.34's, SPRITE234 - the older v2.36 build: two raw flags - as v2.34 adds it)
     Register(0x04BD, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        if (i.Raw.size() == 2)
+            return vm.AddSprite234(c, i);
         int list = vm.m_spriteList;
         int e = vm.SpriteEntry(list, vm.m_spriteCounts[size_t(list)]);
         for (int k = 0; k < 8; k++)

@@ -7,7 +7,8 @@
 //   buttons), WM_LBUTTONDOWN / WM_RBUTTONDOWN (end AUTO / SKIP), WM_KEYDOWN 'A' / 'S' (AUTO /
 //   SKIP on and off) and WM_PAINT (the skip clock);
 // - (slots op_0849 registers for single messages: no game uses them);
-// - then the engine's own handling: WM_CLOSE runs the slot of op_078A (0x488098) and closes the
+// - then the engine's own handling: a mouse button the slot of 0474 / 0475 (the old engines,
+//   ScnVm.OldEngines.cs); WM_CLOSE runs the slot of op_078A (0x488098) and closes the
 //   window only when its "end" is not 0 (no slot: it closes); WM_ACTIVATEAPP the slots of op_076C
 //   (getting the focus) / 076D (losing it); Alt+Enter the slot of op_0794; WM_TIMER the slot of op_0AF0.
 // op_0AFA / 0AFB start and stop the timers (SetTimer / KillTimer). WM_PAINT comes after op_07D0
@@ -147,6 +148,8 @@ public sealed partial class ScnVm
             return;
         if (message == ScnMessage.MouseWheel)
             MouseWheel((short)(wParam >> 16));
+        else if (message is ScnMessage.LButtonDown or ScnMessage.RButtonDown)
+            StartClickSlot(message);
     }
 
     /// <summary>

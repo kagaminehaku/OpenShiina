@@ -27,7 +27,21 @@ public sealed partial class ScnVm
     }
     private bool? m_background;
 
-    // Handles of the menus 0898 made
+    /// <summary>GetSystemMetrics (09DD, user32's through 01A4) as a 1920 x 1080 screen.</summary>
+    private static int SystemMetric(int index) => index switch
+    {
+        0 or 16 => 1920,        // SM_CXSCREEN, SM_CXFULLSCREEN
+        1 => 1080,              // SM_CYSCREEN
+        17 => 1080 - 23,        // SM_CYFULLSCREEN
+        4 => 23,                // SM_CYCAPTION
+        5 or 6 => 1,            // SM_CXBORDER, SM_CYBORDER
+        7 or 8 => 3,            // SM_CXFIXEDFRAME, SM_CYFIXEDFRAME
+        15 => 20,               // SM_CYMENU
+        32 or 33 => 4,          // SM_CXFRAME, SM_CYFRAME
+        _ => 0,
+    };
+
+    // Handles of the menus 0898 and 08A2 made
     private int m_nextMenu = 0x00510000;
 
     private void RegisterMenus()
@@ -61,19 +75,7 @@ public sealed partial class ScnVm
         // 09DD index, v: GetSystemMetrics (FUN_00425F80), as a 1920 x 1080 screen (09E2 too)
         Register(0x09DD, (vm, c, i) =>
         {
-            int index = vm.Value(c, i.Args[0]);
-            vm.Store(c, i.Args[1], index switch
-            {
-                0 or 16 => 1920,        // SM_CXSCREEN, SM_CXFULLSCREEN
-                1 => 1080,              // SM_CYSCREEN
-                17 => 1080 - 23,        // SM_CYFULLSCREEN
-                4 => 23,                // SM_CYCAPTION
-                5 or 6 => 1,            // SM_CXBORDER, SM_CYBORDER
-                7 or 8 => 3,            // SM_CXFIXEDFRAME, SM_CYFIXEDFRAME
-                15 => 20,               // SM_CYMENU
-                32 or 33 => 4,          // SM_CXFRAME, SM_CYFRAME
-                _ => 0,
-            });
+            vm.Store(c, i.Args[1], SystemMetric(vm.Value(c, i.Args[0])));
             return 0;
         });
 

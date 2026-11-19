@@ -47,7 +47,15 @@ const std::map<std::string, std::map<int, Items>>& VersionOverrides()
         {"ops_v234", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v233", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v231", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v230", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v220", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v202", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v211", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v215", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v216", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v218", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v219", {{0x04BD, {"SPRITE234"}}}},
+        {"ops_v236a", {{0x04BD, {"SPRITE234"}}}},
         {"ops_v250", {{0x009C, {"GLYPH250"}}}},
     };
     return overrides;
@@ -133,30 +141,50 @@ ScnOpcodes::ScnOpcodes(const std::string& table, const std::string& name)
         apply(version->second);
 }
 
-std::string ScnOpcodes::TableName(const std::string& version)
+// v2.36 came in two builds that RIO.INI names alike: Wana's (2005) and Hitozuma OL's (2005) 04BD
+// reads its operands as v2.34's (SPRITE234), the later games' as v2.47's. These games take
+// ops_v236a, v2.47's table with v2.34's 04BD
+static bool V236a(const std::string& game)
 {
-    return StartsWith(version, "2.47") || StartsWith(version, "2.46") || StartsWith(version, "2.45") || StartsWith(version, "2.36") ? "ops_v247"
+    return game == "Wana ~Hakudaku Mamire no Houkago~" || game == "Hitozuma OL -Chijoku no Gyoumu Meirei-";
+}
+
+std::string ScnOpcodes::TableName(const std::string& version, const std::string& game)
+{
+    return StartsWith(version, "2.36") && V236a(game) ? "ops_v236a"
+        : StartsWith(version, "2.47") || StartsWith(version, "2.46") || StartsWith(version, "2.45") || StartsWith(version, "2.36") ? "ops_v247"
         : StartsWith(version, "2.44") ? "ops_v244"
         : StartsWith(version, "2.34") ? "ops_v234"
         : StartsWith(version, "2.33") ? "ops_v233"
         : StartsWith(version, "2.31") ? "ops_v231"
+        : StartsWith(version, "2.30") ? "ops_v230"
         : StartsWith(version, "2.20") ? "ops_v220"
+        : StartsWith(version, "2.02") ? "ops_v202"
+        : StartsWith(version, "2.10") ? "ops_v211"
+        : StartsWith(version, "2.11") ? "ops_v211"
+        : StartsWith(version, "2.15") ? "ops_v215"
+        : StartsWith(version, "2.16") ? "ops_v216"
+        : StartsWith(version, "2.18") ? "ops_v218"
+        : StartsWith(version, "2.19") ? "ops_v219"
         : StartsWith(version, "2.37") ? "ops_v237"
+        : StartsWith(version, "2.39") ? "ops_v239"
         : StartsWith(version, "2.50") ? "ops_v250"
         : "ops_v249";
 }
 
-const ScnOpcodes& ScnOpcodes::ForVersion(const std::string& folder, const std::string& version)
+const ScnOpcodes& ScnOpcodes::ForVersion(const std::string& folder, const std::string& version, const std::string& game)
 {
     static std::mutex lock;
     static std::map<std::string, std::unique_ptr<ScnOpcodes>> loaded;
-    std::string name = TableName(version);
+    std::string name = TableName(version, game);
     std::lock_guard guard(lock);
     auto& table = loaded[name];
     if (!table)
     {
         openshiina::Bytes text;
-        if (!Files::ReadAll(Files::Combine(folder, name + ".tsv"), text))
+        // ops_v236a is read from v2.47's file
+        std::string file = name == "ops_v236a" ? "ops_v247" : name;
+        if (!Files::ReadAll(Files::Combine(folder, file + ".tsv"), text))
             throw std::runtime_error("The opcode table " + name + " is missing.");
         table.reset(new ScnOpcodes(std::string(text.begin(), text.end()), name));
     }

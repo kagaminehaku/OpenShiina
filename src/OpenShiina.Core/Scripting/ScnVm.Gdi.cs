@@ -348,6 +348,14 @@ public sealed partial class ScnVm
                 WriteByte(buffer + n, 0);
                 return n;
             }
+            case ("user32", "GetSystemMetrics"):
+                // as 09DD (Nagagutsu wo Haita Deco's START sizes its window with it)
+                return SystemMetric(Arg(0));
+            case ("user32", "DrawMenuBar"):
+            case ("user32", "ModifyMenuA"):
+                // The window has no menu bar here (Hana no Kioku 4-5-6 renames the items of its
+                // own, HK4_TM.SCN): done
+                return 1;
             case ("user32", "SetMenuItemInfoW"):
                 // The window has no menu of the system's here (Bitch Gakuen's START renames
                 // the items of its window menu): done

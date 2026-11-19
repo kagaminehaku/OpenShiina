@@ -7,6 +7,8 @@
 // ScnVm.Movie.cs), 0 and 1 in a window of their own over the game's (MCI or DirectShow,
 // 0578-057F, the engine's records at 0x48DA40 / 0x48C740, 09CF switching between the two). Here
 // that window is drawn into the game window's picture, the movie stretched to its rectangle.
+// The window movies' opcodes (0578 to 057F, 07BE, 09CF) are registered for every engine before
+// 2.40: Gibo to Oba's v2.36 START plays its movies with them when MovieMode is not 2.
 
 namespace OpenShiina.Scripting;
 
@@ -14,6 +16,33 @@ public sealed partial class ScnVm
 {
     // The movie of 0579 and the rectangle of 0578
     private readonly Movie m_windowMovie = new();
+    // 0532's bitmaps by slot
+    private readonly Dictionary<int, OpenShiina.Formats.PixelImage> m_bitmaps = new();
+
+    /// <summary>A BGR picture copied into a surface at (x, y), clipped (24- or 32-bit surfaces).</summary>
+    private void PutPicture(int surface, OpenShiina.Formats.PixelImage picture, int x, int y)
+    {
+        int pixels = SurfaceField(surface, 2), sw = SurfaceField(surface, 7), sh = SurfaceField(surface, 8);
+        int bpp = SurfaceField(surface, 9) >> 3, pitch = SurfaceField(surface, 10);
+        if (pixels == 0 || bpp < 3)
+            return;
+        int sbpp = OpenShiina.Formats.PixelImage.BytesPerPixel(picture.Layout);
+        for (int row = Math.Max(0, -y); row < picture.Height && y + row < sh; row++)
+        {
+            int x0 = Math.Max(0, -x), x1 = Math.Min(picture.Width, sw - x);
+            if (x1 <= x0)
+                return;
+            var line = new byte[(x1 - x0) * bpp];
+            for (int col = x0; col < x1; col++)
+            {
+                int s = (row * picture.Width + col) * sbpp, d = (col - x0) * bpp;
+                line[d] = picture.Pixels[s];
+                line[d + 1] = picture.Pixels[s + 1];
+                line[d + 2] = picture.Pixels[s + 2];
+            }
+            WriteBytes(pixels + (y + row) * pitch + (x + x0) * bpp, line);
+        }
+    }
     private ScreenArea m_windowMovieArea;
 
     private void RegisterEngine233()
@@ -53,11 +82,49 @@ public sealed partial class ScnVm
         // (the stream stops: its flag 0xE8, set when it is made); nothing for a stream not playing
         Register234(0x06DD, (vm, c, i) => vm.FadeOld(c, i, 1));
         Register234(0x06DE, (vm, c, i) => vm.FadeOld(c, i, -1));
-        // FDF2 v, FE06 v, FE10 v (YODUMA.EXE 0x42221F, 0x422289, v2.37): an operand read, nothing
-        // done (Tekoire Princess!'s START runs FE10 and FE06 when a game starts). v2.47 has
-        // handlers of its own for them, not read yet
-        foreach (int op in new[] { 0xFDF2, 0xFE06, 0xFE10 })
+        // FDF2 v, FDFC v, FE06 v, FE10 v (YODUMA.EXE 0x42221F, 0x422289, 0x422290, v2.37): an operand
+        // read, nothing done (Tekoire Princess!'s START runs FE10 and FE06 when a game starts, Wana's
+        // v2.36 START FE10 and FDFC). v2.47 has handlers of its own for them, not read yet
+        foreach (int op in new[] { 0xFDF2, 0xFDFC, 0xFE06, 0xFE10 })
             RegisterBefore240(op, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
+        // The engines before 2.40 show their logos from MI4 pictures (EDEN4.EXE, v2.20; Hachigatsu no
+        // Nostalgia's and Chain Trap's INIT / STAFF / OPENING): 0532 slot, file (0x413600 ->
+        // FUN_00402D10) loads one into a table of 256 bitmaps (0x685658), 2 when it does not load;
+        // 0533 slot (0x413670) lets it go (DeleteObject); 0534 surface, slot, x, y, rop (0x4136C0 ->
+        // FUN_0042D4F0) puts it into the surface at (x, y) (BitBlt, the rop 0: SRCCOPY) and, for
+        // surface 0, has the window paint that rectangle again
+        RegisterBefore240(0x0532, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]) & 0xFF;
+            string file = vm.ReadString(vm.Value(c, i.Args[1]));
+            var picture = vm.ReadScriptFile(file) is { } data ? OpenShiina.Formats.Mi4Decoder.Decode(data) : null;
+            if (picture == null)
+                return 2;
+            vm.m_bitmaps[slot] = picture;
+            return 0;
+        });
+        RegisterBefore240(0x0533, (vm, c, i) =>
+        {
+            int slot = vm.Value(c, i.Args[0]);
+            if ((uint)slot > 0x100)
+                return 2;
+            vm.m_bitmaps.Remove(slot);
+            return 0;
+        });
+        RegisterBefore240(0x0534, (vm, c, i) =>
+        {
+            int target = vm.Value(c, i.Args[0]), slot = vm.Value(c, i.Args[1]);
+            int x = vm.Value(c, i.Args[2]), y = vm.Value(c, i.Args[3]), rop = vm.Value(c, i.Args[4]);
+            int surface = (uint)target < 0xFFFF ? target : target - 0x00030000;
+            if (!vm.m_bitmaps.TryGetValue(slot, out var picture) || surface is < 0 or >= SurfaceCount)
+                return 2;
+            if (rop is not (0 or 0xCC0020))
+                vm.Trace?.Add($"f{vm.m_frameNumber} 0534 rop {rop:X}: copied");
+            vm.PutPicture(surface, picture, x, y);
+            if (target == 0)
+                vm.InvalidateWindow(x, y, x + picture.Width, y + picture.Height);
+            return 0;
+        });
         // Vanquish (VANQ.EXE, v2.33, the same build as CLEAVAGE.EXE). 0190 name (0x417F70): the
         // game folder's DLL loaded (its START loads Export.dll), the one before freed; 2 when it is
         // not there. The player loads no DLL and answers as loaded; 0191 name (0x417FC0, a function
@@ -65,14 +132,15 @@ public sealed partial class ScnVm
         // of the menu that exports them) is not run
         Register234(0x0190, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
         // 073E v (0x41B430): v = the screen has a mode of the window's size at its colour depth
-        // (EnumDisplaySettings), full screen being possible
-        Register234(0x073E, (vm, c, i) => { vm.Store(c, i.Args[0], 1); return 0; });
+        // (EnumDisplaySettings), full screen being possible. These four have the same operands in
+        // every engine from 2.31 to 2.50, and the same work (Omocha no Sensei, v2.37, runs them too)
+        Register(0x073E, (vm, c, i) => { vm.Store(c, i.Args[0], 1); return 0; });
         // 07C6 v (0x41A230): an engine flag (0x46716C) = v
-        Register234(0x07C6, (vm, c, i) => { vm.EngineGlobals[0x46716C] = vm.Value(c, i.Args[0]); return 0; });
+        Register(0x07C6, (vm, c, i) => { vm.EngineGlobals[0x46716C] = vm.Value(c, i.Args[0]); return 0; });
         // 08CA (0x419B00): DrawMenuBar; 08D4 menu, item, flags (0x419B20): EnableMenuItem - the
         // window's menu bar, which the player's window does not have
-        Register234(0x08CA, (vm, c, i) => 0);
-        Register234(0x08D4, (vm, c, i) =>
+        Register(0x08CA, (vm, c, i) => 0);
+        Register(0x08D4, (vm, c, i) =>
         {
             foreach (var arg in i.Args)
                 vm.Value(c, arg);
@@ -125,16 +193,16 @@ public sealed partial class ScnVm
         // player decodes the movies itself
         Register234(0x073A, (vm, c, i) => { vm.Store(c, i.Args[0], 1); return 0; });
         // 07BE (0x41A1C0): WaitMessage - the task waits for the next frame
-        Register234(0x07BE, (vm, c, i) =>
+        RegisterBefore240(0x07BE, (vm, c, i) =>
         {
             vm.FrameShown = true;
             return 3;
         });
         // 09CF mode (0x413760): the window movies' player, MCI (0) or DirectShow (other), the
         // movies playing carried over to the other at the same position; one player here
-        Register234(0x09CF, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
+        RegisterBefore240(0x09CF, (vm, c, i) => { vm.Value(c, i.Args[0]); return 0; });
         // 0578 x, y, w, h (0x413A10): the movie window's rectangle
-        Register234(0x0578, (vm, c, i) =>
+        RegisterBefore240(0x0578, (vm, c, i) =>
         {
             int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
             int w = vm.Value(c, i.Args[2]), h = vm.Value(c, i.Args[3]);
@@ -145,7 +213,7 @@ public sealed partial class ScnVm
         // window (FUN_00413AD0 0, 1); loop 1: it starts again at its end (0 in Cleavage's scripts;
         // EDEN4's START plays a movie n times with it, counting with 0581). A movie that cannot be
         // played here is as one played to its end
-        Register234(0x0579, (vm, c, i) =>
+        RegisterBefore240(0x0579, (vm, c, i) =>
         {
             string name = vm.ReadString(vm.Value(c, i.Args[0]));
             int loop = vm.Value(c, i.Args[1]);
@@ -167,7 +235,7 @@ public sealed partial class ScnVm
             return 0;
         });
         // 057A (0x413CF0): stop the movie and close it
-        Register234(0x057A, (vm, c, i) =>
+        RegisterBefore240(0x057A, (vm, c, i) =>
         {
             var movie = vm.m_windowMovie;
             vm.MovieSoundStop(movie);
@@ -176,14 +244,14 @@ public sealed partial class ScnVm
             return 0;
         });
         // 057E v (0x413DC0): v = the movie's mode, MCI's 0x20E playing, else 0x20D stopped
-        Register234(0x057E, (vm, c, i) =>
+        RegisterBefore240(0x057E, (vm, c, i) =>
         {
             vm.UpdateMovie(vm.m_windowMovie);
             vm.Store(c, i.Args[0], vm.m_windowMovie.State == 3 ? 0x20E : 0x20D);
             return 0;
         });
         // 057F v (0x413E00): v = its position (ms here), 0 before it plays; START waits until it is not 0
-        Register234(0x057F, (vm, c, i) =>
+        RegisterBefore240(0x057F, (vm, c, i) =>
         {
             var movie = vm.m_windowMovie;
             vm.UpdateMovie(movie);

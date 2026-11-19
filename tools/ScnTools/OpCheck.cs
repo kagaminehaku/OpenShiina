@@ -57,14 +57,15 @@ static class OpCheck
             Console.WriteLine($"##### {folder}: {(scheme == null ? "not recognised" : "no engine version in its settings")}");
             return result;
         }
-        var table = ScnDisasm.LoadTable(ScnOpcodes.TableText(version).Split('\n'));
+        var table = ScnDisasm.LoadTable(ScnOpcodes.TableText(version, scheme.Name).Split('\n'));
         ScnDisasm.Version = version;
+        ScnDisasm.Sprite234 = ScnOpcodes.TableName(version, scheme.Name) == "ops_v236a";
         ScnDisasm.Uncertain.Clear();
-        var vm = new ScnVm(ScnOpcodes.ForVersion(version), new ToolHost())
+        var vm = new ScnVm(ScnOpcodes.ForVersion(version, scheme.Name), new ToolHost())
         {
             EngineVersion = (int)Math.Round(double.Parse(version, System.Globalization.CultureInfo.InvariantCulture) * 100),
         };
-        Console.WriteLine($"##### {scheme.Name}: engine v{version}, {ScnOpcodes.TableName(version)}");
+        Console.WriteLine($"##### {scheme.Name}: engine v{version}, {ScnOpcodes.TableName(version, scheme.Name)}");
 
         // Every SCN of every archive, by archive and name
         var modules = new SortedDictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);

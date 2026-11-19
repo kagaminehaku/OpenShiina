@@ -98,6 +98,8 @@ void ScnVm::WindowMessage(int message, int wParam, int lParam)
         return;
     if (message == ScnMessage::MouseWheel)
         MouseWheel(int16_t(wParam >> 16));
+    else if (message == ScnMessage::LButtonDown || message == ScnMessage::RButtonDown)
+        StartClickSlot(message);
 }
 
 bool ScnVm::CloseWindow()

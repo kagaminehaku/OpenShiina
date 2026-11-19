@@ -1523,6 +1523,14 @@ bool ScnVm::DrawChar(int rec, int surface, bool invalidate)
 
     if (G(rec, RAfterChar) != -1)
     {
+        // The character and its box, for 0064 / 0065 in the slot (aoj.EXE 0x424FC6 / 0x425523)
+        int advance = (G(rec, RPitch) == -1 && dc) || IsGaiji(ch, length) ? FixedOr(rec, font, ch, length).first
+                                                                           : (length == 2 ? G(rec, RWidePitch) : G(rec, RPitch)) + G(rec, RSpacing) * length;
+        m_charBox[0] = G(rec, RX);
+        m_charBox[1] = G(rec, RY);
+        m_charBox[2] = G(rec, RX) + advance;
+        m_charBox[3] = G(rec, RY) + G(rec, RHeight);
+        m_charText.assign(ch.begin(), ch.begin() + std::min<ptrdiff_t>(length, ptrdiff_t(ch.size())));
         m_slots.at(size_t(G(rec, RAfterChar))).TextRecord = G(rec, RIndex);
         RunSlotSync(G(rec, RAfterChar));
     }
@@ -2336,6 +2344,27 @@ void ScnVm::RegisterText()
         vm.Store(c, i.Args[1], vm.G(rec, RState));
         return 0;
     });
+}
+
+int ScnVm::RecordColor(ScnContext& c, const ScnInstruction& i, bool background)
+{
+    // 00AA r, g, b / 00AE r, g, b (DECO.EXE 0x41DE59 / 0x41DFE3): the bytes, then the colour flag 1 / 2
+    int r = Value(c, i.Args[0]), g = Value(c, i.Args[1]), b = Value(c, i.Args[2]);
+    int rec = CurrentRecord(c), offset = background ? OBkColor : OColor;
+    WriteByte(rec + offset, uint8_t(r));
+    WriteByte(rec + offset + 1, uint8_t(g));
+    WriteByte(rec + offset + 2, uint8_t(b));
+    S(rec, RColorDirty, G(rec, RColorDirty) | (background ? 2 : 1));
+    return 0;
+}
+
+void ScnVm::RecordPosition(ScnContext& c, int x, int y, int left)
+{
+    // 007A x, y, left (DECO.EXE 0x41DDA8 -> FUN_00427320)
+    int rec = CurrentRecord(c);
+    S(rec, RX, x);
+    S(rec, RY, y);
+    S(rec, RLeft, left);
 }
 
 } // namespace openshiina::scripting

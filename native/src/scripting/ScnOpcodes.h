@@ -42,10 +42,11 @@ public:
 
     /// The table for an engine version as RIO.INI names it ("2.47"), read from `folder` (the
     /// tables' .tsv files) the first time; throws std::runtime_error when it is missing.
-    static const ScnOpcodes& ForVersion(const std::string& folder, const std::string& version);
+    static const ScnOpcodes& ForVersion(const std::string& folder, const std::string& version, const std::string& game = "");
 
-    /// The table an engine version uses ("ops_v247" for "2.45").
-    static std::string TableName(const std::string& version);
+    /// The table an engine version uses ("ops_v247" for "2.45"), for `game` (its scheme's name)
+    /// where one version came in two builds.
+    static std::string TableName(const std::string& version, const std::string& game = "");
 
 private:
     ScnOpcodes(const std::string& table, const std::string& name);

@@ -306,13 +306,60 @@ other opcode 2 (417FDE): `ScnTools opscan KATEI.EXE 417340 41736d 0 417fde 40b02
 operands, which they have as in v2.33 (the scripts decode only so), so the table takes v2.33's
 operands for them.
 
+**v2.30** (EDEN ~FINAL~'s EDENF.EXE, 2003, not packed; table Data/ScnOps/ops_v230.tsv): laid out as
+v2.31, the opcode read in the interpreter itself (FUN_00416E40: the slot as its argument, the current
+one at 698340, the tasks 0x40 bytes from 693074, their script pointer first), dispatched from the
+`and eax, 0FFFFh` at 416E6D by compares and byte-indexed jump tables to `jmp`s into handlers of their
+own; GetVar 40AD90, SetVar 40A840, GetVarAdr 40AC10, any other opcode 2 (417ADE): `ScnTools opscan
+EDENF.EXE 416e40 416e6d 0 417ade 40ad90 40a840 40ac10 <out> 0 None None 693074` gives 481 opcodes,
+v2.31's but for `FE11`, which reads one operand (as v2.20's); the jumps and `03CF` take v2.31's
+operands, which opscan does not see in these builds either. Chain Trap's CTRAP.EXE (built 2003-06, the game out
+in 2004; RIO.INI v2.30 too) is an earlier build (the interpreter at 416C60, GetVar 40AC80, SetVar 40A780, GetVarAdr 40AB30,
+invalid 4178F4, tasks from 691104): the same table but for `0014` and `03CF`, which it lacks.
+
 **v2.20** (EDEN IV's EDEN4.EXE, 2003, not packed; table Data/ScnOps/ops_v220.tsv): laid out as
 v2.31 (the interpreter FUN_004147D0 takes the slot, the current one at 6868F0, the tasks 0x40 bytes
 from 681664, GetVar 409AD0, SetVar 409670, GetVarAdr 409980, any other opcode 2 at 4153FB), but a
 `pop esi` sits between the compare and the first jump of the dispatch, which opscan takes for a
 handler: on a copy with that byte moved before the `and` (the same code) `ScnTools opscan <copy>
 4147d0 414802 0 4153fb 409ad0 409670 409980 <out> 0 None None 681664` gives 445 opcodes, v2.31's
-but for `0795` (no operand) and `FE11` (one); the jumps take v2.31's operands, as there.
+but for `0795` (no operand) and `FE11` (one); the jumps take v2.31's operands, as there. EDEN V's
+EDEN5.EXE is the same build. Hachigatsu no Nostalgia's ADVLOVE.EXE and STAGE's STAGE.EXE (both
+2003) are a later v2.20 build (the interpreter at 414EF0, GetVar 40A1D0, SetVar 409D70, GetVarAdr
+40A080, invalid 415B23, tasks from 6826B4): the same table but for two more, `0582` (two operands)
+and `0598` (three), which ops_v220.tsv has with that build's handlers.
+
+**The engines before 2.20** (none packed; tables read the same way, the jumps given v2.20's
+operands): v2.19 (Hana no Kioku 4-5-6's HK456.EXE, ops_v219.tsv, 443 opcodes), v2.18 (Hana no
+Kioku 7's HK7.EXE, ops_v218.tsv, 453; Mahou no Shippo na Dai San wa's SPN3.EXE is the same build),
+v2.16 (Itsuka, Dokoka de's ID.EXE, ops_v216.tsv, 430; Mahou no Shippo na Dai Ichi wa's SPN1.EXE
+has the same table) and v2.15 (Shi-Ka-E-Shi's FKS.EXE, ops_v215.tsv, 429) are laid out as v2.20,
+the `pop esi` in the dispatch too. v2.11 (Baby, BE's BBB.EXE, ops_v211.tsv, 395; Kanawanu Koi no
+Monogatari's OWD.EXE lacks two of them, 07EE and 07EF), v2.10 (Hana no Kioku 1-2-3's HK123.EXE: 388,
+all of them v2.11's, so v2.10 takes ops_v211.tsv) and v2.02 (Calendar Girl's CG.EXE, ops_v202.tsv,
+374) have an `add esp, 4` there instead, moved before the `and` the same way, and give a bad opcode
+2 at the end of a jump table (HK123 415236, CG 41414C). From one version to the next a few opcodes
+come and go (v2.18 has 23 more than v2.16, the 13-operand 0B73-0B85 are v2.15 to v2.18 only); every
+opcode two of them share has the same operands, but for `0154` and `0158` (one operand fewer in
+v2.15 and v2.16). The disassembler (and the player, ScnVm.OldEngine) read 04BD as v2.34 does and
+names up to their first `}` for every engine before 2.35.
+
+The old engines' own opcodes (ScnVm.OldEngines.cs, from EDEN4.EXE): `0474` / `0475` slot: the slot
+the left / right mouse button starts at once (the window procedure, 0x41B7BF / 0x41B874 ->
+FUN_00416520); `0138` / `0139` name: the flag file read / written (5,008 bytes: s[0..999] and
+a[0..999], then 8 zero bytes) and `013A` / `013B` name the system flag file (4,008: b[0..999]),
+"Not Flag file." / "Not System Flag file." for a file of another length; with `0136`'s switch on
+each byte is XORed with a key from rand() and 0xF4, the key ^ 0xB1 and a sum of the bytes ^ 0xD3,
+XORed with 0x4BC57D21, after them (FUN_00403320; FUN_00403380 undoes it and does not look at the
+sum); `02E9` v: the task's data pointer; `03CA` / `03CB`: QueryPerformanceCounter / Frequency; `050C`
+x, y, from, fx, fy, w, h, to, tx, ty, ms, flags: 050A on a rectangle (FUN_00406A20); `053C`:
+ScrollWindowEx; `0119` folder, name: a file of the archives copied out (Itsuka, Dokoka de's
+present\); `0191` name: a function of the library `0190` loaded, called with the addresses of b[],
+a[], s[], f[] and the stack (Itsuka's SUBLIB.DLL!GetFreeDiskSpace: the free bytes into b[990],
+b[991]); `0A3D` folders: more folders whose archives are looked in (another game's install folder,
+from the registry); `08A2` / `08B6`: CreatePopupMenu / TrackPopupMenu, the Foster games' right-click
+menu (kept as handles, as the window menu is). Through `01A4` Hana no Kioku 4-5-6 calls user32's
+DrawMenuBar and ModifyMenuA, Nagagutsu wo Haita Deco GetSystemMetrics.
 
 **v2.44** (Yokorenbo's YOKOREN.EXE, 2008, not packed; table Data/ScnOps/ops_v244.tsv): laid out
 as v2.45's (`ScnTools opscan YOKOREN.EXE 41cca0 41ccfc 41ccc3 422d96 412630 4120f0 4124a0 <out>
@@ -331,6 +378,21 @@ Its handlers are the newer ones too: below 2.35 (`ScnVm.OldEngine`) the player t
 handlers where they differ (a task wait ends the frame, names are read up to `}`, `051E`
 invalidates); v2.37's scripts read the clock twice in a row expecting the same value (`03BD`), as
 the newer engines give it.
+
+**v2.39** (Nagagutsu wo Haita Deco's DECO.EXE, 2007; table Data/ScnOps/ops_v239.tsv): `.riox` as
+v2.45's (`.text` 0x65580 bytes at 401000, then 0x27000 of `.data` at 46D000). Decrypted, it is laid
+out as v2.34 (aoj.EXE): the interpreter FUN_0041D7D0 takes the slot (the current one at 77D26C),
+the tasks 0x4C bytes from 77737C, GetVar 410B80, SetVar 410490, GetVarAdr 4109A0, any other opcode
+2 at 422A94: `ScnTools opscan <decrypted> 41d7d0 41d81b 0 422a94 410b80 410490 4109a0 <out> 0 None
+None 77737c` gives 579 opcodes, v2.37's and 11 more (013C, 013D, 03C2, 04DD, 04DE, 055C, 055D,
+0576, 0577, AA82, D382), the jumps with v2.37's operands, 055A and 055B with v2.47's (5 and 8).
+Sabae no Ou (v2.36) and Deco use opcodes the later games do not: `0064` l, t, r, b / `0065` v, the
+box and the bytes of the character just drawn, for the record's after-character slot (aoj.EXE
+0x40E330 / 0x40E3C0: the text step keeps them at 0x4F7EF4 just before it runs the slot); `007A` x,
+y, left, the record's position (FUN_00427320: the record's dwords 0x5A, 0x5B and 0x59); `00AA` /
+`00AE` r, g, b, its text / background colour (the bytes at 0x144 / 0x14D, colour flags 1 / 2);
+`06EB` s, v, how long a stream has played in ms (FUN_0043F880, -1 without one); `077C`,
+SetWindowPos.
 
 Of the 704 opcodes both builds know, 699 have the same signature; 0x02DB (varargs, overridden),
 0x04E7, 0x05D5, 0x05D6, 0x0C30 differ (Oreimo is the older engine). Either table decodes Oreimo's

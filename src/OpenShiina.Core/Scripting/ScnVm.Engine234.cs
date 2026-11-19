@@ -46,30 +46,7 @@ public sealed partial class ScnVm
             vm.m_fades234.Remove(c.Slot);
             return 0;
         });
-        // 04BD picture, frame, flags, priority, x, y, word 6 [, alpha] [, r, g, b] (0x410EC0 ->
-        // FUN_0040b350): a sprite entry as v2.47's (eight dwords), the alpha ORed into the flags,
-        // the tint red | green << 8 | blue << 16 (0 without one)
-        Register234(0x04BD, (vm, c, i) =>
-        {
-            int list = vm.m_spriteList;
-            int e = vm.SpriteEntry(list, vm.m_spriteCounts[list]);
-            var v = new int[7];
-            for (int k = 0; k < 7; k++)
-                v[k] = vm.Value(c, i.Args[k]);
-            int next = 7, tint = 0;
-            if (i.Raw[0] != 0)
-                v[2] |= vm.Value(c, i.Args[next++]);
-            if (i.Raw[1] != 0)
-            {
-                int r = vm.Value(c, i.Args[next]), g = vm.Value(c, i.Args[next + 1]), b = vm.Value(c, i.Args[next + 2]);
-                tint = (r & 0xFF) | (g & 0xFF) << 8 | (b & 0xFF) << 16;
-            }
-            for (int k = 0; k < 7; k++)
-                vm.Write32(e + 4 * k, v[k]);
-            vm.Write32(e + 28, tint);
-            vm.m_spriteCounts[list]++;
-            return 0;
-        });
+        Register234(0x04BD, (vm, c, i) => vm.AddSprite234(c, i));
         // 0028 ms (0x415B70 -> FUN_00415ab0): the task waits ms, the engine pumping the window's
         // messages meanwhile (an end of the game gives 1); here a frame at a time. v2.47's
         // (Oreimo 0x425B8D) waits the same way (Sleep(1) until ms have passed; Hitozuma Gui's
@@ -126,6 +103,34 @@ public sealed partial class ScnVm
                 return later(vm, c, i);
             });
         }
+    }
+
+    /// <summary>
+    /// 04BD picture, frame, flags, priority, x, y, word 6 [, alpha] [, r, g, b] as v2.34 reads it
+    /// (0x410EC0 -> FUN_0040b350; the layout SPRITE234, also Wana's and Hitozuma OL's v2.36): a
+    /// sprite entry as v2.47's (eight dwords), the alpha ORed into the flags, the tint red | green
+    /// << 8 | blue << 16 (0 without one)
+    /// </summary>
+    internal int AddSprite234(ScnContext c, ScnInstruction i)
+    {
+        int list = m_spriteList;
+        int e = SpriteEntry(list, m_spriteCounts[list]);
+        var v = new int[7];
+        for (int k = 0; k < 7; k++)
+            v[k] = Value(c, i.Args[k]);
+        int next = 7, tint = 0;
+        if (i.Raw[0] != 0)
+            v[2] |= Value(c, i.Args[next++]);
+        if (i.Raw[1] != 0)
+        {
+            int r = Value(c, i.Args[next]), g = Value(c, i.Args[next + 1]), b = Value(c, i.Args[next + 2]);
+            tint = (r & 0xFF) | (g & 0xFF) << 8 | (b & 0xFF) << 16;
+        }
+        for (int k = 0; k < 7; k++)
+            Write32(e + 4 * k, v[k]);
+        Write32(e + 28, tint);
+        m_spriteCounts[list]++;
+        return 0;
     }
 
     // 0028's waits by task (when they started), and the frame each task last read the mouse or

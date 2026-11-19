@@ -282,6 +282,11 @@ void ScnVm::RegisterNativeRoutines()
     RegisterNative("5A0F18D1D20B4C9ADBD9C1FB5192362A4710377A", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0xA6124); });
     RegisterNative("BDD786F14B5585729034ECF5BFA499AD594E9AF8", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x6C7E0); });
     RegisterNative("2C78CF811E6E950792D2AA44E958A75DD65EBB93", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x6B400); });
+    RegisterNative("4C38545AC2151CB0A0C981EC41A7EEC62F895793", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x4CE78); });
+    RegisterNative("C54F6F14AF68AE34764F162415D5F0D324C8360F", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0xB2F16); });
+    RegisterNative("7E0BA6EEEB744EEAF69E579C4C45FF831568F2C6", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x9FBC1); });
+    RegisterNative("CAD72142EE78EF317432BBC20C929C2031BF0311", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x47608); });
+    RegisterNative("64696516F3693E1FEDD951127715230A195065B6", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x4DE78); });
     RegisterNative("B92CFBBFE981CBC4DE6AB5295ED8BC95845A764D", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 3, 228, 171); });
     RegisterNative("3921567C66959F8FBD5645C33784193E86699A85", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 7, 176, 99, 3840); });
     RegisterNative("913817CA94DE3A84D624A9047C4F36FE533497E6", "thumbnail", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 10, 76, 57); });

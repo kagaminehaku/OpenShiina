@@ -28,6 +28,7 @@ add_library(openshiina_core STATIC
     src/formats/AsfFile.cpp
     src/formats/ExeIcon.cpp
     src/formats/Mdct.cpp
+    src/formats/Mi4.cpp
     src/formats/MovieAhead.cpp
     src/formats/MpegAudio.cpp
     src/formats/MpegVideo.cpp
@@ -75,6 +76,7 @@ add_library(openshiina_core STATIC
     src/scripting/ScnVm.Native.cpp
     src/scripting/ScnVm.NativeKernels.cpp
     src/scripting/ScnVm.NativeRoutines.cpp
+    src/scripting/ScnVm.OldEngines.cpp
     src/scripting/ScnVm.Paint.cpp
     src/scripting/ScnVm.Pending.cpp
     src/scripting/ScnVm.Pictures.cpp

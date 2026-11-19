@@ -285,6 +285,7 @@ public sealed partial class ScnVm : IDisposable
         RegisterEngine250();
         RegisterEngine234();
         RegisterEngine233();
+        RegisterOldEngines();
     }
 
     public ScnContext Slot(int index) => m_slots[index];

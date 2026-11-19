@@ -68,7 +68,7 @@ GameSetup GameSetup::Read(GameData& data, const std::string& savesRoot)
 std::unique_ptr<scripting::ScnVm> GameSetup::CreateVm(scripting::IScnHost& host, const std::string& dataFolder) const
 {
     std::string tables = Files::Combine(dataFolder, "ScnOps");
-    const auto& opcodes = scripting::ScnOpcodes::ForVersion(tables, Version);
+    const auto& opcodes = scripting::ScnOpcodes::ForVersion(tables, Version, Game);
     auto vm = std::make_unique<scripting::ScnVm>(opcodes, host);
     vm->Game = Game;
     vm->EngineVersion = int(std::lround(std::stod(Version) * 100));

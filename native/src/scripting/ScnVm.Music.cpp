@@ -243,6 +243,9 @@ void ScnVm::RegisterMusic()
             vm.Music()->Play(s->Handle, s->Looping);
         }
         s->Status = 1;
+        s->PlayedAt = vm.Clock();
+        s->PausedFor = 0;
+        s->Played = true;
         return 0;
     });
     // 06DA s: stop
@@ -261,6 +264,7 @@ void ScnVm::RegisterMusic()
         if (s && (s->Status & 5) == 1)
         {
             s->Status |= 4;
+            s->PausedAt = vm.Clock();
             if (s->Handle != 0 && vm.Music())
                 vm.Music()->Pause(s->Handle);
         }
@@ -271,6 +275,7 @@ void ScnVm::RegisterMusic()
         if (s && (s->Status & 4) != 0)
         {
             s->Status &= ~4;
+            s->PausedFor += vm.Clock() - s->PausedAt;
             if (s->Handle != 0 && vm.Music())
                 vm.Music()->Resume(s->Handle);
         }

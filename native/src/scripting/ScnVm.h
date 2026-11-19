@@ -735,6 +735,10 @@ private:
     // v2.33: the movie of 0579 and the rectangle of 0578
     Movie m_windowMovie;
     ScreenArea m_windowMovieArea;
+    // 0532's bitmaps by slot (BGR, 3 bytes a pixel)
+    struct Bitmap { int Width = 0, Height = 0; std::vector<uint8_t> Bgr; };
+    std::map<int, Bitmap> m_bitmaps;
+    void PutPicture(int surface, const Bitmap& picture, int x, int y);
     void DrawMovieToWindow(const openshiina::Bytes& rows, int w, int h, const ScreenArea& area);
     // The other player (ScnVm.GraphMovie)
     std::array<Movie, MovieSlots> m_graphMovies{};
@@ -888,6 +892,9 @@ private:
         /// v2.33's fade (06DD / 06DE): no target, it ends past 100 or 0.
         bool FadeOld = false;
         uint32_t FadeDue = 0;
+        // Since when it plays (the scripts' clock), when it was paused and for how long in all (06EB)
+        uint32_t PlayedAt = 0, PausedAt = 0, PausedFor = 0;
+        bool Played = false;
     };
     static constexpr int MusicSlots = 256;
     IScnMusic* Music() { return m_host.Music(); }
@@ -906,6 +913,8 @@ private:
     void SortElements(int lo, int count, int width, int slot);
     // Handles of the menus 0898 made
     int m_nextMenu = 0x00510000;
+    /// GetSystemMetrics (09DD, user32's through 01A4) as a 1920 x 1080 screen.
+    static int SystemMetric(int index);
 
     // ---- Effects ----
     static bool ClipRect(int* r, int* follow, int width, int height);
@@ -1114,10 +1123,25 @@ private:
     // ---- Engine234, Engine233: the old engines' opcodes ----
     void RegisterEngine234();
     void RegisterEngine233();
+    // ---- OldEngines: v2.02 to v2.20 (ScnVm.OldEngines.cpp) ----
+    void RegisterOldEngines();
+    void StartClickSlot(int message);
+    bool WriteFlagFile(const std::string& path, const std::vector<std::pair<int, int>>& parts);
+    bool ReadFlagFile(const std::string& path, const std::vector<std::pair<int, int>>& parts);
+    void CrossfadeRect(int from, int fx, int fy, int to, int tx, int ty, int x, int y, int w, int h, int t);
+    // The character the text step drew last, for the after-character slot (0064 / 0065)
+    int m_charBox[4] = {0, 0, 0, 0};
+    openshiina::Bytes m_charText;
+    /// 00AA / 00AE: three bytes of the task's record (text / background colour), its colour flag set (ScnVm.Text.cpp).
+    int RecordColor(ScnContext& c, const ScnInstruction& i, bool background);
+    /// 007A: the task's record goes on at (x, y), lines starting at left (ScnVm.Text.cpp).
+    void RecordPosition(ScnContext& c, int x, int y, int left);
     static int PolledOld(ScnVm& vm, ScnContext& c, const ScnInstruction& i);
     int SleepOld(ScnContext& c, int ms);
     void Crossfade(int from, int to, int t);
     int FadeOld(ScnContext& c, const ScnInstruction& i, int sign);
+    // 04BD as v2.34 reads it (SPRITE234; also the older v2.36 build): ScnVm.Engine234.cpp
+    int AddSprite234(ScnContext& c, const ScnInstruction& i);
     struct Fade234
     {
         uint32_t Start;

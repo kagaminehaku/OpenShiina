@@ -64,6 +64,7 @@ ScnVm::ScnVm(const ScnOpcodes& opcodes, IScnHost& host)
     RegisterEngine250();
     RegisterEngine234();
     RegisterEngine233();
+    RegisterOldEngines();
 }
 
 ScnVm::~ScnVm()

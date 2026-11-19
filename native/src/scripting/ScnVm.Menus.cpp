@@ -101,6 +101,26 @@ void ScnVm::SetRunsInBackground(bool value)
     UpdatePause();
 }
 
+int ScnVm::SystemMetric(int index)
+{
+    switch (index)
+    {
+    case 0:
+    case 16: return 1920;        // SM_CXSCREEN, SM_CXFULLSCREEN
+    case 1: return 1080;         // SM_CYSCREEN
+    case 17: return 1080 - 23;   // SM_CYFULLSCREEN
+    case 4: return 23;           // SM_CYCAPTION
+    case 5:
+    case 6: return 1;            // SM_CXBORDER, SM_CYBORDER
+    case 7:
+    case 8: return 3;            // SM_CXFIXEDFRAME, SM_CYFIXEDFRAME
+    case 15: return 20;          // SM_CYMENU
+    case 32:
+    case 33: return 4;           // SM_CXFRAME, SM_CYFRAME
+    default: return 0;
+    }
+}
+
 void ScnVm::RegisterMenus()
 {
     // 06CC v: v = Direct3D 9 is there (FUN_00418AA0 -> FUN_00403C70); the v2.50 games stop with
@@ -136,24 +156,7 @@ void ScnVm::RegisterMenus()
     });
     // 09DD index, v: GetSystemMetrics (FUN_00425F80), as a 1920 x 1080 screen (09E2 too)
     Register(0x09DD, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        int value;
-        switch (vm.Value(c, i.Args[0]))
-        {
-        case 0:
-        case 16: value = 1920; break;        // SM_CXSCREEN, SM_CXFULLSCREEN
-        case 1: value = 1080; break;         // SM_CYSCREEN
-        case 17: value = 1080 - 23; break;   // SM_CYFULLSCREEN
-        case 4: value = 23; break;           // SM_CYCAPTION
-        case 5:
-        case 6: value = 1; break;            // SM_CXBORDER, SM_CYBORDER
-        case 7:
-        case 8: value = 3; break;            // SM_CXFIXEDFRAME, SM_CYFIXEDFRAME
-        case 15: value = 20; break;          // SM_CYMENU
-        case 32:
-        case 33: value = 4; break;           // SM_CXFRAME, SM_CYFRAME
-        default: value = 0; break;
-        }
-        vm.Store(c, i.Args[1], value);
+        vm.Store(c, i.Args[1], SystemMetric(vm.Value(c, i.Args[0])));
         return 0;
     });
 

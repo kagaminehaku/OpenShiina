@@ -526,14 +526,16 @@ public sealed partial class ScnVm
         // moves between frames, so a task that has painted (07D1) since it last read the clock in
         // this frame waits for the next one (The Pillagers of Raillore's title fades in a loop
         // that draws, paints and reads the clock until 500 ms have passed, with no other wait).
-        // Before 2.40 a task that reads it again where it read it last, in the same frame, waits
-        // too: Tekoire Princess!'s START (v2.37) waits 30 ms in a loop on the clock alone, and
-        // Yoyogi Hitozuma Senmon Gakuin's reads it at two places in a row wanting the same value
+        // A task that reads it again where it read it last, in the same frame, waits too: Tekoire
+        // Princess!'s START (v2.37) waits 30 ms in a loop on the clock alone, and so does Otome
+        // Chibaku Yuugi's (v2.40, START 0x94054, its voice wait); such a loop would never end in
+        // a frame. Yoyogi Hitozuma Senmon Gakuin's reads it at two places in a row wanting the
+        // same value
         Register(0x03BD, (vm, c, i) =>
         {
             int paints = vm.m_taskPaints.GetValueOrDefault(c.Slot);
             if (vm.m_clockReads.TryGetValue(c.Slot, out var read) && read.Frame == vm.m_frameNumber &&
-                (read.Paints != paints || vm.EngineVersion < 240 && read.Pc == c.Current))
+                (read.Paints != paints || read.Pc == c.Current))
             {
                 c.Pc = c.Current;
                 vm.FrameShown = true;
@@ -684,6 +686,8 @@ public sealed partial class ScnVm
             return 0;
         });
         Register(0x02E8, (vm, c, i) => { vm.Store(c, i.Args[0], c.DataPointer - c.Base); return 0; });
+        // 02E9 v (EDEN4.EXE 0x40F4E0, v2.20): v = the data pointer itself
+        Register(0x02E9, (vm, c, i) => { vm.Store(c, i.Args[0], c.DataPointer); return 0; });
         // 02E6 v / 02E7 v (KATEI.EXE 0x411740 / 0x411780, v2.31): v = the byte / word (unsigned) at
         // the task's data pointer, which goes on by 1 / 2
         Register(0x02E6, (vm, c, i) =>

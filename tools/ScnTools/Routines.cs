@@ -128,7 +128,7 @@ static class Routines
             Console.WriteLine($"{args[0]}: {why ?? "no " + args[1] + " in its archives"}");
             return 3;
         }
-        var vm = NewVm(game.EngineVersion.Length > 0 ? game.EngineVersion : "2.49");
+        var vm = NewVm(game.EngineVersion.Length > 0 ? game.EngineVersion : "2.49", game.Scheme.Name);
         int target = vm.AllocateCopy(WarcOpener.OpenEntry(found.Value.Warc, found.Value.Entry)) + Convert.ToInt32(args[2], 16);
         string signature = vm.NativeSignature(target);
         if (vm.NativeName(signature) is not { } name)
@@ -207,9 +207,10 @@ static class Routines
         }
         if (!quiet)
             Console.WriteLine($"{game.Scheme.Name}: engine v{game.EngineVersion}");
-        var table = ScnDisasm.LoadTable(ScnOpcodes.TableText(game.EngineVersion).Split('\n'));
+        var table = ScnDisasm.LoadTable(ScnOpcodes.TableText(game.EngineVersion, game.Scheme.Name).Split('\n'));
         ScnDisasm.Version = game.EngineVersion;
-        var vm = NewVm(game.EngineVersion);
+        ScnDisasm.Sprite234 = ScnOpcodes.TableName(game.EngineVersion, game.Scheme.Name) == "ops_v236a";
+        var vm = NewVm(game.EngineVersion, game.Scheme.Name);
         var result = new List<Found>();
         foreach (var (archive, warc, entry) in game.Entries())
         {
@@ -244,7 +245,7 @@ static class Routines
             Console.WriteLine($"{folder}: no {moduleName} in its archives");
             return null;
         }
-        var vm = NewVm(game.EngineVersion.Length > 0 ? game.EngineVersion : "2.49");
+        var vm = NewVm(game.EngineVersion.Length > 0 ? game.EngineVersion : "2.49", game.Scheme.Name);
         int module = vm.AllocateCopy(WarcOpener.OpenEntry(found.Warc, found.Entry));
         return Make(game.Scheme.Name, found.Entry.Name, offset, vm, module);
     }
@@ -256,7 +257,7 @@ static class Routines
         return new Found(game, module, offset, code, vm.NativeName(code.Signature), shape);
     }
 
-    static ScnVm NewVm(string version) => new(ScnOpcodes.ForVersion(version), new ToolHost()) { JitInBackground = false, JitX86 = false };
+    static ScnVm NewVm(string version, string? game = null) => new(ScnOpcodes.ForVersion(version, game), new ToolHost()) { JitInBackground = false, JitX86 = false };
 
     static readonly IntelFormatter s_formatter = new() { Options = { FirstOperandCharIndex = 8, HexPrefix = "0x", HexSuffix = "" } };
 

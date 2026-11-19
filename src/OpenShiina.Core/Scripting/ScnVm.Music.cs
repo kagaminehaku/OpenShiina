@@ -52,6 +52,9 @@ public sealed partial class ScnVm
         /// <summary>v2.33's fade (06DD / 06DE): no target, it ends past 100 or 0.</summary>
         public bool FadeOld;
         public uint FadeDue;
+        // Since when it plays (the scripts' clock), when it was paused and for how long in all (06EB)
+        public uint PlayedAt, PausedAt, PausedFor;
+        public bool Played;
     }
 
     // 0x4A15E0: volume 0-100 -> DirectSound volume
@@ -157,6 +160,9 @@ public sealed partial class ScnVm
                 vm.Music.Play(s.Handle, s.Looping);
             }
             s.Status = 1;
+            s.PlayedAt = vm.Clock;
+            s.PausedFor = 0;
+            s.Played = true;
             return 0;
         });
         // 06DA s: stop
@@ -178,6 +184,7 @@ public sealed partial class ScnVm
             if (s != null && (s.Status & 5) == 1)
             {
                 s.Status |= 4;
+                s.PausedAt = vm.Clock;
                 if (s.Handle != 0)
                     vm.Music!.Pause(s.Handle);
             }
@@ -189,6 +196,7 @@ public sealed partial class ScnVm
             if (s != null && (s.Status & 4) != 0)
             {
                 s.Status &= ~4;
+                s.PausedFor += vm.Clock - s.PausedAt;
                 if (s.Handle != 0)
                     vm.Music!.Resume(s.Handle);
             }

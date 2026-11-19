@@ -1352,6 +1352,11 @@ public sealed partial class ScnVm
 
         if (G(rec, RAfterChar) != -1)
         {
+            // The character and its box, for 0064 / 0065 in the slot (aoj.EXE 0x424FC6 / 0x425523)
+            int advance = G(rec, RPitch) == -1 && dc || IsGaiji(ch, length) ? FixedOr(rec, font, ch, length).Width
+                : (length == 2 ? G(rec, RWidePitch) : G(rec, RPitch)) + G(rec, RSpacing) * length;
+            m_charBox = (G(rec, RX), G(rec, RY), G(rec, RX) + advance, G(rec, RY) + G(rec, RHeight));
+            m_charText = ch.AsSpan(0, Math.Min(length, ch.Length)).ToArray();
             m_slots[G(rec, RAfterChar)].TextRecord = G(rec, RIndex);
             RunSlotSync(G(rec, RAfterChar));
         }

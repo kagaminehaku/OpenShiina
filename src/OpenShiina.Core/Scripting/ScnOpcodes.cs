@@ -42,8 +42,26 @@ public sealed class ScnOpcodes
         ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v233"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v231"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v230"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v220"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v202"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v211"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v215"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v216"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v218"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v219"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v236a"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v250"] = new() { [0x009C] = ["GLYPH250"] },
+    };
+
+    // v2.36 came in two builds that RIO.INI names alike: Wana's (2005) and Hitozuma OL's
+    // (2005) 04BD reads its operands as v2.34's (SPRITE234: seven, more by the third's flags), the
+    // later games' (Gibo to Oba, CC Hospital, Shinseki no Oba-san, Sabae no Ou) as v2.47's (eight).
+    // These games take ops_v236a, v2.47's table with v2.34's 04BD
+    private static readonly HashSet<string> s_v236aGames = new(StringComparer.Ordinal)
+    {
+        "Wana ~Hakudaku Mamire no Houkago~",
+        "Hitozuma OL -Chijoku no Gyoumu Meirei-",
     };
 
     private ScnOpcodes(string table, string name)
@@ -79,6 +97,8 @@ public sealed class ScnOpcodes
     /// from Cleavage's CLEAVAGE.EXE, Vanquish's VANQ.EXE the same build): v2.34's but for 06EC,
     /// which it lacks. v2.31 has its own (read from Kateinai Choukyou's KATEI.EXE: 481 opcodes, all
     /// of them v2.33's; the jumps' operands are v2.33's, which opscan does not see in this build).
+    /// v2.30 has its own (read from EDEN ~FINAL~'s EDENF.EXE: v2.31's 481 opcodes, but FE11 takes one
+    /// operand; Chain Trap's CTRAP.EXE, an earlier v2.30 build, lacks 0014 and 03CF).
     /// v2.37 has its own (read from Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE,
     /// its code decrypted as its .riox stub does it: 568 opcodes, v2.47's operands but for 04EC,
     /// 055A and 055B, which are v2.34's, and five of v2.34's v2.47 lacks). v2.44 has its own (read
@@ -86,33 +106,50 @@ public sealed class ScnOpcodes
     /// v2.47 lacks). v2.45 and v2.46 take v2.47's: the 679 opcodes of Chuuchuu Nurse's executable
     /// and the 687 of Hana to Otome ni Shukufuku o's are v2.47's, with the same operands.
     /// </summary>
-    public static ScnOpcodes ForVersion(string version)
+    public static ScnOpcodes ForVersion(string version, string? game = null)
     {
-        string name = TableName(version);
+        string name = TableName(version, game);
         lock (s_loaded)
         {
             if (!s_loaded.TryGetValue(name, out var table))
-                s_loaded[name] = table = new ScnOpcodes(TableText(version), name);
+                s_loaded[name] = table = new ScnOpcodes(TableText(version, game), name);
             return table;
         }
     }
 
-    /// <summary>The opcode table an engine version uses ("ops_v247" for "2.45"; see <see cref="ForVersion"/>).</summary>
-    public static string TableName(string version) =>
-        version.StartsWith("2.47") || version.StartsWith("2.46") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
+    /// <summary>
+    /// The opcode table an engine version uses ("ops_v247" for "2.45"; see <see cref="ForVersion"/>),
+    /// for <paramref name="game"/> (its scheme's name) where one version came in two builds.
+    /// </summary>
+    public static string TableName(string version, string? game = null) =>
+        version.StartsWith("2.36") && game != null && s_v236aGames.Contains(game) ? "ops_v236a"
+            : version.StartsWith("2.47") || version.StartsWith("2.46") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
             : version.StartsWith("2.44") ? "ops_v244"
             : version.StartsWith("2.34") ? "ops_v234"
             : version.StartsWith("2.33") ? "ops_v233"
             : version.StartsWith("2.31") ? "ops_v231"
+            : version.StartsWith("2.30") ? "ops_v230"
             : version.StartsWith("2.20") ? "ops_v220"
+            : version.StartsWith("2.02") ? "ops_v202"
+            : version.StartsWith("2.10") ? "ops_v211"
+            : version.StartsWith("2.11") ? "ops_v211"
+            : version.StartsWith("2.15") ? "ops_v215"
+            : version.StartsWith("2.16") ? "ops_v216"
+            : version.StartsWith("2.18") ? "ops_v218"
+            : version.StartsWith("2.19") ? "ops_v219"
             : version.StartsWith("2.37") ? "ops_v237"
+            : version.StartsWith("2.39") ? "ops_v239"
             : version.StartsWith("2.50") ? "ops_v250" : "ops_v249";
 
+    /// <summary>The file (Data/ScnOps) of a table: ops_v236a is v2.47's with v2.34's 04BD.</summary>
+    public static string TableFile(string name) => name == "ops_v236a" ? "ops_v247" : name;
+
     /// <summary>The text of that table as tools/ScnTools opscan wrote it (Data/ScnOps), for tools.</summary>
-    public static string TableText(string version)
+    public static string TableText(string version, string? game = null)
     {
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"OpenShiina.ScnOps.{TableName(version)}.tsv")
-            ?? throw new InvalidOperationException($"The opcode table {TableName(version)} is missing.");
+        string file = TableFile(TableName(version, game));
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"OpenShiina.ScnOps.{file}.tsv")
+            ?? throw new InvalidOperationException($"The opcode table {file} is missing.");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }

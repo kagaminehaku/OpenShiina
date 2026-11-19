@@ -530,14 +530,14 @@ void ScnVm::RegisterCore()
     Register(0x03A5, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { vm.Store(c, i.Args[0], vm.Value(c, i.Args[0]) - c.Base); return 0; });
     // 03BD v: the time in ms. The engine's clock runs on while it paints the window; here it moves
     // between frames, so a task that has painted (07D1) since it last read the clock in this frame
-    // waits for the next one. Before 2.40 a task that reads it again where it read it last, in the
-    // same frame, waits too
+    // waits for the next one. A task that reads it again where it read it last, in the same frame,
+    // waits too (a loop on the clock alone: Tekoire Princess!'s v2.37, Otome Chibaku Yuugi's v2.40)
     Register(0x03BD, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         int paints = 0;
         if (auto found = vm.m_taskPaints.find(c.Slot); found != vm.m_taskPaints.end())
             paints = found->second;
         if (auto read = vm.m_clockReads.find(c.Slot); read != vm.m_clockReads.end() && read->second.Frame == vm.m_frameNumber
-            && (read->second.Paints != paints || (vm.EngineVersion < 240 && read->second.Pc == c.Current)))
+            && (read->second.Paints != paints || read->second.Pc == c.Current))
         {
             c.Pc = c.Current;
             vm.FrameShown = true;
@@ -687,6 +687,8 @@ void ScnVm::RegisterCore()
         return 0;
     });
     Register(0x02E8, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { vm.Store(c, i.Args[0], c.DataPointer - c.Base); return 0; });
+    // 02E9 v (EDEN4.EXE 0x40F4E0, v2.20): v = the data pointer itself
+    Register(0x02E9, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { vm.Store(c, i.Args[0], c.DataPointer); return 0; });
     // 02E6 v / 02E7 v (v2.31): v = the byte / word (unsigned) at the data pointer, which goes on by 1 / 2
     Register(0x02E6, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         vm.Store(c, i.Args[0], vm.ReadByte(c.DataPointer));

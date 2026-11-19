@@ -9,10 +9,36 @@
 // drawn into the game window's picture, the movie stretched to its rectangle.
 #include "scripting/ScnVm.h"
 
+#include "formats/Mi4.h"
+
 #include <algorithm>
 #include <string>
 
 namespace openshiina::scripting {
+
+// A BGR picture copied into a surface at (x, y), clipped (24- or 32-bit surfaces)
+void ScnVm::PutPicture(int surface, const Bitmap& picture, int x, int y)
+{
+    int pixels = SurfaceField(surface, 2), sw = SurfaceField(surface, 7), sh = SurfaceField(surface, 8);
+    int bpp = SurfaceField(surface, 9) >> 3, pitch = SurfaceField(surface, 10);
+    if (pixels == 0 || bpp < 3)
+        return;
+    int x0 = std::max(0, -x), x1 = std::min(picture.Width, sw - x);
+    if (x1 <= x0)
+        return;
+    openshiina::Bytes line(size_t((x1 - x0) * bpp));
+    for (int row = std::max(0, -y); row < picture.Height && y + row < sh; row++)
+    {
+        for (int col = x0; col < x1; col++)
+        {
+            size_t s = size_t(row * picture.Width + col) * 3, d = size_t((col - x0) * bpp);
+            line[d] = picture.Bgr[s];
+            line[d + 1] = picture.Bgr[s + 1];
+            line[d + 2] = picture.Bgr[s + 2];
+        }
+        WriteBytes(pixels + (y + row) * pitch + (x + x0) * bpp, line);
+    }
+}
 
 void ScnVm::RegisterEngine233()
 {
@@ -36,14 +62,52 @@ void ScnVm::RegisterEngine233()
     // it is made); nothing for a stream not playing
     Register234(0x06DD, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { return vm.FadeOld(c, i, 1); });
     Register234(0x06DE, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { return vm.FadeOld(c, i, -1); });
-    // FDF2 v, FE06 v, FE10 v (YODUMA.EXE 0x42221F, 0x422289, v2.37): an operand read, nothing done
-    // (Tekoire Princess!'s START runs FE10 and FE06 when a game starts). v2.47 has handlers of its own
-    // for them, not read yet
-    for (int op : {0xFDF2, 0xFE06, 0xFE10})
+    // FDF2 v, FDFC v, FE06 v, FE10 v (YODUMA.EXE 0x42221F, 0x422289, 0x422290, v2.37): an operand read,
+    // nothing done (Tekoire Princess!'s START runs FE10 and FE06 when a game starts, Wana's v2.36
+    // START FE10 and FDFC). v2.47 has handlers of its own for them, not read yet
+    for (int op : {0xFDF2, 0xFDFC, 0xFE06, 0xFE10})
         RegisterBefore240(op, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
             vm.Value(c, i.Args[0]);
             return 0;
         });
+    // The engines before 2.40 show their logos from MI4 pictures (EDEN4.EXE, v2.20; Hachigatsu no
+    // Nostalgia's and Chain Trap's INIT / STAFF / OPENING): 0532 slot, file (0x413600 ->
+    // FUN_00402D10) loads one into a table of 256 bitmaps (0x685658), 2 when it does not load; 0533
+    // slot (0x413670) lets it go (DeleteObject); 0534 surface, slot, x, y, rop (0x4136C0 ->
+    // FUN_0042D4F0) puts it into the surface at (x, y) (BitBlt, the rop 0: SRCCOPY) and, for surface
+    // 0, has the window paint that rectangle again
+    RegisterBefore240(0x0532, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int slot = vm.Value(c, i.Args[0]) & 0xFF;
+        std::string file = vm.ReadString(vm.Value(c, i.Args[1]));
+        openshiina::Bytes data;
+        if (!vm.ReadScriptFile(file, data))
+            return 2;
+        auto picture = openshiina::formats::Mi4::Decode(data.data(), data.size());
+        if (!picture)
+            return 2;
+        vm.m_bitmaps[slot] = Bitmap{picture->Width, picture->Height, std::move(picture->Bgr)};
+        return 0;
+    });
+    RegisterBefore240(0x0533, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int slot = vm.Value(c, i.Args[0]);
+        if (uint32_t(slot) > 0x100)
+            return 2;
+        vm.m_bitmaps.erase(slot);
+        return 0;
+    });
+    RegisterBefore240(0x0534, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int target = vm.Value(c, i.Args[0]), slot = vm.Value(c, i.Args[1]);
+        int x = vm.Value(c, i.Args[2]), y = vm.Value(c, i.Args[3]);
+        vm.Value(c, i.Args[4]);   // the rop: copied whatever it is
+        int surface = uint32_t(target) < 0xFFFF ? target : target - 0x00030000;
+        auto found = vm.m_bitmaps.find(slot);
+        if (found == vm.m_bitmaps.end() || surface < 0 || surface >= SurfaceCount)
+            return 2;
+        vm.PutPicture(surface, found->second, x, y);
+        if (target == 0)
+            vm.InvalidateWindow(x, y, x + found->second.Width, y + found->second.Height);
+        return 0;
+    });
     // Vanquish (VANQ.EXE, v2.33, the same build as CLEAVAGE.EXE). 0190 name (0x417F70): the game
     // folder's DLL loaded (its START loads Export.dll), the one before freed; 2 when it is not there.
     // The player loads no DLL and answers as loaded; 0191 name (0x417FC0, a function of it called by
@@ -54,20 +118,21 @@ void ScnVm::RegisterEngine233()
         return 0;
     });
     // 073E v (0x41B430): v = the screen has a mode of the window's size at its colour depth
-    // (EnumDisplaySettings), full screen being possible
-    Register234(0x073E, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    // (EnumDisplaySettings), full screen being possible. These four have the same operands in every
+    // engine from 2.31 to 2.50, and the same work (Omocha no Sensei, v2.37, runs them too)
+    Register(0x073E, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         vm.Store(c, i.Args[0], 1);
         return 0;
     });
     // 07C6 v (0x41A230): an engine flag (0x46716C) = v
-    Register234(0x07C6, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    Register(0x07C6, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         vm.EngineGlobals[0x46716C] = vm.Value(c, i.Args[0]);
         return 0;
     });
     // 08CA (0x419B00): DrawMenuBar; 08D4 menu, item, flags (0x419B20): EnableMenuItem - the window's
     // menu bar, which the player's window does not have
-    Register234(0x08CA, [](ScnVm&, ScnContext&, const ScnInstruction&) { return 0; });
-    Register234(0x08D4, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    Register(0x08CA, [](ScnVm&, ScnContext&, const ScnInstruction&) { return 0; });
+    Register(0x08D4, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         for (const auto& arg : i.Args)
             vm.Value(c, arg);
         return 0;
@@ -126,18 +191,18 @@ void ScnVm::RegisterEngine233()
         return 0;
     });
     // 07BE (0x41A1C0): WaitMessage - the task waits for the next frame
-    Register234(0x07BE, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
+    RegisterBefore240(0x07BE, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
         vm.FrameShown = true;
         return 3;
     });
     // 09CF mode (0x413760): the window movies' player, MCI (0) or DirectShow (other), the movies
     // playing carried over to the other at the same position; one player here
-    Register234(0x09CF, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    RegisterBefore240(0x09CF, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         vm.Value(c, i.Args[0]);
         return 0;
     });
     // 0578 x, y, w, h (0x413A10): the movie window's rectangle
-    Register234(0x0578, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    RegisterBefore240(0x0578, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
         int w = vm.Value(c, i.Args[2]), h = vm.Value(c, i.Args[3]);
         vm.m_windowMovieArea = ScreenArea{x, y, x + w, y + h};
@@ -146,7 +211,7 @@ void ScnVm::RegisterEngine233()
     // 0579 file, v (0x413C40): open the movie (a file of the game folder) and play it in the window
     // (FUN_00413AD0 0, 1); v is kept with it (0 in Cleavage's scripts). A movie that cannot be played
     // here is as one played to its end
-    Register234(0x0579, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    RegisterBefore240(0x0579, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         std::string name = vm.ReadString(vm.Value(c, i.Args[0]));
         // (the second operand: 1, the movie starts again at its end; EDEN4's START plays a movie n
         // times with it, counting with 0581)
@@ -168,7 +233,7 @@ void ScnVm::RegisterEngine233()
         return 0;
     });
     // 057A (0x413CF0): stop the movie and close it
-    Register234(0x057A, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
+    RegisterBefore240(0x057A, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
         Movie& movie = vm.m_windowMovie;
         vm.MovieSoundStop(movie);
         movie.State = movie.Video || movie.State != 0 ? 1 : 0;
@@ -176,13 +241,13 @@ void ScnVm::RegisterEngine233()
         return 0;
     });
     // 057E v (0x413DC0): v = the movie's mode, MCI's 0x20E playing, else 0x20D stopped
-    Register234(0x057E, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    RegisterBefore240(0x057E, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         vm.UpdateMovie(vm.m_windowMovie);
         vm.Store(c, i.Args[0], vm.m_windowMovie.State == 3 ? 0x20E : 0x20D);
         return 0;
     });
     // 057F v (0x413E00): v = its position (ms here), 0 before it plays; START waits until it is not 0
-    Register234(0x057F, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+    RegisterBefore240(0x057F, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
         Movie& movie = vm.m_windowMovie;
         vm.UpdateMovie(movie);
         int position = movie.State == 3 ? std::max(1, int(vm.Clock() - movie.Start)) : movie.State == 0 ? 0 : 1;

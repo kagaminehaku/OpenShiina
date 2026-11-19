@@ -4,10 +4,30 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.8.5 (2026-11-20)
 
 - **EDEN IV plays through** (100 games, 101 releases): each of its 125 scenes was started from
   its scene list and plays on with no error; the last ends the game.
+- **25 more games play through** (125 games, 126 releases): Manin Chijo Densha 2, Otome Chibaku
+  Yuugi, Douryou no Oku-san, Niizuma to Yuukaihan, Jukubo Gui, Onedari Onapet, Yume Miru Egoist,
+  Tsukutori, Classmate no Okaa-san, Wana II, both Stellula Eques games, Tsui☆Teru, Otome Juurin
+  Yuugi, Chikan Circle, Tentacle Busters, the Nukitashi trial, Kichiku Nakadashi Suieibu,
+  Dokodemo Sukishite, Metro Chikansen, Sis☆Pon, the three Gakuen Pets and Megane Choukyou; Wana,
+  Houkago no Hoken'i and Gibo to Oba play.
+- **Idol Koukai Chijoku Sex plays through** (126 games, 127 releases); Mikoko, Zansho Omimai
+  Moushiagemasu and Itsuka, Dokoka de play.
+- The keys of 15 more games (166 schemes): EDEN ~FINAL~ (2004, a ShiinaRio game VNDB names no
+  engine for), Hachigatsu no Nostalgia, Kanawanu Koi no Monogatari, Baby, BE, Itsuka, Dokoka de,
+  Mahou no Shippo na Dai Ichi wa and Dai San wa, EDEN V, Puri-Puri, Sis☆Pon, the three Gakuen
+  Pets, Stellula Eques ~Shokuzai~ and Megane Choukyou; and the executables of 17 more games
+  already keyed; Calendar Girl (2000) opens without keys.
+- The oldest engines get their own opcode tables, read from their executables (2.02, 2.10 / 2.11,
+  2.15, 2.16, 2.18, 2.19, 2.30 and a later 2.20 build), and their own opcodes: the MI4 logos of
+  the engines before 2.40 (on Switch too), the flag files, the slots the mouse buttons start, a
+  crossfade on a rectangle, the popup menus (kept, not shown) and more
+  ([docs/engine-notes.md](docs/engine-notes.md)). Shi-Ka-E-Shi (2.15), Chain Trap, EDEN ~FINAL~,
+  EDEN V, STAGE, Hachigatsu no Nostalgia, Baby, BE, Kanawanu Koi no Monogatari, the Hana no
+  Kioku games, Mahou no Shippo na and Calendar Girl start.
 - OpenShiina Tools packs pictures back: an .S25 can be given to Repack as PNG files of its
   frames, named as extraction names them, and the frames whose pixels changed are written
   into a new S25, compressed as the games' own (runs, one-colour runs, the "incremental" rows

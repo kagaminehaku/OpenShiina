@@ -465,6 +465,13 @@ std::optional<int> ScnVm::DllCall(const std::string& dll, const std::string& fun
         WriteByte(buffer + n, 0);
         return n;
     }
+    if (is("user32", "GetSystemMetrics"))
+        // as 09DD (Nagagutsu wo Haita Deco's START sizes its window with it)
+        return SystemMetric(Arg(0));
+    if (is("user32", "DrawMenuBar") || is("user32", "ModifyMenuA"))
+        // The window has no menu bar here (Hana no Kioku 4-5-6 renames the items of its own,
+        // HK4_TM.SCN): done
+        return 1;
     if (is("user32", "SetMenuItemInfoW"))
         // The window has no menu of the system's here (Bitch Gakuen's START renames the items of
         // its window menu): done

@@ -111,7 +111,14 @@ public sealed partial class ScnVm
     // Mahou Shoujo no Taisetsu na Koto (v2.47: 0x003E2, -1545457906; with f[257] bit 1 none is asked),
     // Shokuinshitsu (TEACH.exe, v2.46: 0x00369, -661847700; -75841587 with f[257] bit 1), VESTIGE
     // (VESTIGE.exe, v2.47: 0x00618, 1510342675; none with f[257] bit 1), You~Gaku (YOUGAKU.EXE,
-    // v2.47: 0x004A8, 1682722154; none with f[257] bit 1)
+    // v2.47: 0x004A8, 1682722154; none with f[257] bit 1), Manin Chijo Densha 2 (MCD2.EXE, v2.45:
+    // 0x003BD, 1334241028; -621166875 with f[257] bit 1), Niizuma to Yuukaihan (NIIZUMA.EXE, v2.45:
+    // 0x003C5, -20049970; 775191508 with f[257] bit 1), Stellula Eques Codex (v2.46: 0x00492,
+    // -552211351; none with f[257] bit 1), Stellula Eques ~Shokuzai no Himekishi~ (STELLULA.EXE,
+    // v2.42: 0x005B7 takes 997501665 or -918893043), Gakuen Pets 2 (GPETS2.EXE, v2.45: 0x003D9,
+    // -474633892; -621166875 with f[257] bit 1), Mikoko (v2.46: 0x00345, -2105729026; -233499411 with
+    // f[257] bit 1), Idol Koukai Chijoku Sex (ISEX.exe, v2.46: 0x00371, -1155919157; -1635043666 with
+    // f[257] bit 1), Zansho Omimai Moushiagemasu (v2.41: 0x006BF, 563946514)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -132,6 +139,14 @@ public sealed partial class ScnVm
         ["Shokuinshitsu"] = 306723180 ^ -661847700,
         ["Vestige -Yaiba ni Nokoru wa Kimi no Omokage-"] = 306723180 ^ 1510342675,
         ["You~Gaku"] = 306723180 ^ 1682722154,
+        ["Manin Chijo Densha 2"] = 306723180 ^ 1334241028,
+        ["Niizuma to Yuukaihan"] = 306723180 ^ -20049970,
+        ["Stellula Eques Codex"] = 306723180 ^ -552211351,
+        ["Stellula Eques ~Shokuzai no Himekishi~"] = 306723180 ^ 997501665,
+        ["Gakuen Pets 2 ~Pool Side no Shiiku Katsudou~"] = 306723180 ^ -474633892,
+        ["Mikoko"] = 306723180 ^ -2105729026,
+        ["Idol Koukai Chijoku Sex"] = 306723180 ^ -1155919157,
+        ["Zansho Omimai Moushiagemasu"] = 306723180 ^ 563946514,
     };
 
     private void RegisterSystem()

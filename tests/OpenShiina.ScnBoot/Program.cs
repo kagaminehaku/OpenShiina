@@ -80,7 +80,7 @@ Console.WriteLine($"{scheme.Name}, engine v{version}, first script {start}");
 string saves = Path.Combine(Path.GetTempPath(), "openshiina-scnboot", PlayerFolders.FolderName(scheme.Name));
 Directory.CreateDirectory(saves);
 var host = new Host(data, saves);
-var vm = new ScnVm(ScnOpcodes.ForVersion(version), host)
+var vm = new ScnVm(ScnOpcodes.ForVersion(version, scheme.Name), host)
 {
     Game = scheme.Name,
     EngineVersion = (int)Math.Round(double.Parse(version, System.Globalization.CultureInfo.InvariantCulture) * 100),

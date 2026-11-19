@@ -1032,9 +1032,12 @@ public sealed partial class ScnVm
         Register(0x04BA, (vm, c, i) => { vm.m_spriteCounts[vm.m_spriteList] = 0; return 0; });
         Register(0x04BB, (vm, c, i) => { vm.m_spriteCounts[vm.m_spriteList] = vm.Value(c, i.Args[0]); return 0; });
         Register(0x04BC, (vm, c, i) => { vm.Store(c, i.Args[0], vm.m_spriteCounts[vm.m_spriteList]); return 0; });
-        // 04BD slot, frame, flags, priority, x, y, a, b: add an entry (FUN_00411FE0)
+        // 04BD slot, frame, flags, priority, x, y, a, b: add an entry (FUN_00411FE0); one read as
+        // v2.34's (SPRITE234, the older v2.36 build: two raw flags) as v2.34 adds it
         Register(0x04BD, (vm, c, i) =>
         {
+            if (i.Raw.Length == 2)
+                return vm.AddSprite234(c, i);
             int list = vm.m_spriteList;
             int e = vm.SpriteEntry(list, vm.m_spriteCounts[list]);
             for (int k = 0; k < 8; k++)

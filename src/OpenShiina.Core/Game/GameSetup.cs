@@ -65,7 +65,7 @@ public sealed class GameSetup
     /// </summary>
     public ScnVm CreateVm(IScnHost host)
     {
-        var vm = new ScnVm(ScnOpcodes.ForVersion(Version), host)
+        var vm = new ScnVm(ScnOpcodes.ForVersion(Version, Game), host)
         {
             Game = Game,
             EngineVersion = (int)Math.Round(double.Parse(Version, System.Globalization.CultureInfo.InvariantCulture) * 100),

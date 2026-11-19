@@ -107,8 +107,14 @@ static class ScnDisasm
     /// <summary>The engine version being disassembled ("2.34"): layouts of one version only (as ScnOpcodes).</summary>
     public static string Version = "";
 
-    // v2.34 and v2.33: names read up to their first '}', 04BD's operands as many as its flags say
-    private static bool Old => Version.StartsWith("2.34") || Version.StartsWith("2.33");
+    /// <summary>04BD read as v2.34's in a later build (ScnOpcodes' ops_v236a: Wana's and Hitozuma OL's v2.36).</summary>
+    public static bool Sprite234;
+
+    // The engines before 2.35 (as ScnVm.OldEngine): names read up to their first '}', 04BD's
+    // operands as many as its flags say
+    private static bool Old => Version.Length >= 4 && Version[1] == '.'
+        && int.TryParse(Version.AsSpan(0, 1), out int major) && int.TryParse(Version.AsSpan(2, 2), out int minor)
+        && major * 100 + minor < 235;
 
     /// <summary>Instructions whose length depends on a variable: decoded with the longer layout.</summary>
     public static readonly List<string> Uncertain = new();
@@ -133,7 +139,7 @@ static class ScnDisasm
         var sig = Overrides.TryGetValue(op, out var ov) ? ov : info.Sig;
         // 04BD of v2.34: seven operands, one more (an alpha) when the third has bits 0x60000000,
         // three more (a tint) when it has 0x20000000
-        if (op == 0x04BD && Old)
+        if (op == 0x04BD && (Old || Sprite234))
         {
             var a = new List<string>();
             for (int k = 0; k < 7; k++) a.Add(Operand(b, ref p, out _));
