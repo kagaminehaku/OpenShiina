@@ -3,8 +3,8 @@
 // filtered, previewed (S25 frames, MI4, PNG/JPEG/BMP, the sounds played, scripts as text, else
 // hex), extracted as they are or converted (S25 / MI4 -> PNG, the layers of an S25 composed as
 // the scenario scripts show them, OGV -> OGG, PAD -> WAV), and edited files packed back into a
-// new archive (WARC 1.7), checked by reading every packed entry back before it is saved. A
-// standalone .S25 file opens as its frames.
+// new archive (WARC 1.7; a picture from the PNG files of its frames), checked by reading every
+// packed entry back before it is saved. A standalone .S25 file opens as its frames.
 
 using System.Runtime.InteropServices;
 using System.Text;
@@ -631,7 +631,7 @@ public sealed class ArchiveView : UserControl
             await Ui.Message(this, "Only WARC 1.7 archives can be packed again (older versions keep their index in a form there is no encoder for).");
             return;
         }
-        if (await Ui.PickFolder(this, "The folder with the edited files (extracted with Convert on extract off)", Folder()) is not { } source)
+        if (await Ui.PickFolder(this, "The folder with the edited files (extracted with Convert on extract off, or pictures as PNG frames with it on and Compose layers off)", Folder()) is not { } source)
             return;
         if (await Ui.PickSave(this, "Save the new archive as", Path.GetFileName(m_path)) is not { } target)
             return;
@@ -675,7 +675,7 @@ public sealed class ArchiveView : UserControl
         else if (wrong.Count > 0)
             await Ui.Message(this, $"The new archive was not saved: {wrong.Count} entries did not read back as their files.\n\n" + string.Join("\n", wrong.Take(15)));
         else if (replaced == 0)
-            await Ui.Message(this, $"No file in {source} has the name of an entry of this archive, so nothing was packed. Extract with Convert on extract off, edit those files and keep their names.");
+            await Ui.Message(this, $"No file in {source} has the name of an entry of this archive, or a picture's frame changed, so nothing was packed. Extract with Convert on extract off (or pictures as PNG frames with Compose layers off), edit those files and keep their names.");
         else
         {
             m_status.Text = $"Saved {target}";

@@ -49,8 +49,9 @@ is mostly for slow phones, and should follow what their perf.log shows.
   names have to stay for the lookup, and the plates are pictures (below).
 - [ ] Texts the scripts build from parts or draw another way (Oreimo Plus's menus):
   `strings.txt` replaces only a text that is a whole original.
-- [ ] **Pictures with Japanese text** (menus, buttons, titles): an S25 encoder, compressed, and
-  in the tools a frame replaced by a PNG / a picture's frames exported and imported back.
+- [x] **Pictures with Japanese text** (menus, buttons, titles): an S25 encoder, compressed, and
+  in the tools a frame replaced by a PNG / a picture's frames exported and imported back
+  (S25Encoder; Repack takes the frames' PNG files, docs/tools.md).
   ([Niflheim](https://github.com/Yggdrasill-Moe/Niflheim/tree/master/RioShiina)'s S25_pack
   writes the layout with every pixel uncompressed.)
 - [ ] In OpenShiina Tools: list the texts the scripts write themselves (the Shift-JIS strings
@@ -59,7 +60,7 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 151 games; 100 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 151 games; 101 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
 - [ ] **Keys for the 18 games without them** (compatibility.md, "No keys yet"), once their files

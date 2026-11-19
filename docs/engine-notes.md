@@ -148,6 +148,22 @@ Oreimo has none: its only expression sprite `KIR.S25` has 11 frames (base, mouth
 eyes 200-206, blush 300), and the 8 expression codes its scripts use cover all of them; the open
 mouth is chosen by the script (code 155), not switched by the engine.
 
+**Writing an S25** (Core `Formats/S25Encoder.cs`, 2026-11-19; the files of Ran→Sem, 774 S25 and
+510,156 rows, as the model). A frame: width, height, x, y, flags (0x80000000 "incremental" in all
+but 18 of 2,692 frames), the file offset of each row; a row: a 16-bit length (the bytes after it,
+pad included, in every row) and runs, each header at an even offset, `method << 13 | skip << 11 |
+count` (count 0: 32 bits follow; no file needs it, their runs being at most the width, 800),
+its data `skip` bytes on. The data of methods 3, 4 and 5 is always at a multiple of 4 (skip 0 or
+2); method 2's is not (skip 0 to 3). Rows the same are named again, within a frame (29,821) and
+across frames (12,080), 37,503 of them with runs of method 2 or 4 although the engine
+delta-decodes such a row in place once for each time it is named (FUN_00403430, section 10):
+the games' packer must have coded them for that. The encoder names a row again only when it has
+no such run or its frame is not incremental, so each is decoded once; the rest as the games'
+files are, transparent pixels (all four bytes 0) as method 0, opaque ones as 2 / 3, any other
+as 4 / 5 (a run of one colour from three pixels). All 774 files decode to the same pixels after
+it (the bytes 95% of the originals', 106% once zlib-packed as the archives keep them); Danchi
+Wife's four menu pictures written again show the same screens in ScnBoot (33 of 33).
+
 ## 3. Scenario TXT
 
 Lines are commands `$NAME,args`, speaker lines `【name】`, dialogue `「...」`, narration, or

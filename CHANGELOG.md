@@ -4,6 +4,15 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **EDEN IV plays through** (100 games, 101 releases): each of its 125 scenes was started from
+  its scene list and plays on with no error; the last ends the game.
+- OpenShiina Tools packs pictures back: an .S25 can be given to Repack as PNG files of its
+  frames, named as extraction names them, and the frames whose pixels changed are written
+  into a new S25 (compressed as the games' own: runs, one-colour runs and the "incremental"
+  rows), so menus, buttons and titles can be edited.
+
 ## 0.8.4 (2026-11-19)
 
 - **12 more games play through** (99 games, 100 releases): Mimi o Sumaseba, Saint ~Aa Shu yo,

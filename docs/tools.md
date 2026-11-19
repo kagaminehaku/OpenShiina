@@ -101,16 +101,23 @@ Maki Fes!, for example:
 **Repack…** makes a new archive with some of its files replaced by edited ones (WARC 1.7
 archives, the newer games'):
 
-1. Turn **Convert on extract** off and extract the files you want to change.
-2. Edit them. Keep their names, and put them all in one folder.
+1. Extract the files you want to change: with **Convert on extract** off, as they are stored;
+   pictures (`.S25`) may instead be extracted with it on and **Compose layers** off, as PNG
+   files of their frames (`TITLE@0000.png`, or `BG01.png` for a picture of one frame).
+2. Edit them. Keep their names, and put them all in one folder. A frame's PNG may be another
+   size; it stays where the frame was on the screen.
 3. Click **Repack…**, choose that folder, then where to save the new archive. The open archive
    itself cannot be written over: save the new one elsewhere.
 4. The files of the folder that have the name of an entry are packed and encrypted like the
-   game's; every other entry is copied as it is. Before the new archive is saved, each packed
-   entry is read back and compared with its file. If one differs, nothing is saved.
+   game's; every other entry is copied as it is. For a picture given as PNG files, the frames
+   whose pixels changed take the place of the old ones and the S25 is written again, compressed
+   as the games' own; a frame left as it was extracted changes nothing. Before the new archive
+   is saved, each packed entry is read back and compared with its file (a picture's frames with
+   their PNG files). If one differs, nothing is saved.
 5. Keep a copy of the game's original archive, then put the new one in its place.
 
-Pictures cannot be made from PNG yet: there is no S25 encoder.
+Pictures saved with **Compose layers** on are whole pictures made of several frames, so they
+cannot be packed back: extract the frames instead.
 
 ## Translation: translate a game
 

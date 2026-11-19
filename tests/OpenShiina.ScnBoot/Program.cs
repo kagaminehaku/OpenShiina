@@ -22,7 +22,9 @@
 // SCNBOOT_SWEEP=1 runs that scenario through and says how it ended (below; tests/sweep.ps1 runs
 // every scenario of a game so). SCNBOOT_LIST=1 only lists the scenarios with message lines.
 // SCNBOOT_DUMP="frame:address:length:file,..." writes the scripts' memory (hex address) to a file
-// after that frame.
+// after that frame. SCNBOOT_POKE="b301=7,g5=1" keeps those variables (g, a or b and the index) at
+// those values: written before every frame, so a game whose story starts at a variable's scene
+// (EDEN IV's b[301], as its scene list sets it) is started there.
 // SCNBOOT_AREAS=1 checks ScnVm.TakeChangedArea: a copy of the window's picture updated only in the
 // areas it gives must be the picture after every frame (the players copy only those).
 // SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames; a game
@@ -235,6 +237,14 @@ uint pausedFor = 0;
 var dumps = (Environment.GetEnvironmentVariable("SCNBOOT_DUMP") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
     .Select(d => d.Split(':', 4)).Where(d => d.Length == 4)
     .Select(d => (Frame: int.Parse(d[0]), Address: Convert.ToInt32(d[1], 16), Length: int.Parse(d[2]), File: d[3])).ToList();
+var pokes = (Environment.GetEnvironmentVariable("SCNBOOT_POKE") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+    .Select(p => p.Split('=')).Select(p => (Address: p[0][0] switch
+    {
+        'g' => vm.GAddress(int.Parse(p[0][1..])),
+        'a' => vm.AAddress(int.Parse(p[0][1..])),
+        'b' => vm.BAddress(int.Parse(p[0][1..])),
+        _ => throw new ArgumentException($"SCNBOOT_POKE: {p[0]}"),
+    }, Value: int.Parse(p[1]))).ToList();
 byte[]? areaCopy = Environment.GetEnvironmentVariable("SCNBOOT_AREAS") == "1" ? new byte[vm.ScreenWidth * vm.ScreenHeight * 3] : null;
 long areaPixels = 0, areaFrames = 0;
 int areaMisses = 0;
@@ -261,6 +271,8 @@ try
                 host.SweepPoint = null;
             }
         }
+        foreach (var (address, value) in pokes)
+            vm.Write32(address, value);
         foreach (var (message, wParam) in host.Messages())
             vm.WindowMessage(message, wParam, message is >= ScnMessage.LButtonDown and <= ScnMessage.MButtonUp
                 ? ScnMessage.Point(host.MousePosition.X, host.MousePosition.Y) : ScnMessage.Key(0, message == ScnMessage.KeyDown, false));

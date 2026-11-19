@@ -2,10 +2,14 @@
 // GrandCrossExtractor). The files of a folder named as entries of an archive are packed (YPK,
 // zlib) and encrypted with the game's scheme; the other entries are copied as they are, so the
 // game reads the new archive as the old one with those files changed. Older WARC versions keep
-// their index range-coded, which there is no encoder for.
+// their index range-coded, which there is no encoder for. A picture (.S25) may be given as PNG
+// files of its frames, named as extraction names them ("BG01.png" for a picture of one frame,
+// "EV01@0002.png" for frame 2 of one of several): the frames whose pixels changed are put in
+// place of the old ones and the S25 written again (S25Encoder).
 
 using System.IO.Compression;
 using System.Text;
+using OpenShiina.Formats;
 
 namespace OpenShiina.Archives;
 
@@ -70,10 +74,12 @@ public static class WarcPacker
             long entryOffset = output.Position;
             string safeName = MediaConverter.SafeFileName(origEntry.Name);
 
-            if (sourceFiles.TryGetValue(safeName, out var srcPath))
+            byte[]? content = sourceFiles.TryGetValue(safeName, out var srcPath) ? File.ReadAllBytes(srcPath)
+                              : FramePictures(origEntry.Name, sourceFiles) is { Count: > 0 } pictures ? PictureFromFrames(originalArchive, origEntry, pictures)
+                              : null;
+            if (content != null)
             {
                 // ── Modified entry: pack & encrypt new content ─────────
-                byte[] content = File.ReadAllBytes(srcPath);
                 byte[] packed = PackAndEncryptEntry(decoder, origEntry, content);
                 output.Write(packed, 0, packed.Length);
 
@@ -150,7 +156,30 @@ public static class WarcPacker
         foreach (var entry in packed.Entries)
         {
             if (!sourceFiles.TryGetValue(MediaConverter.SafeFileName(entry.Name), out var file))
+            {
+                if (FramePictures(entry.Name, sourceFiles) is { Count: > 0 } pictures)
+                {
+                    try
+                    {
+                        // Each frame given as a picture reads back as its pixels
+                        var frames = S25Decoder.DecodeAllFrames(WarcOpener.OpenEntry(packed, entry));
+                        if (pictures.Remove(-1, out var single) && frames.Count == 1)
+                            pictures[frames[0].Index] = single;
+                        foreach (var (index, png) in pictures)
+                            if (frames.FirstOrDefault(f => f.Index == index) is not { } frame
+                                || !SameFrame(frame.Image, LoadPicture(png)))
+                            {
+                                wrong.Add($"{entry.Name}: frame {index} reads back different");
+                                break;
+                            }
+                    }
+                    catch (Exception ex)
+                    {
+                        wrong.Add($"{entry.Name}: {ex.Message}");
+                    }
+                }
                 continue;
+            }
             try
             {
                 if (!WarcOpener.OpenEntry(packed, entry).AsSpan().SequenceEqual(File.ReadAllBytes(file)))
@@ -162,6 +191,82 @@ public static class WarcPacker
             }
         }
         return wrong;
+    }
+
+    /// <summary>
+    /// The PNG files of the source folder that give frames of the picture <paramref name="name"/>
+    /// (an .S25 entry), by frame number: "STEM@NNNN.png" frame NNNN, "STEM.png" the frame of a
+    /// picture of one (number -1 until the picture is read). Empty for any other entry.
+    /// </summary>
+    private static Dictionary<int, string> FramePictures(string name, Dictionary<string, string> sourceFiles)
+    {
+        var pictures = new Dictionary<int, string>();
+        if (!name.EndsWith(".S25", StringComparison.OrdinalIgnoreCase))
+            return pictures;
+        string stem = Path.GetFileNameWithoutExtension(MediaConverter.SafeFileName(name));
+        if (sourceFiles.TryGetValue(stem + ".png", out var single))
+            pictures[-1] = single;
+        foreach (var (file, path) in sourceFiles)
+            if (file.Length == stem.Length + 9 && file.StartsWith(stem + "@", StringComparison.OrdinalIgnoreCase)
+                && file.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(file.AsSpan(stem.Length + 1, 4), System.Globalization.NumberStyles.None, null, out int index))
+                pictures[index] = path;
+        return pictures;
+    }
+
+    /// <summary>
+    /// The picture <paramref name="entry"/> with the frames of <paramref name="pictures"/> in
+    /// place of its own, or null when every one of them has the pixels it had (the entry is then
+    /// copied as it is). A frame number -1 ("STEM.png") is the frame of a picture of one.
+    /// </summary>
+    private static byte[]? PictureFromFrames(WarcArchive archive, WarcEntry entry, Dictionary<int, string> pictures)
+    {
+        byte[] original;
+        lock (archive)
+            original = WarcOpener.OpenEntry(archive, entry);
+        var frames = S25Decoder.DecodeAllFrames(original);
+        if (pictures.Remove(-1, out var single))
+        {
+            if (frames.Count != 1)
+                throw new InvalidDataException($"{entry.Name} has {frames.Count} frames: name their pictures {Path.GetFileNameWithoutExtension(entry.Name)}@NNNN.png, as extraction does.");
+            pictures[frames[0].Index] = single;
+        }
+        var changed = new Dictionary<int, PixelImage>();
+        foreach (var (index, png) in pictures)
+        {
+            var frame = frames.FirstOrDefault(f => f.Index == index)
+                        ?? throw new InvalidDataException($"{entry.Name} has no frame {index} ({Path.GetFileName(png)}).");
+            var picture = LoadPicture(png);
+            if (!SameFrame(frame.Image, picture))
+                changed[index] = picture;
+        }
+        return changed.Count > 0 ? S25Encoder.ReplaceFrames(original, changed) : null;
+    }
+
+    /// <summary>
+    /// A PNG file's pixels, its fully transparent ones made 0 (an editor keeps any colour under
+    /// alpha 0, which shows nothing and the S25 does not keep).
+    /// </summary>
+    private static PixelImage LoadPicture(string png)
+    {
+        var picture = PngDecoder.Decode(File.ReadAllBytes(png));
+        var p = picture.Pixels;
+        for (int i = 0; i < p.Length; i += 4)
+            if (p[i + 3] == 0)
+                p[i] = p[i + 1] = p[i + 2] = 0;
+        return picture;
+    }
+
+    /// <summary>The same size and pixels, a fully transparent pixel being one whatever its colour.</summary>
+    private static bool SameFrame(PixelImage frame, PixelImage picture)
+    {
+        if (frame.Width != picture.Width || frame.Height != picture.Height)
+            return false;
+        byte[] a = frame.Pixels, b = picture.Pixels;
+        for (int i = 0; i < b.Length; i += 4)
+            if (a[i + 3] != b[i + 3] || (b[i + 3] != 0 && (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2])))
+                return false;
+        return true;
     }
 
     // ════════════════════════════════════════════════════════════════════════

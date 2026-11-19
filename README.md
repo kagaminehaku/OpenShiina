@@ -38,10 +38,10 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 
 ## Games
 
-99 games (100 releases) play through on Windows, Linux and Android, among them the GRAND†CROSS
+100 games (101 releases) play through on Windows, Linux and Android, among them the GRAND†CROSS
 "Plus" games and Maki Fes!, the Bitch games, Kyuuketsuki no Libra, and the English releases of
 Libra of the Vampire Princess, Sorcery Jokers and The Pillagers of Raillore. Engine versions 2.20,
-2.31, 2.33, 2.34, 2.37, 2.38, 2.40, 2.43 and 2.44 to 2.50 run. OpenShiina has the keys of 50 more
+2.31, 2.33, 2.34, 2.37, 2.38, 2.40, 2.43 and 2.44 to 2.50 run. OpenShiina has the keys of 49 more
 ShiinaRio games, not played through yet.
 
 **Every game, with its engine version and how far it was checked: [docs/compatibility.md](docs/compatibility.md).**
@@ -115,7 +115,8 @@ it now runs on Avalonia and the player's engine, so it opens every game the play
   pictures frame by frame, play the sounds, read the scripts.
 - **Extract** files as they are stored or converted: S25 / MI4 to PNG, OGV to OGG, PAD to WAV.
   **Compose layers** saves event pictures and sprites whole, as the story shows them.
-- **Repack** edited files into a new archive (WARC 1.7). Each one is checked before it is saved.
+- **Repack** edited files into a new archive (WARC 1.7), pictures from PNG files of their frames.
+  Each one is checked before it is saved.
 - **Translate** a game in the Translation tab, below.
 
 ## Translations

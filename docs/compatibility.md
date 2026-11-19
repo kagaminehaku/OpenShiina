@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.20, 2.31, 2.33, 2.34, 2.37, 2.38, 2.40, 2.43 and 2.44
 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 99 games, 100 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 100 games, 101 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10` and the latter's `FDF2`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -44,7 +44,7 @@ of those versions it does not list.
 | Shi-Ka-E-Shi | シ・カ・エ・シ | 2002-01-25 | [v5574](https://vndb.org/v5574) | v2.15 | ⚪ Not tried |  |
 | Hana no Kioku 7 | 花の記憶 ～第七章～ | 2002-12-20 | [v8713](https://vndb.org/v8713) | v2.18 | ⚪ Not tried |  |
 | Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ⚪ Not tried |  |
-| EDEN IV | ＥＤＥＮ４ | 2003-03-28 | [v4601](https://vndb.org/v4601) | v2.20 | 🟢 Plays | 2026-11-19 |
+| EDEN IV | ＥＤＥＮ４ | 2003-03-28 | [v4601](https://vndb.org/v4601) | v2.20 | ✅ Plays through | 2026-11-19 |
 | STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | ⚪ Not tried |  |
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ⚪ Not tried |  |
@@ -896,10 +896,15 @@ same key); all 2,074 files whole.
 keys (a scheme of its own now). Its opcode table came from its executable (engine-notes.md,
 "Engine builds"); `0580` (a movie's time, not done: the player's movies do not seek), `0581` (how
 many times a looping movie came to its end) and `0654` were new, and `0579`'s second operand
-loops the movie. Its story is in E4MAIN.SCN and 129 MPEG movies in m\: run from its title it
-plays its movies and their scenes where the player clicks a part of the picture (`0456` and a
-table of rectangles); the bot's clicks find some of them and the movies change, but not the way
-on, so it was not played through.
+loops the movie. Its story is in E4MAIN.SCN, not scenario TXT: 125 scenes, each a movie of m\ (129 MPEG
+movies), a `switch` on `b[301]` (the scene to start at, which TOPMENU's MOVIE list sets: a new
+game 0) and the scene after one by where the player clicks the picture (`0456` and a table of
+rectangles). Some scenes are a room seen four ways (`bf2a` to `bf2d` and the like), a click
+turning the view and one place leading out, which the bot's clicks do not find. As Cleavage, it
+was run scene by scene: ScnBoot started at each of the 125 (`SCNBOOT_POKE=b301=N`, the auto
+clicks, 60,000 frames), every one plays its movie and goes on with no error, the scenes after it
+following (`b[600 + n]`, the scene seen, read at the end); the last (124, ls2 and ed.mpg) ends
+the game and goes back to the title, whose MOVIE list then shows the scenes seen (2026-11-19).
 
 ## Sweeping
 
