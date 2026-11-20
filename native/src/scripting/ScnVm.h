@@ -644,6 +644,9 @@ private:
     // ---- Events ----
     void RegisterEvents();
     bool MessageHook(int message, int wParam, int lParam);
+    bool MessageSlot(int slot, int message, int wParam, int lParam);
+    // The slots op_0849 registered for single messages (message, slot), in their order
+    std::vector<std::pair<int, int>> m_messageSlots;
     void PumpMessages() { Paint(); }
     void FireTimers();
     uint32_t Clock() { return (m_paused ? m_pausedAt : m_host.Milliseconds()) - m_pausedFor; }

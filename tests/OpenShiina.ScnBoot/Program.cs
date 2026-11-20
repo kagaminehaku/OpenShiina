@@ -76,8 +76,10 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_LIST") == "1")
 }
 Console.WriteLine($"{scheme.Name}, engine v{version}, first script {start}");
 
-// Save data of the test run: a temporary folder, never the player's real data
-string saves = Path.Combine(Path.GetTempPath(), "openshiina-scnboot", PlayerFolders.FolderName(scheme.Name));
+// Save data of the test run: a temporary folder, never the player's real data (SCNBOOT_SAVES=folder:
+// one of its own, for runs side by side that must not read or hold each other's saves)
+string saves = Environment.GetEnvironmentVariable("SCNBOOT_SAVES") is { Length: > 0 } ownSaves ? ownSaves
+    : Path.Combine(Path.GetTempPath(), "openshiina-scnboot", PlayerFolders.FolderName(scheme.Name));
 Directory.CreateDirectory(saves);
 var host = new Host(data, saves);
 var vm = new ScnVm(ScnOpcodes.ForVersion(version, scheme.Name), host)
@@ -134,7 +136,13 @@ bool sweep = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP") == "1";
 // Kurenai no!?'s message window has a button there) and adds a row at 40% (its choices are at
 // 30-45% of the height, between the grid's rows), and "center" clicks only in the middle:
 // tests\sweep.ps1 runs a stuck scenario again so)
-host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") switch
+// "auto:x,y;x,y..." clicks those places as "auto" clicks its grid (the message window of a game that
+// has it below the grid), the buttons sought after them as there
+string sweepClicksSetting = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") ?? "";
+bool autoClicks = sweepClicksSetting == "auto" || sweepClicksSetting.StartsWith("auto:");
+if (sweepClicksSetting.StartsWith("auto:"))
+    sweepClicksSetting = sweepClicksSetting[5..];
+host.SweepClicks = sweepClicksSetting switch
 {
     "center" => [(vm.ScreenWidth / 2, vm.ScreenHeight / 2)],
     "auto" => [.. from y in new[] { 28, 50, 72 } from x in new[] { 50, 25, 75 } select (vm.ScreenWidth * x / 100, vm.ScreenHeight * y / 100)],
@@ -148,7 +156,7 @@ host.SweepClicks = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") sw
 // scripts look for the mouse (ClickSeeker): the buttons of the sprite list 04C7 tells apart, and
 // the boxes of the places the scripts compare the mouse's x and y with, each once, until
 // something new comes
-var seeker = Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_CLICKS") == "auto" ? new ClickSeeker(vm.ScreenWidth, vm.ScreenHeight) : null;
+var seeker = autoClicks ? new ClickSeeker(vm.ScreenWidth, vm.ScreenHeight) : null;
 int seekAfter = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_AUTO"), out int seekFrames) ? seekFrames : 900;
 if (seeker != null)
     vm.CompareSeen = (a, b, cmp) => seeker.Compared(host.MousePosition, a, b, cmp);
@@ -363,6 +371,11 @@ try
                 (slowestMs, slowestAt) = (frameTime.ElapsedMilliseconds, vm.ShownLine ?? $"frame {frame}");
             if (sweepEnd == null && sweepTotal > 0 && sweepSeen.Count >= sweepTotal)
                 sweepEnd = "done (every line)";
+            if (sweepEnd == null && host.NextModule is { } next)
+                sweepEnd = $"done (next module {next})";
+            // (a module's story going on reads files for the first time: its pictures, voices)
+            if (host.ModuleSwapped)
+                sweepLastNew = Math.Max(sweepLastNew, host.LastNewFile);
             // A movie playing (an ending of minutes) is not standing still
             if (vm.MoviePlaying)
                 sweepLastNew = frame;
@@ -387,7 +400,10 @@ catch (ScnException ex)
     Console.WriteLine($"Frame {frame}: {ex.Message}");
     if (ex.Message.StartsWith("Out of script memory", StringComparison.Ordinal))
         Console.WriteLine($"  [heap] {vm.HeapReport()}");
-    var c = ex.Slot >= 0 ? vm.Slot(ex.Slot) : null;
+    // (an operand the decoder cannot read names no slot: the task running then)
+    var c = ex.Slot >= 0 ? vm.Slot(ex.Slot) : vm.CurrentTask;
+    if (ex.Slot < 0 && c != null)
+        Console.WriteLine($"  slot {c.Slot} decoding at {c.Pc:X8} ({vm.DescribeAddress(c.Pc)})");
     if (c != null)
     {
         try
@@ -573,8 +589,35 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
 
     public int LastNewFile { get; private set; }
 
+    // SCNBOOT_MODULE="first.scn=module.scn": the first time the scripts read the module their story
+    // starts with, another is read in its place (a story of SCN modules swept module by module, the
+    // game started from its title as it is, the variables its menus set kept); NextModule is the
+    // first module read after it (with SCNBOOT_SWEEP=1 the run ends there: "done (next module)")
+    private static readonly string[] s_module = (Environment.GetEnvironmentVariable("SCNBOOT_MODULE") ?? "").Split('=', 2);
+
+    // SCNBOOT_MODULE_SUB="item,tips": modules whose names start so are called and come back (Deco's
+    // items and tips): reading one is not the next module
+    private static readonly string[] s_subModules = (Environment.GetEnvironmentVariable("SCNBOOT_MODULE_SUB") ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+    public bool ModuleSwapped { get; private set; }
+
+    public string? NextModule { get; private set; }
+
     public byte[]? ReadFile(string name)
     {
+        if (s_module.Length == 2 && name.EndsWith(".scn", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!ModuleSwapped && name.EndsWith(s_module[0], StringComparison.OrdinalIgnoreCase))
+            {
+                ModuleSwapped = true;
+                name = name[..^s_module[0].Length] + s_module[1];
+                Console.WriteLine($"[module] {name} in place of {s_module[0]} at {Frame}");
+            }
+            else if (ModuleSwapped && NextModule == null && !name.EndsWith(s_module[1], StringComparison.OrdinalIgnoreCase)
+                && !s_subModules.Any(s => Path.GetFileName(name).StartsWith(s, StringComparison.OrdinalIgnoreCase)))
+                NextModule = name;
+        }
         if (m_filesRead.Add(name))
             LastNewFile = Frame;
         if (Swap(name) is { } swap)
@@ -598,6 +641,13 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
     public byte[]? ReadLooseFile(string name)
     {
         var bytes = data.LooseFile(name) is { } path ? File.ReadAllBytes(path) : null;
+        // (with SCNBOOT_FILES=1 the files of the game's folder too: EDEN's movies)
+        if (s_traceFiles && !name.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase))
+        {
+            if (m_filesRead.Add(name))
+                LastNewFile = Frame;
+            Console.WriteLine($"[loose] {name} {bytes?.Length ?? -1} at {Frame}");
+        }
         // SCNBOOT_INI="Key=value;...": RIO.INI as the scripts see it, with those keys changed
         if (bytes != null && name.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase)
             && Environment.GetEnvironmentVariable("SCNBOOT_INI") is { Length: > 0 } changes)

@@ -6,7 +6,7 @@
 //   WM_ACTIVATEAPP (b[17] & 4: keys are read), WM_MOUSEWHEEL (b[18]: 1 up, 2 down, for its
 //   buttons), WM_LBUTTONDOWN / WM_RBUTTONDOWN (end AUTO / SKIP), WM_KEYDOWN 'A' / 'S' (AUTO /
 //   SKIP on and off) and WM_PAINT (the skip clock);
-// - (slots op_0849 registers for single messages: no game uses them);
+// - if it did not take it, the slots op_0849 registers for single messages (Love Revo's minigames);
 // - then the engine's own handling: a mouse button the slot of 0474 / 0475 (the old engines,
 //   ScnVm.OldEngines.cs); WM_CLOSE runs the slot of op_078A (0x488098) and closes the
 //   window only when its "end" is not 0 (no slot: it closes); WM_ACTIVATEAPP the slots of op_076C
@@ -112,15 +112,31 @@ public sealed partial class ScnVm
             RunSlotSync(slot);
     }
 
+    // The slots op_0849 registered for single messages, in their order (v2.49's 0x8C92B8: message,
+    // slot, the slot's context; 0xD0D668 their number)
+    private readonly List<(int Message, int Slot)> m_messageSlots = new();
+
     /// <summary>
-    /// The slot of op_07E4 sees a message (0x4355B0): window, message, wParam and lParam pushed on
-    /// its stack (l[0..3]) while it runs. True when it took the message (its "end" is not 0).
+    /// The slot of op_07E4 sees a message (0x4355B0), then, if it did not take it, the slots op_0849
+    /// registered for that message one after another (v2.49's 0x43E0D2) until one takes it: window,
+    /// message, wParam and lParam pushed on the slot's stack (l[0..3]) while it runs. True when one
+    /// took the message (its "end" is not 0).
     /// </summary>
     private bool MessageHook(int message, int wParam, int lParam)
     {
         int slot = EngineGlobals.GetValueOrDefault(0x4880A8, -1);
-        if (slot is < 0 or >= Slots)
-            return false;
+        if (slot is >= 0 and < Slots && MessageSlot(slot, message, wParam, lParam))
+            return true;
+        // (a slot run may take itself off the list: its number read again each time, as there)
+        for (int n = 0; n < m_messageSlots.Count; n++)
+            if (m_messageSlots[n].Message == message && MessageSlot(m_messageSlots[n].Slot, message, wParam, lParam))
+                return true;
+        return false;
+    }
+
+    /// <summary>One slot run for a message (see <see cref="MessageHook"/>); true when it took it.</summary>
+    private bool MessageSlot(int slot, int message, int wParam, int lParam)
+    {
         var c = m_slots[slot];
         if (c.Sp < 4)
             return false;
@@ -256,5 +272,30 @@ public sealed partial class ScnVm
         });
         // 0AFB id: KillTimer (an unknown timer is a script error)
         Register(0x0AFB, (vm, c, i) => vm.m_timers.Remove(vm.Value(c, i.Args[0])) ? 0 : 2);
+        // 0848: no slot runs on single messages any more (v2.49's 0x425030)
+        Register(0x0848, (vm, c, i) =>
+        {
+            vm.m_messageSlots.Clear();
+            return 0;
+        });
+        // 0849 message, slot: that slot runs on that message (after the slot of 07E4; Love Revo's
+        // minigames: 2, WM_DESTROY, and 0x201, WM_LBUTTONDOWN), once however often it is asked
+        // (0x425040)
+        Register(0x0849, (vm, c, i) =>
+        {
+            int message = vm.Value(c, i.Args[0]), slot = vm.Value(c, i.Args[1]);
+            if (slot is < 0 or >= Slots)
+                return 2;
+            if (!vm.m_messageSlots.Contains((message, slot)))
+                vm.m_messageSlots.Add((message, slot));
+            return 0;
+        });
+        // 084A message, slot: takes that slot off the message (slot -1: every slot of it; 0x4250B0)
+        Register(0x084A, (vm, c, i) =>
+        {
+            int message = vm.Value(c, i.Args[0]), slot = vm.Value(c, i.Args[1]);
+            vm.m_messageSlots.RemoveAll(s => s.Message == message && (s.Slot == slot || slot == -1));
+            return 0;
+        });
     }
 }

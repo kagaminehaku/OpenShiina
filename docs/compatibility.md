@@ -17,10 +17,9 @@ row when something changes (see [Updating](#updating) at the end).
 Every game whose archives OpenShiina can open: the eleven GRAND†CROSS "Plus" games it started
 with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archives open, every
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
-version. The interpreter runs engine versions 2.20, 2.30, 2.31, 2.33, 2.34, 2.36 to 2.38 and 2.40 to 2.50, and
-boots 2.15 (Shi-Ka-E-Shi); see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
+version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 134 games, 135 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 143 games, 144 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -42,15 +41,15 @@ of those versions it does not list.
 |---|---|---|---|---|---|---|
 | Hachigatsu no Nostalgia ~The Summer with You~ | 八月のノスタルジア ～the summer with you～ | 2000-07-07 | [v3419](https://vndb.org/v3419) | v2.20 | 🟡 Starts | 2026-11-20 |
 | Calendar Girl | カレンダーガール | 2000-07-21 | [v6978](https://vndb.org/v6978) | v2.02 | 🟡 Starts | 2026-11-20 |
-| Hana no Kioku 1-2-3 | 花の記憶 わん・つう・すり～ | 2000-11-24 | [r19761](https://vndb.org/r19761) | v2.10 | 🟡 Starts | 2026-11-20 |
+| Hana no Kioku 1-2-3 | 花の記憶 わん・つう・すり～ | 2000-11-24 | [r19761](https://vndb.org/r19761) | v2.10 | ✅ Plays through | 2026-11-20 |
 | Kanawanu Koi no Monogatari | 叶わぬ恋の物語 | 2001-03-30 | [v20212](https://vndb.org/v20212) | v2.11 | 🟡 Starts | 2026-11-20 |
 | Baby, BE -Bedside Emotion- | Baby, BE -Bedside Emotion- | 2001-04-20 | [v1942](https://vndb.org/v1942) | v2.11 | 🟡 Starts | 2026-11-20 |
-| Shi-Ka-E-Shi | シ・カ・エ・シ | 2002-01-25 | [v5574](https://vndb.org/v5574) | v2.15 | 🟡 Starts | 2026-11-19 |
-| Mahou no Shippo na Dai Ichi wa | 魔法のしっぽな 第一話 | 2002-03-22 | [v14674](https://vndb.org/v14674) | v2.16 | 🟡 Starts | 2026-11-20 |
+| Shi-Ka-E-Shi | シ・カ・エ・シ | 2002-01-25 | [v5574](https://vndb.org/v5574) | v2.15 | ✅ Plays through | 2026-11-20 |
+| Mahou no Shippo na Dai Ichi wa | 魔法のしっぽな 第一話 | 2002-03-22 | [v14674](https://vndb.org/v14674) | v2.16 | ✅ Plays through | 2026-11-20 |
 | Itsuka, Dokoka de ~Ano Amaoto no Kioku~ | いつか、どこかで ～あの雨音の記憶～ | 2002-05-24 | [v3214](https://vndb.org/v3214) | v2.16 | 🟢 Plays | 2026-11-20 |
-| Hana no Kioku 7 | 花の記憶 ～第七章～ | 2002-12-20 | [v8713](https://vndb.org/v8713) | v2.18 | 🟡 Starts | 2026-11-20 |
-| Mahou no Shippo na Dai San wa | 魔法のしっぽな 第三話 | 2003-01-24 | [v14673](https://vndb.org/v14673) | v2.18 | 🟡 Starts | 2026-11-20 |
-| Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | 🟡 Starts | 2026-11-20 |
+| Hana no Kioku 7 | 花の記憶 ～第七章～ | 2002-12-20 | [v8713](https://vndb.org/v8713) | v2.18 | ✅ Plays through | 2026-11-20 |
+| Mahou no Shippo na Dai San wa | 魔法のしっぽな 第三話 | 2003-01-24 | [v14673](https://vndb.org/v14673) | v2.18 | ✅ Plays through | 2026-11-20 |
+| Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ✅ Plays through | 2026-11-20 |
 | EDEN IV | ＥＤＥＮ４ | 2003-03-28 | [v4601](https://vndb.org/v4601) | v2.20 | ✅ Plays through | 2026-11-19 |
 | STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | 🟡 Starts | 2026-11-20 |
 | EDEN V | EDEN V | 2003-07-18 | [v4604](https://vndb.org/v4604) | v2.20 | 🟡 Starts | 2026-11-20 |
@@ -59,7 +58,7 @@ of those versions it does not list.
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | 🟡 Starts | 2026-11-20 |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | ✅ Plays through | 2026-11-05 |
 | Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🟢 Plays | 2026-11-05 |
-| Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | 🟡 Starts | 2026-11-19 |
+| Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ✅ Plays through | 2026-11-20 |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.33 | 🟡 Starts | 2026-11-20 |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ✅ Plays through | 2026-11-04 |
 | Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | v2.34 | 🟡 Starts | 2026-11-20 |
@@ -68,10 +67,10 @@ of those versions it does not list.
 | ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | ✅ Plays through | 2026-11-20 |
 | Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Gibo to Oba ~Soshite Yuujin no Haha~ | 義母と叔母 ～そして友人の母～ | 2005-12-22 | [v2498](https://vndb.org/v2498) | v2.36 | 🟢 Plays | 2026-11-19 |
-| Hitozuma OL -Chijoku no Gyoumu Meirei- | 人妻OL -恥辱の業務命令- | 2005-12-22 | [v2911](https://vndb.org/v2911) | v2.36 | 🟡 Starts | 2026-11-19 |
+| Hitozuma OL -Chijoku no Gyoumu Meirei- | 人妻OL -恥辱の業務命令- | 2005-12-22 | [v2911](https://vndb.org/v2911) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Otometeki Koi Kakumei★Love Revo!! | 乙女的恋革命★ラブレボ!! | 2006-01-26 | [v3549](https://vndb.org/v3549) | v2.42 | ⚪ Not tried |  |
 | CC Hospital | CCホスピタル | 2006-03-24 | [v5300](https://vndb.org/v5300) | v2.37 | ✅ Plays through | 2026-11-20 |
-| Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | 🟡 Starts | 2026-11-20 |
+| Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Shinseki no Oba-san | 親戚の小母さん ～離れの熟女、本家の後妻～ | 2006-03-31 | [v4399](https://vndb.org/v4399) | v2.36 | 🟡 Starts | 2026-11-19 |
 | Sabae no Ou | 蠅声の王 | 2006-04-28 | [v607](https://vndb.org/v607) | v2.36 | 🟡 Starts | 2026-11-19 |
 | Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | v2.37 | ✅ Plays through | 2026-11-04 |
@@ -983,6 +982,23 @@ from June 19 to its last day and an ending (33 of its 35 modules; its text came 
 the Hana no Kioku chapters to their ends (a wait of 4 ms on the performance counter, `03CA`, in a
 loop that does not yield had stood still: the counter now goes on at each read). Puri-Puri and
 Hitozuma OL stood in a `0084` that drew a text at once after a `_w`: its waits are off now.
+
+**The games of SCN modules, module by module (2026-11-20, evening).** A story of SCN modules is
+swept as the scenarios of the later games are: ScnBoot's `SCNBOOT_MODULE="first.scn=module.scn"`
+starts the game from its title as it is (its menus set what they set) and reads another module in
+place of the first one of the story; the run is done when the scripts read the module after it
+("done (next module ...)"), stuck when no file is read for the first time for a while. Every
+module of these ran to the next one with no error: the Hana no Kioku releases (1-2-3: the 16
+modules of its four chapters; 4-5-6: 18, each chapter's from its own menu; 7: 6, from its
+character select), Shi-Ka-E-Shi (26; FKS06 asks whether to save at its end, and its save screen
+closes with the icon at its lower left; the staff roll lasts 150 s), Death☆Meta (211) and
+Hitozuma OL (28). Mahou no Shippo na Dai Ichi wa and Dai San wa are a module each, played from
+their titles to their ends (the same frame with the clicks in order and shuffled: no branches).
+Omocha no Sensei is one module, GAMEMAIN.SCN, its parts one after another from its title: run
+600,000 frames, every file it names was read (M04.OGV, X000, X004 and EV_WHITE are in its archive
+but named by no script). Love Revo's minigames register a slot for a window message (`0849`
+message, slot; `084A` takes it off, `0848` all): such a slot runs after the slot of `07E4` when
+that message comes (ScnVm.Events.cs, from Aneiro's v2.49 build, 0x425040).
 
 ## Sweeping
 

@@ -76,8 +76,18 @@ void ScnVm::Notify(ScnEvent e)
 bool ScnVm::MessageHook(int message, int wParam, int lParam)
 {
     int slot = EngineGlobalOr(0x4880A8, -1);
-    if (slot < 0 || slot >= Slots)
-        return false;
+    if (slot >= 0 && slot < Slots && MessageSlot(slot, message, wParam, lParam))
+        return true;
+    // Then the slots op_0849 registered for this message (a slot run may take itself off the list:
+    // its number read again each time, as there)
+    for (size_t n = 0; n < m_messageSlots.size(); n++)
+        if (m_messageSlots[n].first == message && MessageSlot(m_messageSlots[n].second, message, wParam, lParam))
+            return true;
+    return false;
+}
+
+bool ScnVm::MessageSlot(int slot, int message, int wParam, int lParam)
+{
     auto& c = m_slots[size_t(slot)];
     if (c.Sp < 4)
         return false;
@@ -166,6 +176,27 @@ void ScnVm::RegisterEvents()
     });
     // 0AFB id: KillTimer (an unknown timer is a script error)
     Register(0x0AFB, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) { return vm.m_timers.Remove(vm.Value(c, i.Args[0])) ? 0 : 2; });
+    // 0848: no slot runs on single messages any more
+    Register(0x0848, [](ScnVm& vm, ScnContext&, const ScnInstruction&) {
+        vm.m_messageSlots.clear();
+        return 0;
+    });
+    // 0849 message, slot: that slot runs on that message (after the slot of 07E4), once however often it is asked
+    Register(0x0849, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int message = vm.Value(c, i.Args[0]), slot = vm.Value(c, i.Args[1]);
+        if (slot < 0 || slot >= Slots)
+            return 2;
+        auto entry = std::make_pair(message, slot);
+        if (std::find(vm.m_messageSlots.begin(), vm.m_messageSlots.end(), entry) == vm.m_messageSlots.end())
+            vm.m_messageSlots.push_back(entry);
+        return 0;
+    });
+    // 084A message, slot: takes that slot off the message (slot -1: every slot of it)
+    Register(0x084A, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int message = vm.Value(c, i.Args[0]), slot = vm.Value(c, i.Args[1]);
+        std::erase_if(vm.m_messageSlots, [&](const std::pair<int, int>& s) { return s.first == message && (s.second == slot || slot == -1); });
+        return 0;
+    });
 }
 
 } // namespace openshiina::scripting

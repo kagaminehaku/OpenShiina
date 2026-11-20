@@ -1081,8 +1081,9 @@ the functions they call from the decompile. First findings:
 - **Window messages** (window procedure 0x4355B0; Ghidra leaves it out, read from the x86):
   every message first goes to the slot of `07E4` (0x4880A8) with l[0] the window, l[1] the
   message, l[2] wParam, l[3] lParam pushed on its stack; an "end" other than 0 takes the message.
-  Then the slots of `0849` (message -> slot pairs, 0x7DB128; `0848` clears, `084A` removes; no
-  game uses them), then the engine's own handling: WM_CLOSE runs the slot of `078A` and closes
+  Then the slots of `0849` (message -> slot pairs, 0x7DB128; `0848` clears, `084A` message, slot
+  removes, slot -1 every one of the message), each pushed the same four, until one takes the message
+  (Aneiro's v2.49 0x43E0D2; Love Revo's minigames register WM_DESTROY and WM_LBUTTONDOWN so), then the engine's own handling: WM_CLOSE runs the slot of `078A` and closes
   only when its end is not 0 (no slot: closes); WM_ACTIVATEAPP the focus slots; WM_PAINT (after
   `07D0`'s InvalidateRect) shows the back surface; WM_xBUTTONDOWN / UP keep the button masks
   0x13B52AC (held) / 0x13B52B0 (pressed since the last read) / 0x13B43FC / 0x13B4400 (with 0x20,
