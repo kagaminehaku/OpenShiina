@@ -38,8 +38,8 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 
 ## Games
 
-159 games (160 releases) play through on Windows, Linux and Android. Engine versions 2.02 to
-2.20, 2.30, 2.31, 2.33 to 2.39 and 2.40 to 2.50 run. OpenShiina opens the archives of 6 more
+162 games (163 releases) play through on Windows, Linux and Android. Engine versions 2.02 to
+2.20, 2.30, 2.31, 2.33 to 2.39 and 2.40 to 2.50 run. OpenShiina opens the archives of 3 more
 ShiinaRio games, not played through yet.
 
 **Every game, with its engine version and how far it was checked: [docs/compatibility.md](docs/compatibility.md).**
