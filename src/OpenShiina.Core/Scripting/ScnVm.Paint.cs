@@ -4,8 +4,9 @@
 // draw on it and invalidate their rectangle, 0568 / 056C and full screen invalidate all of it),
 // repainted by WM_PAINT at the next pump of the message queue or by op_07D1 (UpdateWindow).
 // That is the engine's GDI mode (RIO.INI has no "Render", 0x487F30 = -1: FUN_0040DB10 paints
-// between BeginPaint and EndPaint, so only the invalid region changes). Everything else drawn
-// into the display surface stays unseen until a repaint covers it - the save screen's cursor
+// between BeginPaint and EndPaint, so only the invalid region changes). Copies into the display
+// surface request a repaint themselves; Direct3D submits those copies directly.
+// Other drawing stays unseen until a repaint or a submission covers it - the save screen's cursor
 // (START 0x2BE6C) is drawn beyond the slot it belongs to and only the slot is invalidated.
 // The hosts show this picture (Window), not the display surface, and copy only the part of it
 // that changed (TakeChangedArea: the rectangles repainted since they last asked).
@@ -31,6 +32,59 @@ public readonly record struct ScreenArea(int L, int T, int R, int B)
 
 public sealed partial class ScnVm
 {
+    private enum WindowRenderer
+    {
+        Default = -1,
+        Gdi = 0,
+        DirectDraw = 1,
+        Direct3D = 2,
+    }
+
+    private const int RendererGlobal = 0x487F30;
+    private bool m_rendererInitialised;
+    private (int A, int B, int C) m_rendererFilters;
+
+    // Keep the script-visible renderer in one place, whether selected by RIO.INI or 04E8.
+    private WindowRenderer CurrentRenderer
+    {
+        get
+        {
+            if (!m_rendererInitialised)
+            {
+                m_rendererInitialised = true;
+                if (!EngineGlobals.TryGetValue(RendererGlobal, out int mode))
+                    mode = IniInt("RIO.INI", RioSection(), "Render", -1);
+                if (mode is >= 0 and <= 2)
+                    EngineGlobals[RendererGlobal] = mode;
+                m_rendererFilters = mode == 2 ? (2, 2, 0) : default;
+            }
+            return (WindowRenderer)EngineGlobals.GetValueOrDefault(RendererGlobal, -1);
+        }
+    }
+
+    private bool SelectRenderer(int mode, int a, int b, int c)
+    {
+        _ = CurrentRenderer;
+        if (mode is < 0 or > 2)
+            return false;
+        EngineGlobals[RendererGlobal] = mode;
+        if (mode == (int)WindowRenderer.Gdi)
+        {
+            EngineGlobals[0x482940] = a;
+            EngineGlobals[0x482944] = b;
+        }
+        m_rendererFilters = (a, b, c);
+        InvalidateWindow();
+        return true;
+    }
+
+    private (int A, int B, int C)? RendererFilters => CurrentRenderer switch
+    {
+        WindowRenderer.Gdi => (EngineGlobals.GetValueOrDefault(0x482940, 3), EngineGlobals.GetValueOrDefault(0x482944, 3), 0),
+        WindowRenderer.DirectDraw or WindowRenderer.Direct3D => m_rendererFilters,
+        _ => null,
+    };
+
     // The window's picture (24-bit, ScreenWidth x ScreenHeight) and its invalid rectangles
     private byte[]? m_window;
     private readonly List<(int L, int T, int R, int B)> m_invalid = [];
@@ -88,33 +142,12 @@ public sealed partial class ScnVm
         }
         Trace?.Add($"f{m_frameNumber} r{m_rounds} WM_PAINT: {m_invalid.Count} rectangles from surface {DisplaySurface}");
         RunPaintSlot(0x4880B0);
-        var window = m_window ??= new byte[ScreenWidth * ScreenHeight * 3];
-        int surface = DisplaySurface;
-        int pixels = SurfaceField(surface, 2), pitch = SurfaceField(surface, 10), bytes = SurfaceField(surface, 9) >> 3;
-        int width = Math.Min(SurfaceField(surface, 7), ScreenWidth), height = Math.Min(SurfaceField(surface, 8), ScreenHeight);
-        if (pixels != 0 && bytes is 3 or 4)
+        if (CurrentRenderer is WindowRenderer.DirectDraw or WindowRenderer.Direct3D)
+            CopyDisplayToWindow(new ScreenArea(0, 0, ScreenWidth, ScreenHeight));
+        else
         {
-            var row = new byte[ScreenWidth * bytes];
-            foreach (var (l, t, r0, b0) in m_invalid)
-            {
-                int r = Math.Min(r0, width), b = Math.Min(b0, height);
-                m_changed = m_changed.Union(new ScreenArea(l, t, r, b));
-                for (int y = t; y < b && l < r; y++)
-                {
-                    var src = row.AsSpan(0, (r - l) * bytes);
-                    ReadBytes(pixels + y * pitch + l * bytes, src);
-                    var dst = window.AsSpan((y * ScreenWidth + l) * 3, (r - l) * 3);
-                    if (bytes == 3)
-                        src.CopyTo(dst);
-                    else
-                        for (int x = 0, s = 0, d = 0; x < r - l; x++, s += 4, d += 3)
-                        {
-                            dst[d] = src[s];
-                            dst[d + 1] = src[s + 1];
-                            dst[d + 2] = src[s + 2];
-                        }
-                }
-            }
+            foreach (var (l, t, r, b) in m_invalid)
+                CopyDisplayToWindow(new ScreenArea(l, t, r, b));
         }
         m_invalid.Clear();
         ScreenInvalidated = true;
@@ -161,15 +194,45 @@ public sealed partial class ScnVm
         FrameShown = true;
     }
 
-    /// <summary>
-    /// v2.50 presents the display surface with Direct3D (06CC asks for it), so a copy into it shows
-    /// without InvalidateRect: its movie loop copies each frame there with 0514 / 051E and nothing
-    /// else. Here the rectangle is repainted then; earlier versions (GDI) leave it unseen.
-    /// </summary>
-    private void PresentedByDirect3D(int l, int t, int r, int b)
+    // 0514 / 051E request presentation when their destination is the display surface.
+    // GDI and DirectDraw queue a repaint (Chou Saiminjutsu Gakuen trial, 0x418780);
+    // Direct3D submits the whole surface without going through the WM_PAINT callbacks.
+    private void PresentSurfaceCopy(int l, int t, int r, int b)
     {
-        if (EngineVersion >= 250)
-            InvalidateWindow(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b));
+        var area = new ScreenArea(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b)).Clip(ScreenWidth, ScreenHeight);
+        if (area.IsEmpty)
+            return;
+        if (CurrentRenderer == WindowRenderer.Direct3D)
+            CopyDisplayToWindow(new ScreenArea(0, 0, ScreenWidth, ScreenHeight));
+        else
+            InvalidateWindow(area.L, area.T, area.R, area.B);
+    }
+
+    private void CopyDisplayToWindow(ScreenArea area)
+    {
+        int surface = DisplaySurface;
+        int pixels = SurfaceField(surface, 2), pitch = SurfaceField(surface, 10), bytes = SurfaceField(surface, 9) >> 3;
+        area = area.Clip(Math.Min(SurfaceField(surface, 7), ScreenWidth), Math.Min(SurfaceField(surface, 8), ScreenHeight));
+        if (pixels == 0 || bytes is not (3 or 4) || area.IsEmpty)
+            return;
+        var window = m_window ??= new byte[ScreenWidth * ScreenHeight * 3];
+        var row = new byte[area.Width * bytes];
+        for (int y = area.T; y < area.B; y++)
+        {
+            ReadBytes(pixels + y * pitch + area.L * bytes, row);
+            var dst = window.AsSpan((y * ScreenWidth + area.L) * 3, area.Width * 3);
+            if (bytes == 3)
+                row.CopyTo(dst);
+            else
+                for (int x = 0, s = 0, d = 0; x < area.Width; x++, s += 4, d += 3)
+                {
+                    dst[d] = row[s];
+                    dst[d + 1] = row[s + 1];
+                    dst[d + 2] = row[s + 2];
+                }
+        }
+        m_changed = m_changed.Union(area);
+        ScreenInvalidated = true;
     }
 
     private void RunPaintSlot(int global)

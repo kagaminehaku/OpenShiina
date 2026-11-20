@@ -219,19 +219,13 @@ public sealed partial class ScnVm
             return 0;
         });
         // 04E8 mode, a, b, c, v (FUN_0040D340): the renderer - 0 GDI (a, b: StretchBlt modes),
-        // 2 Direct3D, 3 OpenGL (a, b: texture filters). Only GDI is offered: v = 1 for it, 0 for
-        // the others (the scripts then fall back to GDI).
+        // 1 DirectDraw, 2 Direct3D, 3 OpenGL (a, b: texture filters). GDI and the direct
+        // presentation modes are emulated with the same pixel surfaces.
         Register(0x04E8, (vm, c, i) =>
         {
             int mode = vm.Value(c, i.Args[0]), a = vm.Value(c, i.Args[1]), b = vm.Value(c, i.Args[2]);
-            vm.Value(c, i.Args[3]);
-            if (mode == 0)
-            {
-                vm.EngineGlobals[0x482940] = a;
-                vm.EngineGlobals[0x482944] = b;
-                vm.EngineGlobals[0x487F30] = 0;
-            }
-            vm.Store(c, i.Args[4], mode == 0 ? 1 : 0);
+            int result = vm.SelectRenderer(mode, a, b, vm.Value(c, i.Args[3])) ? 1 : 0;
+            vm.Store(c, i.Args[4], result);
             return 0;
         });
         // 04E7 mode, a, b, c (REMPLUS.EXE 0x42B335): the renderer 04E8 last set (-1 when none
@@ -240,21 +234,12 @@ public sealed partial class ScnVm
         // Shiranai Kanojo's START keeps them to go back to when another renderer fails
         Register(0x04E7, (vm, c, i) =>
         {
-            int mode = vm.EngineGlobals.GetValueOrDefault(0x487F30, -1);
-            vm.Store(c, i.Args[0], mode);
-            (int a, int b)? filters = mode switch
+            vm.Store(c, i.Args[0], (int)vm.CurrentRenderer);
+            if (vm.RendererFilters is { } f)
             {
-                0 => (vm.EngineGlobals.GetValueOrDefault(0x482940, 3), vm.EngineGlobals.GetValueOrDefault(0x482944, 3)),
-                1 => (0, 0),
-                2 => (2, 2),
-                3 => (9729, 9729),
-                _ => null,
-            };
-            if (filters is { } f)
-            {
-                vm.Store(c, i.Args[1], f.a);
-                vm.Store(c, i.Args[2], f.b);
-                vm.Store(c, i.Args[3], 0);
+                vm.Store(c, i.Args[1], f.A);
+                vm.Store(c, i.Args[2], f.B);
+                vm.Store(c, i.Args[3], f.C);
             }
             return 0;
         });
