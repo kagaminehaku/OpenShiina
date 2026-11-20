@@ -73,6 +73,31 @@ public sealed partial class ScnVm
         // Saimin Seikatsu START 72760: 76 x 56 from blocks of 10 x 10
         RegisterNative("B51FD501F22CF51D019EF26160C1C35D6154CB2C", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 9, 84, 63));
         RegisterNative("13CE585B31BB34E5FA674268BD852030B126B3E6", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 10, 76, 56));
+        // Nagagutsu wo Haita Deco START 10859F (v2.39): 160 x 120 from blocks of 5 x 5, the picture's rows
+        // l[5] apart; 108617: the same 160 x 120 filled with BGR 75 BD CF, and 93 x 120 from blocks of
+        // 6 x 6 into it 33 pixels in (rows of 480 bytes)
+        RegisterNative("6C5DED8762FBFE6821145A7D410130EFDB95F93A", "thumbnail", (vm, c, a) =>
+            vm.Thumbnail(c, a, 5, 160, 120, vm.NativeArg(a, 0), vm.NativeArg(a, 4), vm.NativeArg(a, 5)));
+        RegisterNative("C80A13141C4B8840B831AAAEA03BC1F2674F128D", "thumbnail framed", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0);
+            if (!vm.IsContiguous(dst, 160 * 120 * 3))
+            {
+                vm.RunX86(c, a);
+                return;
+            }
+            using var verify = vm.VerifyRegion(c, a, dst, 160 * 120 * 3);
+            var fill = vm.Bytes(dst, 160 * 120 * 3);
+            for (int k = 0; k < fill.Length; k += 3)
+            {
+                fill[k] = 0x75;
+                fill[k + 1] = 0xBD;
+                fill[k + 2] = 0xCF;
+            }
+            vm.Thumbnail(c, a, 6, 93, 120, dst + 99, vm.NativeArg(a, 4), vm.NativeArg(a, 5), 480);
+        });
+        // Mikoko START 589C0 (v2.46): 112 x 84 from blocks of 7 x 7
+        RegisterNative("21C52517559904465696F7F765B049476EDE17BB", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 7, 112, 84));
         // Imouto Smile START 6D500: 80 x 60 from blocks of 10 x 10 (Kateinai Choukyou 2DE91, v2.31:
         // the same with the old engine's way into the routine)
         RegisterNative(["98EF46C517E4F797E130C2D3003A186ACE788B2F", "44620AFA82F065FFCECAB61D7549DFB59A7AAB00"], "thumbnail",
@@ -273,6 +298,10 @@ public sealed partial class ScnVm
         RegisterNative("A470F7A6AA684E2AF9F1EBF445D60C63C4269657", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x141C20));
         RegisterNative("6CDD92F21FABE3FBF5353F8D5A210AED96E9EF86", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x69BE0));
         RegisterNative("1EB7C3A5BABAEC65C179ACD912C8032A77D690BC", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x6089C));
+        // Nagagutsu wo Haita Deco START 1086B5: 2,985,250 dwords
+        RegisterNative("6D73D03AEC9CD8D6477AC066F39353EBD70D722E", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0x2D8D22));
+        // Mikoko START 58AAC: 1,035,840 dwords
+        RegisterNative("5001DBCBDC99A57EE01BE17BA747BD536327C00A", "xor stream", (vm, c, a) => vm.XorStream(c, a, 0xFCE40));
         // The games of 2026-11-11 (the same code with other numbers): xor streams of Oshikake!
         // Entremets 66D2D (465,148 dwords), Helter Skelter 2C7D1 (738,390), Mahou Shoujo no Taisetsu na
         // Koto 649AC (680,228), Tenki Ane 668DE and Ryoumaden 67B7E (444,384), Sensei! Shite Ageru
@@ -434,6 +463,17 @@ public sealed partial class ScnVm
         RegisterNative("1A6A7DF7ED1D7E7ADA9CBD9D73D5BCD182FBD18A", "block", (vm, c, a) => vm.BlockCopy(c, a, 108, 576, vm.NativeArg(a, 2)));
         RegisterNative("D67830C1D9986B4B4F9D222727844E17DD9FA26F", "block", (vm, c, a) => vm.BlockCopy(c, a, 63, 252, 2400));
         RegisterNative("2B2980447A2FE263CC8F761EF89A62EEEAD146AA", "block", (vm, c, a) => vm.BlockCopy(c, a, 56, 228, 2400));
+        // Nagagutsu wo Haita Deco START 108895: 600 rows of 2400 bytes from l[1] (l[2] apart) to l[0], 2404
+        // apart; 108904: 768 rows of 1800 bytes, 1804 apart; 108974: its thumbnail's 120 rows of 480
+        // bytes from l[0] to l[1], l[2] apart
+        RegisterNative("898465C22E15FBF0D02AD2A6C5623B0AF255F563", "rows 800 x 600", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 0), 2404, vm.NativeArg(a, 1), vm.NativeArg(a, 2), 600, 2400));
+        RegisterNative("9A0775F5654972C34D2357ABD82214859F14FEB0", "rows 600 x 768", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 0), 1804, vm.NativeArg(a, 1), vm.NativeArg(a, 2), 768, 1800));
+        RegisterNative("DFE54F40674DA1E42091F040F59F6646A607BCB8", "rows 160 x 120", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 480, 120, 480));
+        // Mikoko START 58D33: its thumbnail's 84 rows of 336 bytes, 2400 apart
+        RegisterNative("EF8538B90F657DAD13AEF88D5B0A5E96B381C00A", "block", (vm, c, a) => vm.BlockCopy(c, a, 84, 336, 2400));
         // Chuuchuu Nurse START 36E63: 120 rows of 480 bytes, 2400 apart; Chuuni Hime no Teikoku
         // B5CA0: 113 rows of 600 bytes, l[2] apart; Hin wa Bokura no Fuku no Kami 79483: 135 rows of
         // 540 bytes, 2400 apart (its thumbnail 791EF: 180 x 135 from blocks of 4 x 4)
@@ -692,7 +732,8 @@ public sealed partial class ScnVm
                         "997E3DD49B9B61739720F69D2E180ADAC4C9D884", "D299BA54CDEF926F62CDC0733BC018D56CDA54D5",
                         "683B763EC4CA9666F13D288DF45400CB2F498B4E", "D7BB0B77AF051FEA644DBDCBAB9E624522D31AF8",
                         "1FD120C0ED9408FF1CFA70D8D389AE41A6C97FD9", "0AFC04E0141EBB21410CD23BEFECF1869702A705",
-                        "17C12A8F901EFC316D09685A7A84F78F067502D2", "4DCD44C703951F8B10388CCB125A577E7A167FAF"], "xor32", (vm, c, a) =>
+                        "17C12A8F901EFC316D09685A7A84F78F067502D2", "4DCD44C703951F8B10388CCB125A577E7A167FAF",
+                        "91D56BCF5E3B51B1ECDF5A60CA2B86C6C0D92444"], "xor32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
             uint count = (uint)vm.NativeArg(a, 3), v = (uint)vm.NativeArg(a, 5);

@@ -157,10 +157,13 @@ public sealed partial class ScnVm
             vm.Wsprintf(values[0], values[1], values[2..]);
             return 0;
         });
-        // 02DA dest, format, list: wvsprintfA with the arguments as dwords at list
+        // 02DA dest, format, list: wvsprintfA with the arguments as dwords at list. v2.02 (CG.EXE
+        // 0x40AED0) reads list with GetVarAdr: its scripts give the variable that holds the one
+        // argument (Calendar Girl's "_w%i", l[0]), the later engines its address
         Register(0x02DA, (vm, c, i) =>
         {
-            int dest = vm.Value(c, i.Args[0]), format = vm.Value(c, i.Args[1]), list = vm.Value(c, i.Args[2]);
+            int dest = vm.Value(c, i.Args[0]), format = vm.Value(c, i.Args[1]);
+            int list = vm.EngineVersion < 210 && !i.Args[2].AddressOf ? vm.AddressOf(c, i.Args[2]) : vm.Value(c, i.Args[2]);
             vm.Wvsprintf(dest, format, () => { int v = vm.Read32(list); list += 4; return v; });
             return 0;
         });

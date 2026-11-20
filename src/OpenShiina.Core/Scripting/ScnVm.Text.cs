@@ -1153,7 +1153,11 @@ public sealed partial class ScnVm
     {
         AlignLine(rec, surface);
         S(rec, RState, 2);
-        if (G(rec, RSkipKeys) != 0)
+        // The skip keys are read from engine 2.33 on (CLEAVAGE.EXE 0x424748, aoj.EXE 0x424AC8); the
+        // engines before (BBB.EXE v2.11, EDENF.EXE v2.30, KATEI.EXE v2.31) read the buttons only in
+        // their opcodes and menus: a text drawn would take the press their choices wait for (Baby, BE's
+        // choice loop draws its items with 0084 every frame before its 03EA)
+        if (G(rec, RSkipKeys) != 0 && EngineVersion >= 233)
         {
             int keys = G(rec, RSkipKeys) & 0xFF, buttons = TextSkipButtons();
             if ((keys & 1) != 0 && (buttons & 0x20) != 0)
@@ -1588,8 +1592,6 @@ public sealed partial class ScnVm
             return;
         int count = length & 0x7FFFFFFF;
         bool solid = G(rec, RAntialias) == 0;
-        if (G(rec, RBkMode) == 2)
-            throw new NotSupportedException("Opaque text background (_O) is not supported yet");
 
         int code = count == 1 ? (ushort)(sbyte)ch[0] : ch[0] << 8 | ch[1];
         // v2.50: a character of 009C's pictures comes before the font's
@@ -1622,6 +1624,16 @@ public sealed partial class ScnVm
         {
             x += G(rec, ROffsetX);
             y += G(rec, ROffsetY);
+        }
+        // "_O" (DECO.EXE 0x428B5D: SetBkMode with the record's mode, SetBkColor, TextOutA): the
+        // character's cell, its advance by the font's height from (x, y), filled with the
+        // background colour first, as GDI's OPAQUE mode does
+        if (G(rec, RBkMode) == 2)
+        {
+            if (layer)
+                throw new NotSupportedException("An opaque text background (_O) on a layer is not supported yet");
+            var (cellW, cellH) = fonts.TextExtent(font, ch.AsSpan(0, count));
+            FillTextCell(rec, x, y, cellW, cellH);
         }
         int gx = glyph.OriginX + x;
         int top = glyph.OriginY == int.MinValue ? y : ascent - glyph.OriginY + y;
@@ -1698,6 +1710,26 @@ public sealed partial class ScnVm
                         Blend(q, a);
             }
         }
+    }
+
+    /// <summary>A rectangle of the record's surface filled with its background colour (OBkColor), clipped.</summary>
+    private void FillTextCell(int rec, int x, int y, int w, int h)
+    {
+        int width = G(rec, RSurfaceWidth), height = G(rec, RSurfaceHeight);
+        int pixels = G(rec, RPixels), pitch = G(rec, RSurfacePitch);
+        int l = Math.Max(x, 0), t = Math.Max(y, 0), r = Math.Min(x + w, width), b = Math.Min(y + h, height);
+        if (pixels == 0 || r <= l || b <= t)
+            return;
+        byte cr = ReadByte(rec + OBkColor), cg = ReadByte(rec + OBkColor + 1), cb = ReadByte(rec + OBkColor + 2);
+        var line = new byte[(r - l) * 3];
+        for (int k = 0; k < line.Length; k += 3)
+        {
+            line[k] = cb;
+            line[k + 1] = cg;
+            line[k + 2] = cr;
+        }
+        for (int row = t; row < b; row++)
+            WriteBytes(pixels + row * pitch + l * 3, line);
     }
 
     // 0xFB403C / 0xFA0F90 (FUN_00408EB0): for destination alpha da and source alpha sa (index
@@ -1890,8 +1922,15 @@ public sealed partial class ScnVm
             if (surface is < -1 or >= SurfaceCount)
                 surface = -1;
             vm.S(rec, RContext, c.Slot);
+            // The engine's loop (aoj.EXE 0x40EA73) goes on until the text is done, a character
+            // delay of an earlier _w waited for in the time it takes; the scripts' clock stands
+            // still within a frame, so the waits are off for it (Puri-Puri's and Hitozuma OL's
+            // START draw "】" so after a line with _w)
+            int waits = vm.G(rec, RWaits);
+            vm.S(rec, RWaits, 0);
             while (vm.G(rec, RState) != 0)
                 vm.TextStep(rec, surface, invalidate);
+            vm.S(rec, RWaits, waits);
             return 0;
         });
         // 0083 surface, text: draw the text over the next frames; the task waits (flag 8)

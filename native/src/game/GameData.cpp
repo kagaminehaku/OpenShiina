@@ -2,6 +2,7 @@
 #include "game/GameData.h"
 
 #include <algorithm>
+#include <cctype>
 #include <regex>
 
 #include "archives/FormatManager.h"
@@ -82,7 +83,13 @@ bool IsEngineIni(const std::string& path)
         size_t end = text.find('\n', start);
         std::string line = Trim(text.substr(start, end == std::string::npos ? std::string::npos : end - start));
         if (!line.empty() && line[0] != ';')
-            return line.rfind("[椎名里緒", 0) == 0;
+        {
+            // "[椎名里緒 v2.34]", or "[Rio Shiina v2.37]" (CC Hospital's CCH.ini)
+            std::string lower = line.substr(0, 11);
+            for (char& ch : lower)
+                ch = char(std::tolower(static_cast<unsigned char>(ch)));
+            return line.rfind("[椎名里緒", 0) == 0 || lower == "[rio shiina";
+        }
         if (end == std::string::npos)
             break;
         start = end + 1;

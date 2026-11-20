@@ -143,6 +143,9 @@ public sealed partial class ScnVm
         }
     }
 
+    // 03CA's microseconds added by the reads (the counter goes on within a frame)
+    private long m_counterReads;
+
     // The character the text step drew last, for the after-character slot (0064 / 0065)
     private (int L, int T, int R, int B) m_charBox;
     private byte[] m_charText = [];
@@ -177,10 +180,13 @@ public sealed partial class ScnVm
         Register(0x013A, (vm, c, i) => vm.ReadFlagFile(vm.ReadString(vm.Value(c, i.Args[0])), vm.SystemFlagFileParts) ? 0 : 2);
         Register(0x013B, (vm, c, i) => vm.WriteFlagFile(vm.ReadString(vm.Value(c, i.Args[0])), vm.SystemFlagFileParts) ? 0 : 2);
         // 03CA lo, hi / 03CB lo, hi: QueryPerformanceCounter / QueryPerformanceFrequency
-        // (FUN_00410580 / FUN_004105D0), here a counter of microseconds on the scripts' clock
+        // (FUN_00410580 / FUN_004105D0), here a counter of microseconds on the scripts' clock,
+        // 100 more at each read: Hana no Kioku's START waits 4 ms in a loop of reads that does not
+        // yield (0x08B3E), which the clock alone, still in a frame, would never end
         Register(0x03CA, (vm, c, i) =>
         {
-            long now = (long)vm.Clock * 1000;
+            vm.m_counterReads += 100;
+            long now = (long)vm.Clock * 1000 + vm.m_counterReads;
             vm.Store(c, i.Args[0], (int)now);
             vm.Store(c, i.Args[1], (int)(now >> 32));
             return 0;

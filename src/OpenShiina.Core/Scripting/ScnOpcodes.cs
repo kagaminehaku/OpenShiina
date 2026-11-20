@@ -40,6 +40,7 @@ public sealed class ScnOpcodes
     private static readonly Dictionary<string, Dictionary<int, string[]>> s_versionOverrides = new()
     {
         ["ops_v234"] = new() { [0x04BD] = ["SPRITE234"] },
+        ["ops_v235"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v233"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v231"] = new() { [0x04BD] = ["SPRITE234"] },
         ["ops_v230"] = new() { [0x04BD] = ["SPRITE234"] },
@@ -97,6 +98,8 @@ public sealed class ScnOpcodes
     /// from Cleavage's CLEAVAGE.EXE, Vanquish's VANQ.EXE the same build): v2.34's but for 06EC,
     /// which it lacks. v2.31 has its own (read from Kateinai Choukyou's KATEI.EXE: 481 opcodes, all
     /// of them v2.33's; the jumps' operands are v2.33's, which opscan does not see in this build).
+    /// v2.35 has its own (read from ONE☆BOKU's one.EXE: v2.34's operands, 0046-004A, 00AA-00B1,
+    /// 045C and others new, 007D-0080 gone).
     /// v2.30 has its own (read from EDEN ~FINAL~'s EDENF.EXE: v2.31's 481 opcodes, but FE11 takes one
     /// operand; Chain Trap's CTRAP.EXE, an earlier v2.30 build, lacks 0014 and 03CF).
     /// v2.37 has its own (read from Yoyogi Hitozuma Senmon Gakuin's YODUMA.EXE,
@@ -126,6 +129,7 @@ public sealed class ScnOpcodes
             : version.StartsWith("2.47") || version.StartsWith("2.46") || version.StartsWith("2.45") || version.StartsWith("2.36") ? "ops_v247"
             : version.StartsWith("2.44") ? "ops_v244"
             : version.StartsWith("2.34") ? "ops_v234"
+            : version.StartsWith("2.35") ? "ops_v235"
             : version.StartsWith("2.33") ? "ops_v233"
             : version.StartsWith("2.31") ? "ops_v231"
             : version.StartsWith("2.30") ? "ops_v230"

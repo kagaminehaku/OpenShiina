@@ -78,6 +78,30 @@ void ScnVm::RegisterNativeRoutines()
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 9, 84, 63); });
     RegisterNative("13CE585B31BB34E5FA674268BD852030B126B3E6", "thumbnail",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 10, 76, 56); });
+    // Nagagutsu wo Haita Deco START 10859F (v2.39): 160 x 120 from blocks of 5 x 5, rows l[5] apart;
+    // 108617: 160 x 120 filled with BGR 75 BD CF and 93 x 120 from blocks of 6 x 6 33 pixels in
+    RegisterNative("6C5DED8762FBFE6821145A7D410130EFDB95F93A", "thumbnail",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.ThumbnailAt(c, a, 5, 160, 120, vm.NativeArg(a, 0), vm.NativeArg(a, 4), vm.NativeArg(a, 5), 0); });
+    RegisterNative("C80A13141C4B8840B831AAAEA03BC1F2674F128D", "thumbnail framed",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
+                       int dst = vm.NativeArg(a, 0);
+                       if (!vm.IsContiguous(dst, 160 * 120 * 3))
+                       {
+                           vm.RunX86(c, a);
+                           return;
+                       }
+                       uint8_t* fill = vm.Bytes(dst, 160 * 120 * 3);
+                       for (int k = 0; k < 160 * 120 * 3; k += 3)
+                       {
+                           fill[k] = 0x75;
+                           fill[k + 1] = 0xBD;
+                           fill[k + 2] = 0xCF;
+                       }
+                       vm.ThumbnailAt(c, a, 6, 93, 120, dst + 99, vm.NativeArg(a, 4), vm.NativeArg(a, 5), 480);
+                   });
+    // Mikoko START 589C0 (v2.46): 112 x 84 from blocks of 7 x 7
+    RegisterNative("21C52517559904465696F7F765B049476EDE17BB", "thumbnail",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.Thumbnail(c, a, 7, 112, 84); });
     // Imouto Smile START 6D500: 80 x 60 from blocks of 10 x 10 (Kateinai Choukyou 2DE91, v2.31: the
     // same with the old engine's way into the routine)
     RegisterNative({"98EF46C517E4F797E130C2D3003A186ACE788B2F", "44620AFA82F065FFCECAB61D7549DFB59A7AAB00"}, "thumbnail",
@@ -275,6 +299,12 @@ void ScnVm::RegisterNativeRoutines()
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x69BE0); });
     RegisterNative("1EB7C3A5BABAEC65C179ACD912C8032A77D690BC", "xor stream",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x6089C); });
+    // Nagagutsu wo Haita Deco START 1086B5: 2,985,250 dwords
+    RegisterNative("6D73D03AEC9CD8D6477AC066F39353EBD70D722E", "xor stream",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x2D8D22); });
+    // Mikoko START 58AAC: 1,035,840 dwords
+    RegisterNative("5001DBCBDC99A57EE01BE17BA747BD536327C00A", "xor stream",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0xFCE40); });
     // The games of 2026-11-11 (the same code with other numbers; see the C# player): xor streams,
     // thumbnails, their blocks and Intruder's 24 to 32 bits
     RegisterNative("D3F10A5331FAED973E0D5C4ADBC0C17AC61C85D8", "xor stream", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.XorStream(c, a, 0x718FC); });
@@ -446,6 +476,16 @@ void ScnVm::RegisterNativeRoutines()
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 63, 252, 2400); });
     RegisterNative("2B2980447A2FE263CC8F761EF89A62EEEAD146AA", "block",
                    [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 56, 228, 2400); });
+    // Nagagutsu wo Haita Deco START 108895 / 108904 / 108974: rows copied (see the C# player)
+    RegisterNative("898465C22E15FBF0D02AD2A6C5623B0AF255F563", "rows 800 x 600",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.CopyRows(c, a, vm.NativeArg(a, 0), 2404, vm.NativeArg(a, 1), vm.NativeArg(a, 2), 600, 2400); });
+    RegisterNative("9A0775F5654972C34D2357ABD82214859F14FEB0", "rows 600 x 768",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.CopyRows(c, a, vm.NativeArg(a, 0), 1804, vm.NativeArg(a, 1), vm.NativeArg(a, 2), 768, 1800); });
+    RegisterNative("DFE54F40674DA1E42091F040F59F6646A607BCB8", "rows 160 x 120",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.CopyRows(c, a, vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 0), 480, 120, 480); });
+    // Mikoko START 58D33: its thumbnail's 84 rows of 336 bytes, 2400 apart
+    RegisterNative("EF8538B90F657DAD13AEF88D5B0A5E96B381C00A", "block",
+                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { vm.BlockCopy(c, a, 84, 336, 2400); });
     // Chuuchuu Nurse START 36E63: 120 rows of 480 bytes, 2400 apart; Chuuni Hime no Teikoku B5CA0: 113
     // rows of 600 bytes, l[2] apart; Hin wa Bokura no Fuku no Kami 79483: 135 rows of 540 bytes, 2400
     // apart (its thumbnail 791EF: 180 x 135 from blocks of 4 x 4)
@@ -682,7 +722,8 @@ void ScnVm::RegisterNativeRoutines()
                     "997E3DD49B9B61739720F69D2E180ADAC4C9D884", "D299BA54CDEF926F62CDC0733BC018D56CDA54D5",
                     "683B763EC4CA9666F13D288DF45400CB2F498B4E", "D7BB0B77AF051FEA644DBDCBAB9E624522D31AF8",
                     "1FD120C0ED9408FF1CFA70D8D389AE41A6C97FD9", "0AFC04E0141EBB21410CD23BEFECF1869702A705",
-                    "17C12A8F901EFC316D09685A7A84F78F067502D2", "4DCD44C703951F8B10388CCB125A577E7A167FAF"},
+                    "17C12A8F901EFC316D09685A7A84F78F067502D2", "4DCD44C703951F8B10388CCB125A577E7A167FAF",
+                    "91D56BCF5E3B51B1ECDF5A60CA2B86C6C0D92444"},
                    "xor32", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
                        int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 4);
                        uint32_t count = uint32_t(vm.NativeArg(a, 3)), v = uint32_t(vm.NativeArg(a, 5));

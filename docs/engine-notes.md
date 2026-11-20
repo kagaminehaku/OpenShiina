@@ -277,6 +277,22 @@ operands, so v2.45 uses ops_v247.tsv. The game also checks the executable (`03C2
 START wants v ^ 306723180 = -462117567, the CRC-32 of the decrypted code (BaseOfCode, SizeOfCode)
 XOR that of 0x8000 bytes of `.data` at 47B774 (FUN_00430100 and the engine's init at 408A21).
 
+**v2.35** (ONE☆BOKU's one.EXE, 2005, not packed; table Data/ScnOps/ops_v235.tsv): laid out as
+v2.39 (DECO.EXE): the interpreter FUN_0041BB40 takes the slot (the current one at 718E18), the tasks
+0x44 bytes from 713744, GetVar 40F260, SetVar 40EB60, GetVarAdr 40F080, any other opcode 2 at 41D1B0:
+`ScnTools opscan one.EXE 41bb40 41bbbb 0 41d1b0 40f260 40eb60 40f080 <out> 0 None None 713744`
+gives 555 opcodes, v2.34's with the same operands but for 0046-004A, 00AA-00B1, 045C and a few more
+new, and 007D-0080 gone. Its music has one stream as v2.34's, so 2.35 is one of the old engines
+(ScnVm.OldEngine: below 2.36). CC Hospital's CCH.EXE (2006, `.riox` over `.text` alone: 0x638E0 bytes
+at 401000, the key from 0x0BA84018, the CRC 0x7528E2CE) is v2.37 (`opscan 41cbf0 41cc73 0 41e3d1
+4100a0 40f9a0 40fec0 ... 727fb4`: ops_v237's 568 opcodes and 0A64 / 0A65, which its scripts do not
+use); its START runs `004B` (0x41DD72: the main loop's Sleep after the window's messages, from the
+.INI's CPUSleepFor; `004A` reads whether the pause every n instructions is on, `004C` the ms).
+
+The old engines' clock (`03BD`) read again where it was read already in a frame waits for the next
+frame (their polling loops), but read at another place in the same frame it gives the same time:
+Puri-Puri's START (v2.34, 0x2A185 / 0x2A18A) reads it twice in a row and waits until the two agree.
+
 **v2.34** (Ao no Juuai's aoj.EXE, 2005, not packed; `ScnTools opscan aoj`, table Data/ScnOps/ops_v234.tsv):
 the tasks are a global array, not a context register: FUN_0041e5c0 takes a slot, its script
 pointer is at 71E0E4 + slot * 0x44 (the current slot at 7237B8), the opcode is read at 41E5E2
@@ -360,6 +376,12 @@ b[991]); `0A3D` folders: more folders whose archives are looked in (another game
 from the registry); `08A2` / `08B6`: CreatePopupMenu / TrackPopupMenu, the Foster games' right-click
 menu (kept as handles, as the window menu is). Through `01A4` Hana no Kioku 4-5-6 calls user32's
 DrawMenuBar and ModifyMenuA, Nagagutsu wo Haita Deco GetSystemMetrics.
+v2.02 reads `02DA`'s third operand (wvsprintf's argument list) with GetVarAdr (CG.EXE 0x40AED0):
+Calendar Girl gives the variable, not its address; v2.10 on read its value. Hana no Kioku's START
+waits 4 ms in a loop of `03CA` reads that never yields (0x08B3E): the player's counter goes on by
+100 us at each read. `0084` draws a whole text in one loop (aoj.EXE 0x40EA73), a character delay of
+an earlier `_w` waited out in real time; the scripts' clock stands within a frame, so the player
+turns the waits off for it.
 
 **v2.44** (Yokorenbo's YOKOREN.EXE, 2008, not packed; table Data/ScnOps/ops_v244.tsv): laid out
 as v2.45's (`ScnTools opscan YOKOREN.EXE 41cca0 41ccfc 41ccc3 422d96 412630 4120f0 4124a0 <out>

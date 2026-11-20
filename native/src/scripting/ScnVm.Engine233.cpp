@@ -137,6 +137,23 @@ void ScnVm::RegisterEngine233()
             vm.Value(c, arg);
         return 0;
     });
+    // The engine's own pause for the CPU (CCH.EXE, v2.37; the .INI's CPUSleepFor=n,ms):
+    // 004A v (0x41DD40): v = the pause every n instructions is on (0047 turns it on, 0048 off);
+    // 004B v (0x41DD72): the main loop sleeps ms after the window's messages (-1: not at all;
+    // CC Hospital's START sets 0); 004C v (0x41DD95): v = that ms. The player paces its frames
+    // itself: the value is only kept for 004C
+    Register(0x004A, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.Store(c, i.Args[0], 0);
+        return 0;
+    });
+    Register(0x004B, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.m_loopSleep = vm.Value(c, i.Args[0]);
+        return 0;
+    });
+    Register(0x004C, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.Store(c, i.Args[0], vm.m_loopSleep);
+        return 0;
+    });
     // 0A29 text (0x41AAE0): the text copied into a path of the engine's (0x6D9358); 0A2A text
     // (0x41AB10): SetCurrentDirectoryA (2 when it fails). The player's files are found from the game
     // folder, whatever the current directory

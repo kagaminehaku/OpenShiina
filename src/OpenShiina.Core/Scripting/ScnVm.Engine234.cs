@@ -87,19 +87,42 @@ public sealed partial class ScnVm
         // after 0033) and a frame ends only where a task waits (RunFrame). Both change between
         // frames here, so a task that reads one again in a frame waits for the next one. 05B9 (a
         // movie's state) too: Vanquish's (v2.33) movies play in a loop of 05B9, 05C0 (the next
-        // frame), 0514 and 07D0 with no other wait
+        // frame), 0514 and 07D0 with no other wait. The clock (03BD) waits where the task read it
+        // already in this round of the main loop, or in an earlier round of this frame (time went by:
+        // it gave the window its turn); read at two places in one round it gives the same time, as the
+        // engine's does: Puri-Puri's START (v2.34, 0x2A185 / 0x2A18A) waits until two reads in a row
+        // agree, ONE☆BOKU's transitions (v2.35, START 0x91151 / 0x91180) time a step of a loop that
+        // yields (0034) between its reads
         foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6, 0x05B9 })
         {
             var later = m_handlers[op];
             Register234(op, (vm, c, i) =>
             {
-                if (vm.m_polled234.GetValueOrDefault((c.Slot, i.Op)) == vm.m_frameNumber)
+                bool wait;
+                if (i.Op == 0x03BD)
+                {
+                    var read = vm.m_clock234.GetValueOrDefault(c.Slot);
+                    wait = read.Pcs != null && read.Frame == vm.m_frameNumber && (read.Round != vm.m_rounds || read.Pcs.Contains(c.Current));
+                    if (!wait)
+                    {
+                        if (read.Pcs == null || read.Frame != vm.m_frameNumber || read.Round != vm.m_rounds)
+                            read = (vm.m_frameNumber, vm.m_rounds, new HashSet<int>());
+                        read.Pcs.Add(c.Current);
+                        vm.m_clock234[c.Slot] = read;
+                    }
+                }
+                else
+                {
+                    wait = vm.m_polled234.GetValueOrDefault((c.Slot, i.Op)) == vm.m_frameNumber;
+                    if (!wait)
+                        vm.m_polled234[(c.Slot, i.Op)] = vm.m_frameNumber;
+                }
+                if (wait)
                 {
                     c.Pc = c.Current;
                     vm.FrameShown = true;
                     return 3;
                 }
-                vm.m_polled234[(c.Slot, i.Op)] = vm.m_frameNumber;
                 return later(vm, c, i);
             });
         }
@@ -137,6 +160,8 @@ public sealed partial class ScnVm
     // the time in (by task and opcode)
     private readonly Dictionary<int, uint> m_sleeps234 = new();
     private readonly Dictionary<(int Slot, int Op), int> m_polled234 = new();
+    // 03BD of the old engines: where (pcs) each task read the clock in which frame and round
+    private readonly Dictionary<int, (int Frame, long Round, HashSet<int>? Pcs)> m_clock234 = new();
 
     // 03BB's stopwatch: when it started
     private uint m_stopwatch;

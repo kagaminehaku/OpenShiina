@@ -110,11 +110,11 @@ static class ScnDisasm
     /// <summary>04BD read as v2.34's in a later build (ScnOpcodes' ops_v236a: Wana's and Hitozuma OL's v2.36).</summary>
     public static bool Sprite234;
 
-    // The engines before 2.35 (as ScnVm.OldEngine): names read up to their first '}', 04BD's
+    // The engines before 2.36 (as ScnVm.OldEngine): names read up to their first '}', 04BD's
     // operands as many as its flags say
     private static bool Old => Version.Length >= 4 && Version[1] == '.'
         && int.TryParse(Version.AsSpan(0, 1), out int major) && int.TryParse(Version.AsSpan(2, 2), out int minor)
-        && major * 100 + minor < 235;
+        && major * 100 + minor < 236;
 
     /// <summary>Instructions whose length depends on a variable: decoded with the longer layout.</summary>
     public static readonly List<string> Uncertain = new();

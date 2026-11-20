@@ -128,8 +128,9 @@ std::optional<std::string> ScnVm::ExeFileName()
     if (!formats)
         return std::nullopt;
     std::vector<std::string> names;
+    // GameMap names archives of a game too (Omocha no Sensei's RK01_D.WAR): its .exe names alone
     for (const auto& [exe, game] : formats->GameMap().Items())
-        if (game == Game)
+        if (game == Game && exe.size() > 4 && Text::EqualsIgnoreCase(exe.substr(exe.size() - 4), ".exe"))
             names.push_back(Text::Utf8ToCp932(exe));
     for (const auto& name : names)
         if (m_host.LooseFileSize(name))

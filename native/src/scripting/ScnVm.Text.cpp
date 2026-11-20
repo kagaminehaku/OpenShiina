@@ -1256,7 +1256,11 @@ void ScnVm::TextStep(int rec, int surface, bool invalidate)
     // (RState 0) or when a wait is due. invalidate: the surface is on screen
     AlignLine(rec, surface);
     S(rec, RState, 2);
-    if (G(rec, RSkipKeys) != 0)
+    // The skip keys are read from engine 2.33 on (CLEAVAGE.EXE 0x424748, aoj.EXE 0x424AC8); the
+    // engines before (BBB.EXE v2.11, EDENF.EXE v2.30, KATEI.EXE v2.31) read the buttons only in
+    // their opcodes and menus: a text drawn would take the press their choices wait for (Baby, BE's
+    // choice loop draws its items with 0084 every frame before its 03EA)
+    if (G(rec, RSkipKeys) != 0 && EngineVersion >= 233)
     {
         int keys = G(rec, RSkipKeys) & 0xFF, buttons = RepeatButtons(0x100, Buttons());
         if ((keys & 1) != 0 && (buttons & 0x20) != 0)
@@ -1765,6 +1769,26 @@ void ScnVm::BitBlt(int dst, int x, int y, int width, int height, int src, int sx
             WriteBytes(d, ReadBytes(s, bytes));
 }
 
+// A rectangle of the record's surface filled with its background colour (OBkColor), clipped
+void ScnVm::FillTextCell(int rec, int x, int y, int w, int h)
+{
+    int width = G(rec, RSurfaceWidth), height = G(rec, RSurfaceHeight);
+    int pixels = G(rec, RPixels), pitch = G(rec, RSurfacePitch);
+    int l = std::max(x, 0), t = std::max(y, 0), r = std::min(x + w, width), b = std::min(y + h, height);
+    if (pixels == 0 || r <= l || b <= t)
+        return;
+    uint8_t cr = ReadByte(rec + OBkColor), cg = ReadByte(rec + OBkColor + 1), cb = ReadByte(rec + OBkColor + 2);
+    openshiina::Bytes line(size_t((r - l) * 3));
+    for (size_t k = 0; k < line.size(); k += 3)
+    {
+        line[k] = cb;
+        line[k + 1] = cg;
+        line[k + 2] = cr;
+    }
+    for (int row = t; row < b; row++)
+        WriteBytes(pixels + row * pitch + l * 3, line);
+}
+
 void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::Bytes& ch, int length)
 {
     // FUN_004325A0 with antialiasing on ("_q+"): the GGO_GRAY8 glyph blended into the surface,
@@ -1779,8 +1803,6 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
     TextTime drawTime(*this, drawName);
     int count = length & 0x7FFFFFFF;
     bool solid = G(rec, RAntialias) == 0;
-    if (G(rec, RBkMode) == 2)
-        throw std::runtime_error("Opaque text background (_O) is not supported yet");
 
     int code = count == 1 ? int(uint16_t(int16_t(int8_t(ch[0])))) : ch[0] << 8 | ch[1];
     // v2.50: a character of 009C's pictures comes before the font's
@@ -1833,6 +1855,15 @@ void ScnVm::DrawGlyph(int rec, int, int font, int x, int y, const openshiina::By
     {
         x += G(rec, ROffsetX);
         y += G(rec, ROffsetY);
+    }
+    // "_O": the character's cell (its advance by the font's height) filled with the background
+    // colour first, as GDI's OPAQUE mode does (DECO.EXE 0x428B5D)
+    if (G(rec, RBkMode) == 2)
+    {
+        if (layer)
+            throw std::runtime_error("An opaque text background (_O) on a layer is not supported yet");
+        auto [cellW, cellH] = fonts->TextExtent(font, ch.data(), size_t(count));
+        FillTextCell(rec, x, y, cellW, cellH);
     }
     int gx = glyph->OriginX + x;
     int top = glyph->OriginY == int(0x80000000) ? y : ascent - glyph->OriginY + y;
@@ -2202,8 +2233,13 @@ void ScnVm::RegisterText()
         if (surface < -1 || surface >= SurfaceCount)
             surface = -1;
         vm.S(rec, RContext, c.Slot);
+        // The engine's loop (aoj.EXE 0x40EA73) waits out a character delay in real time; the scripts'
+        // clock stands still within a frame, so the waits are off for it (Puri-Puri's "】")
+        int waits = vm.G(rec, RWaits);
+        vm.S(rec, RWaits, 0);
         while (vm.G(rec, RState) != 0)
             vm.TextStep(rec, surface, invalidate);
+        vm.S(rec, RWaits, waits);
         return 0;
     });
     // 0083 surface, text: draw the text over the next frames; the task waits (flag 8)

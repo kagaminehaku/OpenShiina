@@ -307,7 +307,8 @@ public sealed class GameData : IDisposable
     /// <summary>
     /// The engine's settings in <paramref name="folder"/>: RIO.INI, or for older builds the .INI
     /// named as their .exe (Ao no Juuai's aoj.EXE reads aoj.INI): the .INI whose first section is
-    /// the engine's ("[椎名里緒 v2.34]"), one named as an .exe first. Asked for as RIO.INI.
+    /// the engine's ("[椎名里緒 v2.34]", or "[Rio Shiina v2.37]" as CC Hospital's CCH.ini names it),
+    /// one named as an .exe first. Asked for as RIO.INI.
     /// </summary>
     public static string? EngineIni(string folder)
     {
@@ -332,7 +333,8 @@ public sealed class GameData : IDisposable
             {
                 line = line.Trim();
                 if (line.Length != 0 && !line.StartsWith(';'))
-                    return line.StartsWith("[椎名里緒", StringComparison.Ordinal);
+                    return line.StartsWith("[椎名里緒", StringComparison.Ordinal)
+                        || line.StartsWith("[Rio Shiina", StringComparison.OrdinalIgnoreCase);
             }
         }
         catch (IOException)

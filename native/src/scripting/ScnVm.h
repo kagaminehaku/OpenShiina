@@ -119,7 +119,7 @@ public:
     bool HasHandler(int op) const { return HandlerFor(op) != nullptr; }
 
     /// The old engines, v2.34 and v2.33 (Ao no Juuai, Ayakashibito, Cleavage).
-    bool OldEngine() const { return EngineVersion < 235; }
+    bool OldEngine() const { return EngineVersion < 236; }
 
     /// Instructions a task may run in one frame before it has to yield (DAT_004880C8).
     int Budget = 100000;
@@ -735,6 +735,8 @@ private:
     // v2.33: the movie of 0579 and the rectangle of 0578
     Movie m_windowMovie;
     ScreenArea m_windowMovieArea;
+    // 004B's ms
+    int m_loopSleep = 0;
     // 0532's bitmaps by slot (BGR, 3 bytes a pixel)
     struct Bitmap { int Width = 0, Height = 0; std::vector<uint8_t> Bgr; };
     std::map<int, Bitmap> m_bitmaps;
@@ -1021,6 +1023,7 @@ private:
     int TakeChar(int rec);
     void RubyStart(int rec);
     void TextStep(int rec, int surface, bool invalidate);
+    void FillTextCell(int rec, int x, int y, int w, int h);
     std::pair<int, int> FixedOr(int rec, int font, const openshiina::Bytes& ch, int length);
     // ---- Translations (ScnGaiji): what each record's last character was to a translation (its soft
     // "_r" and its words). START breaks its lines after so many characters: how many since its last
@@ -1131,6 +1134,8 @@ private:
     void CrossfadeRect(int from, int fx, int fy, int to, int tx, int ty, int x, int y, int w, int h, int t);
     // The character the text step drew last, for the after-character slot (0064 / 0065)
     int m_charBox[4] = {0, 0, 0, 0};
+    // 03CA's microseconds added by the reads (the counter goes on within a frame)
+    int64_t m_counterReads = 0;
     openshiina::Bytes m_charText;
     /// 00AA / 00AE: three bytes of the task's record (text / background colour), its colour flag set (ScnVm.Text.cpp).
     int RecordColor(ScnContext& c, const ScnInstruction& i, bool background);
@@ -1153,6 +1158,9 @@ private:
     std::unordered_map<int, Fade234> m_fades234;
     std::unordered_map<int, uint32_t> m_sleeps234, m_crossfades;
     std::map<std::pair<int, int>, int> m_polled234;
+    // 03BD of the old engines: where each task read the clock in which frame and round
+    struct OldClockRead { int Frame = -1; int64_t Round = -1; std::set<int> Pcs; };
+    std::map<int, OldClockRead> m_clock234;
     std::unordered_map<int, OpHandler> m_polledLater;
     uint32_t m_stopwatch = 0;
 

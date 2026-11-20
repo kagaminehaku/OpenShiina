@@ -172,8 +172,10 @@ void ScnVm::RegisterOldEngines()
     });
     // 03CA lo, hi / 03CB lo, hi: QueryPerformanceCounter / QueryPerformanceFrequency (FUN_00410580 /
     // FUN_004105D0), here a counter of microseconds on the scripts' clock
+    // (100 more at each read: Hana no Kioku's START waits 4 ms in a loop of reads that does not yield)
     Register(0x03CA, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        int64_t now = int64_t(vm.Clock()) * 1000;
+        vm.m_counterReads += 100;
+        int64_t now = int64_t(vm.Clock()) * 1000 + vm.m_counterReads;
         vm.Store(c, i.Args[0], int(now));
         vm.Store(c, i.Args[1], int(now >> 32));
         return 0;

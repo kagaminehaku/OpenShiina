@@ -38,10 +38,10 @@ You need your own installed copy of the game. OpenShiina contains no game data.
 
 ## Games
 
-126 games (127 releases) play through on Windows, Linux and Android, among them the GRAND†CROSS
+134 games (135 releases) play through on Windows, Linux and Android, among them the GRAND†CROSS
 "Plus" games and Maki Fes!, the Bitch games, Kyuuketsuki no Libra, and the English releases of
 Libra of the Vampire Princess, Sorcery Jokers and The Pillagers of Raillore. Engine versions 2.20,
-2.30, 2.31, 2.33, 2.34, 2.36 to 2.38 and 2.40 to 2.50 run. OpenShiina opens the archives of 38 more
+2.30, 2.31, 2.33 to 2.38 and 2.40 to 2.50 run. OpenShiina opens the archives of 30 more
 ShiinaRio games, not played through yet.
 
 **Every game, with its engine version and how far it was checked: [docs/compatibility.md](docs/compatibility.md).**

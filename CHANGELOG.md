@@ -4,6 +4,21 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **8 more games play through** (134 games, 135 releases): Reizoku, CC Hospital, Mikoko, Zansho
+  Omimai Moushiagemasu, Houkago no Hoken'i, Wana, Chikan Densha Otoko Gaiden and ONE☆BOKU.
+- The old games of SCN modules go on past their first choices (the engines before 2.33 read no
+  keys in their text step), Calendar Girl shows its text (2.02's `02DA` takes the list's
+  address), the Hana no Kioku games no longer stand in a wait on the performance counter, and a
+  text drawn at once (`0084`) no longer waits out an earlier `_w` (Puri-Puri, Hitozuma OL);
+  Nagagutsu wo Haita Deco's picture routines have C# versions.
+- Puri-Puri, Omocha no Sensei, Reika (its scheme fixed: all its files open now) and Nagagutsu wo
+  Haita Deco start; engine 2.35 (ONE☆BOKU) has its own opcode table.
+- The old engines' clock read at two places in a row gives the same time, as the engine's does; a
+  game's executable is found among GameMap's .exe names only; an engine .INI may name the engine
+  "Rio Shiina" (CC Hospital).
+
 ## 0.8.5 (2026-11-20)
 
 - **EDEN IV plays through** (100 games, 101 releases): each of its 125 scenes was started from

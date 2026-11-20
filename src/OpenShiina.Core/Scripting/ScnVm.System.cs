@@ -91,7 +91,9 @@ public sealed partial class ScnVm
     /// </summary>
     private string? ExeFileName()
     {
-        var names = Archives.FormatManager.Instance.GameMap.Where(e => e.Value == Game).Select(e => e.Key).ToList();
+        // GameMap names archives of a game too (Omocha no Sensei's RK01_D.WAR): its .exe names alone
+        var names = Archives.FormatManager.Instance.GameMap.Where(e => e.Value == Game && e.Key.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            .Select(e => e.Key).ToList();
         return names.FirstOrDefault(n => m_host.LooseFileSize(n) != null) ?? names.FirstOrDefault();
     }
 

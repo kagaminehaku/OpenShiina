@@ -11,15 +11,39 @@ namespace openshiina::scripting {
 int ScnVm::PolledOld(ScnVm& vm, ScnContext& c, const ScnInstruction& i)
 {
     // The mouse and the time read twice in a frame by the old engines' tasks: the second read waits
-    // for the next frame, else the handler the later engines have (m_polledLater)
-    auto key = std::pair(c.Slot, i.Op);
-    if (auto polled = vm.m_polled234.find(key); polled != vm.m_polled234.end() && polled->second == vm.m_frameNumber)
+    // for the next frame, else the handler the later engines have (m_polledLater). The clock (03BD)
+    // waits where the task read it already in this round of the main loop, or in an earlier round of
+    // this frame; two places in one round give the same time (see the C# player)
+    bool wait;
+    if (i.Op == 0x03BD)
+    {
+        auto& read = vm.m_clock234[c.Slot];
+        wait = read.Frame == vm.m_frameNumber && (read.Round != vm.m_rounds || read.Pcs.count(c.Current) != 0);
+        if (!wait)
+        {
+            if (read.Frame != vm.m_frameNumber || read.Round != vm.m_rounds)
+            {
+                read.Frame = vm.m_frameNumber;
+                read.Round = vm.m_rounds;
+                read.Pcs.clear();
+            }
+            read.Pcs.insert(c.Current);
+        }
+    }
+    else
+    {
+        auto key = std::pair(c.Slot, i.Op);
+        auto polled = vm.m_polled234.find(key);
+        wait = polled != vm.m_polled234.end() && polled->second == vm.m_frameNumber;
+        if (!wait)
+            vm.m_polled234[key] = vm.m_frameNumber;
+    }
+    if (wait)
     {
         c.Pc = c.Current;
         vm.FrameShown = true;
         return 3;
     }
-    vm.m_polled234[key] = vm.m_frameNumber;
     return vm.m_polledLater[i.Op](vm, c, i);
 }
 

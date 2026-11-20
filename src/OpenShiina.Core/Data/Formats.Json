@@ -1577,7 +1577,7 @@
           "$type": "GameRes.Formats.ShiinaRio.EncryptionScheme",
           "Name": "Hitozuma Onna Kyoushi Reika",
           "OriginalTitle": "人妻女教師・麗香",
-          "Version": 2390,
+          "Version": 2330,
           "EntryNameSize": 16,
           "CryptKey": "@CryptKey",
           "HelperKey": [
@@ -1591,10 +1591,10 @@
           "DecodeBin": "@DecodeBin2",
           "ShiinaImage": {
             "$type": "GameRes.Formats.ShiinaRio.ImageArray",
-            "Common": "Common",
-            "CommonLength": 33438,
-            "Length": 33438,
-            "Sha256": "57A763E048E8E62D4EEB3B858B2E7355D68BF6E35545F703788FBEC91A1BB324"
+            "Common": "Common2",
+            "CommonLength": 49790,
+            "Length": 49790,
+            "Sha256": "D7756ED38459A84BF2F4780A139C6FD2BDFE76EDC262110A84713EF29EF94139"
           },
           "ExtraCrypt": null
         },

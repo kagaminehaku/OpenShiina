@@ -297,13 +297,13 @@ public sealed partial class ScnVm : IDisposable
     private readonly Dictionary<int, OpHandler> m_handlers234 = new();
 
     /// <summary>
-    /// The old engines, v2.34 and v2.33 (Ao no Juuai, Ayakashibito, Cleavage): their own handlers
+    /// The old engines, v2.35 to v2.33 (ONE☆BOKU, Ao no Juuai, Ayakashibito, Cleavage): their own handlers
     /// (Register234), names read up to their first '}', and a frame that ends where a task waits.
     /// v2.37 (Yoyogi Hitozuma Senmon Gakuin) is not one: its operands are v2.47's but for three
     /// opcodes, and its scripts read the clock twice in a row expecting the same millisecond,
     /// which 2.34's rule of a clock read again waiting for the next frame never gives.
     /// </summary>
-    public bool OldEngine => EngineVersion < 235;
+    public bool OldEngine => EngineVersion < 236;
 
     /// <summary>A handler for the old engines only (<see cref="OldEngine"/>), in place of the later one.</summary>
     public void Register234(int op, OpHandler handler) => m_handlers234[op] = handler;

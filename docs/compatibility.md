@@ -20,7 +20,7 @@ WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depend
 version. The interpreter runs engine versions 2.20, 2.30, 2.31, 2.33, 2.34, 2.36 to 2.38 and 2.40 to 2.50, and
 boots 2.15 (Shi-Ka-E-Shi); see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 126 games, 127 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 134 games, 135 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -60,18 +60,18 @@ of those versions it does not list.
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | ✅ Plays through | 2026-11-05 |
 | Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🟢 Plays | 2026-11-05 |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | 🟡 Starts | 2026-11-19 |
-| Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.33 | 🔴 Stops | 2026-11-19 |
+| Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.33 | 🟡 Starts | 2026-11-20 |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ✅ Plays through | 2026-11-04 |
-| Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | v2.34 | 🟡 Starts | 2026-11-19 |
+| Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | v2.34 | 🟡 Starts | 2026-11-20 |
 | Ao no Juuai | 青の獣愛 | 2005-06-24 | [v4048](https://vndb.org/v4048) | v2.34 | ✅ Plays through | 2026-10-13 |
 | Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | v2.34 | 🟢 Plays | 2026-10-21 |
-| ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | 🔴 Stops | 2026-11-19 |
-| Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | 🟢 Plays | 2026-11-19 |
+| ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | ✅ Plays through | 2026-11-20 |
+| Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Gibo to Oba ~Soshite Yuujin no Haha~ | 義母と叔母 ～そして友人の母～ | 2005-12-22 | [v2498](https://vndb.org/v2498) | v2.36 | 🟢 Plays | 2026-11-19 |
 | Hitozuma OL -Chijoku no Gyoumu Meirei- | 人妻OL -恥辱の業務命令- | 2005-12-22 | [v2911](https://vndb.org/v2911) | v2.36 | 🟡 Starts | 2026-11-19 |
 | Otometeki Koi Kakumei★Love Revo!! | 乙女的恋革命★ラブレボ!! | 2006-01-26 | [v3549](https://vndb.org/v3549) | v2.42 | ⚪ Not tried |  |
-| CC Hospital | CCホスピタル | 2006-03-24 | [v5300](https://vndb.org/v5300) | v2.36 | 🔴 Stops | 2026-11-19 |
-| Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | 🟡 Starts | 2026-11-19 |
+| CC Hospital | CCホスピタル | 2006-03-24 | [v5300](https://vndb.org/v5300) | v2.37 | ✅ Plays through | 2026-11-20 |
+| Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | 🟡 Starts | 2026-11-20 |
 | Shinseki no Oba-san | 親戚の小母さん ～離れの熟女、本家の後妻～ | 2006-03-31 | [v4399](https://vndb.org/v4399) | v2.36 | 🟡 Starts | 2026-11-19 |
 | Sabae no Ou | 蠅声の王 | 2006-04-28 | [v607](https://vndb.org/v607) | v2.36 | 🟡 Starts | 2026-11-19 |
 | Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | v2.37 | ✅ Plays through | 2026-11-04 |
@@ -79,18 +79,18 @@ of those versions it does not list.
 | Otome Juurin Yuugi | 乙女蹂躙遊戯～Maiden Infringement Play～ | 2006-12-22 | [v4352](https://vndb.org/v4352) | v2.37 | ✅ Plays through | 2026-11-19 |
 | Jukubo Gui ~Moto Guradoru no Okaa-san~ | 熟母喰い ～元グラドルのお母さん～ | 2007-01-19 | [v3358](https://vndb.org/v3358) | v2.37 | ✅ Plays through | 2026-11-19 |
 | Yakata Jukujo ~The Immoral Residence~ | 館熟女 ～The immoral residence～ | 2007-03-23 | [v6109](https://vndb.org/v6109) | v2.37 | 🟢 Plays | 2026-11-12 |
-| Houkago no Hoken'i ~Ane Juujoku~ | 放課後の保健医 ～姉・汁辱～ | 2007-03-30 | [v3043](https://vndb.org/v3043) | v2.37 | 🟢 Plays | 2026-11-19 |
+| Houkago no Hoken'i ~Ane Juujoku~ | 放課後の保健医 ～姉・汁辱～ | 2007-03-30 | [v3043](https://vndb.org/v3043) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Tentacle Busters | テンタクル☆バスターズ 対未確認生命体交渉係り | 2007-04-27 | [v3795](https://vndb.org/v3795) | v2.38 | ✅ Plays through | 2026-11-19 |
 | Draculius | ドラクリウス | 2007-05-25 | [v453](https://vndb.org/v453) | v2.38 | ✅ Plays through | 2026-11-12 |
 | Tsukutori | つくとり | 2007-05-25 | [v637](https://vndb.org/v637) | v2.37 | ✅ Plays through | 2026-11-19 |
 | Metro Chikansen  ~Kairaku Jousha Annai~ | 牝トロ痴漢線 ～快楽嬢射案内～ | 2007-07-06 | [v5266](https://vndb.org/v5266) | v2.38 | ✅ Plays through | 2026-11-19 |
-| Nagagutsu wo Haita Deco | 長靴をはいたデコ | 2007-09-28 | [v606](https://vndb.org/v606) | v2.39 | 🔴 Stops | 2026-11-19 |
+| Nagagutsu wo Haita Deco | 長靴をはいたデコ | 2007-09-28 | [v606](https://vndb.org/v606) | v2.39 | 🟡 Starts | 2026-11-20 |
 | Tsui☆Teru | ツイ☆てる | 2007-11-22 | [v454](https://vndb.org/v454) | v2.40 | ✅ Plays through | 2026-11-19 |
 | Helter Skelter | ヘルタースケルター | 2007-11-30 | [v2784](https://vndb.org/v2784) | v2.40 | ✅ Plays through | 2026-11-12 |
 | Sis☆Pon ~Haramase♪ Gochisou-sama!~ | シス☆ぽん～孕ませ♪ご馳走さまっ！～ | 2007-11-30 | [v2858](https://vndb.org/v2858) | v2.40 | ✅ Plays through | 2026-11-19 |
 | Otome Chibaku Yuugi | 乙女恥曝遊戯～Disgrace Return Play～ | 2007-12-21 | [v4154](https://vndb.org/v4154) | v2.40 | ✅ Plays through | 2026-11-19 |
 | Gakuen Pets ~Houkago no Shiikusha~ | 学園ペッツ ～放課後の飼育舎～ | 2007-12-21 | [v5267](https://vndb.org/v5267) | v2.40 | ✅ Plays through | 2026-11-19 |
-| Zansho Omimai Moushiagemasu | 残暑お見舞い申し上げます。 | 2008-02-29 | [v625](https://vndb.org/v625) | v2.41 | 🟢 Plays | 2026-11-20 |
+| Zansho Omimai Moushiagemasu | 残暑お見舞い申し上げます。 | 2008-02-29 | [v625](https://vndb.org/v625) | v2.41 | ✅ Plays through | 2026-11-20 |
 | Kichiku Nakadashi Suieibu | 鬼畜中出し水泳部～キャプテン氷川美玲・汁辱～ | 2008-03-14 | [v3968](https://vndb.org/v3968) | v2.41 | ✅ Plays through | 2026-11-19 |
 | Stellula Eques ~Shokuzai no Himekishi~ | ステルラエクエス～贖罪の姫騎士～ | 2008-04-25 | [v455](https://vndb.org/v455) | v2.42 | ✅ Plays through | 2026-11-19 |
 | Chikan Densha Otoko 2 | 痴漢電車男2 ～伝説へのライナー～ | 2008-05-30 | [v5861](https://vndb.org/v5861) | v2.43 | ✅ Plays through | 2026-11-12 |
@@ -104,16 +104,16 @@ of those versions it does not list.
 | Manin Chijo Densha 2 | 満淫痴女電車2～姉とふたごと人妻と～ | 2008-11-28 | [v5511](https://vndb.org/v5511) | v2.45 | ✅ Plays through | 2026-11-19 |
 | Hitozuma Gui ~Manbiki G-man Chijoku Nikki~ | 人妻喰い ～万引きGメン恥辱日記～ | 2008-12-16 | [v2897](https://vndb.org/v2897) | v2.45 | ✅ Plays through | 2026-10-24 |
 | Niizuma to Yuukaihan | 新妻と誘拐犯 ～寝取り孕ませ計画～ | 2008-12-19 | [v6456](https://vndb.org/v6456) | v2.45 | ✅ Plays through | 2026-11-19 |
-| Reizoku ~Kyonyuu Shimai Choukyou Jugyou~ | 隷属 ～巨乳姉妹調教授業～ | 2009-01-30 | [r13972](https://vndb.org/r13972) | v2.40 | ⚪ Not tried |  |
+| Reizoku ~Kyonyuu Shimai Choukyou Jugyou~ | 隷属 ～巨乳姉妹調教授業～ | 2009-01-30 | [r13972](https://vndb.org/r13972) | v2.40 | ✅ Plays through | 2026-11-20 |
 | Idol Koukai Chijoku Sex | アイドル公開恥辱SEX | 2009-02-13 | [v3063](https://vndb.org/v3063) | v2.46 | ✅ Plays through | 2026-11-20 |
-| Mikoko | みここ | 2009-02-27 | [v1363](https://vndb.org/v1363) | v2.46 | 🟢 Plays | 2026-11-20 |
+| Mikoko | みここ | 2009-02-27 | [v1363](https://vndb.org/v1363) | v2.46 | ✅ Plays through | 2026-11-20 |
 | Douryou no Oku-san ~Netori Tsuma, Netorare Tsuma~ | 同僚の奥さん～ネトリ妻、ネトラレ妻～ | 2009-03-06 | [v2280](https://vndb.org/v2280) | v2.46 | ✅ Plays through | 2026-11-19 |
 | Chikan Circle | 痴漢サークル | 2009-05-01 | [v1703](https://vndb.org/v1703) | v2.46 | ✅ Plays through | 2026-11-19 |
 | Hana to Otome ni Shukufuku o | 花と乙女に祝福を | 2009-05-29 | [v1545](https://vndb.org/v1545) | v2.46 | ✅ Plays through | 2026-11-05 |
 | Stellula Eques Codex | ステルラエクエス コーデックス ～黄昏の姫騎士～ | 2009-05-29 | [v1651](https://vndb.org/v1651) | v2.46 | ✅ Plays through | 2026-11-19 |
 | Shokuinshitsu | 職員室 | 2009-06-26 | [v1696](https://vndb.org/v1696) | v2.46 | ✅ Plays through | 2026-11-12 |
 | Chikan Circle 2 | 痴漢サークル2 | 2009-07-03 | [v2102](https://vndb.org/v2102) | v2.47 | ✅ Plays through | 2026-11-12 |
-| Chikan Densha Otoko Gaiden | 痴漢電車男外伝 ～伝説へのチェイサー～ | 2009-07-10 | [v1997](https://vndb.org/v1997) | v2.47 | 🟢 Plays | 2026-11-12 |
+| Chikan Densha Otoko Gaiden | 痴漢電車男外伝 ～伝説へのチェイサー～ | 2009-07-10 | [v1997](https://vndb.org/v1997) | v2.47 | ✅ Plays through | 2026-11-20 |
 | Onedari Onapet | おねだりオナペット | 2009-07-31 | [v2213](https://vndb.org/v2213) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Chikan Circle 3 | 痴漢サークル3 | 2009-08-21 | [v2424](https://vndb.org/v2424) | v2.47 | ✅ Plays through | 2026-11-19 |
 | Mimi o Sumaseba | みみをすませば | 2009-08-28 | [v2208](https://vndb.org/v2208) | v2.47 | ✅ Plays through | 2026-11-19 |
@@ -954,6 +954,36 @@ archives open with Chain Trap's keys, a scheme of its own now). v2.30 has its ow
 player has now too). From their titles, both ran 150,000 frames into their stories with no fault
 (Chain Trap's CSIZUMA.SCN, its text a page at a time; EDEN ~FINAL~'s E6MAIN.SCN, a movie a scene).
 
+**Later on 2026-11-20.** Play through now: Reizoku (50 scenarios), CC Hospital (244; Future-Digi's
+release, its CCH.ini names the engine "[Rio Shiina v2.37]", which the player now takes as RIO.INI;
+its START sets the main loop's pause with `004B`, and `004A` / `004C` read the pause settings:
+kept, the player paces its frames itself; its table is v2.37's), and, their last scenarios run
+again with 150,000 frames, Mikoko (OP01.TXT; its three routines without C# have native versions,
+the thumbnail and the XOR stream checked against the x86 code), Zansho Omimai (six long
+scenarios), Houkago no Hoken'i (S0002.TXT) and Wana (RSM01 / RSS01). Chikan Densha Otoko Gaiden's
+S01A.TXT ends in its train part, where a movie loops while the game waits for a click (the sweep
+does not click during movies): with Ctrl held and clicks in the middle (SCNBOOT_PRESS,
+SCNBOOT_MOUSE, SCNBOOT_SWEEP_FROM after them) it goes on to S01B.TXT. Start now: Puri-Puri (its
+START reads the clock at two places in a row and waits until they agree; the old engines' rule of
+a clock read again waiting for the next frame now holds only where it was read already),
+Omocha no Sensei (its START compares icon 2 of its executable with icon.bin: the player took
+RK01_D.WAR, which GameMap names for the game too, for the executable; only .exe names are taken
+now), Reika (its scheme had version 2390 and the image of the later engines: v2.33's, Cleavage's
+Common2 image, opens all its 3,328 files) and Nagagutsu wo Haita Deco. ONE☆BOKU (v2.35) had no
+table of its own: Data/ScnOps/ops_v235.tsv is read from its one.EXE (v2.34's operands, with
+`0046`-`004A`, `00AA`-`00B1` and `045C` new and `007D`-`0080` gone), and 2.35 is one of the old
+engines now (ScnVm.OldEngine). The old games of SCN modules (Baby, BE, Calendar Girl, the Hana no
+Kioku releases, Hachigatsu no Nostalgia, Chain Trap, Kanawanu Koi no Monogatari and others) stand
+at their first choices when run from their titles: the player's text step read the skip keys,
+which took the click before the scripts' own `03EA` (the engines before 2.33 read none there;
+now only 2.33 on do). Run from their titles with clicks in their message windows (the sweep's
+grid clicks above them), they go on: Baby, BE through 32 of its 80 modules, Calendar Girl
+from June 19 to its last day and an ending (33 of its 35 modules; its text came only once
+`02DA` of 2.02 took its list by address: "_w%i" had printed a character delay of -2147483648),
+the Hana no Kioku chapters to their ends (a wait of 4 ms on the performance counter, `03CA`, in a
+loop that does not yield had stood still: the counter now goes on at each read). Puri-Puri and
+Hitozuma OL stood in a `0084` that drew a text at once after a `_w`: its waits are off now.
+
 ## Sweeping
 
 `tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through ScnBoot, each from
@@ -1111,6 +1141,13 @@ Miko Dashi and Nukige Mitai na Shima ni Sunderu... 2 on 2026-11-05; the games of
 | Gakuen Pets 3 ~Seieki Mamire no Toshokan~ | 49 | 99.9% |
 | Megane Choukyou ~Megane Shoujo wa Ikan ni Shite Kimoota Kyoushi no Mono ni Natta ka~ | 49 | 95.3% |
 | Idol Koukai Chijoku Sex | 26 | 99.6% |
+| Reizoku ~Kyonyuu Shimai Choukyou Jugyou~ | 50 | 94.6% |
+| CC Hospital | 244 | 44.1% |
+| Mikoko | 299 | 64.4% |
+| Zansho Omimai Moushiagemasu | 17 | 68.2% |
+| ONE☆BOKU Faraway so close! | 361 | 64.8% |
+| Houkago no Hoken'i ~Ane Juujoku~ | 24 | 54.2% |
+| Wana ~Hakudaku Mamire no Houkago~ | 160 | 70.1% |
 
 The sweep found three faults, all fixed (the third: Chuuni Hime's blur on the x86 interpreter,
 12 s a frame, below in Notes): Bitch Gakuen ran out of the scripts' memory in

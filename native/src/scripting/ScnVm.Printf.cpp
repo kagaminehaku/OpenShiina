@@ -175,8 +175,10 @@ void ScnVm::RegisterPrintf()
         return 0;
     });
     // 02DA dest, format, list: wvsprintfA with the arguments as dwords at list
+    // (v2.02, CG.EXE 0x40AED0, reads list with GetVarAdr: Calendar Girl's "_w%i" gives l[0] itself)
     Register(0x02DA, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
-        int dest = vm.Value(c, i.Args[0]), format = vm.Value(c, i.Args[1]), list = vm.Value(c, i.Args[2]);
+        int dest = vm.Value(c, i.Args[0]), format = vm.Value(c, i.Args[1]);
+        int list = vm.EngineVersion < 210 && !i.Args[2].AddressOf ? vm.AddressOf(c, i.Args[2]) : vm.Value(c, i.Args[2]);
         vm.Wvsprintf(dest, format, [&] {
             int v = vm.Read32(list);
             list += 4;
