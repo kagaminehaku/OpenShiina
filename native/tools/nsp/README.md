@@ -15,6 +15,12 @@ the npdm, the NACP's changes and the logos are the Loader's, and so is what the 
 signature patches (sys-patch) on the system it is installed on, and an install with DBI. The keys
 are the console's own and never belong in the repository.
 
+`build.sh` does the same on Linux (`build.sh <prod.keys> <work folder> [build] [version]`): the
+release workflow (`.github/workflows/release.yml`, job `switch`) builds the player in devkitPro's
+container and packs the NSP with it when the repository has the secret `SWITCH_PROD_KEYS` (the
+text of prod.keys, as Lockpick_RCM writes it); the keys are written to a file of the runner's temp
+folder for the packing and deleted after it. Without the secret only the .nro is built.
+
 Two things differ from the Loader, because no hbloader runs before the player:
 
 - No automatic video capture in the NACP (0x3035 = 0). With it the system takes 96 MB of the

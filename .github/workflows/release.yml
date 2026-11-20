@@ -4,6 +4,8 @@
 #   OpenShiinaTools-<version>-windows-x64.zip  OpenShiina Tools (archives, translations) for Windows
 #   OpenShiinaTools-<version>-linux-x64.tar.gz OpenShiina Tools for Linux
 #   OpenShiina-<version>-android.apk           the Android player (CoreCLR: arm64, x64)
+#   OpenShiina-<version>-switch.nro            the Switch player (native/, C++): homebrew, from hbmenu
+#   OpenShiina-<version>-switch.nsp            the same as a title of its own (native/tools/nsp)
 # The version is the tag's (v0.2.0 -> 0.2.0). Run by hand (Actions > Release > Run workflow),
 # it only builds, and the files are kept as the run's artifacts.
 #
@@ -15,6 +17,10 @@
 # with another key cannot be installed over it. The APK's version code is the hour of the build
 # (the Android project's ApplicationVersion), as for a build made by hand, so either installs
 # over an older one.
+#
+# The NSP is packed with a console's keys, which are never in the repository: the secret
+#   SWITCH_PROD_KEYS          prod.keys as Lockpick_RCM writes it (its text, as it is)
+# Without it only the .nro is built.
 
 name: Release
 
@@ -149,9 +155,47 @@ jobs:
           name: android
           path: dist/*
 
+  switch:
+    needs: version
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
+    steps:
+      # (git before the checkout, so that it is a repository; hacBrewPack is cloned too)
+      - name: Tools
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git make gcc g++ libc6-dev cmake ninja-build ca-certificates
+          dkp-pacman -Sy --noconfirm --needed libnx deko3d uam switch-tools switch-cmake switch-pkg-config switch-sdl2 switch-freetype
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cmake -S native -B native/build-switch -G Ninja -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake" -DCMAKE_BUILD_TYPE=Release
+          cmake --build native/build-switch
+          mkdir -p dist
+          cp native/build-switch/OpenShiina.nro "dist/OpenShiina-$VERSION-switch.nro"
+      # The keys only in a file of the runner's temp folder for the packing, deleted after it
+      - name: NSP
+        if: env.SWITCH_PROD_KEYS != ''
+        run: |
+          printf '%s\n' "$SWITCH_PROD_KEYS" > "$RUNNER_TEMP/prod.keys"
+          trap 'rm -f "$RUNNER_TEMP/prod.keys"' EXIT
+          bash native/tools/nsp/build.sh "$RUNNER_TEMP/prod.keys" "$RUNNER_TEMP/nsp" native/build-switch "${VERSION%%-*}"
+          cp "$RUNNER_TEMP"/nsp/hacbrewpack_nsp/*.nsp "dist/OpenShiina-$VERSION-switch.nsp"
+      - name: No NSP
+        if: env.SWITCH_PROD_KEYS == ''
+        run: |
+          echo "::warning::No SWITCH_PROD_KEYS secret: only the .nro is built"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: switch
+          path: dist/*
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, linux, android]
+    needs: [windows, linux, android, switch]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
