@@ -323,7 +323,14 @@ bool ScnVm::WriteScriptFile(const std::string& path, const openshiina::Bytes& da
         return true;    // the engine reports success and writes nothing
     auto p = ResolvePath(path);
     if (!p || !p->Save)
-        return false;
+    {
+        // A bare file name, which the engine writes into its current folder, the game's (Deco's and
+        // Sabae no Ou's EFCLIB log to EFCDBG.TXT in every effect): into the save folder instead
+        if (path.empty() || path.find_first_of("\\/:") != std::string::npos)
+            return false;
+        WriteSave(path, data);
+        return true;
+    }
     WriteSave(p->Name, data);
     return true;
 }

@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 152 games, 153 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 156 games, 157 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -43,10 +43,10 @@ of those versions it does not list.
 | Calendar Girl | カレンダーガール | 2000-07-21 | [v6978](https://vndb.org/v6978) | v2.02 | ✅ Plays through | 2026-11-20 |
 | Hana no Kioku 1-2-3 | 花の記憶 わん・つう・すり～ | 2000-11-24 | [r19761](https://vndb.org/r19761) | v2.10 | ✅ Plays through | 2026-11-20 |
 | Kanawanu Koi no Monogatari | 叶わぬ恋の物語 | 2001-03-30 | [v20212](https://vndb.org/v20212) | v2.11 | ✅ Plays through | 2026-11-20 |
-| Baby, BE -Bedside Emotion- | Baby, BE -Bedside Emotion- | 2001-04-20 | [v1942](https://vndb.org/v1942) | v2.11 | 🟡 Starts | 2026-11-20 |
+| Baby, BE -Bedside Emotion- | Baby, BE -Bedside Emotion- | 2001-04-20 | [v1942](https://vndb.org/v1942) | v2.11 | ✅ Plays through | 2026-11-20 |
 | Shi-Ka-E-Shi | シ・カ・エ・シ | 2002-01-25 | [v5574](https://vndb.org/v5574) | v2.15 | ✅ Plays through | 2026-11-20 |
 | Mahou no Shippo na Dai Ichi wa | 魔法のしっぽな 第一話 | 2002-03-22 | [v14674](https://vndb.org/v14674) | v2.16 | ✅ Plays through | 2026-11-20 |
-| Itsuka, Dokoka de ~Ano Amaoto no Kioku~ | いつか、どこかで ～あの雨音の記憶～ | 2002-05-24 | [v3214](https://vndb.org/v3214) | v2.16 | 🟢 Plays | 2026-11-20 |
+| Itsuka, Dokoka de ~Ano Amaoto no Kioku~ | いつか、どこかで ～あの雨音の記憶～ | 2002-05-24 | [v3214](https://vndb.org/v3214) | v2.16 | ✅ Plays through | 2026-11-20 |
 | Hana no Kioku 7 | 花の記憶 ～第七章～ | 2002-12-20 | [v8713](https://vndb.org/v8713) | v2.18 | ✅ Plays through | 2026-11-20 |
 | Mahou no Shippo na Dai San wa | 魔法のしっぽな 第三話 | 2003-01-24 | [v14673](https://vndb.org/v14673) | v2.18 | ✅ Plays through | 2026-11-20 |
 | Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ✅ Plays through | 2026-11-20 |
@@ -55,9 +55,9 @@ of those versions it does not list.
 | EDEN V | EDEN V | 2003-07-18 | [v4604](https://vndb.org/v4604) | v2.20 | 🟡 Starts | 2026-11-20 |
 | EDEN ~FINAL~ | ＥＤＥＮ～ＦＩＮＡＬ～ | 2004-01-16 | [v2288](https://vndb.org/v2288) | v2.30 | 🟡 Starts | 2026-11-20 |
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
-| Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | 🟡 Starts | 2026-11-20 |
+| Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ✅ Plays through | 2026-11-20 |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | ✅ Plays through | 2026-11-05 |
-| Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🟢 Plays | 2026-11-05 |
+| Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | ✅ Plays through | 2026-11-20 |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ✅ Plays through | 2026-11-20 |
 | Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.33 | ✅ Plays through | 2026-11-20 |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ✅ Plays through | 2026-11-04 |
@@ -1010,6 +1010,14 @@ and not counted: the menus a title opens (Calendar Girl's MEMORIES, Kanawanu's O
 on a stack they lack when swapped in. Puri-Puri's T001_02 swapped in for T001_01 stops in START,
 whose loop over a count T001_01 sets runs from 0 down and writes over memory; it plays after it.
 Oba-san's STAFF goes on to the epilogue of the route taken (`a[400]`), none when swapped in.
+
+Then Baby, BE (77 modules), Itsuka, Dokoka de (108; its RESULT menu, opened from the title, not
+counted) and Chain Trap (its four routes) ran every module to the next one with fixed clicks (the
+buttons sought had opened their backlogs and Baby, BE's navigator), and Vanquish (one module, its
+103 scenes a switch on `b[301]` as EDEN IV's) was run scene by scene: each plays its movie and goes
+on, the game overs and the staff roll back to the title, with no error. EFCLIB (Nagagutsu wo Haita
+Deco, Sabae no Ou) logs a few characters to EFCDBG.TXT in every effect: a bare file name, which the
+engine writes into its current folder, goes into the save folder now (it was a script error).
 
 ## Sweeping
 

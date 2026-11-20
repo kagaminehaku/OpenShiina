@@ -14,6 +14,10 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **9 more games play through** (152 games, 153 releases): Hachigatsu no Nostalgia, Calendar Girl,
   Kanawanu Koi no Monogatari, STAGE, Reika, Puri-Puri, Ayakashibito, Shinseki no Oba-san and Yakata
   Jukujo.
+- **4 more games play through** (156 games, 157 releases): Baby, BE, Itsuka, Dokoka de, Chain
+  Trap and Vanquish.
+- A file the scripts write by its bare name goes into the save folder (EFCLIB's EFCDBG.TXT log of
+  Nagagutsu wo Haita Deco and Sabae no Ou was a script error).
 - `0848`-`084A`: a slot run on one window message (Love Revo's minigames).
 - The old engines' `06E8` (a stream's state) read again in a frame waits for the next one:
   Calendar Girl's staff roll no longer stands in a loop that never yields.

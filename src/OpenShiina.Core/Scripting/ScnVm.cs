@@ -860,9 +860,11 @@ public sealed partial class ScnVm : IDisposable
             // picture slot stays empty, the scene goes on.
             if (result == 2)
             {
+                string detail = m_errorDetail is { } d ? $": {d}" : "";
+                m_errorDetail = null;
                 if (ScriptErrorReports != 0)
-                    throw Error(c, $"Script error in opcode {ins.Op:X4}");
-                ScriptErrorPassed?.Invoke(Error(c, $"Script error in opcode {ins.Op:X4}").Message);
+                    throw Error(c, $"Script error in opcode {ins.Op:X4}{detail}");
+                ScriptErrorPassed?.Invoke(Error(c, $"Script error in opcode {ins.Op:X4}{detail}").Message);
                 return 0;
             }
             if (result != 0)
@@ -880,6 +882,9 @@ public sealed partial class ScnVm : IDisposable
                 return 0;
         }
     }
+
+    // What a handler that returned 2 (a script error) found wrong, for the report
+    private string? m_errorDetail;
 
     public ScnException Error(ScnContext c, string message) =>
         new($"{message} (slot {c.Slot}, {c.Current - c.CodeBase:X5} in its module)", c.Slot, c.Current, Read16(c.Current));

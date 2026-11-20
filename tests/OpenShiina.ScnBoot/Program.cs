@@ -162,7 +162,9 @@ if (seeker != null)
     vm.CompareSeen = (a, b, cmp) => seeker.Compared(host.MousePosition, a, b, cmp);
 int sweepStuck = int.TryParse(Environment.GetEnvironmentVariable("SCNBOOT_SWEEP_STUCK"), out int stuckFrames) ? stuckFrames : 9000;
 string? sweepFile = null, sweepEnd = null, sweepLast = null, slowestAt = null;
-int sweepTotal = 0, sweepLastNew = 0, sweepLastBlock = int.MaxValue;
+// (sweepLastLine: the last new line alone - a movie playing is not "something new" for the clicks sought:
+// EDEN V's rooms loop a movie until the place leading out is clicked)
+int sweepTotal = 0, sweepLastNew = 0, sweepLastLine = 0, sweepLastBlock = int.MaxValue;
 bool sweepReachedEnd = false;
 long slowestMs = 0, heapPeak = 0;
 var sweepSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -204,7 +206,7 @@ if (Environment.GetEnvironmentVariable("SCNBOOT_PLAYFROM") is { } playFrom && pl
             if (int.TryParse(id[(id.LastIndexOf(':') + 1)..], out int line) && line >= sweepLastBlock)
                 sweepReachedEnd = true;
             if (sweepSeen.Add(id))
-                sweepLastNew = host.Frame;
+                sweepLastNew = sweepLastLine = host.Frame;
         }
     };
 }
@@ -271,7 +273,7 @@ try
         // A place for each click of the sweep (they come every 48 frames), while nothing new comes
         if (seeker != null && host.Sweeping && frame % 48 == 0)
         {
-            if (frame - Math.Max(sweepLastNew, host.LastNewFile) > seekAfter)
+            if (frame - Math.Max(sweepLastLine, host.LastNewFile) > seekAfter)
                 host.SweepPoint = seeker.Next(vm.HitTargets(), frame);
             else
             {

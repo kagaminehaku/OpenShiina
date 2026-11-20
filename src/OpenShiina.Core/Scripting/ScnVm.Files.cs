@@ -335,7 +335,15 @@ public sealed partial class ScnVm
         if (!FileWritesEnabled)
             return true;    // the engine reports success and writes nothing
         if (ResolvePath(path) is not { Save: true } p)
-            return false;
+        {
+            // A bare file name, which the engine writes into its current folder, the game's
+            // (Nagagutsu wo Haita Deco's and Sabae no Ou's EFCLIB log "A", "B"... to EFCDBG.TXT
+            // in every effect): into the save folder, the game's folder is never written
+            if (path.Length == 0 || path.IndexOfAny(['\\', '/', ':']) >= 0)
+                return false;
+            WriteSave(path, data);
+            return true;
+        }
         WriteSave(p.Name, data);
         return true;
     }
@@ -421,7 +429,10 @@ public sealed partial class ScnVm
         {
             int buffer = vm.Value(c, i.Args[0]), n = vm.Value(c, i.Args[1]);
             string path = vm.ReadString(vm.Value(c, i.Args[2]));
-            return vm.WriteScriptFile(path, vm.ReadBytes(buffer, Math.Max(0, n))) ? 0 : 2;
+            if (vm.WriteScriptFile(path, vm.ReadBytes(buffer, Math.Max(0, n))))
+                return 0;
+            vm.m_errorDetail = $"\"{path}\" is not in the save folder";
+            return 2;
         });
 
         // 0104 file: the settings file for 0107
