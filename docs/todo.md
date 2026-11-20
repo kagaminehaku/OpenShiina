@@ -54,6 +54,15 @@ is mostly for slow phones, and should follow what their perf.log shows.
   (S25Encoder; Repack takes the frames' PNG files, docs/tools.md).
   ([Niflheim](https://github.com/Yggdrasill-Moe/Niflheim/tree/master/RioShiina)'s S25_pack
   writes the layout with every pixel uncompressed.)
+- [ ] **The games whose story is in SCN modules, not scenario TXT** (Cleavage, Reika, Puri-Puri,
+  Death☆Meta, the Hana no Kioku releases, Nagagutsu wo Haita Deco and the others of
+  compatibility.md's notes "SCN modules"): their lines are Shift-JIS strings in the modules' code
+  (Reika's SCA01.SCN: `"「……くん」_r"`), which the player already replaces when a whole one is in
+  `strings.tsv`; the Translation tab lists the lines of scenario TXT only. It should read each
+  module's strings (as `ScnTools dis` finds them: the operands of the text calls, with their
+  codes such as `_r`) into the tables, a module as a "scenario", and play a module from its
+  first line as Play from here does a scenario (SCNBOOT_MODULE's swap). Texts built at run time
+  (names put in) still cannot be matched whole.
 - [ ] In OpenShiina Tools: list the texts the scripts write themselves (the Shift-JIS strings
   passed to 0083 / 0084 / 00A0); a whole game translated (are 2,820 letter codes enough?);
   Enter to the next line; machine translation of the empty lines (the user's own key).
