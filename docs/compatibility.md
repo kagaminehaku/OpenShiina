@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 162 games, 163 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 163 games, 164 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -83,7 +83,7 @@ of those versions it does not list.
 | Draculius | ドラクリウス | 2007-05-25 | [v453](https://vndb.org/v453) | v2.38 | ✅ Plays through | 2026-11-12 |
 | Tsukutori | つくとり | 2007-05-25 | [v637](https://vndb.org/v637) | v2.37 | ✅ Plays through | 2026-11-19 |
 | Metro Chikansen  ~Kairaku Jousha Annai~ | 牝トロ痴漢線 ～快楽嬢射案内～ | 2007-07-06 | [v5266](https://vndb.org/v5266) | v2.38 | ✅ Plays through | 2026-11-19 |
-| Nagagutsu wo Haita Deco | 長靴をはいたデコ | 2007-09-28 | [v606](https://vndb.org/v606) | v2.39 | 🟡 Starts | 2026-11-20 |
+| Nagagutsu wo Haita Deco | 長靴をはいたデコ | 2007-09-28 | [v606](https://vndb.org/v606) | v2.39 | ✅ Plays through | 2026-11-20 |
 | Tsui☆Teru | ツイ☆てる | 2007-11-22 | [v454](https://vndb.org/v454) | v2.40 | ✅ Plays through | 2026-11-19 |
 | Helter Skelter | ヘルタースケルター | 2007-11-30 | [v2784](https://vndb.org/v2784) | v2.40 | ✅ Plays through | 2026-11-12 |
 | Sis☆Pon ~Haramase♪ Gochisou-sama!~ | シス☆ぽん～孕ませ♪ご馳走さまっ！～ | 2007-11-30 | [v2858](https://vndb.org/v2858) | v2.40 | ✅ Plays through | 2026-11-19 |
@@ -1038,6 +1038,11 @@ Gibo to Oba (170 modules, started from its title's Initial Start), Kateinai Chou
 Sabae no Ou (984: 830 paragraphs, and its items and tips, which a paragraph calls and comes back
 from, each swapped in for the first one its first paragraph calls) ran every module to the next
 one with no error.
+
+Nagagutsu wo Haita Deco (a gamebook: 865 numbered paragraphs, 38 items and 117 tips) ran every
+module to the next one with no error: its battles with their dice, the paragraphs' links ("――999へ")
+clicked; its items and tips swapped in for the first tip its first paragraph calls. PARA528 ends
+the world at its paragraph 999: the game saves and quits there, as it means to.
 
 ## Sweeping
 
