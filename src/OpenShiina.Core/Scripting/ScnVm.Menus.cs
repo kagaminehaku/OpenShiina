@@ -196,6 +196,17 @@ public sealed partial class ScnVm
             vm.SortElements(start, count, width, slot);
             return 0;
         });
+        // 0295 base, count, width, slot: the same with the engine's comb sort (Oreimo Plus's
+        // FUN_00416780; Cruise☆Cruise's SRC_MAIN sorts with it)
+        Register(0x0295, (vm, c, i) =>
+        {
+            int start = vm.Value(c, i.Args[0]), count = vm.Value(c, i.Args[1]);
+            int width = vm.Value(c, i.Args[2]), slot = vm.Value(c, i.Args[3]);
+            if (slot is < 0 or >= Slots)
+                return 2;
+            vm.SortElements(start, count, width, slot, comb: true);
+            return 0;
+        });
     }
 
     /// <summary>
@@ -247,7 +258,7 @@ public sealed partial class ScnVm
         }
     }
 
-    private void SortElements(int lo, int count, int width, int slot)
+    private void SortElements(int lo, int count, int width, int slot, bool comb = false)
     {
         if ((uint)count < 2 || width == 0)
             return;
@@ -288,7 +299,10 @@ public sealed partial class ScnVm
 
         try
         {
-            SortRange(lo, count, width, Compare, Swap);
+            if (comb)
+                CombSort(lo, count, width, Compare, Swap);
+            else
+                SortRange(lo, count, width, Compare, Swap);
         }
         finally
         {
@@ -300,6 +314,32 @@ public sealed partial class ScnVm
                 Write32(FAddress(slot, 0), last);
                 c.ExitCode = last;
             }
+        }
+    }
+
+    /// <summary>
+    /// The comb sort of 0295 (FUN_00416780): the gap a tenth of 13 smaller before each pass (1 at
+    /// least, 11 for 9 or 10), each element compared with the one a gap after it (l[0] the first,
+    /// l[1] the second) and swapped when the slot ends above 0, until a pass of gap 1 swaps none.
+    /// </summary>
+    private static void CombSort(int lo, int count, int width, Func<int, int, int> Compare, Action<int, int> Swap)
+    {
+        int gap = count;
+        bool sorted = false;
+        while (gap > 1 || !sorted)
+        {
+            gap = gap * 10 / 13;
+            if (gap == 0)
+                gap = 1;
+            else if (gap is 9 or 10)
+                gap = 11;
+            sorted = true;
+            for (int k = 0, a = lo, b = lo + gap * width; k < count - gap; k++, a += width, b += width)
+                if (Compare(a, b) > 0)
+                {
+                    Swap(a, b);
+                    sorted = false;
+                }
         }
     }
 

@@ -172,6 +172,7 @@ std::optional<int> ExeChecksum(const std::string& game)
         {"Mikoko", 306723180 ^ -2105729026},
         {"Idol Koukai Chijoku Sex", 306723180 ^ -1155919157},
         {"Zansho Omimai Moushiagemasu", 306723180 ^ 563946514},
+        {"Cruise☆Cruise ~Shoujo no 10nen to Chiisana Yakusoku~", 306723180 ^ 1378710625},
     };
     for (const auto& [name, value] : checksums)
         if (Text::EqualsIgnoreCase(name, game))

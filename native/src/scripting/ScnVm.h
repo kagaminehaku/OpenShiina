@@ -915,7 +915,7 @@ private:
     void RegisterMenus();
     int Compare16(int x, int y);
     bool IsCompare16Slot(int slot);
-    void SortElements(int lo, int count, int width, int slot);
+    void SortElements(int lo, int count, int width, int slot, bool comb = false);
     // Handles of the menus 0898 made
     int m_nextMenu = 0x00510000;
     /// GetSystemMetrics (09DD, user32's through 01A4) as a 1920 x 1080 screen.

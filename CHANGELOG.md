@@ -16,6 +16,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   Jukujo.
 - **4 more games play through** (156 games, 157 releases): Baby, BE, Itsuka, Dokoka de, Chain
   Trap and Vanquish.
+- **Cruise☆Cruise plays through** (157 games, 158 releases): its keys (167 schemes), its
+  executable's checksum and `0295`, the engine's comb sort.
 - A file the scripts write by its bare name goes into the save folder (EFCLIB's EFCDBG.TXT log of
   Nagagutsu wo Haita Deco and Sabae no Ou was a script error).
 - `0848`-`084A`: a slot run on one window message (Love Revo's minigames).

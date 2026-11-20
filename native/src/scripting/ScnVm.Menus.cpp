@@ -12,6 +12,31 @@ namespace openshiina::scripting {
 
 namespace {
 
+/// The comb sort of 0295 (FUN_00416780): the gap a tenth of 13 smaller before each pass (1 at least,
+/// 11 for 9 or 10), each element compared with the one a gap after it and swapped when the slot ends
+/// above 0, until a pass of gap 1 swaps none.
+void CombSort(int lo, int count, int width, const std::function<int(int, int)>& Compare,
+              const std::function<void(int, int)>& Swap)
+{
+    int gap = count;
+    bool sorted = false;
+    while (gap > 1 || !sorted)
+    {
+        gap = gap * 10 / 13;
+        if (gap == 0)
+            gap = 1;
+        else if (gap == 9 || gap == 10)
+            gap = 11;
+        sorted = true;
+        for (int k = 0, a = lo, b = lo + gap * width; k < count - gap; k++, a += width, b += width)
+            if (Compare(a, b) > 0)
+            {
+                Swap(a, b);
+                sorted = false;
+            }
+    }
+}
+
 /// The VC6 qsort of 0294 over count elements of width bytes from lo.
 void SortRange(int lo, int count, int width, const std::function<int(int, int)>& Compare,
                const std::function<void(int, int)>& Swap)
@@ -287,6 +312,15 @@ void ScnVm::RegisterMenus()
         vm.SortElements(start, count, width, slot);
         return 0;
     });
+    // 0295 base, count, width, slot: the same with the engine's comb sort (Cruise☆Cruise's SRC_MAIN)
+    Register(0x0295, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        int start = vm.Value(c, i.Args[0]), count = vm.Value(c, i.Args[1]);
+        int width = vm.Value(c, i.Args[2]), slot = vm.Value(c, i.Args[3]);
+        if (slot < 0 || slot >= Slots)
+            return 2;
+        vm.SortElements(start, count, width, slot, true);
+        return 0;
+    });
 }
 
 int ScnVm::Compare16(int x, int y)
@@ -337,7 +371,7 @@ bool ScnVm::IsCompare16Slot(int slot)
     return result;
 }
 
-void ScnVm::SortElements(int lo, int count, int width, int slot)
+void ScnVm::SortElements(int lo, int count, int width, int slot, bool comb)
 {
     // The engine's qsort (FUN_004174E0): Visual C++ 6's, with its own stack of ranges and a
     // selection sort for 8 elements or fewer (FUN_00417360); the comparison runs a slot to its end
@@ -390,7 +424,10 @@ void ScnVm::SortElements(int lo, int count, int width, int slot)
     };
     try
     {
-        SortRange(lo, count, width, Compare, Swap);
+        if (comb)
+            CombSort(lo, count, width, Compare, Swap);
+        else
+            SortRange(lo, count, width, Compare, Swap);
     }
     catch (...)
     {

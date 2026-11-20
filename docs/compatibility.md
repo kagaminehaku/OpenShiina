@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 156 games, 157 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 157 games, 158 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -110,6 +110,7 @@ of those versions it does not list.
 | Chikan Circle | 痴漢サークル | 2009-05-01 | [v1703](https://vndb.org/v1703) | v2.46 | ✅ Plays through | 2026-11-19 |
 | Hana to Otome ni Shukufuku o | 花と乙女に祝福を | 2009-05-29 | [v1545](https://vndb.org/v1545) | v2.46 | ✅ Plays through | 2026-11-05 |
 | Stellula Eques Codex | ステルラエクエス コーデックス ～黄昏の姫騎士～ | 2009-05-29 | [v1651](https://vndb.org/v1651) | v2.46 | ✅ Plays through | 2026-11-19 |
+| Cruise☆Cruise ~Shoujo no 10nen to Chiisana Yakusoku~ | くる～ず☆クルーズ～少女の10年とちいさな約束～ | 2009-05-29 | [v1780](https://vndb.org/v1780) | v2.46 | ✅ Plays through | 2026-11-20 |
 | Shokuinshitsu | 職員室 | 2009-06-26 | [v1696](https://vndb.org/v1696) | v2.46 | ✅ Plays through | 2026-11-12 |
 | Chikan Circle 2 | 痴漢サークル2 | 2009-07-03 | [v2102](https://vndb.org/v2102) | v2.47 | ✅ Plays through | 2026-11-12 |
 | Chikan Densha Otoko Gaiden | 痴漢電車男外伝 ～伝説へのチェイサー～ | 2009-07-10 | [v1997](https://vndb.org/v1997) | v2.47 | ✅ Plays through | 2026-11-20 |
@@ -240,7 +241,6 @@ ShiinaRio's. Playing it would take a small player of its own (todo.md).
 |---|---|---|---|---|---|---|
 | Delicious Way |  | 2000-12-29 | [v63587](https://vndb.org/v63587) | Shinonome | 0 | 🔒 No keys |
 | Mahou no Shippo na Dai Ni wa | 魔法のしっぽな 第二話 | 2002-09-13 | [v14675](https://vndb.org/v14675) | Sith | 2 | 🔒 No keys |
-| Cruise☆Cruise ~Shoujo no 10nen to Chiisana Yakusoku~ | くる～ず☆クルーズ～少女の10年とちいさな約束～ | 2009-05-29 | [v1780](https://vndb.org/v1780) | Abelia, Guten Tag | 6 | 🔒 No keys |
 
 ## Platforms
 
@@ -1018,6 +1018,14 @@ buttons sought had opened their backlogs and Baby, BE's navigator), and Vanquish
 on, the game overs and the staff roll back to the title, with no error. EFCLIB (Nagagutsu wo Haita
 Deco, Sabae no Ou) logs a few characters to EFCDBG.TXT in every effect: a bare file name, which the
 engine writes into its current folder, goes into the save folder now (it was a script error).
+
+**Cruise☆Cruise** (Abelia / Guten Tag, KURUKURU.exe, 2009, engine v2.46): its executable is behind
+Alpha-ROM (SETTEC); the user recovered its keys (a scheme of its own, ShiinaImage the common
+image) and all 8,816 files of its seven archives come out whole. Its START wants 1378710625 from
+`03C2` (the executable's checksum), and SRC_MAIN sorts with `0295`, the engine's comb sort
+(Oreimo Plus's FUN_00416780: the gap a tenth of 13 smaller before each pass, 11 for 9 or 10, a
+script slot comparing each element with the one a gap after it). Swept on 2026-11-20: its 131
+scenarios all done, 87.1% of their lines.
 
 ## Sweeping
 

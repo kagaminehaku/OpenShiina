@@ -120,7 +120,8 @@ public sealed partial class ScnVm
     // v2.42: 0x005B7 takes 997501665 or -918893043), Gakuen Pets 2 (GPETS2.EXE, v2.45: 0x003D9,
     // -474633892; -621166875 with f[257] bit 1), Mikoko (v2.46: 0x00345, -2105729026; -233499411 with
     // f[257] bit 1), Idol Koukai Chijoku Sex (ISEX.exe, v2.46: 0x00371, -1155919157; -1635043666 with
-    // f[257] bit 1), Zansho Omimai Moushiagemasu (v2.41: 0x006BF, 563946514)
+    // f[257] bit 1), Zansho Omimai Moushiagemasu (v2.41: 0x006BF, 563946514), Cruise☆Cruise
+    // (KURUKURU.exe, v2.46, its code behind Alpha-ROM: 0x00481, 1378710625; -75841587 with f[257] bit 1)
     private static readonly Dictionary<string, int> s_exeChecksums = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Azu Plus"] = 306723180 ^ 1804523910,
@@ -149,6 +150,7 @@ public sealed partial class ScnVm
         ["Mikoko"] = 306723180 ^ -2105729026,
         ["Idol Koukai Chijoku Sex"] = 306723180 ^ -1155919157,
         ["Zansho Omimai Moushiagemasu"] = 306723180 ^ 563946514,
+        ["Cruise☆Cruise ~Shoujo no 10nen to Chiisana Yakusoku~"] = 306723180 ^ 1378710625,
     };
 
     private void RegisterSystem()
