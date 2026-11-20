@@ -92,8 +92,9 @@ public sealed partial class ScnVm
         // it gave the window its turn); read at two places in one round it gives the same time, as the
         // engine's does: Puri-Puri's START (v2.34, 0x2A185 / 0x2A18A) waits until two reads in a row
         // agree, ONE☆BOKU's transitions (v2.35, START 0x91151 / 0x91180) time a step of a loop that
-        // yields (0034) between its reads
-        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6, 0x05B9 })
+        // yields (0034) between its reads. 06E8 (a stream's state): Calendar Girl's (v2.02) staff roll
+        // waits in a loop of 06E8 alone until its music ends
+        foreach (int op in new[] { 0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6, 0x05B9, 0x06E8 })
         {
             var later = m_handlers[op];
             Register234(op, (vm, c, i) =>

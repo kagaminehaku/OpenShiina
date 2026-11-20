@@ -125,7 +125,8 @@ void ScnVm::RegisterEngine234()
     // waits (RunFrame). Both change between frames here, so a task that reads one again in a frame
     // waits for the next one. 05B9 (a movie's state) too: Vanquish's (v2.33) movies play in a loop of
     // 05B9, 05C0 (the next frame), 0514 and 07D0 with no other wait
-    for (int op : {0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6, 0x05B9})
+    // (06E8, a stream's state: Calendar Girl's staff roll waits in a loop of it alone until its music ends)
+    for (int op : {0x0456, 0x0458, 0x03BD, 0x03BC, 0x03B6, 0x05B9, 0x06E8})
     {
         m_polledLater[op] = m_handlers[size_t(op)];
         Register234(op, PolledOld);

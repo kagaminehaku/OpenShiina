@@ -11,7 +11,12 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **9 more games play through** (143 games, 144 releases), their SCN modules swept one by one:
   Hana no Kioku 1-2-3, 4-5-6 and 7, Shi-Ka-E-Shi, Mahou no Shippo na Dai Ichi wa and Dai San wa,
   Death☆Meta, Hitozuma OL and Omocha no Sensei.
+- **9 more games play through** (152 games, 153 releases): Hachigatsu no Nostalgia, Calendar Girl,
+  Kanawanu Koi no Monogatari, STAGE, Reika, Puri-Puri, Ayakashibito, Shinseki no Oba-san and Yakata
+  Jukujo.
 - `0848`-`084A`: a slot run on one window message (Love Revo's minigames).
+- The old engines' `06E8` (a stream's state) read again in a frame waits for the next one:
+  Calendar Girl's staff roll no longer stands in a loop that never yields.
 - The old games of SCN modules go on past their first choices (the engines before 2.33 read no
   keys in their text step), Calendar Girl shows its text (2.02's `02DA` takes the list's
   address), the Hana no Kioku games no longer stand in a wait on the performance counter, and a

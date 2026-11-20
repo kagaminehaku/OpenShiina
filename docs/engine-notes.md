@@ -292,6 +292,9 @@ use); its START runs `004B` (0x41DD72: the main loop's Sleep after the window's 
 The old engines' clock (`03BD`) read again where it was read already in a frame waits for the next
 frame (their polling loops), but read at another place in the same frame it gives the same time:
 Puri-Puri's START (v2.34, 0x2A185 / 0x2A18A) reads it twice in a row and waits until the two agree.
+The mouse (`0456`, `0458`), the other clocks (`03BC`, `03B6`), a movie's state (`05B9`) and a
+stream's (`06E8`) read again by a task in one frame wait for the next too: Calendar Girl's staff
+roll (v2.02, STAFF.SCN 0x1625) loops on `06E8` alone, with no wait, until its music ends.
 
 **v2.34** (Ao no Juuai's aoj.EXE, 2005, not packed; `ScnTools opscan aoj`, table Data/ScnOps/ops_v234.tsv):
 the tasks are a global array, not a context register: FUN_0041e5c0 takes a slot, its script

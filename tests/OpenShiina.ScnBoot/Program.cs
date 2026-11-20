@@ -807,14 +807,15 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
 
     public void SetFullScreen(bool fullScreen) => Console.WriteLine($"  [full screen] {fullScreen}");
 
-    public IScnMusic? Music { get; } = new TestMusic();
+    public IScnMusic? Music => m_music ??= new TestMusic(() => Clock);
+    private TestMusic? m_music;
 
     public IScnFonts? Fonts { get; } = OperatingSystem.IsWindows() ? new OpenShiina.Platform.GdiFonts() : null;
     public IScnShapes? Shapes { get; } = OperatingSystem.IsWindows() ? new OpenShiina.Platform.GdiShapes() : null;
 }
 
 // Music that is only decoded, to check what the scripts open: prints the format and length
-sealed class TestMusic : IScnMusic
+sealed class TestMusic(Func<uint> clock) : IScnMusic
 {
     private int m_next = 1;
 
@@ -822,10 +823,13 @@ sealed class TestMusic : IScnMusic
     {
         uint magic = BitConverter.ToUInt32(file, 0);
         byte[]? ogg = (magic & 0xFFFFFF) == 0x56474F ? OpenShiina.Formats.AudioDecoder.DecodeOgv(file) : magic == 0x5367674F ? file : null;
-        if (ogg == null && magic == 0x46464952)
+        // (a PAD, the old games' music, is a WAVE as the players decode it)
+        byte[]? riff = (magic & 0xFFFFFF) == 0x444150 ? OpenShiina.Formats.AudioDecoder.DecodePad(file) : magic == 0x46464952 ? file : null;
+        if (ogg == null && riff != null)
         {
-            using var wave = new NAudio.Wave.WaveFileReader(new MemoryStream(file));
+            using var wave = new NAudio.Wave.WaveFileReader(new MemoryStream(riff));
             Console.WriteLine($"  [music] {file.Length} bytes, WAVE: {wave.WaveFormat.SampleRate} Hz, {wave.WaveFormat.Channels} ch, {wave.TotalTime.TotalSeconds:F1} s");
+            m_lengths[m_next] = wave.TotalTime.TotalMilliseconds;
             return m_next++;
         }
         if (ogg == null)
@@ -835,14 +839,28 @@ sealed class TestMusic : IScnMusic
         }
         using var reader = new NVorbis.VorbisReader(new MemoryStream(ogg), true);
         Console.WriteLine($"  [music] {file.Length} bytes: {reader.SampleRate} Hz, {reader.Channels} ch, {reader.TotalTime.TotalSeconds:F1} s");
+        m_lengths[m_next] = reader.TotalTime.TotalMilliseconds;
         return m_next++;
     }
 
+    // A stream's length (ms) and when it was played, not looping (the run's clock): it plays until
+    // then (a staff roll that waits for its music to end: Calendar Girl's)
+    private readonly Dictionary<int, double> m_lengths = new();
+    private readonly Dictionary<int, uint> m_playedAt = new();
+
     public void Close(int stream) => Console.WriteLine($"  [music] close {stream}");
-    public void Play(int stream, bool loop) => Console.WriteLine($"  [music] play {stream}{(loop ? " looping" : "")}");
+    public void Play(int stream, bool loop)
+    {
+        Console.WriteLine($"  [music] play {stream}{(loop ? " looping" : "")}");
+        if (loop)
+            m_playedAt.Remove(stream);
+        else
+            m_playedAt[stream] = clock();
+    }
     public void Stop(int stream) { }
     public void Pause(int stream) => Console.WriteLine($"  [music] pause {stream}");
     public void Resume(int stream) => Console.WriteLine($"  [music] resume {stream}");
     public void SetVolume(int stream, int volume) => Console.WriteLine($"  [music] volume {stream} {volume}");
-    public bool IsPlaying(int stream) => true;
+    public bool IsPlaying(int stream) =>
+        !m_playedAt.TryGetValue(stream, out uint at) || !m_lengths.TryGetValue(stream, out double ms) || clock() - at < ms;
 }

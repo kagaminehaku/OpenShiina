@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 143 games, 144 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 152 games, 153 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -39,10 +39,10 @@ of those versions it does not list.
 
 | Game | Japanese title | Release | VNDB | ShiinaRio | Status | Checked |
 |---|---|---|---|---|---|---|
-| Hachigatsu no Nostalgia ~The Summer with You~ | 八月のノスタルジア ～the summer with you～ | 2000-07-07 | [v3419](https://vndb.org/v3419) | v2.20 | 🟡 Starts | 2026-11-20 |
-| Calendar Girl | カレンダーガール | 2000-07-21 | [v6978](https://vndb.org/v6978) | v2.02 | 🟡 Starts | 2026-11-20 |
+| Hachigatsu no Nostalgia ~The Summer with You~ | 八月のノスタルジア ～the summer with you～ | 2000-07-07 | [v3419](https://vndb.org/v3419) | v2.20 | ✅ Plays through | 2026-11-20 |
+| Calendar Girl | カレンダーガール | 2000-07-21 | [v6978](https://vndb.org/v6978) | v2.02 | ✅ Plays through | 2026-11-20 |
 | Hana no Kioku 1-2-3 | 花の記憶 わん・つう・すり～ | 2000-11-24 | [r19761](https://vndb.org/r19761) | v2.10 | ✅ Plays through | 2026-11-20 |
-| Kanawanu Koi no Monogatari | 叶わぬ恋の物語 | 2001-03-30 | [v20212](https://vndb.org/v20212) | v2.11 | 🟡 Starts | 2026-11-20 |
+| Kanawanu Koi no Monogatari | 叶わぬ恋の物語 | 2001-03-30 | [v20212](https://vndb.org/v20212) | v2.11 | ✅ Plays through | 2026-11-20 |
 | Baby, BE -Bedside Emotion- | Baby, BE -Bedside Emotion- | 2001-04-20 | [v1942](https://vndb.org/v1942) | v2.11 | 🟡 Starts | 2026-11-20 |
 | Shi-Ka-E-Shi | シ・カ・エ・シ | 2002-01-25 | [v5574](https://vndb.org/v5574) | v2.15 | ✅ Plays through | 2026-11-20 |
 | Mahou no Shippo na Dai Ichi wa | 魔法のしっぽな 第一話 | 2002-03-22 | [v14674](https://vndb.org/v14674) | v2.16 | ✅ Plays through | 2026-11-20 |
@@ -51,7 +51,7 @@ of those versions it does not list.
 | Mahou no Shippo na Dai San wa | 魔法のしっぽな 第三話 | 2003-01-24 | [v14673](https://vndb.org/v14673) | v2.18 | ✅ Plays through | 2026-11-20 |
 | Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ✅ Plays through | 2026-11-20 |
 | EDEN IV | ＥＤＥＮ４ | 2003-03-28 | [v4601](https://vndb.org/v4601) | v2.20 | ✅ Plays through | 2026-11-19 |
-| STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | 🟡 Starts | 2026-11-20 |
+| STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | ✅ Plays through | 2026-11-20 |
 | EDEN V | EDEN V | 2003-07-18 | [v4604](https://vndb.org/v4604) | v2.20 | 🟡 Starts | 2026-11-20 |
 | EDEN ~FINAL~ | ＥＤＥＮ～ＦＩＮＡＬ～ | 2004-01-16 | [v2288](https://vndb.org/v2288) | v2.30 | 🟡 Starts | 2026-11-20 |
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
@@ -59,11 +59,11 @@ of those versions it does not list.
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | ✅ Plays through | 2026-11-05 |
 | Vanquish | VANQUISH | 2004-10-22 | [v7459](https://vndb.org/v7459) | v2.33 | 🟢 Plays | 2026-11-05 |
 | Death☆Meta | です☆めた | 2004-11-26 | [v5707](https://vndb.org/v5707) | v2.33 | ✅ Plays through | 2026-11-20 |
-| Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.33 | 🟡 Starts | 2026-11-20 |
+| Hitozuma Onna Kyoushi Reika | 人妻女教師・麗香 | 2004-12-10 | [v3719](https://vndb.org/v3719) | v2.33 | ✅ Plays through | 2026-11-20 |
 | Cleavage | CLEAVAGE | 2005-02-18 | [v931](https://vndb.org/v931) | v2.33 | ✅ Plays through | 2026-11-04 |
-| Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | v2.34 | 🟡 Starts | 2026-11-20 |
+| Puri-Puri ~PRINCE×PRINCE~ | ぷり・プリ～PRINCE×PRINCE～ | 2005-06-17 | [v3558](https://vndb.org/v3558) | v2.34 | ✅ Plays through | 2026-11-20 |
 | Ao no Juuai | 青の獣愛 | 2005-06-24 | [v4048](https://vndb.org/v4048) | v2.34 | ✅ Plays through | 2026-10-13 |
-| Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | v2.34 | 🟢 Plays | 2026-10-21 |
+| Ayakashibito | あやかしびと | 2005-06-24 | [v646](https://vndb.org/v646) | v2.34 | ✅ Plays through | 2026-11-20 |
 | ONE☆BOKU Faraway so close! | ONE☆BOKU Faraway so close！～お姉ちゃんとボク～ | 2005-08-26 | [v2067](https://vndb.org/v2067) | v2.35 | ✅ Plays through | 2026-11-20 |
 | Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Gibo to Oba ~Soshite Yuujin no Haha~ | 義母と叔母 ～そして友人の母～ | 2005-12-22 | [v2498](https://vndb.org/v2498) | v2.36 | 🟢 Plays | 2026-11-19 |
@@ -71,13 +71,13 @@ of those versions it does not list.
 | Otometeki Koi Kakumei★Love Revo!! | 乙女的恋革命★ラブレボ!! | 2006-01-26 | [v3549](https://vndb.org/v3549) | v2.42 | ⚪ Not tried |  |
 | CC Hospital | CCホスピタル | 2006-03-24 | [v5300](https://vndb.org/v5300) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | ✅ Plays through | 2026-11-20 |
-| Shinseki no Oba-san | 親戚の小母さん ～離れの熟女、本家の後妻～ | 2006-03-31 | [v4399](https://vndb.org/v4399) | v2.36 | 🟡 Starts | 2026-11-19 |
+| Shinseki no Oba-san | 親戚の小母さん ～離れの熟女、本家の後妻～ | 2006-03-31 | [v4399](https://vndb.org/v4399) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Sabae no Ou | 蠅声の王 | 2006-04-28 | [v607](https://vndb.org/v607) | v2.36 | 🟡 Starts | 2026-11-19 |
 | Yoyogi Hitozuma Senmon Gakuin ~Nyuuzuma-tachi no Ennui~ | 代々木人妻専門学院～乳妻たちのアンニュイ～ | 2006-06-30 | [v5585](https://vndb.org/v5585) | v2.37 | ✅ Plays through | 2026-11-04 |
 | Classmate no Okaa-san | クラスメイトのお母さん | 2006-08-04 | [v5862](https://vndb.org/v5862) | v2.37 | ✅ Plays through | 2026-11-19 |
 | Otome Juurin Yuugi | 乙女蹂躙遊戯～Maiden Infringement Play～ | 2006-12-22 | [v4352](https://vndb.org/v4352) | v2.37 | ✅ Plays through | 2026-11-19 |
 | Jukubo Gui ~Moto Guradoru no Okaa-san~ | 熟母喰い ～元グラドルのお母さん～ | 2007-01-19 | [v3358](https://vndb.org/v3358) | v2.37 | ✅ Plays through | 2026-11-19 |
-| Yakata Jukujo ~The Immoral Residence~ | 館熟女 ～The immoral residence～ | 2007-03-23 | [v6109](https://vndb.org/v6109) | v2.37 | 🟢 Plays | 2026-11-12 |
+| Yakata Jukujo ~The Immoral Residence~ | 館熟女 ～The immoral residence～ | 2007-03-23 | [v6109](https://vndb.org/v6109) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Houkago no Hoken'i ~Ane Juujoku~ | 放課後の保健医 ～姉・汁辱～ | 2007-03-30 | [v3043](https://vndb.org/v3043) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Tentacle Busters | テンタクル☆バスターズ 対未確認生命体交渉係り | 2007-04-27 | [v3795](https://vndb.org/v3795) | v2.38 | ✅ Plays through | 2026-11-19 |
 | Draculius | ドラクリウス | 2007-05-25 | [v453](https://vndb.org/v453) | v2.38 | ✅ Plays through | 2026-11-12 |
@@ -999,6 +999,17 @@ Omocha no Sensei is one module, GAMEMAIN.SCN, its parts one after another from i
 but named by no script). Love Revo's minigames register a slot for a window message (`0849`
 message, slot; `084A` takes it off, `0848` all): such a slot runs after the slot of `07E4` when
 that message comes (ScnVm.Events.cs, from Aneiro's v2.49 build, 0x425040).
+
+Later the same evening, with a save folder of its own for each run (`SCNBOOT_SAVES`: runs side
+by side had read and held each other's saves), the old engines' `06E8` (a stream's state) read
+again in a frame waiting for the next one (Calendar Girl's staff roll waits in a loop of it alone
+until its music ends) and ScnBoot's music ending after its length: Hachigatsu no Nostalgia (16
+modules), Calendar Girl (32), Kanawanu Koi no Monogatari (17), STAGE (67), Reika (89), Puri-Puri
+(227), Ayakashibito (174), Shinseki no Oba-san (59) and Yakata Jukujo (220). Not story modules,
+and not counted: the menus a title opens (Calendar Girl's MEMORIES, Kanawanu's OMODE), which stop
+on a stack they lack when swapped in. Puri-Puri's T001_02 swapped in for T001_01 stops in START,
+whose loop over a count T001_01 sets runs from 0 down and writes over memory; it plays after it.
+Oba-san's STAFF goes on to the epilogue of the route taken (`a[400]`), none when swapped in.
 
 ## Sweeping
 
