@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 157 games, 158 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 159 games, 160 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -52,8 +52,8 @@ of those versions it does not list.
 | Hana no Kioku 4-5-6 | 花の記憶 よん・ごー・ろく | 2003-02-14 | [r19762](https://vndb.org/r19762) | v2.19 | ✅ Plays through | 2026-11-20 |
 | EDEN IV | ＥＤＥＮ４ | 2003-03-28 | [v4601](https://vndb.org/v4601) | v2.20 | ✅ Plays through | 2026-11-19 |
 | STAGE | STAGE | 2003-05-02 | [v7271](https://vndb.org/v7271) | v2.20 | ✅ Plays through | 2026-11-20 |
-| EDEN V | EDEN V | 2003-07-18 | [v4604](https://vndb.org/v4604) | v2.20 | 🟡 Starts | 2026-11-20 |
-| EDEN ~FINAL~ | ＥＤＥＮ～ＦＩＮＡＬ～ | 2004-01-16 | [v2288](https://vndb.org/v2288) | v2.30 | 🟡 Starts | 2026-11-20 |
+| EDEN V | EDEN V | 2003-07-18 | [v4604](https://vndb.org/v4604) | v2.20 | ✅ Plays through | 2026-11-20 |
+| EDEN ~FINAL~ | ＥＤＥＮ～ＦＩＮＡＬ～ | 2004-01-16 | [v2288](https://vndb.org/v2288) | v2.30 | ✅ Plays through | 2026-11-20 |
 | Kateinai Choukyou | 家庭内調教 | 2004-01-23 | [v4330](https://vndb.org/v4330) | v2.31 | 🟢 Plays | 2026-11-05 |
 | Chain Trap ~Fukushuu no Midara Wana~ | CHAIN TRAP ～復讐の淫罠～ | 2004-04-02 | [v9632](https://vndb.org/v9632) | v2.30 | ✅ Plays through | 2026-11-20 |
 | Tekoire Princess! ~Boku ga Mienai Kimi no Tame~ | てこいれぷりんせす！～僕が見えない君のため～ | 2004-09-17 | [v4054](https://vndb.org/v4054) | v2.37 | ✅ Plays through | 2026-11-05 |
@@ -1026,6 +1026,13 @@ image) and all 8,816 files of its seven archives come out whole. Its START wants
 (Oreimo Plus's FUN_00416780: the gap a tenth of 13 smaller before each pass, 11 for 9 or 10, a
 script slot comparing each element with the one a gap after it). Swept on 2026-11-20: its 131
 scenarios all done, 87.1% of their lines.
+
+**EDEN V and EDEN ~FINAL~** (FORST) are built as EDEN IV: one module, its scenes a switch on
+`b[301]` (EDEN V 117, E5MAIN.SCN; EDEN ~FINAL~ 147, E6MAIN.SCN), each a movie of the game's folder.
+Run scene by scene (`SCNBOOT_POKE=b301=N`, the auto clicks, 60,000 frames), every scene plays its
+movie and goes on to another, or back to the title (the game overs and the endings), with no
+error. Their rooms seen four ways loop a movie until the place leading out is clicked: ScnBoot's
+clicks sought now start while a movie loops (a movie playing kept them from starting).
 
 ## Sweeping
 

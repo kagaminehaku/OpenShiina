@@ -18,6 +18,7 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   Trap and Vanquish.
 - **Cruise☆Cruise plays through** (157 games, 158 releases): its keys (167 schemes), its
   executable's checksum and `0295`, the engine's comb sort.
+- **EDEN V and EDEN ~FINAL~ play through** (159 games, 160 releases), scene by scene.
 - A file the scripts write by its bare name goes into the save folder (EFCLIB's EFCDBG.TXT log of
   Nagagutsu wo Haita Deco and Sabae no Ou was a script error).
 - `0848`-`084A`: a slot run on one window message (Love Revo's minigames).
