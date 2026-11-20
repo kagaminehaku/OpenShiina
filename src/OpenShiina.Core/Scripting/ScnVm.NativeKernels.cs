@@ -289,14 +289,15 @@ public sealed partial class ScnVm
         // Bitch Nee-chan START 9F5E6 (SSE2; Bitch Gakuen A1B46, Bitch Shimai A1712: the same code,
         // its two work buffers 4 bytes further on; Chuuni Hime no Teikoku 9406E, 8 bytes; Chiccha na
         // Hanayome 9764A, 20 bytes; Libra of the Vampire Princess B93E3, 27 bytes, its fan disc B90AF,
-        // 31 bytes; The Pillagers of Raillore 3B0939, 21 bytes): the blur of
+        // 31 bytes; The Pillagers of Raillore 3B0939, 21 bytes; Raillore no Ryakudatsusha's DL release
+        // 332351): the blur of
         // ScnVm.Blur32.cs (15 s a call on the interpreter, which Shimai's would run on: its calls
         // keep X86Jit from it). l[0] dst, l[1] its stride, l[2] width, l[3] height, l[4] src,
         // l[5] its stride, l[6] / l[7] the radii across and down
         RegisterNative(["1276382986E6312B58F7F1B31302308A07B97B92", "CD7D21630A140CC934220F956BB41155BF171ACF",
                         "E4A694FDFEB6B98B6B486A905F1B3116D4C4DBA9", "1C6CA4B22558BD5DDE1CBD2C2D3FF11E3ED6D1DE",
                         "AD91701A1AAD2E04C4C45F84178FDADBBB22B95D", "C2A3BC695326D0A369634C6A4922F01C4E93C14C",
-                        "1D845BAE4B226F73879EBDE7E29E9CF94319678E"], "blur32", (vm, c, a) =>
+                        "1D845BAE4B226F73879EBDE7E29E9CF94319678E", "CD2ED8094324FB68177405BE5E26B10DFF344877"], "blur32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), stride = vm.NativeArg(a, 1), w = vm.NativeArg(a, 2), h = vm.NativeArg(a, 3);
             using var verify = vm.VerifyRegion(c, a, dst, w <= 0 || h <= 0 ? 0 : stride * (h - 1) + w * 4);

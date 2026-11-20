@@ -4,7 +4,7 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.8.6 (2026-11-21)
 
 - **8 more games play through** (134 games, 135 releases): Reizoku, CC Hospital, Mikoko, Zansho
   Omimai Moushiagemasu, Houkago no Hoken'i, Wana, Chikan Densha Otoko Gaiden and ONE☆BOKU.
@@ -21,6 +21,10 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **EDEN V and EDEN ~FINAL~ play through** (159 games, 160 releases), scene by scene.
 - **Gibo to Oba, Kateinai Choukyou and Sabae no Ou play through** (162 games, 163 releases).
 - **Nagagutsu wo Haita Deco plays through** (163 games, 164 releases).
+- Raillore no Ryakudatsusha (the Japanese DL release) opens whole (its DecodeBin date) and plays;
+  its blur runs in C#. Love Revo plays.
+- Release: the Switch player (.nro) is built and published, and its NSP when the repository has
+  the secret SWITCH_PROD_KEYS (native/tools/nsp/build.sh).
 - A file the scripts write by its bare name goes into the save folder (EFCLIB's EFCDBG.TXT log of
   Nagagutsu wo Haita Deco and Sabae no Ou was a script error).
 - `0848`-`084A`: a slot run on one window message (Love Revo's minigames).

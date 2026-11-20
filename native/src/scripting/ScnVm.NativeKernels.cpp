@@ -218,7 +218,7 @@ void ScnVm::RegisterNativeKernels()
     RegisterNative({"1276382986E6312B58F7F1B31302308A07B97B92", "CD7D21630A140CC934220F956BB41155BF171ACF",
                     "E4A694FDFEB6B98B6B486A905F1B3116D4C4DBA9", "1C6CA4B22558BD5DDE1CBD2C2D3FF11E3ED6D1DE",
                     "AD91701A1AAD2E04C4C45F84178FDADBBB22B95D", "C2A3BC695326D0A369634C6A4922F01C4E93C14C",
-                    "1D845BAE4B226F73879EBDE7E29E9CF94319678E"},
+                    "1D845BAE4B226F73879EBDE7E29E9CF94319678E", "CD2ED8094324FB68177405BE5E26B10DFF344877"},
                    "blur32", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
                        if (!vm.Blur32(vm.NativeArg(a, 0), vm.NativeArg(a, 1), vm.NativeArg(a, 2), vm.NativeArg(a, 3), vm.NativeArg(a, 4),
                                       vm.NativeArg(a, 5), vm.NativeArg(a, 6), vm.NativeArg(a, 7)))

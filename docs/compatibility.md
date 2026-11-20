@@ -68,7 +68,7 @@ of those versions it does not list.
 | Wana ~Hakudaku Mamire no Houkago~ | 輪罠 ～白濁まみれの放課後～ | 2005-10-21 | [v6680](https://vndb.org/v6680) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Gibo to Oba ~Soshite Yuujin no Haha~ | 義母と叔母 ～そして友人の母～ | 2005-12-22 | [v2498](https://vndb.org/v2498) | v2.36 | ✅ Plays through | 2026-11-20 |
 | Hitozuma OL -Chijoku no Gyoumu Meirei- | 人妻OL -恥辱の業務命令- | 2005-12-22 | [v2911](https://vndb.org/v2911) | v2.36 | ✅ Plays through | 2026-11-20 |
-| Otometeki Koi Kakumei★Love Revo!! | 乙女的恋革命★ラブレボ!! | 2006-01-26 | [v3549](https://vndb.org/v3549) | v2.42 | ⚪ Not tried |  |
+| Otometeki Koi Kakumei★Love Revo!! | 乙女的恋革命★ラブレボ!! | 2006-01-26 | [v3549](https://vndb.org/v3549) | v2.42 | 🟢 Plays | 2026-11-21 |
 | CC Hospital | CCホスピタル | 2006-03-24 | [v5300](https://vndb.org/v5300) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Omocha no Sensei Nawa Midori | おもちゃの先生 那波みどり | 2006-03-31 | [v6632](https://vndb.org/v6632) | v2.37 | ✅ Plays through | 2026-11-20 |
 | Shinseki no Oba-san | 親戚の小母さん ～離れの熟女、本家の後妻～ | 2006-03-31 | [v4399](https://vndb.org/v4399) | v2.36 | ✅ Plays through | 2026-11-20 |
@@ -202,7 +202,7 @@ of those versions it does not list.
 | Saimin Paradise! | 催眠ぱらだいす! ～催眠術でツゴウノイイ美少女学園性活～ | 2018-09-28 | [v23063](https://vndb.org/v23063) | v2.50 | ✅ Plays through | 2026-11-12 |
 | Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ✅ Plays through | 2026-11-05 |
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
-| Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ⚪ Not tried |  |
+| Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | 🟢 Plays | 2026-11-21 |
 | Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
 | The Pillagers of Raillore | レイルロアの略奪者 (English) | 2025-05-29 | [r84728](https://vndb.org/r84728) | v2.50 | ✅ Plays through | 2026-10-23 |
 
@@ -1043,6 +1043,14 @@ Nagagutsu wo Haita Deco (a gamebook: 865 numbered paragraphs, 38 items and 117 t
 module to the next one with no error: its battles with their dice, the paragraphs' links ("――999へ")
 clicked; its items and tips swapped in for the first tip its first paragraph calls. PARA528 ends
 the world at its paragraph 999: the game saves and quits there, as it means to.
+
+**Raillore no Ryakudatsusha** (3rdEye, the Japanese DL release, RAILLORE_DL.EXE, v2.50): its scheme's
+DecodeBin date was wrong (20080214: 17 pictures not whole); `ScnTools datefind` gave 20191021 and
+all 26,695 files come out whole. Its blur is The Pillagers of Raillore's (blur32) with its work
+buffers elsewhere (START 332351): the C# version, checked against its x86 code on 40 random
+cases, byte for byte. Swept on 2026-11-21 (not to its end yet): every scenario run so far done.
+**Love Revo** (planpeace, v2.42) plays: from its title, the name entry, its schedule, its shop and
+its first weeks (`0848`-`084A`); a whole year of its simulation was not played.
 
 ## Sweeping
 
