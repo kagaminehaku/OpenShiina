@@ -873,6 +873,10 @@ void Responder::Handle(const uint8_t* command, size_t size)
         struct stat info{};
         if (!o || stat(o->Path.c_str(), &info) != 0)
         {
+            // (a handle of a file gone - a copy cut short, a file deleted over Wi-Fi - is forgotten:
+            // the host lists the folder again and drops it)
+            if (o)
+                Forget(o->Path);
             Respond(InvalidObjectHandle);
             return;
         }
@@ -961,6 +965,14 @@ void Responder::Handle(const uint8_t* command, size_t size)
             uint32_t handle = HandleFor(path, parent);
             Respond(IsDirectory(path) ? Ok : AccessDenied, {kStorage, p[1], handle});
             return;
+        }
+        // A file announced before whose data never came (the host's copy given up between the two):
+        // its handle is forgotten unless the file is there, so the host does not keep a name of nothing
+        if (Object* before = m_pending != 0 ? Find(m_pending) : nullptr)
+        {
+            struct stat was{};
+            if (stat(before->Path.c_str(), &was) != 0)
+                Forget(before->Path);
         }
         m_pending = HandleFor(path, parent);
         m_pendingSize = Read32(info.data() + 8);
