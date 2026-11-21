@@ -9,8 +9,10 @@
 // operations are those Windows' MTP driver needs to browse, copy both ways and delete: device and
 // storage info, object handles, info and properties (by GetObjectPropValue, the property list
 // operation is not offered), GetObject, SendObjectInfo + SendObject, DeleteObject. A file goes through
-// a ring of 4 MB blocks: the cable fills (or sends) them on the responder's thread while a thread of
+// a ring of 1 MB blocks: the cable fills (or sends) them on the responder's thread while a thread of
 // the file's reads (or writes) the SD card, so neither waits for the other.
+// (ftruncate and fileno: POSIX, not seen under the strict standard the build asks for)
+#define _DEFAULT_SOURCE
 #include "Mtp.h"
 
 #include <switch.h>
@@ -20,6 +22,8 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdarg>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
@@ -39,11 +43,18 @@ namespace {
 
 constexpr const char* kRoot = "sdmc:/OpenShiina";
 constexpr uint32_t kStorage = 0x00010001;
-constexpr size_t kBlock = 4 << 20;   // a bulk transfer of a file's data
-constexpr int kBlocks = 3;           // the ring between the cable and the SD card
+// A bulk transfer of a file's data, and the ring of them between the cable and the SD card: small
+// blocks, many of them, as an SD card that is nearly full writes at 1-3 MB/s, far below the cable,
+// and Windows gives a copy up when the device takes nothing for about 4 seconds - the cable waits
+// for one block's write at most
+constexpr size_t kBlock = 1 << 20;
+constexpr int kBlocks = 16;
 // A data phase or a response that does not move for this long is given up (the PC cancelled a
 // copy, or went): the responder goes back to waiting for a command
 constexpr int kDataLimit = 15;
+// ...and a file's data phase given longer, as a PC waiting on its own disk may stand a while before it
+// goes on (a cable pulled out is seen at once either way); the trace tells of any such wait
+constexpr int kFileDataLimit = 120;
 constexpr size_t kSmall = 0x10000;   // commands, responses, small data phases
 
 // Container types and codes (PTP / MTP)
@@ -77,6 +88,7 @@ enum : uint16_t
     Ok = 0x2001,
     GeneralError = 0x2002,
     OperationNotSupported = 0x2005,
+    IncompleteTransfer = 0x2007,
     InvalidStorageId = 0x2008,
     InvalidObjectHandle = 0x2009,
     DevicePropNotSupported = 0x200A,
@@ -378,9 +390,34 @@ private:
     }
     static std::string NameOf(const std::string& path) { return path.substr(path.rfind('/') + 1); }
     bool PropValue(Writer& w, uint32_t handle, uint16_t prop);
+    /// The file of a handle, or (the one SendObject is writing) the file it is written into first
+    int StatOf(uint32_t handle, const Object& o, struct stat& info)
+    {
+        return stat(handle == m_writing && !m_part.empty() ? m_part.c_str() : o.Path.c_str(), &info);
+    }
+    /// The name a file is written under until its data has all come (then renamed to its own: a copy
+    /// cut short leaves the file that was there before as it was); not listed
+    static constexpr const char* kPartPrefix = ".devhost-";
+    static std::string PartOf(const std::string& path)
+    {
+        size_t slash = path.rfind('/');
+        return path.substr(0, slash + 1) + kPartPrefix + path.substr(slash + 1);
+    }
 
     void GetFile(uint32_t handle);
     void PutFile();
+
+    // ---- trace ----
+    /// A line of the trace (the commands, their answers, why a file's data phase ended short), the
+    /// last 4000 kept; SaveTrace writes them to sdmc:/OpenShiina/devhost-mtp.log (after a file's data
+    /// phase, an answer not Ok, the cable going), to read over Wi-Fi with devget.ps1 when a copy over
+    /// USB goes wrong.
+    void Trace(const char* format, ...) __attribute__((format(printf, 2, 3)));
+    void SaveTrace();
+    std::deque<std::string> m_trace;
+    std::mutex m_traceLock;   // (the SD card's writer traces too)
+    std::string m_why;   // why the last USB transfer ended false (Finish)
+    int m_waited = 0;    // whole seconds the last USB transfer waited (Finish)
 
     std::function<void(const std::string&)> m_log;
     std::atomic<int>* m_busy;
@@ -400,6 +437,9 @@ private:
     // SendObjectInfo's object, for the SendObject after it
     uint32_t m_pending = 0;
     uint64_t m_pendingSize = 0;
+    // the one SendObject writes, and the file it is written into until it is whole
+    uint32_t m_writing = 0;
+    std::string m_part;
 };
 
 bool Responder::Setup()
@@ -461,10 +501,12 @@ bool Responder::Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done, int limit)
     // waited for in steps, so that a cable pulled out (or a data phase the PC left) ends the transfer
     for (int waited = 0;; waited++)
     {
+        m_waited = waited;
         if (R_SUCCEEDED(eventWait(&ep->CompletionEvent, 1'000'000'000)))
             break;
         if (m_stop || !Configured() || (limit > 0 && waited + 1 >= limit))
         {
+            m_why = m_stop ? "devhost leaving" : !Configured() ? "the cable went" : "nothing came for " + std::to_string(limit) + " s";
             usbDsEndpoint_Cancel(ep);
             eventWait(&ep->CompletionEvent, 1'000'000'000);
             eventClear(&ep->CompletionEvent);
@@ -475,9 +517,41 @@ bool Responder::Finish(UsbDsEndpoint* ep, uint32_t urb, size_t& done, int limit)
     UsbDsReportData report{};
     u32 transferred = 0;
     if (R_FAILED(usbDsEndpoint_GetReportData(ep, &report)) || R_FAILED(usbDsParseReportData(&report, urb, nullptr, &transferred)))
+    {
+        m_why = "the transfer's report could not be read";
         return false;
+    }
     done = transferred;
     return true;
+}
+
+void Responder::Trace(const char* format, ...)
+{
+    char line[512];
+    int at = std::snprintf(line, sizeof line, "%10.3f ", double(armTicksToNs(armGetSystemTick())) / 1e9);
+    va_list args;
+    va_start(args, format);
+    std::vsnprintf(line + at, sizeof line - at, format, args);
+    va_end(args);
+    std::lock_guard lock(m_traceLock);
+    m_trace.emplace_back(line);
+    while (m_trace.size() > 4000)
+        m_trace.pop_front();
+}
+
+void Responder::SaveTrace()
+{
+    // (written whole and closed each time: the SD card does not let devget read a file open for writing)
+    std::lock_guard lock(m_traceLock);
+    if (std::FILE* file = std::fopen("sdmc:/OpenShiina/devhost-mtp.log", "w"))
+    {
+        for (const std::string& line : m_trace)
+        {
+            std::fputs(line.c_str(), file);
+            std::fputc('\n', file);
+        }
+        std::fclose(file);
+    }
 }
 
 bool Responder::Read(void* buffer, size_t size, size_t& done, int limit)
@@ -537,6 +611,9 @@ bool Responder::Respond(uint16_t code, std::initializer_list<uint32_t> params)
     w.U32(m_transaction);
     for (uint32_t p : params)
         w.U32(p);
+    Trace("  -> %04X%s", code, params.size() ? (" " + std::to_string(*params.begin()) + (params.size() > 2 ? " " + std::to_string(params.begin()[2]) : "")).c_str() : "");
+    if (code != Ok)
+        SaveTrace();
     std::memcpy(m_small, w.Bytes.data(), w.Bytes.size());
     return Write(m_small, w.Bytes.size(), true);
 }
@@ -587,7 +664,7 @@ bool Responder::PropValue(Writer& w, uint32_t handle, uint16_t prop)
     if (!o)
         return false;
     struct stat info{};
-    stat(o->Path.c_str(), &info);
+    StatOf(handle, *o, info);
     bool dir = S_ISDIR(info.st_mode);
     switch (prop)
     {
@@ -705,8 +782,16 @@ void Responder::PutFile()
         Respond(NoValidObjectInfo);
         return;
     }
-    std::string path = o->Path;
-    std::FILE* file = std::fopen(path.c_str(), "wb");
+    std::string path = o->Path, part = PartOf(path);
+    // (into the room SendObjectInfo took, if it did)
+    std::FILE* file = std::fopen(part.c_str(), "r+b");
+    if (!file)
+        file = std::fopen(part.c_str(), "wb");
+    if (!file)
+        Trace("  %s cannot be opened: %s", part.c_str() + std::strlen(kRoot), std::strerror(errno));
+    m_writing = m_pending;
+    m_part = part;
+    int writeError = 0;
     ++*m_busy;
     uint64_t start = armGetSystemTick();
     // The cable read into the ring on this thread, the SD card written from it on a thread of its own
@@ -714,29 +799,62 @@ void Responder::PutFile()
     bool written = file != nullptr;
     std::thread writer([&] {
         size_t offset = 0, length = 0;
+        uint64_t at = 0;
         for (int b; (b = ring.TakeFilled(offset, length)) >= 0;)
         {
-            if (written && length > 0)
-                written = std::fwrite(ring.Block(b) + offset, 1, length, file) == length;
+            uint64_t before = armGetSystemTick();
+            if (written && length > 0 && !(written = std::fwrite(ring.Block(b) + offset, 1, length, file) == length))
+                writeError = errno;
+            uint64_t ms = armTicksToNs(armGetSystemTick() - before) / 1000000;
+            if (ms >= 1000)
+                Trace("  the SD card took %llu ms to write %zu bytes at byte %llu", (unsigned long long)ms, length, (unsigned long long)at);
+            at += length;
             ring.PutEmpty(b);
         }
     });
     uint64_t total = 0, received = 0;
     bool ok = true;
+    std::string why;
+    std::vector<uint8_t> left;
     for (bool first = true; ok && (first || received < total); first = false)
     {
+        uint64_t before = armGetSystemTick();
         int b = ring.TakeEmpty();
+        uint64_t heldMs = armTicksToNs(armGetSystemTick() - before) / 1000000;
+        if (heldMs >= 1000)
+            Trace("  the cable waited %llu ms for the SD card at byte %llu", (unsigned long long)heldMs, (unsigned long long)received);
         size_t done = 0;
-        ok = b >= 0 && Read(ring.Block(b), kBlock, done);
+        m_why.clear();
+        ok = b >= 0 && Read(ring.Block(b), kBlock, done, kFileDataLimit);
+        if (ok && m_waited >= 2)
+            Trace("  the PC stood %d s at byte %llu", m_waited, (unsigned long long)received);
+        if (!ok)
+            why = b < 0 ? "the ring failed (the SD card's writer stopped)" : "a read failed: " + m_why;
         if (ok && first)
         {
             ok = done >= 12 && Read16(ring.Block(b) + 4) == Data;
+            if (!ok)
+                why = "the first transfer, " + std::to_string(done) + " bytes, was not a data container ("
+                      + (done >= 8 ? std::to_string(Read16(ring.Block(b) + 4)) + "/" + std::to_string(Read16(ring.Block(b) + 6)) : "short") + ")";
             total = ok ? Read32(ring.Block(b)) : 0;
             if (total == 0xFFFFFFFF)
                 total = m_pendingSize + 12;
+            if (ok)
+                Trace("  data phase: %llu bytes (%u announced)", (unsigned long long)total, unsigned(m_pendingSize));
         }
         if (ok && !first && done == 0)
+        {
             ok = false;
+            why = "an empty transfer";
+        }
+        // (a command where the data should go on: the PC left the data phase - its copy given up - and
+        // goes on with the next operation, answered after this one is put away)
+        if (ok && !first && done >= 12 && done < 64 && Read32(ring.Block(b)) == done && Read16(ring.Block(b) + 4) == Command)
+        {
+            ok = false;
+            left.assign(ring.Block(b), ring.Block(b) + done);
+            why = "the PC left the data phase (command " + std::to_string(Read16(ring.Block(b) + 6)) + " came)";
+        }
         if (!ok)
             break;
         received += done;
@@ -747,23 +865,50 @@ void Responder::PutFile()
     else
         ring.Fail();
     writer.join();
+    // (the room taken was the size announced: the file made the size that came)
+    if (file && ok && written && ftruncate(fileno(file), off_t(total - 12)) != 0)
+        written = false;
     if (file)
         written = std::fclose(file) == 0 && written;
     --*m_busy;
-    if (!ok || !written)
+    m_writing = 0;
+    m_part.clear();
+    // (the file that was there before, if any, given up for the new one only now that it is whole)
+    if (ok && written)
     {
         unlink(path.c_str());
-        Forget(path);
+        if (rename(part.c_str(), path.c_str()) != 0)
+        {
+            Trace("  %s cannot be renamed: %s", part.c_str() + std::strlen(kRoot), std::strerror(errno));
+            written = false;
+        }
+    }
+    if (!ok || !written)
+    {
+        Trace("  not whole: %llu of %llu bytes came, %s%s%s", (unsigned long long)received, (unsigned long long)total,
+              ok ? "the data phase whole" : why.c_str(), written ? "" : "; not written: ",
+              written ? "" : writeError ? std::strerror(writeError) : file ? "closing failed" : "not opened");
+        unlink(part.c_str());
+        struct stat before{};
+        if (stat(path.c_str(), &before) != 0)
+            Forget(path);
         m_pending = 0;
-        if (ok)
-            Respond(StoreFull);
+        // (an answer either way, or the PC waits for one for ever; a data phase the PC goes on with
+        // after it is passed over by Run) - but none to a PC that left it for its next command
+        if (left.empty())
+            Respond(ok ? StoreFull : IncompleteTransfer);
         m_log("MTP: " + NameOf(path) + " was not written whole");
+        SaveTrace();
+        if (!left.empty())
+            Handle(left.data(), left.size());
         return;
     }
     double seconds = double(armTicksToNs(armGetSystemTick() - start)) / 1e9;
     char line[96];
     std::snprintf(line, sizeof line, " (%.1f MB/s)", seconds > 0 ? double(total - 12) / 1048576.0 / seconds : 0.0);
     m_log("MTP: saved " + path.substr(std::strlen(kRoot) + 1) + line);
+    Trace("  saved, %llu bytes%s", (unsigned long long)(total - 12), line);
+    SaveTrace();
     m_pending = 0;
     Respond(Ok);
 }
@@ -775,6 +920,11 @@ void Responder::Handle(const uint8_t* command, size_t size)
     uint32_t p[5] = {};
     for (size_t k = 0; k < 5 && 12 + 4 * k + 4 <= size; k++)
         p[k] = Read32(command + 12 + 4 * k);
+    {
+        Object* o = Find(code == GetObjectHandles || code == SendObjectInfo ? p[code == GetObjectHandles ? 2 : 1] : p[0]);
+        Trace("%04X #%u %08X %08X %08X %s", code, m_transaction, p[0], p[1], p[2],
+              o ? o->Path.c_str() + std::strlen(kRoot) : "");
+    }
     Writer w;
     switch (code)
     {
@@ -856,7 +1006,7 @@ void Responder::Handle(const uint8_t* command, size_t size)
             while (dirent* entry = readdir(dir))
             {
                 std::string name = entry->d_name;
-                if (name != "." && name != "..")
+                if (name != "." && name != ".." && name.rfind(kPartPrefix, 0) != 0)
                     handles.push_back(HandleFor(folder + "/" + name, p[2] == 0xFFFFFFFF ? 0 : p[2]));
             }
             closedir(dir);
@@ -871,7 +1021,7 @@ void Responder::Handle(const uint8_t* command, size_t size)
     {
         Object* o = Find(p[0]);
         struct stat info{};
-        if (!o || stat(o->Path.c_str(), &info) != 0)
+        if (!o || StatOf(p[0], *o, info) != 0)
         {
             // (a handle of a file gone - a copy cut short, a file deleted over Wi-Fi - is forgotten:
             // the host lists the folder again and drops it)
@@ -959,6 +1109,12 @@ void Responder::Handle(const uint8_t* command, size_t size)
         }
         std::string path = folder + "/" + name;
         uint32_t parent = p[1] == 0xFFFFFFFF ? 0 : p[1];
+        {
+            struct stat there{};
+            bool exists = stat(path.c_str(), &there) == 0;
+            Trace("  info: %s, format %04X, %u bytes%s", path.c_str() + std::strlen(kRoot), format, Read32(info.data() + 8),
+                  exists ? (", there already (" + std::to_string(there.st_size) + " bytes)").c_str() : "");
+        }
         if (format == FormatAssociation)
         {
             mkdir(path.c_str(), 0777);
@@ -976,7 +1132,21 @@ void Responder::Handle(const uint8_t* command, size_t size)
         }
         m_pending = HandleFor(path, parent);
         m_pendingSize = Read32(info.data() + 8);
+        // The file's room taken on the SD card now, before its data comes (a card nearly full is slow to
+        // find it a block at a time, while the PC waits); 0xFFFFFFFF: 4 GB or more, not told
+        if (m_pendingSize != 0xFFFFFFFF)
+        {
+            uint64_t before = armGetSystemTick();
+            std::string part = PartOf(path);
+            if (std::FILE* file = std::fopen(part.c_str(), "wb"))
+            {
+                bool sized = ftruncate(fileno(file), off_t(m_pendingSize)) == 0;
+                std::fclose(file);
+                Trace("  room for it %s in %llu ms", sized ? "taken" : "not taken", (unsigned long long)(armTicksToNs(armGetSystemTick() - before) / 1000000));
+            }
+        }
         Respond(Ok, {kStorage, p[1], m_pending});
+        SaveTrace();
         return;
     }
     case SendObject:
@@ -1080,6 +1250,7 @@ void Responder::Run()
         usbDsGetSpeed(&speed);
         m_packet = speed == UsbDeviceSpeed_Super ? 1024 : speed == UsbDeviceSpeed_High ? 512 : 64;
         m_log("MTP: connected over USB");
+        Trace("connected, %u-byte packets", m_packet);
         while (!m_stop && Configured())
         {
             size_t done = 0;
@@ -1091,12 +1262,19 @@ void Responder::Run()
             }
             // (a zero-length packet left from a data phase, or anything not a command: passed over)
             if (done < 12 || Read16(m_small + 4) != Command)
+            {
+                Trace("  passed over: %zu bytes%s", done, done >= 8 ? (", type " + std::to_string(Read16(m_small + 4)) + " code " + std::to_string(Read16(m_small + 6))).c_str() : "");
                 continue;
+            }
             std::vector<uint8_t> command(m_small, m_small + done);
             Handle(command.data(), command.size());
         }
         if (!m_stop)
+        {
             m_log("MTP: the cable went");
+            Trace("the cable went");
+            SaveTrace();
+        }
         m_pending = 0;
     }
 }
