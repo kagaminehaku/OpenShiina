@@ -144,6 +144,10 @@
   <data name="ThemeParchmentHelp" xml:space="preserve"><value>The same colours on cream pages, light.</value></data>
   <data name="ThemeGraphite" xml:space="preserve"><value>Graphite</value></data>
   <data name="ThemeGraphiteHelp" xml:space="preserve"><value>Plain dark greys.</value></data>
+  <data name="ThemeWhite" xml:space="preserve"><value>White</value></data>
+  <data name="ThemeWhiteHelp" xml:space="preserve"><value>Plain white and light greys.</value></data>
+  <data name="ThemeSystem" xml:space="preserve"><value>As the system</value></data>
+  <data name="ThemeSystemHelp" xml:space="preserve"><value>White or Graphite, as your system is set to light or dark.</value></data>
   <data name="LevelPotato" xml:space="preserve"><value>Potato</value></data>
   <data name="LevelPotatoHelp" xml:space="preserve"><value>Nearest pixels, no filtering: the least work, for the slowest phones.</value></data>
   <data name="LevelLow" xml:space="preserve"><value>Low</value></data>

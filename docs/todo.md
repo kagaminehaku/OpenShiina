@@ -41,7 +41,7 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Themes
 
-- [ ] **A white theme and "as the system"** (asked 2026-11-21): AppTheme.White, neutral, Graphite's
+- [x] **A white theme and "as the system"** (asked 2026-11-21, done in 0.8.6.1): AppTheme.White, neutral, Graphite's
   light counterpart, its contrast checked (WCAG AA): background #F4F4F6, surface #FFFFFF, surface
   high #E6E6EB, border #C9C9D1, ink #1C1C21 (13.6-17:1), muted #5A5A66 (5.5-6.8:1), accent and
   danger #C8102E (5.4:1; white on it 5.9:1), gold #D4A649 with #1C1C21 on it (7.6:1), gold as text
@@ -80,7 +80,7 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 164 games; 164 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 164 games; 165 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
 - [ ] **Keys for the 3 games without them** (compatibility.md, "No keys yet"), once their files

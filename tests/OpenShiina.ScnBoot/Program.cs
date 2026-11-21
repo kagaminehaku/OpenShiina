@@ -659,7 +659,10 @@ sealed class Host(GameData data, string saveFolder) : IScnHost
             foreach (var change in changes.Split(';', StringSplitOptions.RemoveEmptyEntries))
             {
                 string key = change.Split('=')[0];
-                text = System.Text.RegularExpressions.Regex.Replace(text, $@"(?im)^{System.Text.RegularExpressions.Regex.Escape(key)}=[^\r\n]*", change);
+                var pattern = new System.Text.RegularExpressions.Regex($@"(?im)^{System.Text.RegularExpressions.Regex.Escape(key)}=[^\r\n]*");
+                // (a key the file lacks goes in after its first section's name: Raillore's Opt_RealMemorySize_Free)
+                text = pattern.IsMatch(text) ? pattern.Replace(text, change)
+                    : new System.Text.RegularExpressions.Regex(@"(?m)^\[[^\]\r\n]*\][^\r\n]*\r?\n").Replace(text, m => m.Value + change + "\r\n", 1);
             }
             bytes = sjis.GetBytes(text);
         }

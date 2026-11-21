@@ -26,6 +26,12 @@ public enum AppTheme
 
     /// <summary>Plain dark greys, the red only for what is chosen.</summary>
     Graphite,
+
+    /// <summary>Graphite's light counterpart: plain white and light greys.</summary>
+    White,
+
+    /// <summary>White or Graphite as the system's own colours are, light or dark, changing with them.</summary>
+    System,
 }
 
 public enum Renderer

@@ -166,6 +166,17 @@ public sealed class SettingsView : UserControl
                     },
                 },
             };
+            // As the system: the sample half White, half Graphite (the theme follows the system's light or dark)
+            if (theme == AppTheme.System)
+            {
+                Color light = PlayerTheme.Sample(AppTheme.White).Background, dark = PlayerTheme.Sample(AppTheme.Graphite).Background;
+                picture.Background = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                    EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(light, 0), new GradientStop(light, 0.5), new GradientStop(dark, 0.5), new GradientStop(dark, 1) },
+                };
+            }
             var button = ChoiceCard(label, help, picture, 160);
             button.Click += (_, _) =>
             {

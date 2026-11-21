@@ -174,9 +174,35 @@ void LogClocks(const char* when)
 /// A colour as the Renderer takes it, 0xAABBGGRR.
 constexpr uint32_t Rgb(uint32_t r, uint32_t g, uint32_t b, uint32_t a = 255) { return a << 24 | b << 16 | g << 8 | r; }
 
-// The logo's colours (C# PlayerTheme's Shiina theme)
-constexpr uint32_t kBackground = Rgb(26, 10, 16), kPanel = Rgb(44, 20, 28), kAccent = Rgb(200, 30, 58), kText = Rgb(242, 230, 201),
-                   kDim = Rgb(170, 150, 140);
+// The screens' colours (ApplyTheme): dark, the logo's (C# PlayerTheme's Shiina theme), or light, its White
+// (ink #1C1C21 13:1 on the panels, dim #5A5A66 5:1; the chosen row a pale red the ink reads on, 11:1).
+// kSelection is the chosen row's ground, kAccent the red of lines and bars, kWordmark the wordmark's tint.
+uint32_t kBackground = Rgb(26, 10, 16), kPanel = Rgb(44, 20, 28), kAccent = Rgb(200, 30, 58), kText = Rgb(242, 230, 201),
+         kDim = Rgb(170, 150, 140), kSelection = Rgb(200, 30, 58), kWordmark = 0xFFFFFFFF;
+
+/// The colours of the setting Theme: 0 as the console's own theme (setsys' colour set: Light or Dark),
+/// 1 dark, 2 light.
+void ApplyTheme(int theme)
+{
+    bool light = theme == 2;
+    if (theme == 0 && R_SUCCEEDED(setsysInitialize()))
+    {
+        ColorSetId id = ColorSetId_Dark;
+        if (R_SUCCEEDED(setsysGetColorSetId(&id)))
+            light = id == ColorSetId_Light;
+        setsysExit();
+    }
+    if (light)
+    {
+        kBackground = Rgb(244, 244, 246), kPanel = Rgb(226, 226, 232), kAccent = Rgb(200, 16, 46), kText = Rgb(28, 28, 33);
+        kDim = Rgb(90, 90, 102), kSelection = Rgb(245, 205, 212), kWordmark = Rgb(28, 28, 33);
+    }
+    else
+    {
+        kBackground = Rgb(26, 10, 16), kPanel = Rgb(44, 20, 28), kAccent = Rgb(200, 30, 58), kText = Rgb(242, 230, 201);
+        kDim = Rgb(170, 150, 140), kSelection = Rgb(200, 30, 58), kWordmark = 0xFFFFFFFF;
+    }
+}
 
 // The buttons' symbols of the Switch's font (Nintendo's extension)
 constexpr const char* kButtonA = "\xEE\x83\xA0";
@@ -483,8 +509,8 @@ constexpr bool kLanguages = false;
 /// X goes back, and the file is written if anything changed.
 void SettingsScreen(Ui& ui)
 {
-    constexpr int Rows = kLanguages ? 7 : 6;
-    constexpr float RowHeight = 76, ListX = 380, ListY = 120, ListW = 860;
+    constexpr int Rows = kLanguages ? 8 : 7;
+    constexpr float RowHeight = 68, ListX = 380, ListY = 120, ListW = 860;
     constexpr int LanguageCount = int(std::size(player::kLanguageChoices));
     constexpr int ScalingCount = int(std::size(player::kScalingChoices));
     player::Settings before = s_settings;
@@ -504,6 +530,11 @@ void SettingsScreen(Ui& ui)
     };
     auto change = [&](int r, int step) {
         if (r == 6)
+        {
+            s_settings.Theme = (s_settings.Theme + step + 3) % 3;
+            ApplyTheme(s_settings.Theme);
+        }
+        else if (r == 7)
         {
             s_settings.Language = player::kLanguageChoices[(languageIndex() + step + LanguageCount) % LanguageCount].Code;
             player::SetLanguage(s_settings.Language);
@@ -549,20 +580,23 @@ void SettingsScreen(Ui& ui)
         s.Fill({0, 0, 340, 720}, kPanel);
         s.Image(ui.Logo, {90, 60, 160, 160});
         float ww = 280, wh = ui.Wordmark.Valid() ? ww * float(ui.Wordmark.Height) / float(ui.Wordmark.Width) : 0;
-        s.Image(ui.Wordmark, {30, 240, ww, wh});
+        s.Image(ui.Wordmark, {30, 240, ww, wh}, kWordmark);
         ui.Text.Draw(Tr("Settings"), ListX, 48, 34, kText);
         const auto& scaling = player::kScalingChoices[scalingIndex()];
         const auto& cache = player::kFileCacheChoices[s_settings.FileCache];
         std::string cacheLabel = cache.Megabytes != 0 ? Tr(cache.Label) : Trf("Auto ({} MB here)", s_settings.FileCacheBytes() >> 20);
-        std::string values[7] = {Tr(scaling.Label), std::to_string(s_settings.FsrSharpness), cacheLabel,
+        const char* themes[3] = {"As the console", "Dark", "Light"};
+        std::string values[8] = {Tr(scaling.Label), std::to_string(s_settings.FsrSharpness), cacheLabel,
                                  Tr(s_settings.ShowFrameRate ? "On" : "Off"), Tr(s_settings.FastZoom ? "On" : "Off"),
-                                 Tr(s_settings.GpuSprites ? "On" : "Off"), Tr(player::kLanguageChoices[languageIndex()].Name)};
-        const char* names[7] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate", "Fast zoom", "Sprites on the GPU", "Language"};
+                                 Tr(s_settings.GpuSprites ? "On" : "Off"), Tr(themes[std::clamp(s_settings.Theme, 0, 2)]),
+                                 Tr(player::kLanguageChoices[languageIndex()].Name)};
+        const char* names[8] = {"Scaling", "FSR sharpness", "File cache", "Show the frame rate", "Fast zoom", "Sprites on the GPU", "Theme",
+                                "Language"};
         for (int r = 0; r < Rows; r++)
         {
             float y = ListY + float(r) * RowHeight;
             if (r == row)
-                s.Fill({ListX - 12, y, ListW, RowHeight - 12}, kAccent, 12);
+                s.Fill({ListX - 12, y, ListW, RowHeight - 12}, kSelection, 12);
             ui.Text.Draw(Tr(names[r]), ListX + 8, y + 16, 28, kText);
             std::string value = std::string("<  ") + values[r] + "  >";
             ui.Text.Draw(value, ListX + ListW - 40 - ui.Text.Measure(value, 28), y + 16, 28, kText);
@@ -574,6 +608,7 @@ void SettingsScreen(Ui& ui)
                            : row == 3 ? "Frames a second and the slowest frame, over the game's corner."
                            : row == 4 ? "Zooms of the picture on the GPU in fewer steps: faster, very slightly different from the PC."
                            : row == 5 ? "The GPU draws the games' sprites: the same picture, less work for the CPU."
+                           : row == 6 ? "The colours of these screens: as the console's own theme (System Settings, Themes), dark or light."
                                       : "The words of OpenShiina's own screens. The games keep their own.";
         float helpY = ListY + Rows * RowHeight + 12;
         for (const auto& line : WrapText(ui, Tr(help), 24, ListW - 20))
@@ -590,7 +625,7 @@ void SettingsScreen(Ui& ui)
     }
     if (s_settings.PictureScaling != before.PictureScaling || s_settings.FsrSharpness != before.FsrSharpness
         || s_settings.FileCache != before.FileCache || s_settings.ShowFrameRate != before.ShowFrameRate || s_settings.FastZoom != before.FastZoom
-        || s_settings.GpuSprites != before.GpuSprites || s_settings.Language != before.Language)
+        || s_settings.GpuSprites != before.GpuSprites || s_settings.Language != before.Language || s_settings.Theme != before.Theme)
         s_settings.Save(kSettings);
 }
 
@@ -607,7 +642,7 @@ void DrawRail(Ui& ui)
     player::Renderer& s = ui.Screen;
     s.Fill({0, 0, 340, 720}, kPanel);
     s.Image(ui.Logo, {90, 60, 160, 160});
-    s.Image(ui.Wordmark, {30, 240, 280, WordmarkBottom(ui) - 240});
+    s.Image(ui.Wordmark, {30, 240, 280, WordmarkBottom(ui) - 240}, kWordmark);
 }
 
 /// The size of the storage icons (a square).
@@ -867,7 +902,7 @@ int ChooseFrom(Ui& ui, const std::string& title, const std::vector<std::string>&
         {
             float y = ListY + float(k - top) * RowHeight;
             if (k == choice)
-                s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kAccent, 12);
+                s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kSelection, 12);
             ui.Text.Draw(ui.Text.Fit(items[k], 28, ListW - 24), ListX + 8, y + 10, 28, kText);
         }
         s.Fill({0, 672, 1280, 48}, kPanel);
@@ -1003,7 +1038,7 @@ GameAction GameScreen(Ui& ui, const player::GameEntry& game)
         {
             float y = rowsY + float(k) * RowHeight;
             if (k == choice)
-                s.Fill({ListX - 12, y, ListW, RowHeight - 10}, kAccent, 12);
+                s.Fill({ListX - 12, y, ListW, RowHeight - 10}, kSelection, 12);
             ui.Text.Draw(ui.Text.Fit(label(rows[k]), 28, ListW - 24), ListX + 8, y + 12, 28, kText);
         }
         s.Fill({0, 672, 1280, 48}, kPanel);
@@ -1144,7 +1179,7 @@ std::string PickGame(Ui& ui, bool internal)
             const auto& game = games[k];
             float y = ListY + float(k - top) * RowHeight;
             if (k == choice)
-                s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kAccent, 12);
+                s.Fill({ListX - 12, y, ListW, RowHeight - 8}, kSelection, 12);
             player::Texture icon;
             if (IconOf(ui, game, readOne, icon) && icon.Valid())
                 s.Image(icon, {ListX, y + (RowHeight - 8 - IconSize) / 2, IconSize, IconSize});
@@ -1152,7 +1187,7 @@ std::string PickGame(Ui& ui, bool internal)
             // where it is at the row's end (its words and when it was played are under the logo)
             float textX = ListX + IconSize + 16, right = ListX + ListW - 24 - kStorageIcon;
             DrawStorageIcon(s, game.Internal, right, y + (RowHeight - 8 - kStorageIcon) / 2, k == choice ? kText : kDim,
-                            k == choice ? kAccent : kBackground);
+                            k == choice ? kSelection : kBackground);
             right -= 16;
             ui.Text.Draw(ui.Text.Fit(name, 28, right - textX), textX, y + 10, 28, game.Known ? kText : kDim);
         }
@@ -1273,7 +1308,7 @@ bool GameMenu(Ui& ui, const std::function<void()>& drawGame)
         {
             float y = MenuY + float(r) * RowHeight;
             if (r == row)
-                s.Fill({MenuX - 12, y, MenuW + 24, RowHeight - 10}, kAccent, 12);
+                s.Fill({MenuX - 12, y, MenuW + 24, RowHeight - 10}, kSelection, 12);
             std::string text = labels[r];
             if (r == ScalingRow || r == Sharpness || r == FastZoomRow || r == SpritesRow)
                 text = std::string("<  ") + text + "  >";
@@ -1378,7 +1413,7 @@ int MessageDialog(Ui& ui, const std::function<void()>& drawGame, const std::stri
         for (int k = 0; k < count; k++)
         {
             float bx = buttonX(k);
-            s.Fill({bx, buttonsY, ButtonW, ButtonH}, k == chosen ? kAccent : kBackground, 12);
+            s.Fill({bx, buttonsY, ButtonW, ButtonH}, k == chosen ? kSelection : kBackground, 12);
             float w = ui.Text.Measure(Tr(buttons[k].Label), TextSize);
             ui.Text.Draw(Tr(buttons[k].Label), bx + (ButtonW - w) / 2, buttonsY + 13, TextSize, kText);
         }
@@ -1920,6 +1955,7 @@ int main(int argc, char** argv)
     // (where the games go, there to be seen on the card; the console's storage is written only by a move)
     Files::CreateDirectories(kGames);
     s_settings = player::Settings::Load(kSettings);
+    ApplyTheme(s_settings.Theme);
     if (kLanguages)
         player::SetLanguage(s_settings.Language);
     // The logs of the last runs kept (player.1.log the run before this one, up to player.3.log): the

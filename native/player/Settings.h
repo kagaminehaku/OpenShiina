@@ -28,6 +28,9 @@ struct Settings
     bool FastZoom = true;
     /// The GPU mode draws the sprites (04C4 / 04C5, ScnVm::GpuSprites), to the byte: the CPU does less.
     bool GpuSprites = false;
+    /// The colours of the player's screens (C# Theme): 0 as the console's own theme (System), 1 dark
+    /// (Shiina's), 2 light (White's).
+    int Theme = 0;
     /// The language of the player's screens (C# Language): "" (the console's), "en" or "vi".
     std::string Language;
     /// The warning before the first game moved onto the console's storage was shown and accepted.

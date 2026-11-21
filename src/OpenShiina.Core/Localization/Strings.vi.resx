@@ -144,6 +144,10 @@
   <data name="ThemeParchmentHelp" xml:space="preserve"><value>Cùng bộ màu trên nền giấy kem, sáng.</value></data>
   <data name="ThemeGraphite" xml:space="preserve"><value>Graphite</value></data>
   <data name="ThemeGraphiteHelp" xml:space="preserve"><value>Xám tối trung tính.</value></data>
+  <data name="ThemeWhite" xml:space="preserve"><value>Trắng</value></data>
+  <data name="ThemeWhiteHelp" xml:space="preserve"><value>Trắng và xám nhạt trung tính.</value></data>
+  <data name="ThemeSystem" xml:space="preserve"><value>Theo hệ thống</value></data>
+  <data name="ThemeSystemHelp" xml:space="preserve"><value>Trắng hoặc Graphite, theo chế độ sáng hay tối của hệ thống.</value></data>
   <data name="LevelPotato" xml:space="preserve"><value>Potato</value></data>
   <data name="LevelPotatoHelp" xml:space="preserve"><value>Điểm ảnh gần nhất, không lọc: nhẹ nhất, cho điện thoại yếu nhất.</value></data>
   <data name="LevelLow" xml:space="preserve"><value>Low</value></data>

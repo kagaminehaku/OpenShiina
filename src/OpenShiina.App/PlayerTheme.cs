@@ -66,8 +66,13 @@ public static class PlayerTheme
     // #6B1024, red #C8102E (#E23B4E on dark), gold #D4A649 (#A9792B its shade), pages #F3E6C8.
     // Text has 4.5 times the light of its ground (WCAG's AA) or more: so the gold as text is
     // #7F5719 on the pages, Play's text on their gold the leather, and Remove #F0606E on the dark themes.
-    private static Palette Of(AppTheme theme) => theme switch
+    // White (Graphite's light counterpart): ink #1C1C21 13.6-17:1 on its grounds, muted #5A5A66 5.5-6.8:1,
+    // the red 5.4:1 as text and white on it 5.9:1, the gold #D4A649 with the ink on it 7.6:1, the gold as
+    // text #7F5719 5.2-6.4:1. System: White or Graphite as the system is light or dark (Resolve).
+    private static Palette Of(AppTheme theme) => Resolve(theme) switch
     {
+        AppTheme.White => new(false, C("#F4F4F6"), C("#FFFFFF"), C("#E6E6EB"), C("#C9C9D1"), C("#1C1C21"), C("#5A5A66"),
+                              C("#C8102E"), C("#FFFFFF"), C("#D4A649"), C("#1C1C21"), C("#7F5719"), C("#C8102E"), C("#1C1C21"), C("#C8102E")),
         AppTheme.Parchment => new(false, C("#F3E6C8"), C("#FBF6EC"), C("#EADBB8"), C("#D6C49C"), C("#2B1A20"), C("#6B4E44"),
                                   C("#C8102E"), C("#FBF6EC"), C("#A9792B"), C("#2A0A12"), C("#7F5719"), C("#C8102E"), C("#2B1A20"), C("#C8102E")),
         AppTheme.Graphite => new(true, C("#16161A"), C("#222228"), C("#30303A"), C("#3A3A44"), C("#EDEDF0"), C("#A8A8B2"),
@@ -76,12 +81,23 @@ public static class PlayerTheme
                  C("#C8102E"), C("#FBF6EC"), C("#D4A649"), C("#2A0A12"), C("#D4A649"), C("#F0606E"), C("#F3E6C8"), C("#E23B4E")),
     };
 
+    /// <summary>
+    /// The theme a choice shows: System is White when the system's colours are light (or it says
+    /// nothing), Graphite when they are dark (Windows' app mode, Android's dark theme...).
+    /// </summary>
+    public static AppTheme Resolve(AppTheme theme) =>
+        theme != AppTheme.System ? theme
+        : Application.Current?.PlatformSettings?.GetColorValues().ThemeVariant == Avalonia.Platform.PlatformThemeVariant.Dark
+            ? AppTheme.Graphite : AppTheme.White;
+
     /// <summary>The choices of the settings, in the screens' language: each theme with its name and a line about it.</summary>
     public static IReadOnlyList<(AppTheme Theme, string Label, string Help)> Choices =>
     [
         (AppTheme.Shiina, Strings.ThemeShiina, Strings.ThemeShiinaHelp),
         (AppTheme.Parchment, Strings.ThemeParchment, Strings.ThemeParchmentHelp),
         (AppTheme.Graphite, Strings.ThemeGraphite, Strings.ThemeGraphiteHelp),
+        (AppTheme.White, Strings.ThemeWhite, Strings.ThemeWhiteHelp),
+        (AppTheme.System, Strings.ThemeSystem, Strings.ThemeSystemHelp),
     ];
 
     /// <summary>The wordmark's font: Cinzel (bold), as the logo's.</summary>
@@ -108,9 +124,24 @@ public static class PlayerTheme
         return fluent;
     }
 
+    // The theme chosen (System stays System: the system's colours changing apply it again)
+    private static AppTheme s_requested = AppTheme.Shiina;
+    private static bool s_following;
+
     /// <summary>The theme's brushes and Fluent's palette, for the whole application.</summary>
     public static void Apply(Application application, AppTheme theme)
     {
+        s_requested = theme;
+        if (!s_following && application.PlatformSettings is { } platform)
+        {
+            s_following = true;
+            platform.ColorValuesChanged += (_, _) =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (s_requested == AppTheme.System)
+                        Apply(application, AppTheme.System);
+                });
+        }
         var p = s_current = Of(theme);
         var resources = application.Resources;
         resources[Keys.Background] = new SolidColorBrush(p.Background);

@@ -79,6 +79,12 @@ Settings Settings::Load(const std::string& path)
         settings.FastZoom = z->get<bool>();
     if (auto g = json.find("GpuSprites"); g != json.end() && g->is_boolean())
         settings.GpuSprites = g->get<bool>();
+    if (auto t = json.find("Theme"); t != json.end() && t->is_string())
+    {
+        // (the C# player's names: its dark themes dark, its light ones light)
+        std::string name = t->get<std::string>();
+        settings.Theme = name == "System" ? 0 : name == "Shiina" || name == "Graphite" ? 1 : 2;
+    }
     if (auto l = json.find("Language"); l != json.end() && l->is_string())
         settings.Language = l->get<std::string>();
     if (auto w = json.find("ConsoleStorageWarned"); w != json.end() && w->is_boolean())
@@ -97,6 +103,7 @@ void Settings::Save(const std::string& path) const
     json["ShowFrameRate"] = ShowFrameRate;
     json["FastZoom"] = FastZoom;
     json["GpuSprites"] = GpuSprites;
+    json["Theme"] = Theme == 0 ? "System" : Theme == 1 ? "Shiina" : "White";
     json["Language"] = Language;
     if (ConsoleWarned)
         json["ConsoleStorageWarned"] = true;

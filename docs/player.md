@@ -51,7 +51,9 @@ The home screen's Settings button opens their page. They are saved in `settings.
 `library.json`, and each counts from the next game started.
 
 - **Appearance**: the theme, shown at once (OpenShiina Tools too): Shiina, the logo's wine red and
-  gold, by default; Parchment, light; Graphite, plain greys. And the language of the player's own
+  gold, by default; Parchment, light; Graphite, plain greys; White, plain white and light greys;
+  As the system, White or Graphite as the system's own colours are light or dark (it changes with
+  them). And the language of the player's own
   screens: the device's by default, English or Vietnamese (the words are in
   `src/OpenShiina.Core/Localization`: `Strings.resx` in English, a `Strings.<language>.resx` for
   each translation, which shows in the list by itself).

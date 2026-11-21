@@ -4,6 +4,15 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.8.6.1 (2026-11-21)
+
+- **Raillore no Ryakudatsusha (the Japanese DL release) plays through** (164 games, 165 releases):
+  its 130 scenarios swept; one needs the larger picture arena of the game's later build (RIO.INI
+  `Opt_RealMemorySize_Free=550`).
+- **Themes White and As the system**: a plain light theme (WCAG AA contrast throughout), and one
+  that follows the system's light or dark mode as it changes (Windows, Linux, Android). The Switch
+  player has the setting Theme too: as the console's own theme, dark or light.
+
 ## 0.8.6 (2026-11-21)
 
 - **8 more games play through** (134 games, 135 releases): Reizoku, CC Hospital, Mikoko, Zansho

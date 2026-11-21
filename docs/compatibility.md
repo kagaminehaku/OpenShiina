@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 163 games, 164 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 164 games, 165 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -202,7 +202,7 @@ of those versions it does not list.
 | Saimin Paradise! | 催眠ぱらだいす! ～催眠術でツゴウノイイ美少女学園性活～ | 2018-09-28 | [v23063](https://vndb.org/v23063) | v2.50 | ✅ Plays through | 2026-11-12 |
 | Nukige Mitai na Shima ni Sunderu... 2 | 抜きゲーみたいな島に住んでる貧乳はどうすりゃいいですか? 2 | 2019-07-26 | [v23741](https://vndb.org/v23741) | v2.50 | ✅ Plays through | 2026-11-05 |
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
-| Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | 🟢 Plays | 2026-11-21 |
+| Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ✅ Plays through | 2026-11-21 |
 | Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
 | The Pillagers of Raillore | レイルロアの略奪者 (English) | 2025-05-29 | [r84728](https://vndb.org/r84728) | v2.50 | ✅ Plays through | 2026-10-23 |
 
@@ -1048,7 +1048,12 @@ the world at its paragraph 999: the game saves and quits there, as it means to.
 DecodeBin date was wrong (20080214: 17 pictures not whole); `ScnTools datefind` gave 20191021 and
 all 26,695 files come out whole. Its blur is The Pillagers of Raillore's (blur32) with its work
 buffers elsewhere (START 332351): the C# version, checked against its x86 code on 40 random
-cases, byte for byte. Swept on 2026-11-21 (not to its end yet): every scenario run so far done.
+cases, byte for byte. Swept on 2026-11-21: its 130 scenarios all done. CHAP8_ACT4_EPI4 ends in a
+staff roll timed to a song of 258 s (longer than the sweep's 9,000 frames of standing still: run
+again with 30,000). CHAP3_ACT4_EPI3 ran out of the game's own picture arena in the sweep's skip
+("Cannot Allocate Memory (F) : 534 + 8"): START makes it 540 MB (566231040), and The Pillagers of
+Raillore, the later build, 550 MB; with 550 (RIO.INI `Opt_RealMemorySize_Free=550`, ScnBoot's
+SCNBOOT_INI adds a key the file lacks now) it plays through.
 **Love Revo** (planpeace, v2.42) plays: from its title, the name entry, its schedule, its shop and
 its first weeks (`0848`-`084A`); a whole year of its simulation was not played.
 
