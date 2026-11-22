@@ -7,8 +7,8 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 ## Unreleased
 
 - **Chou Saiminjutsu Gakuen's web trial plays through** (164 games, 166 releases): its opening
-  movie no longer stays black (this build repaints the window where it copies into the screen,
-  as v2.50 does).
+  movie no longer stays black. v2.49 games repaint the window where they copy into the screen,
+  as v2.50's do (every v2.49 executable read does).
 
 ## 0.8.6.1 (2026-11-21)
 

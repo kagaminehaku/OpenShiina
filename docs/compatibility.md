@@ -1060,10 +1060,12 @@ its first weeks (`0848`-`084A`); a whole year of its simulation was not played.
 
 **Chou Saiminjutsu Gakuen's web trial** (C:drive., CHOSAIMIN_TKB.exe, v2.49 in its RIO.INI, the
 full game's scheme): its opening movie (mv\OP.mpg, `MovieMode=0`) stayed black, shown only by a
-click's repaint (reported on GitHub, from Linux). Its START chooses GDI (`04E8` 0), and before
-v2.50 a copy into the display surface shows only where the window is repainted - but this build's
-`0514` (0x423040, through 0x422F30) and its other copies there end in 0x418780, whose GDI branch is
-InvalidateRect: its copies repaint as v2.50's do. Its save thumbnail (START 8B3BF, 128 x 72 from
+click's repaint (reported on GitHub, from Linux). Its START chooses GDI (`04E8` 0), and a copy
+into the display surface was repainted from v2.50 on only - but this build's `0514` (0x423040,
+through 0x422F30) and its other copies there end in 0x418780, whose GDI branch is InvalidateRect,
+and so do those of every v2.49 executable that could be read: copies into the display surface
+repaint from v2.49 on now (engine-notes.md). It is the only v2.49 game here whose movie is
+copied there; the others' are layers. Its save thumbnail (START 8B3BF, 128 x 72 from
 blocks of 8 x 8, Cleavage's code for 1024 x 576) and the copy of its rows (8B653) are C# now,
 checked against the x86 code on 20 random cases each. Swept on 2026-11-22: its 17 scenarios all
 done (99.7% of the lines).

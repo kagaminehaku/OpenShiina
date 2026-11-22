@@ -119,10 +119,10 @@ void ScnVm::BltToWindow(int l, int t, int r, int b, int src, int sl, int st, int
 
 void ScnVm::PresentedByDirect3D(int l, int t, int r, int b)
 {
-    // v2.50 presents the display surface with Direct3D, so a copy into it shows without
-    // InvalidateRect; earlier versions (GDI) leave it unseen, but for Chou Saiminjutsu Gakuen's web
-    // trial (v2.49, GDI), whose copies into the display surface end in InvalidateRect (0x418780)
-    if (EngineVersion >= 250 || Game == "Chou Saiminjutsu Gakuen")
+    // From v2.49 on, a copy into the display surface shows by itself: the engine's copies there end
+    // in a helper that is InvalidateRect in GDI mode, a Direct3D present otherwise (0x418780 in
+    // every v2.49 executable read); v2.47's leave it unseen
+    if (EngineVersion >= 249)
         InvalidateWindow(std::min(l, r), std::min(t, b), std::max(l, r), std::max(t, b));
 }
 

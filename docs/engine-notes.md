@@ -1619,11 +1619,15 @@ the functions they call from the decompile. First findings:
   - 1025 picture slots (0-0x400; 0-0x100 before).
   - The screen is shown with Direct3D: a copy into the display surface shows without
     InvalidateRect. Its movie loop copies frames there with `0514` / `051E` and nothing else, so
-    those repaint their rectangle in v2.50 (the GDI window picture of ScnVm.Paint stays for the
-    rest: showing the surface every frame showed the backlog half drawn). Chou Saiminjutsu
-    Gakuen's web trial (CHOSAIMIN_TKB.exe, v2.49, GDI) repaints there too: its `0514` (0x423040)
-    copies with 0x422F30, which ends in 0x418780 - InvalidateRect in GDI mode, a Direct3D
-    present otherwise - as do its other copies into the display surface (27 calls).
+    those repaint their rectangle from v2.49 on (the GDI window picture of ScnVm.Paint stays for
+    the rest: showing the surface every frame showed the backlog half drawn). In GDI mode too:
+    Chou Saiminjutsu Gakuen's web trial (CHOSAIMIN_TKB.exe, v2.49) copies with `0514` (0x423040)
+    through 0x422F30, which ends in 0x418780 - InvalidateRect in GDI mode, a Direct3D present
+    otherwise - as do its other copies into the display surface (28 calls in all). Every v2.49
+    executable that could be read (14: Bitch Gakuen, Gensou no Idea, Megane Choukyou, the Plus
+    games, ...) has that helper with its 28 calls, the BitBlt copies among them, and v2.50's have
+    it with 28-29; v2.47's (Gakuen Pets 3, Ryoumaden, ...) have none. The movies of the other v2.49
+    games here are layers (`$L_MOVIE`), composed with the rest, so only the trial showed it.
   - Its backlog draws its lines again one `0083` after another every frame: `0083` starting
     text counts as text going on, so a frame does not end between the lines (it flickered).
   - Sounds in memory (`06B1`) are measured by the container, as the engine does: an Ogg stream
