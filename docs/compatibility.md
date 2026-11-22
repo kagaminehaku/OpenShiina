@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 164 games, 165 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 164 games, 166 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -172,6 +172,7 @@ of those versions it does not list.
 | Tojita Sekai no Tori Colony | 閉じたセカイのトリコロニー | 2013-07-26 | [v12473](https://vndb.org/v12473) | v2.49 | ✅ Plays through | 2026-10-24 |
 | Love & Piss ~Shoujo no Gaman ga Sekai o Sukuu~ | Love＆Piss ～少女のガマンが世界を救う～ | 2013-08-30 | [v12613](https://vndb.org/v12613) | v2.49 | ✅ Plays through | 2026-11-04 |
 | S.D.I.-Sadistic Daughter Incident- ~Musume ni Doutei o Ubawareru Boku~ | S.D.I.-Sadistic Daughter Incident- ～ムスメに童貞を奪われるボク～ | 2013-11-29 | [v13762](https://vndb.org/v13762) | v2.49 | ✅ Plays through | 2026-11-05 |
+| Chou Saiminjutsu Gakuen [Trial] | 超催眠術学園 Web体験版 | 2014-05-14 | [r34072](https://vndb.org/r34072) | v2.49 | ✅ Plays through | 2026-11-22 |
 | Chou Saiminjutsu Gakuen | 超催眠術学園 | 2014-05-30 | [v14614](https://vndb.org/v14614) | v2.50 | ✅ Plays through | 2026-11-12 |
 | Majime to Sasayakareru Ore o Osananajimi no Risa | 真面目と囁かれるオレを幼なじみの理彩が性的な意味も込めて陥落していく話 | 2014-07-18 | [v15537](https://vndb.org/v15537) | v2.49 | ✅ Plays through | 2026-11-19 |
 | Majime to Sasayakareru Ore o Jimi Kyonyuu no Nazuna | 真面目と囁かれるオレを地味巨乳のなずなが性的な意味も込めて陥落していく話 | 2014-09-12 | [v16038](https://vndb.org/v16038) | v2.50 | ✅ Plays through | 2026-11-19 |
@@ -1057,6 +1058,16 @@ SCNBOOT_INI adds a key the file lacks now) it plays through.
 **Love Revo** (planpeace, v2.42) plays: from its title, the name entry, its schedule, its shop and
 its first weeks (`0848`-`084A`); a whole year of its simulation was not played.
 
+**Chou Saiminjutsu Gakuen's web trial** (C:drive., CHOSAIMIN_TKB.exe, v2.49 in its RIO.INI, the
+full game's scheme): its opening movie (mv\OP.mpg, `MovieMode=0`) stayed black, shown only by a
+click's repaint (reported on GitHub, from Linux). Its START chooses GDI (`04E8` 0), and before
+v2.50 a copy into the display surface shows only where the window is repainted - but this build's
+`0514` (0x423040, through 0x422F30) and its other copies there end in 0x418780, whose GDI branch is
+InvalidateRect: its copies repaint as v2.50's do. Its save thumbnail (START 8B3BF, 128 x 72 from
+blocks of 8 x 8, Cleavage's code for 1024 x 576) and the copy of its rows (8B653) are C# now,
+checked against the x86 code on 20 random cases each. Swept on 2026-11-22: its 17 scenarios all
+done (99.7% of the lines).
+
 ## Sweeping
 
 `tests/sweep.ps1 -Folder <game folder>` runs every scenario of a game through ScnBoot, each from
@@ -1087,7 +1098,7 @@ and Doushite Daite Kurenai no!? on 2026-11-03; Rin x Sen, Last Waltz, Ran→Sem,
 Tanetsuke Mura, Shojo Mama, Boku Igai no Otoko o Shiranai Kanojo, Gohoushi Nurse, Lovecha and
 Nukige Mitai na Shima ni Sunderu on 2026-11-04, Hitozuma Gui, Raillore and Sorcery Jokers (English) again;
 Miko Dashi and Nukige Mitai na Shima ni Sunderu... 2 on 2026-11-05; the games of 2026-11-11 on
-2026-11-12, Notes): none stopped, none stuck, but for Entremets' trial end.
+2026-11-12, Notes; Chou Saiminjutsu Gakuen's trial on 2026-11-22): none stopped, none stuck, but for Entremets' trial end.
 
 | Game | Scenarios | Lines shown |
 |---|---|---|
@@ -1204,6 +1215,7 @@ Miko Dashi and Nukige Mitai na Shima ni Sunderu... 2 on 2026-11-05; the games of
 | Chikan Circle | 45 | 54.3% |
 | Tentacle Busters | 83 | 43.3% |
 | Nukige Mitai na Shima ni Sunderu [Trial] | 45 | 99.6% |
+| Chou Saiminjutsu Gakuen [Trial] | 17 | 99.7% |
 | Kichiku Nakadashi Suieibu | 36 | 51.9% |
 | Dokodemo Sukishite Itsudemo Sukishite | 524 | 62.4% |
 | Metro Chikansen  ~Kairaku Jousha Annai~ | 26 | 73.0% |

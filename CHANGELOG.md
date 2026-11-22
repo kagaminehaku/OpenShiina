@@ -4,6 +4,12 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **Chou Saiminjutsu Gakuen's web trial plays through** (164 games, 166 releases): its opening
+  movie no longer stays black (this build repaints the window where it copies into the screen,
+  as v2.50 does).
+
 ## 0.8.6.1 (2026-11-21)
 
 - **Raillore no Ryakudatsusha (the Japanese DL release) plays through** (164 games, 165 releases):

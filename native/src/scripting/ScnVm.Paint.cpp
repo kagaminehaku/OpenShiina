@@ -120,8 +120,9 @@ void ScnVm::BltToWindow(int l, int t, int r, int b, int src, int sl, int st, int
 void ScnVm::PresentedByDirect3D(int l, int t, int r, int b)
 {
     // v2.50 presents the display surface with Direct3D, so a copy into it shows without
-    // InvalidateRect; earlier versions (GDI) leave it unseen
-    if (EngineVersion >= 250)
+    // InvalidateRect; earlier versions (GDI) leave it unseen, but for Chou Saiminjutsu Gakuen's web
+    // trial (v2.49, GDI), whose copies into the display surface end in InvalidateRect (0x418780)
+    if (EngineVersion >= 250 || Game == "Chou Saiminjutsu Gakuen")
         InvalidateWindow(std::min(l, r), std::min(t, b), std::max(l, r), std::max(t, b));
 }
 

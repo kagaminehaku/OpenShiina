@@ -118,6 +118,12 @@ public sealed partial class ScnVm
         // Cleavage 29313: 72 rows of 288 bytes
         RegisterNative("C4E2EF445D41ADB0A605D700A9FD74D4FD8C18F7", "rows 96 x 72", (vm, c, a) =>
             vm.CopyRows(c, a, vm.NativeArg(a, 1), 2400, vm.NativeArg(a, 0), 288, 72, 288));
+        // Chou Saiminjutsu Gakuen's web trial START 8B3BF (v2.49, 1024 x 576, "ret"): Cleavage's code
+        // for 128 x 72 from blocks of 8 x 8, rows of 3,072 bytes; 8B653: those 72 rows of 384 bytes
+        // into a picture of 1024 x 576
+        RegisterNative("C2CDA8C5B41C97EA6C4184D8C8EE08126DF6D3F7", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 8, 128, 72, 3072));
+        RegisterNative("3019CA5FA1E524962E1B3635A4543A9F0174646C", "rows 128 x 72", (vm, c, a) =>
+            vm.CopyRows(c, a, vm.NativeArg(a, 1), 3072, vm.NativeArg(a, 0), 384, 72, 384));
         // Doushite Daite Kurenai no!? START 8822F: 232 x 174 from blocks of 3 x 3 (the rest left out)
         RegisterNative("EFC1A7C2555C74261AD0BADB864569B4BF210B9D", "thumbnail", (vm, c, a) => vm.Thumbnail(c, a, 3, 232, 174));
         // Chuuchuu Nurse START 70036AF3 / 70036B67 (v2.45): 160 x 120 from blocks of 5 x 5, and the

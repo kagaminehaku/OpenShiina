@@ -164,11 +164,14 @@ public sealed partial class ScnVm
     /// <summary>
     /// v2.50 presents the display surface with Direct3D (06CC asks for it), so a copy into it shows
     /// without InvalidateRect: its movie loop copies each frame there with 0514 / 051E and nothing
-    /// else. Here the rectangle is repainted then; earlier versions (GDI) leave it unseen.
+    /// else. Here the rectangle is repainted then; earlier versions (GDI) leave it unseen, but for
+    /// Chou Saiminjutsu Gakuen's web trial (CHOSAIMIN_TKB.exe, v2.49 in its RIO.INI, GDI): its 0514
+    /// (0x423040, by 0x422F30) and the engine's other copies into the display surface end in
+    /// 0x418780, whose GDI branch is InvalidateRect - its opening movie stayed black.
     /// </summary>
     private void PresentedByDirect3D(int l, int t, int r, int b)
     {
-        if (EngineVersion >= 250)
+        if (EngineVersion >= 250 || Game == "Chou Saiminjutsu Gakuen")
             InvalidateWindow(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b));
     }
 
