@@ -1156,8 +1156,14 @@ public sealed partial class ScnVm
         // The skip keys are read from engine 2.33 on (CLEAVAGE.EXE 0x424748, aoj.EXE 0x424AC8); the
         // engines before (BBB.EXE v2.11, EDENF.EXE v2.30, KATEI.EXE v2.31) read the buttons only in
         // their opcodes and menus: a text drawn would take the press their choices wait for (Baby, BE's
-        // choice loop draws its items with 0084 every frame before its 03EA)
-        if (G(rec, RSkipKeys) != 0 && EngineVersion >= 233)
+        // choice loop draws its items with 0084 every frame before its 03EA). And only while the text
+        // has its waits on, the one thing a skip key does: 0084 draws with them off, so its read would
+        // only take a press from the scripts - one the engine's own read takes only now and then, its
+        // loops going round about once a millisecond (a Sleep(1) at every 0034) and its buttons drawn
+        // again at their animation's pace, where here a loop goes round once a frame and draws them
+        // every time: Cleavage's save and load screens (the slot under the pointer drawn again with
+        // 0084 just before their 03EA) never saw a click
+        if (G(rec, RSkipKeys) != 0 && G(rec, RWaits) != 0 && EngineVersion >= 233)
         {
             int keys = G(rec, RSkipKeys) & 0xFF, buttons = TextSkipButtons();
             if ((keys & 1) != 0 && (buttons & 0x20) != 0)

@@ -223,6 +223,9 @@ public:
     ScnContext* CurrentTask = nullptr;
     /// One round of the main loop: every running task until it yields.
     void RunRound();
+    /// A task read the mouse (0456, 0458): from 2.36 on, read again at the same place in a later
+    /// round of this frame, the frame ends after that round (RunFrame).
+    void MouseRead(const ScnContext& c);
     /// A task started or stopped: the scheduler counts the running slots again.
     void TasksChanged() { m_activeCount = -1; }
 
@@ -584,6 +587,10 @@ private:
     std::map<int, int> m_freeRanges;
     std::optional<bool> m_largeAddressAware;
     bool m_taskWaited = false;
+    // Where each task read the mouse (0456 / 0458) in this frame, and in which round (MouseRead)
+    std::map<std::pair<int, int>, int64_t> m_mouseReads;
+    int m_mouseReadsFrame = -1;
+    bool m_mousePolledAgain = false;
     int m_activeCount = -1;
     // Decoded instructions taken out while one of them may be running (the C# player's garbage
     // collector keeps them), kept until no instruction runs; how deep Run is
@@ -688,6 +695,8 @@ private:
     void PresentedByDirect3D(int l, int t, int r, int b);
     void RunPaintSlot(int global);
     openshiina::Bytes m_window;
+    // a row of the display surface and the same as BGR, kept for Paint
+    openshiina::Bytes m_paintRow, m_paintBgr;
     std::vector<std::array<int, 4>> m_invalid;
     ScreenArea m_changed{0, 0, 0x7FFFFFFF, 0x7FFFFFFF};
 

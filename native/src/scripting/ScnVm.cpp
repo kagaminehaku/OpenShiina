@@ -427,6 +427,7 @@ bool ScnVm::RunFrame(int maxRounds)
     PumpMessages();
     FrameShown = false;
     m_taskWaited = false;
+    m_mousePolledAgain = false;
     FrameRounds = 0;
     SleepRequested = 0;
     for (int round = 0; round < maxRounds && !QuitRequested; round++)
@@ -437,11 +438,31 @@ bool ScnVm::RunFrame(int maxRounds)
         FireTimers();
         PumpMessages();
         // 2.34 shows its pictures as it goes and takes time only where a task waits: a frame ends
-        // there, not at the first picture
-        if ((OldEngine() ? m_taskWaited : FrameShown) && !m_textWentOn)
+        // there, not at the first picture. The later engines' frame ends at a picture, or where a
+        // task read the mouse again (MouseRead)
+        if ((OldEngine() ? m_taskWaited : FrameShown || m_mousePolledAgain) && !m_textWentOn)
             break;
     }
     return !QuitRequested;
+}
+
+void ScnVm::MouseRead(const ScnContext& c)
+{
+    // From 2.36 on, a task that reads the mouse again at the same place in a later round of this
+    // frame is in a loop that waits for the user (Tsukutori's title, nothing drawn while the pointer
+    // stands): the frame ends after that round, not after all its rounds (1.8 s a frame here)
+    if (OldEngine())
+        return;
+    if (m_mouseReadsFrame != m_frameNumber)
+    {
+        m_mouseReads.clear();
+        m_mouseReadsFrame = m_frameNumber;
+    }
+    auto key = std::make_pair(c.Slot, c.Current);
+    auto found = m_mouseReads.find(key);
+    if (found != m_mouseReads.end() && found->second != m_rounds)
+        m_mousePolledAgain = true;
+    m_mouseReads[key] = m_rounds;
 }
 
 void ScnVm::RunRound()

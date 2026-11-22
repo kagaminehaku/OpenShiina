@@ -994,6 +994,39 @@ the functions they call from the decompile. First findings:
 - The main loop is not tied to frames: it pumps messages and runs every task once per round
   (`0033` makes tasks yield after every instruction, `0032` ends that); pictures reach the
   window only through the drawing opcodes.
+- **The main loop as REMPLUS.EXE runs it** (v2.50, 2026-11-22). WinMain (0x441A8F) calls
+  0x432710 when RIO.INI's `ScriptThread` is 0 (the default; else a thread of its own, 0x4413D0,
+  runs it while the window's thread waits in GetMessage): rounds for ever, each over the slots -
+  a sleeping one (flag 2, `0028`) is woken when its time is up, one with a text step (flag 8)
+  takes a step, a running one (flag 1) goes into the interpreter 0x4297D0, which runs it until
+  `0034`, or one instruction while `0033`'s flag (0x4C21E8) is set, or `Turbo` instructions
+  (0x4C2394, RIO.INI or the command line; 1 when not given). After each round 0x4137E0 empties the
+  message queue (PeekMessage / Dispatch; WaitMessage while the window is behind with Background
+  0) and sleeps `CPUSleepPM` ms (0x4C2390: RIO.INI, `004B` sets it, `004C` reads it; 1 when not
+  given); `0034` does the same (0x425B10), so a task's loop that yields goes round about once a
+  millisecond with the CPU asleep most of the time. The window is painted by WM_PAINT where it
+  was made invalid. Re:Rem Plus's START keeps GDI in a window of the game's size and picks
+  OpenGL, else Direct3D, only full screen (`04E8 3, ...` / `04E8 2, 2, 2`, to stretch the
+  picture): the scripts' drawing is on the CPU either way. Measured on its title (the window in
+  front, 1280 x 720; the process's CPU time over the span, % of one core): REMPLUS.EXE 22-45%
+  (one thread; a third of it kernel time, its Sleep and GDI); OpenShiina 0.8.6.1 with Potato and
+  the CPU renderer 8.7%, with only the rows' changed bytes copied and counted as changed
+  (ScnVm.Paint, PixelRows) 7.5%. Skipped with Ctrl from START to the route choice: REMPLUS.EXE
+  71-85% a second, OpenShiina 40-113% (its loading on threads of its own), about the same CPU
+  time in all; standing at the route choice, both about 0%. A window of another size costs
+  OpenShiina more with the CPU renderer: the picture is scaled in Skia's raster (91% in a window
+  of about 490 x 490).
+- Here a frame of 2.36 and later ends at a picture shown, or where a task reads the mouse
+  (`0456`, `0458`) again at the same place in a later round of the frame (ScnVm.MouseRead):
+  Tsukutori's title (its buttons, the mouse and seven `0034` a turn, nothing drawn while the
+  pointer stands still) ran all of a frame's 20,000 rounds, 0.1 s a frame on a PC and 1.8 s
+  on the Switch; now 14 rounds, 0.05 ms.
+- A text's skip keys (`_s`) are read only while it has waits to cut: `0084` draws with them off,
+  so its read only took the press from the scripts' `03EA` (one key-repeat state, caller
+  0x100). The engine reads them there too (CLEAVAGE.EXE 0x424748), but its loops go round about
+  once a millisecond and draw a button again at its animation's pace; here a loop goes round
+  once a frame and draws the button under the pointer every time - Cleavage's save and load
+  screens (the slot drawn with `0084` just before their `03EA`) never saw a click.
 
 ### Text, pictures, sound, input (ScnVm, 2026-10-06)
 

@@ -8,8 +8,54 @@
 #include "scripting/ScnVm.h"
 
 #include <algorithm>
+#include <cstring>
+#if defined(__ARM_NEON) || defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 namespace openshiina::scripting {
+
+namespace {
+
+// BGRX (4 bytes a pixel) to BGR, 16 pixels a step with NEON (C# PixelRows.BgrxToBgr)
+void BgrxToBgr(const uint8_t* src, uint8_t* dst, int pixels)
+{
+    int x = 0;
+#if defined(__ARM_NEON) || defined(__aarch64__)
+    for (; x + 16 <= pixels; x += 16)
+    {
+        uint8x16x4_t v = vld4q_u8(src + x * 4);
+        uint8x16x3_t bgr = {{v.val[0], v.val[1], v.val[2]}};
+        vst3q_u8(dst + x * 3, bgr);
+    }
+#endif
+    for (; x < pixels; x++)
+    {
+        dst[x * 3] = src[x * 4];
+        dst[x * 3 + 1] = src[x * 4 + 1];
+        dst[x * 3 + 2] = src[x * 4 + 2];
+    }
+}
+
+// The bytes where two rows differ, [first, last); false when they are the same (C# PixelRows.Differs)
+bool Differs(const uint8_t* a, const uint8_t* b, int length, int& first, int& last)
+{
+    first = 0;
+    while (first + 64 <= length && std::memcmp(a + first, b + first, 64) == 0)
+        first += 64;
+    while (first < length && a[first] == b[first])
+        first++;
+    if (first >= length)
+        return false;
+    last = length;
+    while (last - first > 64 && std::memcmp(a + last - 64, b + last - 64, 64) == 0)
+        last -= 64;
+    while (last > first + 1 && a[last - 1] == b[last - 1])
+        last--;
+    return true;
+}
+
+} // namespace
 
 const openshiina::Bytes& ScnVm::Window()
 {
@@ -56,25 +102,36 @@ void ScnVm::Paint()
     int width = std::min(SurfaceField(surface, 7), ScreenWidth), height = std::min(SurfaceField(surface, 8), ScreenHeight);
     if (pixels != 0 && (bytes == 3 || bytes == 4))
     {
-        openshiina::Bytes row(size_t(ScreenWidth) * size_t(bytes));
+        // (the same rectangle may be invalid several times, and one of all the window covers the rest)
+        if (std::any_of(m_invalid.begin(), m_invalid.end(),
+                        [&](const auto& i) { return i[0] <= 0 && i[1] <= 0 && i[2] >= width && i[3] >= height; }))
+        {
+            m_invalid.clear();
+            m_invalid.push_back({0, 0, width, height});
+        }
+        m_paintRow.resize(size_t(ScreenWidth) * 4);
+        m_paintBgr.resize(size_t(ScreenWidth) * 3);
         for (const auto& [l, t, r0, b0] : m_invalid)
         {
             int r = std::min(r0, width), b = std::min(b0, height);
-            m_changed = m_changed.Union({l, t, r, b});
             for (int y = t; y < b && l < r; y++)
             {
-                uint8_t* src = row.data();
+                uint8_t* src = m_paintRow.data();
                 ReadBytes(pixels + y * pitch + l * bytes, src, (r - l) * bytes);
+                const uint8_t* line = src;
+                if (bytes == 4)
+                {
+                    BgrxToBgr(src, m_paintBgr.data(), r - l);
+                    line = m_paintBgr.data();
+                }
+                // Only what differs from the window's picture is written and counted as changed: a
+                // screen invalidated whole each frame (Re:Rem Plus's title) costs only what moved
                 uint8_t* dst = &m_window[(size_t(y) * size_t(ScreenWidth) + size_t(l)) * 3];
-                if (bytes == 3)
-                    std::memcpy(dst, src, size_t(r - l) * 3);
-                else
-                    for (int x = 0, s = 0, d = 0; x < r - l; x++, s += 4, d += 3)
-                    {
-                        dst[d] = src[s];
-                        dst[d + 1] = src[s + 1];
-                        dst[d + 2] = src[s + 2];
-                    }
+                int first = 0, last = 0;
+                if (!Differs(line, dst, (r - l) * 3, first, last))
+                    continue;
+                std::memcpy(dst + first, line + first, size_t(last - first));
+                m_changed = m_changed.Union({l + first / 3, y, l + (last + 2) / 3, y + 1});
             }
         }
     }

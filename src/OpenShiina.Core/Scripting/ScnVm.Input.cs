@@ -165,6 +165,7 @@ public sealed partial class ScnVm
         // until a game sizes it)
         Register(0x0456, (vm, c, i) =>
         {
+            vm.MouseRead(c);
             var (sx, sy) = vm.m_host.MousePosition;
             var (x, y) = vm.ScreenToClient(sx, sy);
             vm.EngineGlobals[0xBCE348] = x;
@@ -187,6 +188,7 @@ public sealed partial class ScnVm
         // of the buttons the window procedure keeps, 0x7238CC)
         Register(0x0458, (vm, c, i) =>
         {
+            vm.MouseRead(c);
             int mouse = vm.m_host.Active ? vm.m_host.MouseButtons : 0;
             vm.Store(c, i.Args[0], mouse & 1);
             vm.Store(c, i.Args[1], (mouse >> 1) & 1);

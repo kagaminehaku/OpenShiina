@@ -31,8 +31,9 @@ public readonly record struct ScreenArea(int L, int T, int R, int B)
 
 public sealed partial class ScnVm
 {
-    // The window's picture (24-bit, ScreenWidth x ScreenHeight) and its invalid rectangles
-    private byte[]? m_window;
+    // The window's picture (24-bit, ScreenWidth x ScreenHeight) and its invalid rectangles; a row of
+    // the display surface and the same as BGR, kept for Paint
+    private byte[]? m_window, m_paintRow, m_paintBgr;
     private readonly List<(int L, int T, int R, int B)> m_invalid = [];
     // What changed in the window's picture since TakeChangedArea; all of it at first
     private ScreenArea m_changed = new(0, 0, int.MaxValue, int.MaxValue);
@@ -94,25 +95,32 @@ public sealed partial class ScnVm
         int width = Math.Min(SurfaceField(surface, 7), ScreenWidth), height = Math.Min(SurfaceField(surface, 8), ScreenHeight);
         if (pixels != 0 && bytes is 3 or 4)
         {
-            var row = new byte[ScreenWidth * bytes];
+            // (the same rectangle may be invalid several times, and one of all the window covers the rest)
+            if (m_invalid.Exists(i => i.L <= 0 && i.T <= 0 && i.R >= width && i.B >= height))
+            {
+                m_invalid.Clear();
+                m_invalid.Add((0, 0, width, height));
+            }
+            var row = m_paintRow is { } kept && kept.Length >= ScreenWidth * 4 + 16 ? kept : m_paintRow = new byte[ScreenWidth * 4 + 16];
+            var bgr = m_paintBgr is { } keptBgr && keptBgr.Length >= ScreenWidth * 3 + 16 ? keptBgr : m_paintBgr = new byte[ScreenWidth * 3 + 16];
             foreach (var (l, t, r0, b0) in m_invalid)
             {
                 int r = Math.Min(r0, width), b = Math.Min(b0, height);
-                m_changed = m_changed.Union(new ScreenArea(l, t, r, b));
                 for (int y = t; y < b && l < r; y++)
                 {
                     var src = row.AsSpan(0, (r - l) * bytes);
                     ReadBytes(pixels + y * pitch + l * bytes, src);
+                    if (bytes == 4)
+                        PixelRows.BgrxToBgr(src, bgr);
+                    var line = bytes == 3 ? src : bgr.AsSpan(0, (r - l) * 3);
+                    // Only what differs from the window's picture is written and counted as changed:
+                    // a screen invalidated whole each frame (Re:Rem Plus's title, its animation a few
+                    // small pictures) costs the hosts only the pixels that moved
                     var dst = window.AsSpan((y * ScreenWidth + l) * 3, (r - l) * 3);
-                    if (bytes == 3)
-                        src.CopyTo(dst);
-                    else
-                        for (int x = 0, s = 0, d = 0; x < r - l; x++, s += 4, d += 3)
-                        {
-                            dst[d] = src[s];
-                            dst[d + 1] = src[s + 1];
-                            dst[d + 2] = src[s + 2];
-                        }
+                    if (PixelRows.Differs(line, dst) is not var (first, last))
+                        continue;
+                    line[first..last].CopyTo(dst[first..last]);
+                    m_changed = m_changed.Union(new ScreenArea(l + first / 3, y, l + (last + 2) / 3, y + 1));
                 }
             }
         }

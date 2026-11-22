@@ -9,6 +9,15 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 - **Chou Saiminjutsu Gakuen's web trial plays through** (164 games, 166 releases): its opening
   movie no longer stays black. v2.49 games repaint the window where they copy into the screen,
   as v2.50's do (every v2.49 executable read does).
+- **Cleavage's save and load screens take clicks again** (after a save or a load the game no
+  longer stands with only the buttons' sounds answering).
+- **Tsukutori's title no longer takes a whole frame's work**: 16 fps on a PC and 1.8 s a frame on
+  the Switch before, a fraction of a millisecond now (engines 2.36 and later: a frame ends where a
+  task reads the mouse again).
+- **The picture copies only what changed**: a screen the game invalidates whole every frame
+  (Re:Rem Plus's title) is compared row by row and only the bytes that moved go on to the window,
+  and the pixels are converted four at a time (SSE / NEON). Re:Rem Plus's title in a 1280 x 720
+  window with the CPU renderer: 8.7% of a core before, 7.5% now (the original executable: 22-45%).
 
 ## 0.8.6.1 (2026-11-21)
 

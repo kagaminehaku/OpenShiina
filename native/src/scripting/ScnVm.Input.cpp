@@ -171,6 +171,7 @@ void ScnVm::RegisterInput()
     // 0xBCE344): the host's point of the screen, in the window 0A00 sized (the same point until a
     // game sizes it)
     Register(0x0456, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.MouseRead(c);
         auto [sx, sy] = vm.m_host.MousePosition();
         auto [x, y] = vm.ScreenToClient(sx, sy);
         vm.EngineGlobals[0xBCE348] = x;
@@ -190,6 +191,7 @@ void ScnVm::RegisterInput()
     });
     // 0458 l, r: the left and right mouse buttons held, 1 or 0
     Register(0x0458, [](ScnVm& vm, ScnContext& c, const ScnInstruction& i) {
+        vm.MouseRead(c);
         int mouse = vm.m_host.Active() ? vm.m_host.MouseButtons() : 0;
         vm.Store(c, i.Args[0], mouse & 1);
         vm.Store(c, i.Args[1], (mouse >> 1) & 1);

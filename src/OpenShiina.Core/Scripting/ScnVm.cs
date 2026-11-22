@@ -755,6 +755,7 @@ public sealed partial class ScnVm : IDisposable
         PumpMessages();
         FrameShown = false;
         m_taskWaited = false;
+        m_mousePolledAgain = false;
         FrameRounds = 0;
         SleepRequested = 0;
         for (int round = 0; round < maxRounds && !QuitRequested; round++)
@@ -765,11 +766,40 @@ public sealed partial class ScnVm : IDisposable
             FireTimers();
             PumpMessages();
             // 2.34 shows its pictures as it goes and takes time only where a task waits (0028, 03BE,
-            // the mouse read again): a frame ends there, not at the first picture
-            if ((OldEngine ? m_taskWaited : FrameShown) && !m_textWentOn)
+            // the mouse read again): a frame ends there, not at the first picture. The later
+            // engines' frame ends at a picture, or where a task read the mouse again (MouseRead)
+            if ((OldEngine ? m_taskWaited : FrameShown || m_mousePolledAgain) && !m_textWentOn)
                 break;
         }
         return !QuitRequested;
+    }
+
+    // Where each task read the mouse (0456 / 0458) in this frame, and in which round
+    private readonly Dictionary<(int Slot, int Pc), long> m_mouseReads = new();
+    private int m_mouseReadsFrame;
+    private bool m_mousePolledAgain;
+
+    /// <summary>
+    /// A task read the mouse (0456, 0458). From 2.36 on, one that reads it again at the same place in
+    /// a later round of this frame is in a loop that waits for the user (Tsukutori's title: the
+    /// buttons' states, the mouse and seven 0034 a turn, nothing drawn while the pointer stands): the
+    /// frame ends after that round. The engine (REMPLUS.EXE 0x432710) pumps the window's messages and
+    /// sleeps its CPUSleepPM (1 ms unless the .INI or 004B says) after every round and at every 0034
+    /// (0x425B10), so such a loop goes round about once a millisecond with the CPU mostly asleep;
+    /// here the frame would run all its rounds (20,000, 0.1 s a frame on a PC, 1.8 s on the Switch).
+    /// </summary>
+    private void MouseRead(ScnContext c)
+    {
+        if (OldEngine)
+            return;
+        if (m_mouseReadsFrame != m_frameNumber)
+        {
+            m_mouseReads.Clear();
+            m_mouseReadsFrame = m_frameNumber;
+        }
+        if (m_mouseReads.TryGetValue((c.Slot, c.Current), out long round) && round != m_rounds)
+            m_mousePolledAgain = true;
+        m_mouseReads[(c.Slot, c.Current)] = m_rounds;
     }
 
     /// <summary>

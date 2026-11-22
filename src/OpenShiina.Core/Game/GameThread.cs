@@ -361,14 +361,9 @@ public sealed class GameThread : IDisposable
             var copy = changed.Union(m_backStale).Clip(Math.Min(m_vm.ScreenWidth, Width), Math.Min(m_vm.ScreenHeight, Height));
             var window = m_vm.Window;
             int stride = m_vm.ScreenWidth * 3;
-            // A pixel a store (BGR to BGRA with A = FF)
+            // BGR to BGRA with A = FF
             for (int y = copy.T; y < copy.B; y++)
-            {
-                var row = window.Slice(y * stride + copy.L * 3, copy.Width * 3);
-                var dst = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(m_back.AsSpan((y * Width + copy.L) * 4, copy.Width * 4));
-                for (int x = 0, s = 0; x < dst.Length; x++, s += 3)
-                    dst[x] = row[s] | (uint)row[s + 1] << 8 | (uint)row[s + 2] << 16 | 0xFF000000;
-            }
+                PixelRows.BgrToBgra(window.Slice(y * stride + copy.L * 3, copy.Width * 3), m_back.AsSpan((y * Width + copy.L) * 4, copy.Width * 4));
         }
         lock (m_frameLock)
         {
