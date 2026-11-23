@@ -101,7 +101,15 @@ is mostly for slow phones, and should follow what their perf.log shows.
   the ASF parsed): read its header only, the rest as it plays.
 - [ ] **Switch: Sorcery Jokers' first scenes** (4-12 frames a second: effects of 1920 x 1080
   stacked); scale32's first column with its last pixel on the GPU (db3caab) still to be checked
-  on the console with gpu-check.
+  on the console with gpu-check. Measured 2026-11-23 (sjslow, frames 1500-2160, handheld clocks:
+  CPU 1020, GPU 307, memory 1331 MHz): 54.7 ms a frame; scale32's SSE2 build 13.3 ms a call (its
+  shader 10.2: the whole screen from about 2,500 x 1,400, 660 calls the same bytes as the CPU's),
+  subpixel32 8.2 (shader 5.5), the CPU's cache flushed before a run 1.6-2.0, a run queued 0.26
+  and woken 0.04; 04C4 13.8 ms a frame, 00D2 7.0, 04E2 + 04C5 7.2, the picture copied 1.7, the
+  GPU's drawing 0.6. Tried on scale32sse_csh, both slower or no faster, not kept: the work
+  group's source pixels read once into shared memory as floats (29-39 ms a call), the bytes made
+  floats without I2F (11.3). What is slow in the shader is still to find (a bench of the routine
+  alone, below, would make each try seconds instead of two minutes).
 
 - [ ] iOS player on `OpenShiina.App`.
 - [ ] The games on Linux and macOS (compatibility.md, Platforms), and the flat memory's `mmap`
