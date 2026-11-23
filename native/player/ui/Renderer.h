@@ -20,7 +20,7 @@ namespace openshiina::player {
 /// The C# player's setting "Scaling" (Game/PictureScaling.cs), without Anime4K yet.
 enum class Scaling
 {
-    /// Whole game pixels as far as they fit, the rest bilinear: even and sharp (the default).
+    /// Whole game pixels as far as they fit, the rest bilinear: even and sharp (the C# player's default).
     Sharp,
     /// x2, x3... only (x1 when not even that fits): exact.
     WholeNumbers,
@@ -28,7 +28,8 @@ enum class Scaling
     Smooth,
     /// Nearest-neighbour to the screen's size: uneven at scales that are not whole numbers.
     Nearest,
-    /// AMD FidelityFX Super Resolution 1: edge-adaptive upscaling (EASU), then sharpening (RCAS).
+    /// AMD FidelityFX Super Resolution 1: edge-adaptive upscaling (EASU), then sharpening (RCAS);
+    /// the Switch player's default.
     Fsr,
 };
 

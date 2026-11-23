@@ -1,5 +1,5 @@
 // The Switch player's settings, of the C# player's (Game/PlayerSettings.cs) those it has:
-// sdmc:/OpenShiina/settings.json with the C# player's names and values ("Scaling": "Sharp",
+// sdmc:/OpenShiina/settings.json with the C# player's names and values ("Scaling": "Fsr",
 // "FsrSharpness": 8, "FileCache": "High", "ShowFrameRate": true, "Language": "vi"); the keys it does not know are kept as they are when it
 // writes the file. The file cache is High (256 MB) when the file does not say: the C# player's Auto
 // would give the Switch 96 MB, too little for the large pictures of the 1600 x 900 games. The
@@ -16,8 +16,10 @@ namespace openshiina::player {
 
 struct Settings
 {
-    /// How the game's picture is scaled to the screen (C# PictureScaling).
-    Scaling PictureScaling = Scaling::Sharp;
+    /// How the game's picture is scaled to the screen (C# PictureScaling). FSR 1 when the file does
+    /// not say (the C# player's default is Sharp): the GPU has the time for it (about 0.6 ms a frame
+    /// drawn, whatever the game), and most games are 800 x 600 or 1280 x 720 on a 1280 x 720 screen
+    Scaling PictureScaling = Scaling::Fsr;
     /// FSR's sharpening: 1 (mild) to 10 (AMD's strongest).
     int FsrSharpness = 8;
     /// The memory the archives' decoded files are kept in (C# FileCacheSize): an index of kFileCacheChoices.

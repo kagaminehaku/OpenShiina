@@ -49,7 +49,7 @@ There − does nothing in the list of games (there is no Homebrew Menu to go bac
 OpenShiina shows the games of `OpenShiina/Games` to pick from, each with its name and its icon
 (games copied to the console's own storage, DBI's "Nand USER", in `OpenShiina/Games` there, are
 listed too). A plays the chosen one, X opens the settings (how the picture is scaled: Sharp, Whole
-numbers, Smooth, Nearest or FSR 1, and FSR's sharpness; the theme: as the console's own, dark or
+numbers, Smooth, Nearest or FSR 1, FSR 1 until another is chosen, and FSR's sharpness; the theme: as the console's own, dark or
 light), Y looks at the game folders again, − goes
 back to hbmenu, + quits.
 
