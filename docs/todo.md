@@ -39,17 +39,6 @@ is mostly for slow phones, and should follow what their perf.log shows.
 - [ ] **Older phones (the S7)**: Re:Rem Plus's zoom, a scene change and a movie with perf.log on;
   ParallelRows' piece size and MaxParts were measured on a PC only. FSR and Anime4K there too.
 
-## Themes
-
-- [x] **A white theme and "as the system"** (asked 2026-11-21, done in 0.8.6.1): AppTheme.White, neutral, Graphite's
-  light counterpart, its contrast checked (WCAG AA): background #F4F4F6, surface #FFFFFF, surface
-  high #E6E6EB, border #C9C9D1, ink #1C1C21 (13.6-17:1), muted #5A5A66 (5.5-6.8:1), accent and
-  danger #C8102E (5.4:1; white on it 5.9:1), gold #D4A649 with #1C1C21 on it (7.6:1), gold as text
-  #7F5719 (5.2-6.4:1). AppTheme.System: White or Graphite as the platform's colour values say
-  (Application.PlatformSettings, again on ColorValuesChanged). The Switch player: its five colours
-  (main_switch.cpp kBackground, kPanel, kAccent, kText, kDim) a palette of a setting Dark / Light /
-  System (setsysGetColorSetId), the same White palette.
-
 ## Translations
 
 - [ ] A translated scene on a phone (tried on Windows only).
@@ -60,11 +49,6 @@ is mostly for slow phones, and should follow what their perf.log shows.
   names have to stay for the lookup, and the plates are pictures (below).
 - [ ] Texts the scripts build from parts or draw another way (Oreimo Plus's menus):
   `strings.txt` replaces only a text that is a whole original.
-- [x] **Pictures with Japanese text** (menus, buttons, titles): an S25 encoder, compressed, and
-  in the tools a frame replaced by a PNG / a picture's frames exported and imported back
-  (S25Encoder; Repack takes the frames' PNG files, docs/tools.md).
-  ([Niflheim](https://github.com/Yggdrasill-Moe/Niflheim/tree/master/RioShiina)'s S25_pack
-  writes the layout with every pixel uncompressed.)
 - [ ] **The games whose story is in SCN modules, not scenario TXT** (Cleavage, Reika, Puri-Puri,
   Death☆Meta, the Hana no Kioku releases, Nagagutsu wo Haita Deco and the others of
   compatibility.md's notes "SCN modules"): their lines are Shift-JIS strings in the modules' code

@@ -16,6 +16,7 @@
 // with the Switch's own Japanese font
 // (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
 #include <SDL.h>
+#include <arm_neon.h>
 #include <malloc.h>
 #include <switch.h>
 #include <sys/stat.h>
@@ -55,6 +56,7 @@
 #include "game/GameSetup.h"
 #include "platform/DibShapes.h"
 #include "platform/Files.h"
+#include "scripting/ParallelRows.h"
 #include "scripting/ScnAddressSpace.h"
 #include "scripting/ScnVm.h"
 #include "text/Text.h"
@@ -1213,20 +1215,37 @@ std::string PickGame(Ui& ui, bool internal)
 }
 
 /// The game's window picture (BGR rows) into an RGBA texture.
-void CopyPicture(const Bytes& window, int width, int height, player::Texture& t)
+/// The part of the window's picture (BGR) that changed into the texture (RGBA): 16 pixels a step
+/// with NEON, the rows shared with cores 1 and 2 when there are many (ParallelRows). Only what
+/// changed since the texture last took it: most frames change a few rows, or none at all.
+void CopyPicture(const Bytes& window, int width, int height, player::Texture& t, scripting::ScreenArea area)
 {
-    for (int y = 0; y < height; y++)
-    {
-        const uint8_t* src = window.data() + size_t(y) * size_t(width) * 3;
-        uint8_t* dst = t.Pixels + size_t(y) * t.Stride;
-        for (int x = 0; x < width; x++, src += 3, dst += 4)
+    area = area.Clip(width, height);
+    if (area.IsEmpty())
+        return;
+    int pixels = area.Width();
+    auto rows = [&](int first, int last) {
+        for (int y = area.T + first; y < area.T + last; y++)
         {
-            dst[0] = src[2];
-            dst[1] = src[1];
-            dst[2] = src[0];
-            dst[3] = 0xFF;
+            const uint8_t* src = window.data() + (size_t(y) * size_t(width) + size_t(area.L)) * 3;
+            uint8_t* dst = t.Pixels + size_t(y) * t.Stride + size_t(area.L) * 4;
+            int x = 0;
+            for (; x + 16 <= pixels; x += 16)
+            {
+                uint8x16x3_t bgr = vld3q_u8(src + x * 3);
+                uint8x16x4_t rgba = {{bgr.val[2], bgr.val[1], bgr.val[0], vdupq_n_u8(0xFF)}};
+                vst4q_u8(dst + x * 4, rgba);
+            }
+            for (; x < pixels; x++)
+            {
+                dst[x * 4] = src[x * 3 + 2];
+                dst[x * 4 + 1] = src[x * 3 + 1];
+                dst[x * 4 + 2] = src[x * 3];
+                dst[x * 4 + 3] = 0xFF;
+            }
         }
-    }
+    };
+    scripting::ParallelRows::For(area.Height(), int64_t(pixels) * area.Height(), rows);
 }
 
 /// The menu + opens while a game plays, over its picture (the game stands still meanwhile): back
@@ -1585,12 +1604,32 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
         spanStart = meterStart = lastFrame = armGetSystemTick();
         spanFrames = spanScripts = meterFrames = meterSlowest = 0;
     };
-    // The game's picture: each of the two textures takes it again when it is behind
+    // The game's picture: each of the two textures takes what changed since it last took it (all
+    // of it when it is new: its memory moved)
+    const scripting::ScreenArea wholePicture{0, 0, setup.Width, setup.Height};
+    struct PictureCopy { const uint8_t* Pixels = nullptr; scripting::ScreenArea Stale; };
+    std::vector<PictureCopy> pictureCopies;
+    auto pictureChanged = [&] {
+        if (!vm->ScreenInvalidated)
+            return;
+        vm->ScreenInvalidated = false;
+        pictureVersion++;
+        scripting::ScreenArea changed = vm->TakeChangedArea();
+        for (auto& copy : pictureCopies)
+            copy.Stale = copy.Stale.Union(changed);
+    };
     auto drawGame = [&] {
         player::Texture& picture = ui.Screen.PictureTexture(setup.Width, setup.Height);
         if (picture.Version != pictureVersion)
         {
-            CopyPicture(vm->Window(), setup.Width, setup.Height, picture);
+            auto copy = std::find_if(pictureCopies.begin(), pictureCopies.end(), [&](const PictureCopy& c) { return c.Pixels == picture.Pixels; });
+            if (copy == pictureCopies.end())
+                copy = pictureCopies.insert(pictureCopies.end(), {picture.Pixels, wholePicture});
+            uint64_t copyStart = armGetSystemTick();
+            CopyPicture(vm->Window(), setup.Width, setup.Height, picture, copy->Stale);
+            if (timing)
+                timed.CopyMs += double(armTicksToNs(armGetSystemTick() - copyStart)) / 1e6;
+            copy->Stale = {};
             picture.Version = pictureVersion;
         }
         ui.Screen.Picture(picture, place, scaling, s_settings.FsrSharpness);
@@ -1601,11 +1640,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
     uint64_t askedTicks = 0;
     host.AskPlayer = [&](const std::string& text, const std::string& caption, int type) {
         uint64_t start = armGetSystemTick();
-        if (vm->ScreenInvalidated)
-        {
-            vm->ScreenInvalidated = false;
-            pictureVersion++;
-        }
+        pictureChanged();
         int answer = MessageDialog(ui, drawGame, Text::Cp932ToUtf8(text), Text::Cp932ToUtf8(caption), type);
         asked = true;
         askedTicks += armGetSystemTick() - start;
@@ -1773,12 +1808,9 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             spanFrames++;
             if (timing && int64_t(frames) > test->TimesTo)
                 endTiming();
-            if (vm->ScreenInvalidated)
-            {
-                vm->ScreenInvalidated = false;
-                pictureVersion++;
-            }
+            pictureChanged();
 
+            uint64_t drawStart = armGetSystemTick();
             ui.Screen.Begin(0xFF000000);
             drawGame();
             if (armGetSystemTick() < pointerShownUntil)
@@ -1795,6 +1827,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
                 ui.Text.Draw(meterText, 18, 13, 20, Rgb(255, 255, 255));
             }
             ui.Screen.End();
+            if (timing)
+                timed.DrawMs += double(armTicksToNs(armGetSystemTick() - drawStart)) / 1e6;
 
             uint64_t now = armGetSystemTick();
             meterSlowest = std::max(meterSlowest, now - lastFrame);

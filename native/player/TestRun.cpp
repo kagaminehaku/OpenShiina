@@ -185,6 +185,8 @@ std::vector<std::string> TestRun::Report(const Times& times) const
     std::vector<std::string> lines;
     lines.push_back(std::format("[times] frames {}-{} ({} run): scripts {:.1f} ms, {:.2f} ms a frame", TimesFrom, TimesTo, times.Frames, times.ScriptsMs,
                                 times.Frames > 0 ? times.ScriptsMs / times.Frames : 0.0));
+    lines.push_back(std::format("[times] picture copied {:.1f} ms ({:.3f} a frame), frame drawn {:.1f} ms ({:.3f} a frame)", times.CopyMs,
+                                times.Frames > 0 ? times.CopyMs / times.Frames : 0.0, times.DrawMs, times.Frames > 0 ? times.DrawMs / times.Frames : 0.0));
     std::vector<std::pair<std::string, scripting::ScnVm::RoutineTime>> routines(times.Routines.begin(), times.Routines.end());
     std::sort(routines.begin(), routines.end(), [](const auto& a, const auto& b) { return a.second.Milliseconds > b.second.Milliseconds; });
     for (size_t k = 0; k < routines.size() && k < 20; k++)

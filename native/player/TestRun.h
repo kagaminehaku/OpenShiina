@@ -65,6 +65,9 @@ public:
         std::unordered_map<std::string, scripting::ScnVm::RoutineTime> Routines;
         std::unordered_map<int, scripting::ScnVm::RoutineTime> Ops;
         double ScriptsMs = 0;
+        // the game's picture copied into its texture (CopyPicture), and the frame drawn (from
+        // Begin to End: the picture, the pointer, the meter, the frame given to the GPU)
+        double CopyMs = 0, DrawMs = 0;
         int Frames = 0;
     };
     /// The lines the log tells them in ("[times] ...").
