@@ -4,7 +4,7 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
-## Unreleased
+## 0.8.7 (2026-11-24)
 
 - **Chou Saiminjutsu Gakuen's web trial plays through** (164 games, 166 releases): its opening
   movie no longer stays black. v2.49 games repaint the window where they copy into the screen,
