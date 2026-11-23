@@ -464,9 +464,10 @@ public:
     {
         return Scale32(dst, dstPitch, dl, dt, dr, db, src, srcPitch, sl, st, sr, sb, 0, 0, false);
     }
-    /// Scale32 with its tables written to the work buffers (when given) and Can Fes!'s quirk (lastAlways).
+    /// Scale32 with its tables written to the work buffers (when given), Can Fes!'s quirk (lastAlways)
+    /// and Oshikake! Entremets' (carryShared).
     bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb, int columnTable,
-                 int rowTable, bool lastAlways);
+                 int rowTable, bool lastAlways, bool carryShared = false);
     /// The number of Scale32 table entries of an axis from its destination start and end.
     static int ScaleEntryCount(int start, int end);
     /// Bitch Nee-chan START C7C70: Scale32's SSE2 build (single floats).

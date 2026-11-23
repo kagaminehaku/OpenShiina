@@ -6,8 +6,9 @@ using OpenShiina.Scripting;
 // The x86 routines embedded in a game's SCN modules, for giving each its C# version
 // (ScnVm.NativeKernels.cs: a C# routine is found by the signature of the code).
 //
-// ScnTools routines <game folder> [--like <game folder>...]: every routine the scripts call (the
-// targets of 0276), with its signature and the C# routine registered for it. With --like, each
+// ScnTools routines <game folder>... [--like <game folder>...]: every routine the scripts call (the
+// targets of 0276), with its signature and the C# routine registered for it (by its signature, or
+// found by its bytes: the xor streams). With --like, each
 // routine without one is matched against those of other games by its shape (its instructions
 // with numbers left out: offsets of a build's data, PIC adjustments): the same shape as a routine
 // that has a C# version is most often that routine with its buffers elsewhere, and its signature
@@ -20,19 +21,33 @@ static class Routines
 
     public static int RunAll(string[] args)
     {
-        if (args.Length < 1 || args.Length > 1 && args[1] != "--like")
+        int like = Array.IndexOf(args, "--like");
+        var games = like < 0 ? args : args[..like];
+        if (games.Length < 1)
         {
-            Console.WriteLine("usage: ScnTools routines <game folder> [--like <game folder>...]");
+            Console.WriteLine("usage: ScnTools routines <game folder>... [--like <game folder>...]");
             return 1;
         }
-        var mine = Collect(args[0]);
-        if (mine == null)
-            return 3;
         var known = new List<Found>();
-        foreach (var other in args.Skip(2))
+        foreach (var other in like < 0 ? [] : args[(like + 1)..])
             known.AddRange(Collect(other, quiet: true) ?? []);
         var byShape = known.Where(k => k.Native != null).GroupBy(k => string.Join("\n", k.Shape)).ToDictionary(g => g.Key, g => g.First());
+        int result = 0;
+        foreach (var game in games)
+        {
+            if (games.Length > 1)
+                Console.WriteLine($"== {game}");
+            int one = RunGame(game, known, byShape);
+            result = Math.Max(result, one);
+        }
+        return result;
+    }
 
+    static int RunGame(string folder, List<Found> known, Dictionary<string, Found> byShape)
+    {
+        var mine = Collect(folder);
+        if (mine == null)
+            return 3;
         int without = 0;
         foreach (var r in mine)
         {
@@ -80,37 +95,61 @@ static class Routines
         if (other == null)
             return 3;
         Console.WriteLine($"{one.Module} {one.Offset:X5} ({one.Code.Code.Count} instr, {one.Native ?? "no C#"}) against {other.Game} {other.Module} {other.Offset:X5} ({other.Code.Code.Count} instr, {other.Native ?? "no C#"})");
-        // Compared with their numbers (a constant of the C# version may be one of them), branch
-        // targets taken from each routine's entry
+        // Lined up by their shapes (a longest common subsequence: a build may have instructions the
+        // other has not), then compared with their numbers (a constant of the C# version may be
+        // one of them)
         var a = Listing(one, labels: false);
         var b = Listing(other, labels: false);
         int differ = 0, shape = 0;
-        for (int k = 0; k < Math.Max(a.Count, b.Count); k++)
+        foreach (var (x, y) in LineUp(a, b))
         {
-            string x = k < a.Count ? a[k] : "", y = k < b.Count ? b[k] : "";
-            if (Relative(x, one.Offset) == Relative(y, other.Offset))
+            if (x != null && y != null && Relative(x) == Relative(y))
                 continue;
             differ++;
-            if (Strip(x) != Strip(y))
+            if (x == null || y == null)
                 shape++;
-            if (differ <= 60)
-                Console.WriteLine($"  {x}\n    other: {y}");
+            if (differ <= 400)
+                Console.WriteLine($"  {x ?? "(none)"}\n    other: {y ?? "(none)"}");
         }
         Console.WriteLine(differ == 0 ? "The same instructions." : $"{differ} instructions differ ({shape} of them in more than their numbers).");
         return 0;
     }
 
-    /// <summary>An instruction of a listing without its address, branch targets from the routine's entry.</summary>
-    static string Relative(string line, int entry) =>
-        Regex.Replace(Regex.Replace(line, @"^\s*[0-9A-F]{5,8}\s+", ""), @"L_([0-9A-F]+)", m => $"L+{Convert.ToInt32(m.Groups[1].Value, 16) - entry:X}");
+    /// <summary>Two listings lined up by the longest common subsequence of their shapes; null where one has no instruction.</summary>
+    static List<(string? A, string? B)> LineUp(List<string> a, List<string> b)
+    {
+        var sa = a.Select(Strip).ToArray();
+        var sb = b.Select(Strip).ToArray();
+        var length = new int[sa.Length + 1, sb.Length + 1];
+        for (int i = sa.Length - 1; i >= 0; i--)
+            for (int j = sb.Length - 1; j >= 0; j--)
+                length[i, j] = sa[i] == sb[j] ? length[i + 1, j + 1] + 1 : Math.Max(length[i + 1, j], length[i, j + 1]);
+        var pairs = new List<(string?, string?)>();
+        int p = 0, q = 0;
+        while (p < sa.Length || q < sb.Length)
+        {
+            if (p < sa.Length && q < sb.Length && sa[p] == sb[q])
+                pairs.Add((a[p++], b[q++]));
+            else if (q == sb.Length || p < sa.Length && length[p + 1, q] >= length[p, q + 1])
+                pairs.Add((a[p++], null));
+            else
+                pairs.Add((null, b[q++]));
+        }
+        return pairs;
+    }
+
+    /// <summary>An instruction of a listing without its address and branch target (padding moves those).</summary>
+    static string Relative(string line) =>
+        Regex.Replace(Regex.Replace(line, @"^\s*[0-9A-F]{5,8}\s+", ""), @"L_([0-9A-F]+)", "L");
 
     /// <summary>
     /// ScnTools routinecheck <game folder> <module> <hex offset> <l[] spec> [cases]: the routine's
     /// C# version against its x86 code on random input, for a routine no game run reaches (a
     /// sweep skips menus and saves). The spec gives each l[i], comma-separated: "b65536" a buffer
     /// of so many random bytes ("b4096:8140": of the bytes 81 and 40 only, for a routine that looks
-    /// for some), "300" a number, "3840-7680" a random number in that range, "_" 0.
-    /// Every buffer and l[] after the C# version must be byte for byte what the x86 code left.
+    /// for some), "w8192" a work buffer (random bytes, not compared: a routine's scratch space),
+    /// "300" a number, "3840-7680" a random number in that range, "_" 0.
+    /// Every other buffer and l[] after the C# version must be byte for byte what the x86 code left.
     /// After a ';', the same for f[] (slot 0), for a routine that takes its arguments from there
     /// (Ao no Juuai's and Ran→Sem's thumbnails: f[0] the picture, f[1] the thumbnail).
     /// </summary>
@@ -131,7 +170,7 @@ static class Routines
         var vm = NewVm(game.EngineVersion.Length > 0 ? game.EngineVersion : "2.49", game.Scheme.Name);
         int target = vm.AllocateCopy(WarcOpener.OpenEntry(found.Value.Warc, found.Value.Entry)) + Convert.ToInt32(args[2], 16);
         string signature = vm.NativeSignature(target);
-        if (vm.NativeName(signature) is not { } name)
+        if (vm.NativeNameAt(target) is not { } name)
         {
             Console.WriteLine($"{args[1]} {args[2]}: {signature} has no C# version");
             return 2;
@@ -144,11 +183,12 @@ static class Routines
         var random = new Random(1);
         // The buffers, and l[] (14 dwords, past it what a routine may read beyond)
         static int Size(string s) => int.Parse(s[1..].Split(':')[0]);
-        var buffers = spec.Select(s => s.StartsWith('b') ? vm.Allocate(Size(s)) : 0).ToArray();
+        static bool IsBuffer(string s) => s.StartsWith('b') || s.StartsWith('w');
+        var buffers = spec.Select(s => IsBuffer(s) ? vm.Allocate(Size(s)) : 0).ToArray();
         var alphabets = spec.Select(s => s.StartsWith('b') && s.Contains(':') ? Convert.FromHexString(s.Split(':')[1]) : null).ToArray();
         int stack = vm.Allocate(64 * 4);
-        var regions = buffers.Select((b, i) => (Address: b, Length: b == 0 ? 0 : Size(spec[i]), Alphabet: alphabets[i]))
-                             .Where(r => r.Address != 0).Append((Address: stack, Length: 64 * 4, Alphabet: null)).ToArray();
+        var regions = buffers.Select((b, i) => (Address: b, Length: b == 0 ? 0 : Size(spec[i]), Alphabet: alphabets[i], Compare: !spec[i].StartsWith('w')))
+                             .Where(r => r.Address != 0).Append((Address: stack, Length: 64 * 4, Alphabet: null, Compare: true)).ToArray();
         for (int n = 0; n < cases; n++)
         {
             for (int i = 0; i < spec.Length; i++)
@@ -157,13 +197,13 @@ static class Routines
                 int value = s switch
                 {
                     "_" => 0,
-                    _ when s.StartsWith('b') => buffers[i],
+                    _ when IsBuffer(s) => buffers[i],
                     _ when s.IndexOf('-', 1) is > 0 and int dash => random.Next(int.Parse(s[..dash]), int.Parse(s[(dash + 1)..]) + 1),
                     _ => int.Parse(s),
                 };
                 vm.Write32(i < lCount ? stack + 4 * i : vm.FAddress(0, i - lCount), value);
             }
-            foreach (var (address, length, alphabet) in regions.SkipLast(1))
+            foreach (var (address, length, alphabet, _) in regions.SkipLast(1))
             {
                 var bytes = new byte[length];
                 random.NextBytes(bytes);
@@ -180,6 +220,8 @@ static class Routines
             vm.RunRoutine(target, stack, x86: false);
             for (int r = 0; r < regions.Length; r++)
             {
+                if (!regions[r].Compare)
+                    continue;
                 var actual = vm.ReadBytes(regions[r].Address, regions[r].Length);
                 int at = actual.AsSpan().CommonPrefixLength(expected[r]);
                 if (at < actual.Length)
@@ -188,6 +230,8 @@ static class Routines
                     string where = r == regions.Length - 1 ? $"l[] + {at:X}"
                         : owner < lCount ? $"buffer of l[{owner}] + {at:X}" : $"buffer of f[{owner - lCount}] + {at:X}";
                     Console.WriteLine($"case {n}: C# {name} differs from the x86 code at {where} ({actual[at]:X2} instead of {expected[r][at]:X2})");
+                    Console.WriteLine("  l[] = " + string.Join(", ", Enumerable.Range(0, lCount).Select(i =>
+                        IsBuffer(spec[i]) ? "buffer" : BitConverter.ToInt32(before[^1], 4 * i).ToString())));
                     return 2;
                 }
             }
@@ -253,8 +297,8 @@ static class Routines
     static Found Make(string game, string module, int offset, ScnVm vm, int moduleAddress)
     {
         var code = new X86Routine(vm, (uint)(moduleAddress + offset));
-        var shape = code.Code.Values.Select(i => Strip(Format(i))).ToArray();
-        return new Found(game, module, offset, code, vm.NativeName(code.Signature), shape);
+        var shape = code.Code.Values.Where(i => !Padding(i)).Select(i => Strip(Format(i))).ToArray();
+        return new Found(game, module, offset, code, vm.NativeNameAt(moduleAddress + offset), shape);
     }
 
     static ScnVm NewVm(string version, string? game = null) => new(ScnOpcodes.ForVersion(version, game), new ToolHost()) { JitInBackground = false, JitX86 = false };
@@ -271,7 +315,17 @@ static class Routines
     /// <summary>An instruction without its numbers (offsets, displacements, immediates, targets).</summary>
     static string Strip(string text) => Regex.Replace(Regex.Replace(text, @"^\s*(L_[0-9A-F]+:)?\s*([0-9A-F]{5,8}\s+)?", ""), @"0x[0-9A-F]+|\b[0-9A-F]{5,8}\b|L_[0-9A-F]+", "#");
 
-    /// <summary>The routine's instructions, branch targets as module offsets (L_xxxxx).</summary>
+    /// <summary>
+    /// An instruction that only pads code to a block's alignment (nop, lea esp,[esp], mov edi,edi):
+    /// builds of a routine differ in it, so shapes and comparisons leave it out.
+    /// </summary>
+    static bool Padding(Instruction ins) =>
+        ins.Mnemonic == Mnemonic.Nop
+        || ins.Mnemonic == Mnemonic.Lea && ins.Op1Kind == OpKind.Memory && ins.MemoryBase == ins.Op0Register
+           && ins.MemoryIndex == Register.None && ins.MemoryDisplacement32 == 0
+        || ins.Mnemonic == Mnemonic.Mov && ins.Op0Kind == OpKind.Register && ins.Op1Kind == OpKind.Register && ins.Op0Register == ins.Op1Register;
+
+    /// <summary>The routine's instructions, branch targets as module offsets (L_xxxxx); without labels (for comparing), no padding.</summary>
     static List<string> Listing(Found r, bool labels = true)
     {
         uint module = r.Code.Entry - (uint)r.Offset;
@@ -279,6 +333,8 @@ static class Routines
         uint previous = 0;
         foreach (var (ip, ins) in r.Code.Code)
         {
+            if (!labels && Padding(ins))
+                continue;
             if (labels && previous != 0 && ip != previous)
                 lines.Add("        ...");
             string text = Format(ins);

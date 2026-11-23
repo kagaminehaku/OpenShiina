@@ -47,6 +47,9 @@ public sealed partial class ScnVm
     /// <summary>The name of the C# version registered for a signature, or null.</summary>
     public string? NativeName(string signature) => m_natives.TryGetValue(signature, out var native) ? native.Name : null;
 
+    /// <summary>The name of the C# version the routine at an address runs as: by its signature or by its bytes (NativeByPattern), or null.</summary>
+    public string? NativeNameAt(int address) => RoutineAt(address).Native?.Name;
+
     /// <summary>
     /// Runs the routine at <paramref name="target"/> with its l[] at <paramref name="stack"/>: its C#
     /// version (false when it has none) or, with <paramref name="x86"/>, its x86 code on the

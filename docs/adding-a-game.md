@@ -103,7 +103,8 @@ numbers):
   at the first byte the C# version writes otherwise (`=1`: every C# routine; large zooms take
   long on the interpreter). A routine neither the start nor the sweep reaches (menus, saves) is
   checked on its own: `ScnTools routinecheck <game> <module> <offset> <l[] spec>` runs both on
-  random input (the spec gives each l[i]: `b<bytes>` a buffer, `300` a number, `396-7680` a
+  random input (the spec gives each l[i]: `b<bytes>` a buffer, `w<bytes>` a work buffer not
+  compared (scale32's tables), `300` a number, `396-7680` a
   random one, `_` 0; Chiccha's block: `b29700,b576000,396-7680`; after a `;` the same for f[],
   for a routine that takes its arguments from there: `_;b1440000,b22500`). A routine that
   pushes one more dword before it reads its arguments takes them from l[], not f[]: a check

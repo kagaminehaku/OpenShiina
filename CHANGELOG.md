@@ -18,6 +18,14 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
   (Re:Rem Plus's title) is compared row by row and only the bytes that moved go on to the window,
   and the pixels are converted four at a time (SSE / NEON). Re:Rem Plus's title in a 1280 x 720
   window with the CPU renderer: 8.7% of a core before, 7.5% now (the original executable: 22-45%).
+- **Oshikake! Entremets' zooms run as native code**: its three picture routines (moving by
+  sixteenths of a pixel, scaling down, blending two pictures) had no C# or C++ version and ran as
+  translated x86 code; each now gives the same bytes as the x86 code. So do ADVLOVE's dissolve
+  (`grid24`) and ID's opening movie frames (`palette8 2x`, 400 x 300 to 800 x 600).
+- ScnTools: `routines` counts the routines found by their bytes (the XOR streams) as having a C#
+  version, takes several games at once and leaves padding out of the shapes; `routine --like`
+  lines the two routines up (one may have instructions the other lacks); `routinecheck` takes
+  work buffers (`w8192`, not compared) and prints the arguments of a case that differs.
 
 ## 0.8.6.1 (2026-11-21)
 

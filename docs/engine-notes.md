@@ -1696,6 +1696,15 @@ the functions they call from the decompile. First findings:
   (which now checks every place a routine writes). Left to the x86 code: the SSE2 build of the
   zoom (Oreimo 79A20, Sena 79E70, Re: Rem Plus 8BDE0), which START takes only when the CPU
   check gives SSE2 (b[77]); the interpreter's CPU has none, so it never runs.
+- 2026-11-23: Oshikake! Entremets' zoom routines (subpixel32 67478 and blend32 6A252, known code
+  in other places; scale32 69420, Can Fes!'s without the loop for a first column of 0x80: its
+  rows take that column's shared pixel from mm2 / mm4 as earlier rows left them, ScnVm.Scale32.cs);
+  ADVLOVE's grid24 (07730 of START and its 18 other modules: a dissolve copying BGR pixels on a
+  grid, l[5] pixels and l[6] rows apart); ID's palette8 2x (OPENING.SCN 00B80: its opening's
+  400 x 300 frames of 8-bit indexes to 800 x 600 BGR, each pixel 2 x 2, the colours times l[2] /
+  256; six shifted copies of the colours kept in its own module at +0xD70, which the C# version
+  writes too). Each the same bytes as its x86 code (routinecheck; ID and ADVLOVE also in play
+  with SCNBOOT_VERIFY_NATIVE, Entremets' subpixel32 in OA_001A.TXT).
 - The SSE2 games (2026-10-11; Bitch Nee-chan and Bitch Gakuen: their START will not run
   without SSE2, so their zoom and blur run their SSE2 builds). Their scale32 (START C7C70 /
   CA1E0, one signature) took 700 ms a call translated, and the scripts call it every frame for

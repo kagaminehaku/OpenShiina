@@ -26,6 +26,14 @@
 // does not hold then: whatever the work buffer had there (a pair of dwords, one for channels 0
 // and 2, one for 1 and 3). This build writes its tables into the work buffers as the x86 code
 // does and reads that pair after (lastAlways).
+//
+// Oshikake! Entremets START 69420 is Can Fes!'s code without its copy of the general loop for a
+// first column of 0x80 (no 0x20; Oreimo 0x78FB0): such rows take the general loop from their
+// first pixel, so that pixel's shared first column comes from mm2 (the partly covered first
+// source row) and mm4 (the last one) as earlier rows left them (carryShared): at the start the
+// whole-row and whole-column weight pairs; after a row of the general loop the last source
+// pixel it read there (unpacked to words); after a row of the 0xC0 loops the last pixel of its
+// last source row times its weight (mm2) and that weight (mm4).
 
 namespace OpenShiina.Scripting;
 
@@ -203,10 +211,11 @@ public sealed partial class ScnVm
     /// <summary>
     /// Scale32, with the tables also written to <paramref name="columnTable"/> and
     /// <paramref name="rowTable"/> (the scripts' work buffers) when they are given, and
-    /// <paramref name="lastAlways"/> for Can Fes!'s build (see the top of the file).
+    /// <paramref name="lastAlways"/> for Can Fes!'s build, with <paramref name="carryShared"/> for
+    /// Oshikake! Entremets' (see the top of the file).
     /// </summary>
     public bool Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb,
-                        int columnTable, int rowTable, bool lastAlways)
+                        int columnTable, int rowTable, bool lastAlways, bool carryShared = false)
     {
         uint dw = (uint)(dr - dl), dh = (uint)(db - dt), sw = (uint)(sr - sl), sh = (uint)(sb - st);
         if (dw == 0 || dh == 0 || sw == 0 || sh == 0)
@@ -271,8 +280,11 @@ public sealed partial class ScnVm
             rowY[r + 1] = rowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
         // (the work is the source's pixels as much as the destination's: a save's thumbnail of a
         // whole screen, few pixels made from many, went to the CPU at 23-41 ms on the Switch)
+        // Entremets' build: the first column's shared source pixel from the registers (see the top)
+        var carried = carryShared && nc > 0 && (cols[0].Flags & 0xA0) == 0x80
+            ? CarriedShared(rows, rowY, cols, colFrom, colB, srcX, srcPitch, fullRow, fullCol, lastAlways) : null;
         var timing = ChooseGpu("scale32", Math.Max((long)nr * nc, (long)width * rowY[nr]));
-        if (timing.Gpu && firstLast == null)
+        if (timing.Gpu && firstLast == null && carried == null)
         {
             if (ScaleOnGpu(Accelerator!, 0, rows, rowY, cols, colFrom, width, srcX, srcPitch, dstRow, dstPitch, fullRow, fullCol))
             {
@@ -322,12 +334,13 @@ public sealed partial class ScnVm
                 Array.Clear(accLo);
                 Array.Clear(accHi);
                 Array.Clear(clear);
+                (ScaleWords First, ScaleWords Last)? shared = ownLoop || carried == null ? null : carried[r];
                 if (hasFirst)
-                    first.AddTo(e.First, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop, extra);
+                    first.AddTo(e.First, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop, extra, shared?.First);
                 if (e.Count > 0)
-                    whole.AddTo(fullRow, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: false, extra);
+                    whole.AddTo(fullRow, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: false, extra, null);
                 if (hasLast)
-                    last.AddTo(e.Last, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop, extra);
+                    last.AddTo(e.Last, fullCol, colWx, colShape, accLo, accHi, clear, skipShared: !ownLoop, extra, shared?.Last);
                 var output = Bytes(dstRow + r * dstPitch, nc * 4);
                 for (int c = 0; c < nc; c++)
                 {
@@ -343,6 +356,69 @@ public sealed partial class ScnVm
         ParallelRows.For(nr, (long)nr * nc, RunRows);
         GpuDone("scale32", timing);
         return true;
+    }
+
+    /// <summary>Four 16-bit words as the two lane pairs of ScaleRow (words 0 and 2, words 1 and 3).</summary>
+    private readonly record struct ScaleWords(ulong Lo, ulong Hi)
+    {
+        public static ScaleWords Pair(uint dword) =>
+            new((dword & 0xFFFF) * 0x100000001UL, (dword >> 16) * 0x100000001UL);
+
+        public static ScaleWords Pixel(ReadOnlySpan<byte> p, uint w = 1) =>
+            new((p[0] * w & 0xFFFF) | (ulong)(p[2] * w & 0xFFFF) << 32, (p[1] * w & 0xFFFF) | (ulong)(p[3] * w & 0xFFFF) << 32);
+    }
+
+    /// <summary>
+    /// mm2 and mm4 as each row of Entremets' build finds them (the registers its general loop takes
+    /// the first column's shared source pixel from), worked out row by row (see the top of the file).
+    /// </summary>
+    private (ScaleWords First, ScaleWords Last)[] CarriedShared(List<ScaleEntry> rows, int[] rowY, List<ScaleEntry> cols, int[] colFrom,
+                                                               int[] colB, int srcX, int srcPitch, uint fullRow, uint fullCol, bool lastAlways)
+    {
+        var carried = new (ScaleWords, ScaleWords)[rows.Count];
+        ScaleWords mm2 = ScaleWords.Pair(fullRow), mm4 = ScaleWords.Pair(fullCol);
+        ReadOnlySpan<byte> PixelAt(int row, int x) => Bytes(srcX + row * srcPitch + x * 4, 4);
+        for (int r = 0; r < rows.Count; r++)
+        {
+            carried[r] = (mm2, mm4);
+            var e = rows[r];
+            int p = rowY[r];
+            if (e.Flags == 0xC0 && e.Count <= 1)
+            {
+                // the 0xC0 loops: the last pixel of the last source row times its weight, and that weight
+                for (int c = cols.Count - 1; c >= 0; c--)
+                {
+                    var col = cols[c];
+                    int x;
+                    uint w;
+                    if ((col.Flags & 0x40) != 0)
+                        (x, w) = (colB[c], ScaleWeight(col.Last, e.Last));
+                    else if (col.Count > 0)
+                        (x, w) = (colB[c] - 1, ScaleWeight(fullCol, e.Last));
+                    else if ((col.Flags & 0x80) != 0)
+                        (x, w) = (colFrom[c], ScaleWeight(col.First, e.Last));
+                    else
+                        continue;
+                    mm2 = ScaleWords.Pixel(PixelAt(p + 1 + e.Count, x), w);
+                    mm4 = ScaleWords.Pair(w * 0x10001);
+                    break;
+                }
+                continue;
+            }
+            // the general loop: the last source pixel it read past a column's whole ones (the
+            // first column's copy of 0x20 always reads one)
+            for (int c = cols.Count - 1; c >= 0; c--)
+            {
+                if ((cols[c].Flags & 0x40) == 0 && !(c == 0 && lastAlways && (cols[0].Flags & 0x20) != 0))
+                    continue;
+                if ((e.Flags & 0x80) != 0)
+                    mm2 = ScaleWords.Pixel(PixelAt(p, colB[c]));
+                if ((e.Flags & 0x40) != 0)
+                    mm4 = ScaleWords.Pixel(PixelAt(p + ((e.Flags & 0x80) != 0 ? 1 : 0) + e.Count, colB[c]));
+                break;
+            }
+        }
+        return carried;
     }
 
     /// <summary>
@@ -452,9 +528,11 @@ public sealed partial class ScnVm
         /// opaque. With skipShared the shared first column of every column but the first is left
         /// out of the count (the general loop's register copy). With firstLast the first column
         /// also gets its last source pixel with those weights (Can Fes!'s build, without 0x40).
+        /// With shared0 the first column's shared first pixel is those words instead, left out
+        /// of the count (Entremets' build: a register as an earlier row left it).
         /// </summary>
         public void AddTo(uint wy, uint fullCol, uint[] colWx, int[] shape, ulong[] accLo, ulong[] accHi, int[] clear, bool skipShared,
-                          (uint Lo, uint Hi)? firstLast)
+                          (uint Lo, uint Hi)? firstLast, ScaleWords? shared0)
         {
             ulong[] lo = m_lo, hi = m_hi;
             int[] cl = m_clear;
@@ -467,10 +545,18 @@ public sealed partial class ScnVm
                 if ((flags & 0x80) != 0)
                 {
                     uint w = ScaleWeight(colWx[2 * c], wy);
-                    l += (lo[f + 1] - lo[f]) * w;
-                    h += (hi[f + 1] - hi[f]) * w;
-                    if (!(skipShared && c > 0))
-                        nonOpaque += cl[f + 1] - cl[f];
+                    if (c == 0 && shared0 is { } s)
+                    {
+                        l += s.Lo * w;
+                        h += s.Hi * w;
+                    }
+                    else
+                    {
+                        l += (lo[f + 1] - lo[f]) * w;
+                        h += (hi[f + 1] - hi[f]) * w;
+                        if (!(skipShared && c > 0))
+                            nonOpaque += cl[f + 1] - cl[f];
+                    }
                 }
                 if (b > a)
                 {

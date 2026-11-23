@@ -71,9 +71,16 @@ is mostly for slow phones, and should follow what their perf.log shows.
   compatibility.md, "No keys yet"), once their files are found. From Niflheim's WARC_unpack.c:
   the DecodeBin (0x2000 bytes) is read by the code near the constant 0x40000000; v2.50's Extra
   picture is unpacked at run time (follow `push 202` through GetProcAddress).
-- [ ] Native versions of Entremets' own routines (START 67478 637AD9C1, 897 instructions; 69420
-  4A0DB321, 1,044; 6A252 90834B46, 222), which no sweep ran and no other game's resemble
-  (`ScnTools routines --like`, `routinecheck`).
+- [ ] **Routines still without C#** (`ScnTools routines <games> --like <every game>`, 2026-11-23;
+  the xor streams found by their bytes are not among them). The same shape as a C# version, its
+  numbers to check with `routine --like` and `routinecheck`: thumbnails of Stellula Eques 2E006,
+  Tsui☆Teru 2CB9A, Toriko no Chigiri 77D0F, Majikan 1 7A8BF and 2 7EB0F,
+  Mekyou Choukyou 70C7F, Baby BE 1BF35 and ID 21674 (1 instruction from Kateinai Choukyou's);
+  blocks of Stellula Eques 2E373, Tsui☆Teru 2CE93, You∽Gaku 73740, Draculius 2D4C3; rows of
+  Toriko no Chigiri 77FA3 and Mekyou Choukyou 70F13 (Bloody Rondo's 244 x 183), Foster's HK456
+  09DB8 (HK7, STAGE, Shikaeshi: rows600); the rule wipe of EDEN IV 053B8 (EDEN V, FINAL, SPN1,
+  SPN3); copy32 of Niwaka Ane 5E03F; enlarge16 of Najimi no Oba-chan 9A243. Love Revo's scan did
+  not end.
 - [ ] **Known builds**: a game's build told by the SHA-256 (and size) of its .exe, for the
   scheme and keys (Re:Rem Plus's re-release has another DecodeBin date under the same .exe name),
   `03C2`'s value, and in the library whether that build was played through; and START.SCN's

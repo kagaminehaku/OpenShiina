@@ -860,6 +860,10 @@ Saiminjutsu Gakuen and Saimin Paradise!. What they needed:
   bits, shift32, enlarge32, CPUID in its "add eax" form) of Entremets, Helter Skelter, Mahou Shoujo,
   Tenki Ane, Ryoumaden, Sensei! Shite Ageru, Intruder, Kinpatsu Tarou and Onegan!, each the same
   bytes as its x86 code on random cases (ScnTools routinecheck); and Yakata Jukujo's lone `ret 4`.
+  Entremets' zoom routines since 2026-11-23: its subpixel32 (Oreimo's with its arguments copied to
+  its stack frame) and blend32 (Saimin Seikatsu's, other padding), and a scale32 of its own: Can
+  Fes!'s without the loop for a first column of 0x80, whose rows then take that column's shared
+  pixel from registers earlier rows left (ScnVm.Scale32.cs; 1,800 random cases the same bytes).
 - Engage Links (v2.45) asks for frame 401 of a picture whose entry 401 is empty, a few frames into
   31 of its scenarios: up to 2.45 `04C8` / `04CB` take a missing frame as no error (it was below
   2.40 only).

@@ -718,6 +718,90 @@ void ScnVm::RegisterNativeRoutines()
     RegisterNative("C49F893EBD8503C88B65BBE87E5BCC02D480EEB5", "sepia (third pixel of 8 off)",
                    [sepia](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { sepia(vm, c, a, true); });
 
+    // ADVLOVE START 07730 (the same in all its 19 modules): BGR pixels of a grid copied from l[2] to
+    // l[1] at the same places, each 3 bytes, for a dissolve that fills a picture in a dot at a time:
+    // l[7] across, l[5] pixels apart, l[8] down, l[6] rows apart, from x l[3], y l[4], rows l[9]
+    // pixels wide (the products as the x86 code's 32-bit mul)
+    RegisterNative("3C9B3E8E7988F44096B2457F84A86AFF262E6292", "grid24", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
+        uint32_t width = uint32_t(vm.NativeArg(a, 9));
+        uint32_t start = (uint32_t(vm.NativeArg(a, 4)) * width + uint32_t(vm.NativeArg(a, 3))) * 3;
+        uint32_t across = uint32_t(vm.NativeArg(a, 7)), down = uint32_t(vm.NativeArg(a, 8));
+        uint32_t step = 3 * uint32_t(vm.NativeArg(a, 5)), rowStep = 3 * uint32_t(vm.NativeArg(a, 6)) * width;
+        int dst = int(uint32_t(vm.NativeArg(a, 1)) + start), src = int(uint32_t(vm.NativeArg(a, 2)) + start);
+        // counts of 0 make the x86 loops run 2^32 times; steps past 2 GB wrap around
+        int64_t extent = int64_t(down - 1) * rowStep + int64_t(across - 1) * step + 3;
+        if (across == 0 || down == 0 || step > 0x10000000 || rowStep > 0x10000000 || extent > 0x10000000
+            || (dst != src && !Apart(dst, extent, src, extent)))
+        {
+            vm.RunX86(c, a);
+            return;
+        }
+        if (dst == src)
+            return;
+        uint8_t* to = vm.Bytes(dst, int(extent));
+        const uint8_t* from = vm.Bytes(src, int(extent));
+        // (steps of 0 copy the same pixel again: once is the same)
+        uint32_t rows = rowStep == 0 ? 1 : down, columns = step == 0 ? 1 : across;
+        int64_t row = 0;
+        for (uint32_t j = 0; j < rows; j++, row += rowStep)
+        {
+            int64_t at = row;
+            for (uint32_t i = 0; i < columns; i++, at += step)
+                std::memcpy(to + at, from + at, 3);
+        }
+    });
+
+    // ID OPENING.SCN 00B80: a 400 x 300 picture of 8-bit indexes (l[0]: its 256 dword colours, then
+    // the rows bottom up) to 800 x 600 BGR at l[1], each pixel 2 x 2, top down; the colours' bytes
+    // times l[2] / 256 unless l[2] is 256 (the opening's fades). The x86 code keeps six tables of the
+    // colours shifted in its own module (+0xD70 from its start, 1 KB each: c, c << 24, c >> 8,
+    // c << 16, c >> 16, c << 8) and writes each dword of the output as two of them ORed
+    RegisterNative("72818DF69CF3389A6BAA8E985D969B1B0B969B1E", "palette8 2x", [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
+        constexpr int Width = 400, Height = 300, Out = Width * 2 * 3;
+        int source = vm.NativeArg(a, 0), dst = vm.NativeArg(a, 1);
+        uint32_t scale = uint32_t(vm.NativeArg(a, 2));
+        int tables = vm.m_nativeTarget - 0xB80 + 0xD70;
+        if (!Apart(dst, Out * Height * 2, source, 0x400 + Width * Height) || !Apart(dst, Out * Height * 2, tables, 0x1800))
+        {
+            vm.RunX86(c, a);
+            return;
+        }
+        uint32_t colour[256];
+        for (int i = 0; i < 256; i++)
+        {
+            uint32_t e = uint32_t(vm.Read32(source + 4 * i));
+            if (scale != 0x100)
+            {
+                // each byte times l[2] (mul: the low 32 bits) >> 8, put together as the x86 code ORs them
+                auto t = [e, scale](int shift) { return ((e >> shift) & 0xFF) * scale >> 8; };
+                uint32_t ebx = ((t(24) << 8 | t(16)) << 8 | t(8)) << 8;
+                e = t(0) | ebx;
+            }
+            colour[i] = e;
+            vm.Write32(tables + 4 * i, int(e));
+            vm.Write32(tables + 0x400 + 4 * i, int(e << 24));
+            vm.Write32(tables + 0x800 + 4 * i, int(e >> 8));
+            vm.Write32(tables + 0xC00 + 4 * i, int(e << 16));
+            vm.Write32(tables + 0x1000 + 4 * i, int(e >> 16));
+            vm.Write32(tables + 0x1400 + 4 * i, int(e << 8));
+        }
+        std::vector<uint32_t> line(Out / 4);
+        for (int y = 0; y < Height; y++)
+        {
+            const uint8_t* row = vm.Bytes(source + 0x400 + (Height - 1 - y) * Width, Width);
+            for (int x = 0; x < Width; x += 2)
+            {
+                uint32_t p = colour[row[x]], q = colour[row[x + 1]];
+                size_t k = size_t(x / 2 * 3);
+                line[k] = p | p << 24;
+                line[k + 1] = p >> 8 | q << 16;
+                line[k + 2] = q >> 16 | q << 8;
+            }
+            vm.WriteBytes(dst + 2 * y * Out, reinterpret_cast<const uint8_t*>(line.data()), Out);
+            vm.WriteBytes(dst + (2 * y + 1) * Out, reinterpret_cast<const uint8_t*>(line.data()), Out);
+        }
+    });
+
     // START 7963C / 79A8A / 88BDC (Ero-On! 5EB4A; MMX): a rectangle of 32-bit pixels. l[0] dst, l[1]
     // src, l[2] / l[3] their row strides, l[4] width, l[5] height
     RegisterNative({"6E76FCA4FA78FA7B47C9153B7BFEEA95FF609582", "6F192CD4BA3ACAB3A5F79FE84D6B6CA9A08E6C36",

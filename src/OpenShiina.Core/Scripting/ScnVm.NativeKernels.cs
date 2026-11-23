@@ -89,8 +89,10 @@ public sealed partial class ScnVm
         // Ero-On!'s START 5E878 is other code that gives the same bytes (300 random cases on the
         // interpreter against 79366). Saimin Seikatsu START 7384A: a build that takes two pixels at
         // a time (and a lone first one to align the destination to 8 bytes), the same bytes
+        // (Oshikake! Entremets 6A252: Saimin Seikatsu's build with other padding, 300 random cases)
         RegisterNative(["A4344EBEFD9887DE875827C5FC8F01C6DC49DEEF", "4A177932B7CDFCE9D2FBC516D15DCB24243F0A00",
-                        "9B44AD3EA3AFD3BEE7FA87EF120DEC2088989FA9", "F4220D18813B1FBCD4BFE3D56FFECD202AA02DD8"], "blend32", (vm, c, a) =>
+                        "9B44AD3EA3AFD3BEE7FA87EF120DEC2088989FA9", "F4220D18813B1FBCD4BFE3D56FFECD202AA02DD8",
+                        "90834B46E06DDF6F1A5B9C1A047BE31C57D4543E"], "blend32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pa = vm.NativeArg(a, 1), pb = vm.NativeArg(a, 2);
             int sd = vm.NativeArg(a, 3), sa = vm.NativeArg(a, 4), sb = vm.NativeArg(a, 5);
@@ -160,8 +162,11 @@ public sealed partial class ScnVm
         // with positions in 1/16 pixels (bilinear weights at the fractions, partial coverage in
         // the alpha of the edge pixels). Written out in ScnVm.Subpixel32.cs.
         // l[0] dst, l[1] its row stride, l[2] / l[3] dst x / y, l[4] / l[5] width / height,
-        // l[6] src, l[7] its stride, l[8] / l[9] src x / y (all 1/16 pixels)
-        RegisterNative(["D39944F06B961BEDC6A0F25C3C4F5A87D184E244", "FDDD8FF834069B7A80B9424B868B9D71F6BDD4E8"], "subpixel32", (vm, c, a) =>
+        // l[6] src, l[7] its stride, l[8] / l[9] src x / y (all 1/16 pixels). Oshikake! Entremets
+        // START 67478: the same code with its arguments copied to the bottom of its stack frame
+        // (300 random cases the same as its x86 code)
+        RegisterNative(["D39944F06B961BEDC6A0F25C3C4F5A87D184E244", "FDDD8FF834069B7A80B9424B868B9D71F6BDD4E8",
+                        "637AD9C121DB84FD693D46C61E4FF44814A8A317"], "subpixel32", (vm, c, a) =>
         {
             int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
             int x = vm.NativeArg(a, 2), y = vm.NativeArg(a, 3), w = vm.NativeArg(a, 4), h = vm.NativeArg(a, 5);
@@ -268,6 +273,22 @@ public sealed partial class ScnVm
                                                 (rowTable, ScaleEntryCount(dt, bottom) * 24));
             if (!vm.Scale32(dst, pitch, dl, dt, right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7),
                             vm.NativeArg(a, 8), vm.NativeArg(a, 9), vm.NativeArg(a, 10), vm.NativeArg(a, 11), columnTable, rowTable, lastAlways: true))
+                throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
+        });
+
+        // Oshikake! Entremets START 69420: Can Fes!'s code without its copy of the general loop for
+        // a first column of 0x80 (see ScnVm.Scale32.cs, carryShared; 1,800 random cases the same as its
+        // x86 code). Arguments as Can Fes!'s
+        RegisterNative("4A0DB3210D8DF7083329F717514B2B61E42F791F", "scale32 (Entremets)", (vm, c, a) =>
+        {
+            int dst = vm.NativeArg(a, 0), pitch = vm.NativeArg(a, 1);
+            int dl = vm.NativeArg(a, 2), dt = vm.NativeArg(a, 3), right = vm.NativeArg(a, 4), bottom = vm.NativeArg(a, 5);
+            int columnTable = vm.NativeArg(a, 12), rowTable = vm.NativeArg(a, 13);
+            int length = right < 0 || bottom < 0 ? 0 : pitch * ((bottom >> 4) + 1) + ((right >> 4) + 1) * 4;
+            using var verify = vm.VerifyRegions(c, a, (dst, length), (columnTable, ScaleEntryCount(dl, right) * 24),
+                                                (rowTable, ScaleEntryCount(dt, bottom) * 24));
+            if (!vm.Scale32(dst, pitch, dl, dt, right, bottom, vm.NativeArg(a, 6), vm.NativeArg(a, 7), vm.NativeArg(a, 8), vm.NativeArg(a, 9),
+                            vm.NativeArg(a, 10), vm.NativeArg(a, 11), columnTable, rowTable, lastAlways: true, carryShared: true))
                 throw vm.Error(c, "Embedded x86 routine (scale32): rectangles it cannot scale (the x86 code would not end)");
         });
 

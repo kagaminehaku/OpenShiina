@@ -681,6 +681,20 @@ public sealed partial class ScnVm
         // pixel of each 8 (bytes 6-8) is made of bytes 3, 4 and 5 | 8 of the source
         RegisterNative("C49F893EBD8503C88B65BBE87E5BCC02D480EEB5", "sepia (third pixel of 8 off)", (vm, c, a) => vm.Sepia(c, a, true));
 
+        // ADVLOVE START 07730 (the same in all its 19 modules): BGR pixels of a grid copied from
+        // l[2] to l[1] at the same places, each 3 bytes, for a dissolve that fills a picture in a
+        // dot at a time: l[7] across, l[5] pixels apart, l[8] down, l[6] rows apart, from x l[3],
+        // y l[4], rows l[9] pixels wide (the products as the x86 code's 32-bit mul)
+        RegisterNative("3C9B3E8E7988F44096B2457F84A86AFF262E6292", "grid24", (vm, c, a) => vm.Grid24(c, a));
+
+        // ID OPENING.SCN 00B80: a 400 x 300 picture of 8-bit indexes (l[0]: its 256 dword colours,
+        // then the rows bottom up) to 800 x 600 BGR at l[1], each pixel 2 x 2, top down; the
+        // colours' bytes times l[2] / 256 unless l[2] is 256 (the opening's fades). The x86 code
+        // keeps six tables of the colours shifted in its own module (+0xD70 from its start, 1 KB
+        // each: c, c << 24, c >> 8, c << 16, c >> 16, c << 8) and writes each dword of the output
+        // as two of them ORed
+        RegisterNative("72818DF69CF3389A6BAA8E985D969B1B0B969B1E", "palette8 2x", (vm, c, a) => vm.Palette8Double(c, a));
+
 
         // START 7963C / 79A8A / 88BDC (Ero-On! 5EB4A; MMX): a rectangle of 32-bit pixels. l[0]
         // dst, l[1] src, l[2] / l[3] their row strides, l[4] width, l[5] height
@@ -1502,6 +1516,84 @@ public sealed partial class ScnVm
             key = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Numerics.BitOperations.RotateLeft(key + 1, 3));
         }
         WriteBytes(at, bytes);
+    }
+
+    /// <summary>ADVLOVE's grid24 (see its registration).</summary>
+    private void Grid24(ScnContext c, ScnNativeArgs a)
+    {
+        uint width = (uint)NativeArg(a, 9);
+        uint start = ((uint)NativeArg(a, 4) * width + (uint)NativeArg(a, 3)) * 3;
+        uint across = (uint)NativeArg(a, 7), down = (uint)NativeArg(a, 8);
+        uint step = 3 * (uint)NativeArg(a, 5), rowStep = 3 * (uint)NativeArg(a, 6) * width;
+        int dst = NativeArg(a, 1) + (int)start, src = NativeArg(a, 2) + (int)start;
+        // counts of 0 make the x86 loops run 2^32 times; steps past 2 GB wrap around
+        long extent = (long)(down - 1) * rowStep + (long)(across - 1) * step + 3;
+        if (across == 0 || down == 0 || step > 0x10000000 || rowStep > 0x10000000 || extent > 0x10000000
+            || dst != src && !Apart(dst, extent, src, extent) || !IsContiguous(dst, (int)extent) || !IsContiguous(src, (int)extent))
+        {
+            RunX86(c, a);
+            return;
+        }
+        if (dst == src)
+            return;
+        using var verify = VerifyRegion(c, a, dst, (int)extent);
+        var to = Bytes(dst, (int)extent);
+        ReadOnlySpan<byte> from = Bytes(src, (int)extent);
+        // (steps of 0 copy the same pixel again: once is the same)
+        uint rows = rowStep == 0 ? 1 : down, columns = step == 0 ? 1 : across;
+        for (long j = 0, row = 0; j < rows; j++, row += rowStep)
+            for (long i = 0, at = row; i < columns; i++, at += step)
+                from.Slice((int)at, 3).CopyTo(to.Slice((int)at, 3));
+    }
+
+    /// <summary>ID's palette8 2x (see its registration).</summary>
+    private void Palette8Double(ScnContext c, ScnNativeArgs a)
+    {
+        const int Width = 400, Height = 300, Out = Width * 2 * 3;
+        int source = NativeArg(a, 0), dst = NativeArg(a, 1);
+        uint scale = (uint)NativeArg(a, 2);
+        int tables = m_nativeTarget - 0xB80 + 0xD70;
+        if (!Apart(dst, Out * Height * 2, source, 0x400 + Width * Height) || !Apart(dst, Out * Height * 2, tables, 0x1800))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegions(c, a, (dst, Out * Height * 2), (tables, 0x1800));
+        Span<uint> colour = stackalloc uint[256];
+        for (int i = 0; i < 256; i++)
+        {
+            uint e = (uint)Read32(source + 4 * i);
+            if (scale != 0x100)
+            {
+                // each byte times l[2] (mul: the low 32 bits) >> 8, put together as the x86 code ORs them
+                uint T(int shift) => ((e >> shift) & 0xFF) * scale >> 8;
+                uint ebx = ((T(24) << 8 | T(16)) << 8 | T(8)) << 8;
+                e = T(0) | ebx;
+            }
+            colour[i] = e;
+            Write32(tables + 4 * i, (int)e);
+            Write32(tables + 0x400 + 4 * i, (int)(e << 24));
+            Write32(tables + 0x800 + 4 * i, (int)(e >> 8));
+            Write32(tables + 0xC00 + 4 * i, (int)(e << 16));
+            Write32(tables + 0x1000 + 4 * i, (int)(e >> 16));
+            Write32(tables + 0x1400 + 4 * i, (int)(e << 8));
+        }
+        var line = new byte[Out];
+        var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(line.AsSpan());
+        for (int y = 0; y < Height; y++)
+        {
+            ReadOnlySpan<byte> row = Bytes(source + 0x400 + (Height - 1 - y) * Width, Width);
+            for (int x = 0; x < Width; x += 2)
+            {
+                uint p = colour[row[x]], q = colour[row[x + 1]];
+                int k = x / 2 * 3;
+                words[k] = p | p << 24;
+                words[k + 1] = p >> 8 | q << 16;
+                words[k + 2] = q >> 16 | q << 8;
+            }
+            WriteBytes(dst + 2 * y * Out, line);
+            WriteBytes(dst + (2 * y + 1) * Out, line);
+        }
     }
 
     /// <summary>The sepia routine (NativeRoutines "sepia"); <paramref name="thirdOff"/>: Tenki Ane's build.</summary>

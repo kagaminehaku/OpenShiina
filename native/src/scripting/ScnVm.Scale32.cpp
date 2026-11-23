@@ -27,6 +27,14 @@
 // not hold then: whatever the work buffer had there (a pair of dwords, one for channels 0 and 2,
 // one for 1 and 3). This build writes its tables into the work buffers as the x86 code does and
 // reads that pair after (lastAlways).
+//
+// Oshikake! Entremets START 69420 is Can Fes!'s code without its copy of the general loop for a
+// first column of 0x80 (no 0x20; Oreimo 0x78FB0): such rows take the general loop from their
+// first pixel, so that pixel's shared first column comes from mm2 (the partly covered first
+// source row) and mm4 (the last one) as earlier rows left them (carryShared): at the start the
+// whole-row and whole-column weight pairs; after a row of the general loop the last source pixel
+// it read there (unpacked to words); after a row of the 0xC0 loops the last pixel of its last
+// source row times its weight (mm2) and that weight (mm4).
 #include "scripting/ScnVm.h"
 #include "scripting/ParallelRows.h"
 
@@ -211,9 +219,12 @@ public:
     /// wy, into accLo / accHi (mod 65536 a lane); counts the pixels that are not opaque. With
     /// skipShared the shared first column of every column but the first is left out of the count
     /// (the general loop's register copy). With firstLast the first column also gets its last
-    /// source pixel with those weights (Can Fes!'s build, without 0x40).
+    /// source pixel with those weights (Can Fes!'s build, without 0x40). With shared0 the first
+    /// column's shared first pixel is those lanes instead, left out of the count (Entremets' build:
+    /// a register as an earlier row left it).
     void AddTo(uint32_t wy, uint32_t fullCol, const std::vector<uint32_t>& colWx, const std::vector<int>& shape, std::vector<uint64_t>& accLo,
-               std::vector<uint64_t>& accHi, std::vector<int>& clear, bool skipShared, const std::optional<std::pair<uint32_t, uint32_t>>& firstLast) const
+               std::vector<uint64_t>& accHi, std::vector<int>& clear, bool skipShared, const std::optional<std::pair<uint32_t, uint32_t>>& firstLast,
+               const std::optional<std::pair<uint64_t, uint64_t>>& shared0 = std::nullopt) const
     {
         uint32_t wWhole = ScaleWeight(fullCol, wy);
         for (size_t c = 0, n = accLo.size(); c < n; c++)
@@ -225,10 +236,18 @@ public:
             if ((flags & 0x80) != 0)
             {
                 uint32_t w = ScaleWeight(colWx[2 * c], wy);
-                l += p.FirstLo * w;
-                h += p.FirstHi * w;
-                if (!(skipShared && c > 0))
-                    nonOpaque += p.FirstClear;
+                if (c == 0 && shared0)
+                {
+                    l += shared0->first * w;
+                    h += shared0->second * w;
+                }
+                else
+                {
+                    l += p.FirstLo * w;
+                    h += p.FirstHi * w;
+                    if (!(skipShared && c > 0))
+                        nonOpaque += p.FirstClear;
+                }
             }
             if (b > a)
             {
@@ -352,7 +371,7 @@ int ScnVm::ScaleEntryCount(int start, int end)
 }
 
 bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int src, int srcPitch, int sl, int st, int sr, int sb, int columnTable,
-                    int rowTable, bool lastAlways)
+                    int rowTable, bool lastAlways, bool carryShared)
 {
     uint32_t dw = uint32_t(dr - dl), dh = uint32_t(db - dt), sw = uint32_t(sr - sl), sh = uint32_t(sb - st);
     if (dw == 0 || dh == 0 || sw == 0 || sh == 0)
@@ -406,9 +425,64 @@ bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
     for (size_t r = 0; r < nr; r++)
         work.RowY[r + 1] = work.RowY[r] + rows[r].Count + ((rows[r].Flags & 0x80) != 0 ? 1 : 0);
 
+    // Entremets' build: the first column's shared source pixel from mm2 / mm4 as each row finds them
+    // (see the top), worked out row by row: four 16-bit words as lanes (words 0 and 2, 1 and 3)
+    using Words = std::pair<uint64_t, uint64_t>;
+    std::vector<std::pair<Words, Words>> carried;
+    if (carryShared && nc > 0 && (cols[0].Flags & 0xA0) == 0x80)
+    {
+        auto pair = [](uint32_t dword) { return Words((dword & 0xFFFF) * 0x100000001ull, (dword >> 16) * 0x100000001ull); };
+        auto pixel = [this, srcX, srcPitch](int row, int at, uint32_t w) {
+            const uint8_t* p = Bytes(srcX + row * srcPitch + at * 4, 4);
+            return Words((p[0] * w & 0xFFFF) | uint64_t(p[2] * w & 0xFFFF) << 32, (p[1] * w & 0xFFFF) | uint64_t(p[3] * w & 0xFFFF) << 32);
+        };
+        Words mm2 = pair(fullRow), mm4 = pair(fullCol);
+        carried.resize(nr);
+        for (size_t r = 0; r < nr; r++)
+        {
+            carried[r] = {mm2, mm4};
+            const auto& e = rows[r];
+            int p = work.RowY[r];
+            if (e.Flags == 0xC0 && e.Count <= 1)
+            {
+                // the 0xC0 loops: the last pixel of the last source row times its weight, and that weight
+                for (size_t c = nc; c-- > 0;)
+                {
+                    const auto& col = cols[c];
+                    int at;
+                    uint32_t w;
+                    if ((col.Flags & 0x40) != 0)
+                        at = work.ColShape[4 * c + 2], w = ScaleWeight(col.Last, e.Last);
+                    else if (col.Count > 0)
+                        at = work.ColShape[4 * c + 2] - 1, w = ScaleWeight(fullCol, e.Last);
+                    else if ((col.Flags & 0x80) != 0)
+                        at = work.ColShape[4 * c], w = ScaleWeight(col.First, e.Last);
+                    else
+                        continue;
+                    mm2 = pixel(p + 1 + e.Count, at, w);
+                    mm4 = pair(w * 0x10001);
+                    break;
+                }
+                continue;
+            }
+            // the general loop: the last source pixel it read past a column's whole ones (the first
+            // column's copy of 0x20 always reads one)
+            for (size_t c = nc; c-- > 0;)
+            {
+                if ((cols[c].Flags & 0x40) == 0 && !(c == 0 && lastAlways && (cols[0].Flags & 0x20) != 0))
+                    continue;
+                if ((e.Flags & 0x80) != 0)
+                    mm2 = pixel(p, work.ColShape[4 * c + 2], 1);
+                if ((e.Flags & 0x40) != 0)
+                    mm4 = pixel(p + ((e.Flags & 0x80) != 0 ? 1 : 0) + e.Count, work.ColShape[4 * c + 2], 1);
+                break;
+            }
+        }
+    }
+
     // (the work is the source's pixels as much as the destination's: a save's thumbnail of a whole
     // screen, few pixels made from many, went to the CPU at 23-41 ms on the Switch)
-    if (UseGpu("scale32", std::max(int64_t(nr) * int64_t(nc), int64_t(width) * int64_t(work.RowY[nr]))))
+    if (carried.empty() && UseGpu("scale32", std::max(int64_t(nr) * int64_t(nc), int64_t(width) * int64_t(work.RowY[nr]))))
     {
         std::vector<std::array<int, 4>> rowEntries, columnEntries;
         std::vector<int> rowFrom(work.RowY.begin(), work.RowY.begin() + ptrdiff_t(nr)), columnFrom(nc);
@@ -459,15 +533,18 @@ bool ScnVm::Scale32(int dst, int dstPitch, int dl, int dt, int dr, int db, int s
             // the general loop's register copy of the shared first column (see the top)
             bool ownLoop = e.Flags == 0xC0 && e.Count <= 1;
             auto extra = ownLoop ? std::nullopt : firstLast;
+            std::optional<Words> sharedFirst, sharedLast;
+            if (!ownLoop && !carried.empty())
+                sharedFirst = carried[r].first, sharedLast = carried[r].second;
             std::fill(b.AccLo.begin(), b.AccLo.end(), 0);
             std::fill(b.AccHi.begin(), b.AccHi.end(), 0);
             std::fill(b.Clear.begin(), b.Clear.end(), 0);
             if (hasFirst)
-                b.First.AddTo(e.First, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, !ownLoop, extra);
+                b.First.AddTo(e.First, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, !ownLoop, extra, sharedFirst);
             if (e.Count > 0)
                 b.Whole.AddTo(fullRow, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, false, extra);
             if (hasLast)
-                b.Last.AddTo(e.Last, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, !ownLoop, extra);
+                b.Last.AddTo(e.Last, fullCol, work.ColWx, work.ColShape, b.AccLo, b.AccHi, b.Clear, !ownLoop, extra, sharedLast);
             uint8_t* output = Bytes(dstRow + int(r) * dstPitch, int(nc) * 4);
             for (size_t c = 0; c < nc; c++)
             {
