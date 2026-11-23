@@ -75,6 +75,9 @@ private:
         DkGpuAddr uniforms = m_owner.m_dataMem.getGpuAddr() + CommandBytes;
         // The inputs as the CPU left them, not as the GPU's L2 may remember them from the last run
         cmd.barrier(DkBarrier_None, DkInvalidateFlags_L2Cache);
+        DkGpuAddr stamps = m_owner.m_timeMem.getGpuAddr();
+        if (m_owner.MeasureRuns)
+            cmd.reportCounter(DkCounter_Timestamp, stamps);
         cmd.bindShaders(DkStageFlag_Compute, {&m_shader});
         cmd.bindUniformBuffer(DkStage_Compute, 0, uniforms, UniformBytes);
         cmd.pushConstants(uniforms, UniformBytes, 0, uint32_t(size), parameters);
@@ -85,12 +88,26 @@ private:
             cmd.bindStorageBuffer(DkStage_Compute, uint32_t(binding), s.Block.getGpuAddr(), s.Size);
         cmd.dispatchCompute(uint32_t(groupsX), uint32_t(groupsY), 1);
         cmd.barrier(DkBarrier_Full, DkInvalidateFlags_L2Cache);
+        if (m_owner.MeasureRuns)
+            cmd.reportCounter(DkCounter_Timestamp, stamps + 16);
         m_owner.m_queue.submitCommands(cmd.finishList());
         m_owner.m_queue.signalFence(m_owner.m_fence);
         m_owner.m_queue.flush();
+        uint64_t sent = m_owner.MeasureRuns ? m_owner.m_device.getCurrentTimestamp() : 0;
         if (m_owner.m_fence.wait() != DkResult_Success)
             return false;
         m_times.Gpu = since(start);
+        if (m_owner.MeasureRuns)
+        {
+            // (the GPU's clock read from the CPU: an ioctl, so "sent" is a little after the kickoff)
+            uint64_t woken = m_owner.m_device.getCurrentTimestamp();
+            const auto* t = static_cast<const volatile uint64_t*>(m_owner.m_timeMem.getCpuAddr());
+            uint64_t begun = t[1], ended = t[3];
+            auto ms = [](uint64_t from, uint64_t to) { return to >= from ? double(dkTimestampToNs(to - from)) / 1e6 : 0.0; };
+            m_times.Queued = ms(sent, begun);
+            m_times.Shader = ms(begun, ended);
+            m_times.Woken = ms(ended, woken);
+        }
         start = armGetSystemTick();
         // The outputs as the GPU wrote them in memory
         for (auto& [binding, b] : m_buffers)
@@ -155,6 +172,7 @@ DekoAccelerator::DekoAccelerator(dk::Device device) : m_device(device)
                     .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached)
                     .create();
     m_cmd = dk::CmdBufMaker{m_device}.create();
+    m_timeMem = dk::MemBlockMaker{m_device, DK_MEMBLOCK_ALIGNMENT}.setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuUncached).create();
 }
 
 DekoAccelerator::~DekoAccelerator()

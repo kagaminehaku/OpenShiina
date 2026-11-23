@@ -193,6 +193,12 @@ void ScnVm::GpuTimes(const char* routine, int64_t started, int64_t ran, int64_t 
     add("flush before", run.Before);
     add("GPU", run.Gpu);
     add("flush after", run.After);
+    if (run.Shader >= 0)
+    {
+        add("GPU queued", run.Queued);
+        add("GPU shader", run.Shader);
+        add("GPU woken", run.Woken);
+    }
     add("write back", double(Now() - back) / 1e6);
 }
 

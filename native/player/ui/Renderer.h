@@ -76,6 +76,9 @@ public:
     void Begin(uint32_t clear = 0xFF000000);
     /// The frame drawn so far goes to the screen (at the next vertical blank).
     void End();
+    /// The GPU's time for the last frame whose fence Begin waited for (two frames back), from its
+    /// own timestamps (its 614.4 MHz clock); 0 before any.
+    double LastGpuMs() const { return m_lastGpuMs; }
 
     /// The texture of the game's picture for this frame (one of two, made again when the game's size
     /// is another): written by the caller between Begin and Picture.
@@ -135,6 +138,12 @@ private:
     uint32_t m_textureUsed = 0, m_codeUsed = 0;
     int m_nextSlot = 0;
     std::vector<dk::Image> m_images = std::vector<dk::Image>(MaxTextures);
+
+    // Each frame's two GPU timestamps (16 bytes each: a payload, then the time), not cached by
+    // either side so the CPU reads what the GPU wrote once the frame's fence is signalled
+    dk::UniqueMemBlock m_timeMem;
+    std::array<bool, Frames> m_timed{};
+    double m_lastGpuMs = 0;
 
     // the frame being drawn
     int m_frame = 0, m_framebuffer = -1;

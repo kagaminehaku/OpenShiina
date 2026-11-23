@@ -68,6 +68,8 @@ public:
         // the game's picture copied into its texture (CopyPicture), and the frame drawn (from
         // Begin to End: the picture, the pointer, the meter, the frame given to the GPU)
         double CopyMs = 0, DrawMs = 0;
+        // the GPU's own time for the frames (Renderer::LastGpuMs, from its timestamps)
+        double GpuDrawMs = 0;
         int Frames = 0;
     };
     /// The lines the log tells them in ("[times] ...").

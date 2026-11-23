@@ -105,6 +105,7 @@ Renderer::Renderer()
     LoadShader(m_rcasShader, "romfs:/shaders/rcas_fsh.dksh");
 
     m_cmd = dk::CmdBufMaker{m_device}.create();
+    m_timeMem = dk::MemBlockMaker{m_device, DK_MEMBLOCK_ALIGNMENT}.setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuUncached).create();
 
     // Slot 0: one white pixel, for shapes (and what is drawn with no texture)
     Texture white = CreateTexture(1, 1);
@@ -245,6 +246,10 @@ void Renderer::Begin(uint32_t clear)
         End();
     int f = m_frame % Frames;
     m_fences[size_t(f)].wait();
+    // the GPU's time for the frame this slot drew last
+    const auto* times = static_cast<const volatile uint64_t*>(m_timeMem.getCpuAddr()) + 4 * f;
+    if (m_timed[size_t(f)] && times[3] >= times[1])
+        m_lastGpuMs = double(dkTimestampToNs(times[3] - times[1])) / 1e6;
     m_cmd.clear();
     m_cmd.addMemory(m_dataMem, m_commandBase[size_t(f)], CommandBytes);
     m_vertexUsed = 0;
@@ -260,6 +265,7 @@ void Renderer::Begin(uint32_t clear)
                      float(clear >> 24) / 255.0f);
     // what the CPU wrote since (textures, descriptors) seen by the GPU
     m_cmd.barrier(DkBarrier_None, DkInvalidateFlags_Image | DkInvalidateFlags_Descriptors | DkInvalidateFlags_L2Cache);
+    m_cmd.reportCounter(DkCounter_Timestamp, m_timeMem.getGpuAddr() + uint32_t(f) * 32);
 
     DkGpuAddr base = m_dataMem.getGpuAddr();
     m_cmd.bindImageDescriptorSet(base + m_imageDescriptors, MaxTextures);
@@ -314,6 +320,8 @@ void Renderer::End()
 {
     Flush();
     int f = m_frame % Frames;
+    m_cmd.reportCounter(DkCounter_Timestamp, m_timeMem.getGpuAddr() + uint32_t(f) * 32 + 16);
+    m_timed[size_t(f)] = true;
     m_queue.submitCommands(m_cmd.finishList());
     m_queue.signalFence(m_fences[size_t(f)]);
     m_queue.presentImage(m_swapchain, m_framebuffer);

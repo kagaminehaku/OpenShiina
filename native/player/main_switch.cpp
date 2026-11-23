@@ -1583,6 +1583,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
     bool timing = false;
     auto endTiming = [&] {
         timing = false;
+        if (s_gpu)
+            s_gpu->MeasureRuns = false;
         vm->RoutineTimes = &routineTimes;
         vm->OpTimes = &opTimes;
         LogClocks("the timed frames end");
@@ -1755,6 +1757,8 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             if (test && int64_t(frames) == test->TimesFrom)
             {
                 timing = true;
+                if (s_gpu)
+                    s_gpu->MeasureRuns = true;
                 vm->RoutineTimes = &timed.Routines;
                 vm->OpTimes = &timed.Ops;
             }
@@ -1828,7 +1832,10 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             }
             ui.Screen.End();
             if (timing)
+            {
                 timed.DrawMs += double(armTicksToNs(armGetSystemTick() - drawStart)) / 1e6;
+                timed.GpuDrawMs += ui.Screen.LastGpuMs();
+            }
 
             uint64_t now = armGetSystemTick();
             meterSlowest = std::max(meterSlowest, now - lastFrame);

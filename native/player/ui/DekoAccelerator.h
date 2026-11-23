@@ -42,6 +42,9 @@ public:
     /// Whether the GPU caches the blocks on the scripts' memory (the blocks made so far go when it changes).
     void SetScriptCaching(bool gpuCached);
     bool ScriptCaching() const { return m_scriptGpuCached; }
+    /// Each run split up by the GPU's timestamps (RunTimes Queued / Shader / Woken; two reads of the
+    /// GPU's clock a run, so only while timing: devrun's times=).
+    bool MeasureRuns = false;
 
 private:
     class DekoKernel;
@@ -50,6 +53,8 @@ private:
     dk::Device m_device;
     dk::UniqueQueue m_queue;
     dk::UniqueMemBlock m_codeMem, m_dataMem;
+    // A run's two GPU timestamps (16 bytes each), cached by neither side
+    dk::UniqueMemBlock m_timeMem;
     dk::UniqueCmdBuf m_cmd;
     dk::Fence m_fence;
     uint32_t m_codeUsed = 0;

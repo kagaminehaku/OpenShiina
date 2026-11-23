@@ -36,10 +36,14 @@ public:
         return false;
     }
     /// The last run's parts in milliseconds: the CPU's cache flushed before it, the GPU's work (made,
-    /// sent and waited for), the cache flushed after (for the slow log).
+    /// sent and waited for), the cache flushed after (for the slow log). Where the device has
+    /// timestamps (and measures), the GPU's part split up: from the commands sent to the shader's
+    /// start (Queued: the GPU on other work), the shader (Shader), from its end to the waiting
+    /// thread going on (Woken); -1 when not measured.
     struct RunTimes
     {
         double Before = 0, Gpu = 0, After = 0;
+        double Queued = -1, Shader = -1, Woken = -1;
     };
     virtual RunTimes LastRun() const { return {}; }
     /// Runs groupsX x groupsY work groups with the parameters (the shader's uniform block) and
