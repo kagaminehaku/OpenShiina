@@ -67,37 +67,19 @@ is mostly for slow phones, and should follow what their perf.log shows.
 `Formats.Json` has the keys of 164 games; 166 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
-- [ ] **Keys for the 3 games without them** (compatibility.md, "No keys yet"), once their files
-  are found. From Niflheim's WARC_unpack.c: the DecodeBin (0x2000 bytes) is read by the code
-  near the constant 0x40000000; v2.50's Extra picture is unpacked at run time (follow
-  `push 202` through GetProcAddress).
-- [ ] Other v2.34 games: the 11 opcodes with other operands than v2.47's (0686-068B, 055A, 055B,
-  04EC, 0B7D), the 9 new ones (007D-0080, 060E-0610, 0614, 077B) and 03BF. Ao no Juuai uses none.
-- [ ] **The games of 2026-11-11** (compatibility.md, Notes): Chikan Densha Otoko Gaiden's train
-  part (S01A.TXT's end: a looping movie that waits for the player's moves) played by hand; Yakata
-  Jukujo (SCN modules) played through by hand; Yume Miru Egoist once a whole copy is found;
-  native versions of Entremets' own routines (637AD9C1, 4A0DB321, 90834B46) and of Tenki Ane's /
-  Ryoumaden's sepia build (C49F893E), which no sweep ran.
-- [ ] Opcode tables for 2.35, 2.38-2.43 and 2.48 (opscan on the game's executable; v2.31,
-  v2.33, v2.34, v2.37 and v2.44 have theirs, 2.45 and 2.46 are v2.47's).
-- [ ] The ExtraCrypts (PostAdler, PreAdler, Count, AltCount, Ushimitsu, Nukitashi2,
-  Saimin) checked against their archives.
-- [ ] **WMV9 P-picture loop filter**: Windows' decoder chooses some loop filter edges of WMV3
-  P pictures otherwise than the standard (Sorcery Jokers' 2nd OP differs by 1-2 from frame 140;
-  engine-notes.md, "Windows Media movies"). Find its rule.
-- [ ] Interlaced VC-1 pictures, WMV3 range reduction / multiresolution / X8 intra pictures: no
-  game movie has them yet (Vc1Video refuses such a stream).
+- [ ] **Keys for the 2 games without them** (Delicious Way, Mahou no Shippo na Dai Ni wa;
+  compatibility.md, "No keys yet"), once their files are found. From Niflheim's WARC_unpack.c:
+  the DecodeBin (0x2000 bytes) is read by the code near the constant 0x40000000; v2.50's Extra
+  picture is unpacked at run time (follow `push 202` through GetProcAddress).
+- [ ] Native versions of Entremets' own routines (START 67478 637AD9C1, 897 instructions; 69420
+  4A0DB321, 1,044; 6A252 90834B46, 222), which no sweep ran and no other game's resemble
+  (`ScnTools routines --like`, `routinecheck`).
 - [ ] **Known builds**: a game's build told by the SHA-256 (and size) of its .exe, for the
   scheme and keys (Re:Rem Plus's re-release has another DecodeBin date under the same .exe name),
   `03C2`'s value, and in the library whether that build was played through; and START.SCN's
   hash (or the archives' indexes) as the mark of the scripts a sweep ran (an update can leave the
   .exe as it is). An unknown hash only says so: the .exe name and SchemeDetector as now, never
   refused (patched, disc-free or translated .exes all differ).
-- [ ] A real WARC 1.0-1.6 game (1.0 / 1.1 tried only on archives made for the test, 1.2-1.6
-  only against GARbro's on random input).
-- [ ] Side quest: **Ayaka-san to Shuugen-kun** (propeller's freeware of 2006) runs on an engine
-  of its own (compatibility.md, "No keys yet"): its archives, its `.lzo` pictures and the
-  commands of its two scripts, read from ayakashiban.exe.
 
 ## Platforms
 

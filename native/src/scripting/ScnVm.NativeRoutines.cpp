@@ -669,33 +669,54 @@ void ScnVm::RegisterNativeRoutines()
 
     // START 76042 / 76490 / 85920 (MMX): sepia of BGR pixels, l[2] bytes (rounded down to 24) from
     // l[1] to l[0]: y = (151 b0 + 77 b1 + 29 b2) >> 8, then its bytes (y * 145, y * 200, y * 240) >> 8
+    auto sepia = [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a, bool thirdOff) {
+        int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
+        uint32_t count = uint32_t(vm.NativeArg(a, 2));
+        int64_t bytes = int64_t(count / 24) * 24;
+        // under 24 bytes the x86 loop's count wraps round
+        if (bytes == 0 || (dst != src && !Apart(dst, bytes, src, bytes)))
+        {
+            vm.RunX86(c, a);
+            return;
+        }
+        constexpr int Chunk = 24 * 4096;
+        openshiina::Bytes buffer(Chunk);
+        int third[3] = {};
+        for (int64_t done = 0; done < bytes; done += Chunk)
+        {
+            int n = int(std::min<int64_t>(Chunk, bytes - done));
+            vm.ReadBytes(src + int(done), buffer.data(), n);
+            for (int i = 0; i < n; i += 3)
+            {
+                int b0 = buffer[size_t(i)], b1 = buffer[size_t(i + 1)], b2 = buffer[size_t(i + 2)];
+                // (Tenki Ane: the third pixel of each 24 bytes from bytes 3, 4 and 5 | 8, before any is written)
+                if (thirdOff && i % 24 == 0)
+                {
+                    third[0] = buffer[size_t(i + 3)];
+                    third[1] = buffer[size_t(i + 4)];
+                    third[2] = buffer[size_t(i + 5)] | buffer[size_t(i + 8)];
+                }
+                if (thirdOff && i % 24 == 6)
+                {
+                    b0 = third[0];
+                    b1 = third[1];
+                    b2 = third[2];
+                }
+                int y = (b0 * 151 + b1 * 77 + b2 * 29) >> 8;
+                buffer[size_t(i)] = uint8_t(y * 145 >> 8);
+                buffer[size_t(i + 1)] = uint8_t(y * 200 >> 8);
+                buffer[size_t(i + 2)] = uint8_t(y * 240 >> 8);
+            }
+            vm.WriteBytes(dst + int(done), buffer.data(), n);
+        }
+    };
     RegisterNative({"B9D719E48EB9DD041EA49683ADA8C7F1602FB1FC", "649843201017621317B4493924B9AF51F5FDD445"}, "sepia",
-                   [](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) {
-                       int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
-                       uint32_t count = uint32_t(vm.NativeArg(a, 2));
-                       int64_t bytes = int64_t(count / 24) * 24;
-                       // under 24 bytes the x86 loop's count wraps round
-                       if (bytes == 0 || (dst != src && !Apart(dst, bytes, src, bytes)))
-                       {
-                           vm.RunX86(c, a);
-                           return;
-                       }
-                       constexpr int Chunk = 24 * 4096;
-                       openshiina::Bytes buffer(Chunk);
-                       for (int64_t done = 0; done < bytes; done += Chunk)
-                       {
-                           int n = int(std::min<int64_t>(Chunk, bytes - done));
-                           vm.ReadBytes(src + int(done), buffer.data(), n);
-                           for (int i = 0; i < n; i += 3)
-                           {
-                               int y = (buffer[size_t(i)] * 151 + buffer[size_t(i + 1)] * 77 + buffer[size_t(i + 2)] * 29) >> 8;
-                               buffer[size_t(i)] = uint8_t(y * 145 >> 8);
-                               buffer[size_t(i + 1)] = uint8_t(y * 200 >> 8);
-                               buffer[size_t(i + 2)] = uint8_t(y * 240 >> 8);
-                           }
-                           vm.WriteBytes(dst + int(done), buffer.data(), n);
-                       }
-                   });
+                   [sepia](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { sepia(vm, c, a, false); });
+    // Tenki Ane START 66CE2, Ryoumaden 67F82: the same code but for two registers - its first two
+    // pixels taken in the other order, which leaves mm4 shifted once: the third pixel of each 8
+    // (bytes 6-8) is made of bytes 3, 4 and 5 | 8 of the source
+    RegisterNative("C49F893EBD8503C88B65BBE87E5BCC02D480EEB5", "sepia (third pixel of 8 off)",
+                   [sepia](ScnVm& vm, ScnContext& c, const ScnNativeArgs& a) { sepia(vm, c, a, true); });
 
     // START 7963C / 79A8A / 88BDC (Ero-On! 5EB4A; MMX): a rectangle of 32-bit pixels. l[0] dst, l[1]
     // src, l[2] / l[3] their row strides, l[4] width, l[5] height

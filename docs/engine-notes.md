@@ -109,7 +109,8 @@ bytes, 5.6 MB out, every output the same, also where it does not fit (0). Archiv
 of 1.0 and 1.1 need no scheme: a game with no GameMap entry gets one without keys named after
 its folder (FormatManager.SchemeForArchive, used by the library, both players and ScnBoot), so
 its saves have a folder of their own. 1.0 and 1.1 checked on archives made as the formats are
-(scratch oldwarc: both versions, a Ylz entry); none of those games is here, nor one of 1.2-1.6.
+(scratch oldwarc: both versions, a Ylz entry); none of those games is here (Forest's, before
+ShiinaRio). Of 1.2-1.6, Ao no Juuai's archives are 1.5 and the game plays through.
 
 ## 2. S25 layered images *(verified)*
 

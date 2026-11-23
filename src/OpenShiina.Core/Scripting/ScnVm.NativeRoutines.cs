@@ -674,36 +674,13 @@ public sealed partial class ScnVm
         // START 76042 / 76490 / 85920 (MMX): sepia of BGR pixels, l[2] bytes (rounded down to 24)
         // from l[1] to l[0]: y = (151 b0 + 77 b1 + 29 b2) >> 8 of each pixel's bytes, then its
         // bytes (y * 145, y * 200, y * 240) >> 8
-        RegisterNative(["B9D719E48EB9DD041EA49683ADA8C7F1602FB1FC", "649843201017621317B4493924B9AF51F5FDD445"], "sepia", (vm, c, a) =>
-        {
-            int dst = vm.NativeArg(a, 0), src = vm.NativeArg(a, 1);
-            uint count = (uint)vm.NativeArg(a, 2);
-            long bytes = count / 24 * 24L;
-            // under 24 bytes the x86 loop's count wraps round
-            if (bytes == 0 || dst != src && !Apart(dst, bytes, src, bytes))
-            {
-                vm.RunX86(c, a);
-                return;
-            }
-            using var verify = vm.VerifyRegion(c, a, dst, (int)bytes);
-            const int Chunk = 24 * 4096;
-            var buffer = ArrayPool<byte>.Shared.Rent(Chunk);
-            for (long done = 0; done < bytes; done += Chunk)
-            {
-                int n = (int)Math.Min(Chunk, bytes - done);
-                var span = buffer.AsSpan(0, n);
-                vm.ReadBytes(src + (int)done, span);
-                for (int i = 0; i < n; i += 3)
-                {
-                    int y = (span[i] * 151 + span[i + 1] * 77 + span[i + 2] * 29) >> 8;
-                    span[i] = (byte)(y * 145 >> 8);
-                    span[i + 1] = (byte)(y * 200 >> 8);
-                    span[i + 2] = (byte)(y * 240 >> 8);
-                }
-                vm.WriteBytes(dst + (int)done, span);
-            }
-            ArrayPool<byte>.Shared.Return(buffer);
-        });
+        RegisterNative(["B9D719E48EB9DD041EA49683ADA8C7F1602FB1FC", "649843201017621317B4493924B9AF51F5FDD445"], "sepia",
+                       (vm, c, a) => vm.Sepia(c, a, false));
+        // Tenki Ane START 66CE2, Ryoumaden 67F82: the same code but for two registers - its first
+        // two pixels taken in the other order, which leaves mm4 shifted once, not twice: the third
+        // pixel of each 8 (bytes 6-8) is made of bytes 3, 4 and 5 | 8 of the source
+        RegisterNative("C49F893EBD8503C88B65BBE87E5BCC02D480EEB5", "sepia (third pixel of 8 off)", (vm, c, a) => vm.Sepia(c, a, true));
+
 
         // START 7963C / 79A8A / 88BDC (Ero-On! 5EB4A; MMX): a rectangle of 32-bit pixels. l[0]
         // dst, l[1] src, l[2] / l[3] their row strides, l[4] width, l[5] height
@@ -1525,6 +1502,45 @@ public sealed partial class ScnVm
             key = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Numerics.BitOperations.RotateLeft(key + 1, 3));
         }
         WriteBytes(at, bytes);
+    }
+
+    /// <summary>The sepia routine (NativeRoutines "sepia"); <paramref name="thirdOff"/>: Tenki Ane's build.</summary>
+    private void Sepia(ScnContext c, ScnNativeArgs a, bool thirdOff)
+    {
+        int dst = NativeArg(a, 0), src = NativeArg(a, 1);
+        uint count = (uint)NativeArg(a, 2);
+        long bytes = count / 24 * 24L;
+        // under 24 bytes the x86 loop's count wraps round
+        if (bytes == 0 || dst != src && !Apart(dst, bytes, src, bytes))
+        {
+            RunX86(c, a);
+            return;
+        }
+        using var verify = VerifyRegion(c, a, dst, (int)bytes);
+        const int Chunk = 24 * 4096;
+        var buffer = ArrayPool<byte>.Shared.Rent(Chunk);
+        (int, int, int) third = default;
+        for (long done = 0; done < bytes; done += Chunk)
+        {
+            int n = (int)Math.Min(Chunk, bytes - done);
+            var span = buffer.AsSpan(0, n);
+            ReadBytes(src + (int)done, span);
+            for (int i = 0; i < n; i += 3)
+            {
+                // (Tenki Ane: the third pixel of each 24 bytes from bytes 3, 4 and 5 | 8, before any is written)
+                int b0 = span[i], b1 = span[i + 1], b2 = span[i + 2];
+                if (thirdOff && i % 24 == 0)
+                    third = (span[i + 3], span[i + 4], span[i + 5] | span[i + 8]);
+                if (thirdOff && i % 24 == 6)
+                    (b0, b1, b2) = third;
+                int y = (b0 * 151 + b1 * 77 + b2 * 29) >> 8;
+                span[i] = (byte)(y * 145 >> 8);
+                span[i + 1] = (byte)(y * 200 >> 8);
+                span[i + 2] = (byte)(y * 240 >> 8);
+            }
+            WriteBytes(dst + (int)done, span);
+        }
+        ArrayPool<byte>.Shared.Return(buffer);
     }
 
     private void Thumbnail(ScnContext c, ScnNativeArgs a, int block, int columns, int rows, int stride = 2400) =>
