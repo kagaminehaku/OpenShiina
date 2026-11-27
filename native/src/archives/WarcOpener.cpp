@@ -631,7 +631,17 @@ Bytes WarcOpener::OpenEntry(WarcArchive& warc, const Entry& entry)
         Decoder& decoder = *warc.m_decoder;
         if (decoder.WarcVersion() > 110)
         {
+            // The signature is stored XORed with the unpacked size; an archive packed again by
+            // other tools (Iyashinbo The Motion's English translation: entries not encrypted) can
+            // have it as it is, which the engine reads too
+            auto packed = [](uint32_t s) {
+                s &= 0xFFFFFF;
+                return s == 0x314859 || s == 0x4b5059 || s == 0x5a4c59;
+            };
+            uint32_t plain = sig;
             sig ^= (unpackedSize ^ 0x82AD82) & 0xFFFFFF;
+            if (!packed(sig) && packed(plain))
+                sig = plain;
             if (0 != (entry.Flags & 0x80000000u))
                 decoder.Decrypt(encData, 8, entry.Size - 8);
             if (decoder.ExtraCrypt())

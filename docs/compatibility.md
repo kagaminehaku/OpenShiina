@@ -19,7 +19,7 @@ with, and the other ShiinaRio games of GARbro-Mod's scheme database. Their archi
 WARC version (1.0 to 1.7; 1.0 and 1.1 need no keys); whether a game plays depends on its engine
 version. The interpreter runs engine versions 2.02 to 2.20, 2.30, 2.31 and 2.33 to 2.50; see [engine-notes.md](engine-notes.md), section 1 ("The schemes", "WARC versions") and section 10.
 Try a game with `ScnTools opcheck <game folder>` first: the opcodes and DLL functions of all its
-scripts the player does not run yet (none in the 164 games, 166 releases, that play through, but for Hitozuma
+scripts the player does not run yet (none in the 164 games, 167 releases, that play through, but for Hitozuma
 Gui's, Tanetsuke Mura's and Boku Igai's `FE10`, the latter's `FDF2` and Chikan Circle's `FE2E` and `FE2F`, in branches never
 taken; all of them play through, as the table above has them). Then ScnBoot
 (`tests/OpenShiina.ScnBoot`): it plays the game without a screen and says where it stops; and
@@ -205,6 +205,7 @@ of those versions it does not list.
 | School Saimin Paradise! ~Sakki made Zenzen Suki Janakatta no ni!?~ | スク～ル催眠ぱらだいす！～さっきまで全然好きじゃなかったのに!?～ | 2019-07-26 | [v25534](https://vndb.org/v25534) | v2.50 | ✅ Plays through | 2026-10-15 |
 | Raillore no Ryakudatsusha | レイルロアの略奪者 | 2019-10-25 | [v24752](https://vndb.org/v24752) | v2.50 | ✅ Plays through | 2026-11-21 |
 | Sis△Camp | シス△キャン | 2020-10-30 | [v28635](https://vndb.org/v28635) | v2.50 | ✅ Plays through | 2026-10-15 |
+| Iyashinbo The Motion [English] | 癒しん母 The Motion (English, fan translation) | 2022 | [r116275](https://vndb.org/r116275) | v2.47 | ✅ Plays through | 2026-11-28 |
 | The Pillagers of Raillore | レイルロアの略奪者 (English) | 2025-05-29 | [r84728](https://vndb.org/r84728) | v2.50 | ✅ Plays through | 2026-10-23 |
 
 ### No keys yet
@@ -501,6 +502,15 @@ shows no box yet: the comment stays what the scripts put there. Its "Motion" ani
 they stopped the scenarios that play them (`05C9` failed) until the player took such a stream as
 it is. The game is found by its archives' names too, so its executable is not needed. Swept: 82
 scenarios, every one to its end.
+
+Its English fan translation (Iyashinbo The Motion [English], [r116275](https://vndb.org/r116275):
+the game with IYASHIm_S, \_T and \_D.WAR packed again, the scripts, the text and the menus'
+pictures) stopped at once on "Unknown opcode 5059": the tool that packed them leaves the
+entries unencrypted and stores their signature (`YPK`) as it is, where the game's own are XORed
+with the unpacked size (engine-notes.md, "Packed again"), so START.SCN came out still packed.
+The engine reads both, and so does the player now (WarcOpener). All 3,030 files come out whole;
+swept on 2026-11-28: 82 scenarios, every one to its end (55.8% of the lines shown, as the
+Japanese release's).
 
 **Gakushoku no Oba-san The Motion** (GuiltyPLUS, GAKUOBAm.EXE, engine v2.48, 800 x 600) needed
 nothing new: its 812 S25, 68 TXT and 2,548 OGV come out whole, opcheck found nothing missing, and

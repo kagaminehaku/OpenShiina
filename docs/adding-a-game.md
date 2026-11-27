@@ -193,3 +193,4 @@ a C# routine others use), sweep the games it touches again before committing.
 | Out of the scripts' memory | the heap's size; for an .exe that is large address aware, whether the flag is read (engine-notes.md, "Heap") | Bitch Gakuen, Kyuuketsuki no Libra; Nukitashi 2 (its high heap) |
 | Every scenario of the sweep stuck with no line shown | "Play from here" did not find the new game in TOPMENU.SCN (ScnVm.Warp.cs) | Boku Igai no Otoko o Shiranai Kanojo |
 | The archives open with another game's scheme, files not whole | GameMap lacks the .exe and the archives' names hold another game's | Nukitashi 2 |
+| "Unknown opcode 5059" at the start, the files of some archives not whole, those of others whole | archives a fan translation packed again, with the entries' signature as it is (engine-notes.md, "Packed again") | Iyashinbo The Motion (English) |

@@ -64,7 +64,7 @@ is mostly for slow phones, and should follow what their perf.log shows.
 
 ## Other ShiinaRio games
 
-`Formats.Json` has the keys of 164 games; 166 releases play through (compatibility.md). For a new one:
+`Formats.Json` has the keys of 164 games; 167 releases play through (compatibility.md). For a new one:
 `ScnTools opcheck`, then `tests/sweep.ps1`.
 
 - [ ] **Keys for the 2 games without them** (Delicious Way, Mahou no Shippo na Dai Ni wa;

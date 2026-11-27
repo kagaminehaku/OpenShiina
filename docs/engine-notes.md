@@ -112,6 +112,15 @@ its saves have a folder of their own. 1.0 and 1.1 checked on archives made as th
 (scratch oldwarc: both versions, a Ylz entry); none of those games is here (Forest's, before
 ShiinaRio). Of 1.2-1.6, Ao no Juuai's archives are 1.5 and the game plays through.
 
+**Packed again** (from 1.2 on). An entry starts with its signature (`YH1`, `YPK` or `YLZ` and a
+byte that says whether its data is XORed) and its unpacked size; the games' own signatures are
+XORed with (unpacked size ^ 0x82AD82), low 24 bits. Archives packed again by other tools can
+store the signature as it is: Iyashinbo The Motion's English fan translation has its new
+entries so, with flags 0x00000003 (not encrypted: bit 31 clear), and the game's executable
+plays it. WarcOpener takes the signature as it is when the XORed one is not a packed entry's
+and it is; GARbro does not (its entries come out still packed, START.SCN read as opcode 0x5059,
+"YP").
+
 ## 2. S25 layered images *(verified)*
 
 Frames are grouped by their slot number in the S25 header:

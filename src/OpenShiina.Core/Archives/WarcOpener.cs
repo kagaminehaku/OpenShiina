@@ -221,7 +221,13 @@ public class WarcOpener
 
             if (warc.Decoder.WarcVersion > 110)
             {
+                // The signature is stored XORed with the unpacked size; an archive packed again by
+                // other tools (Iyashinbo The Motion's English translation: entries not encrypted)
+                // can have it as it is, which the engine reads too
+                uint plain = sig;
                 sig ^= (unpacked_size ^ 0x82AD82) & 0xFFFFFF;
+                if (!IsPacked(sig) && IsPacked(plain))
+                    sig = plain;
                 if (0 != (wentry.Flags & 0x80000000u))
                     warc.Decoder.Decrypt(enc_data, 8, entry.Size - 8);
                 if (warc.Decoder.ExtraCrypt != null)
@@ -262,6 +268,9 @@ public class WarcOpener
 
         return unpacked;
     }
+
+    /// <summary>A packed entry's signature: YH1, YPK or YLZ.</summary>
+    private static bool IsPacked(uint sig) => (sig & 0xFFFFFF) is 0x314859 or 0x4b5059 or 0x5a4c59;
 
     /// <summary>A WARC 1.0 entry: as it is, or "Ylz" + its unpacked size + Ylz16 data.</summary>
     private static byte[] OpenForestEntry(WarcArchive warc, Entry entry)
