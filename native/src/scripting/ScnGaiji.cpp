@@ -32,6 +32,23 @@ std::optional<Bytes> Encode(const std::u32string& element)
     return bytes;
 }
 
+// Punctuation Shift-JIS has only as full-width characters, which a line of Latin text draws as its
+// letters, with their own advances ("vai “Hiệp sĩ đoàn” chúng", not a full-width cell each)
+constexpr char32_t kLatinPunctuation[] = U"“”‘’…–—";
+
+/// A line of Latin text: it has an ASCII letter, or a character Shift-JIS lacks.
+template <class Elements> bool IsLatin(const Elements& elements)
+{
+    for (const std::u32string& e : elements)
+    {
+        if (e.size() == 1 && ((e[0] >= U'A' && e[0] <= U'Z') || (e[0] >= U'a' && e[0] <= U'z')))
+            return true;
+        if (!(e.size() == 1 && e[0] < 0x80) && !Encode(e))
+            return true;
+    }
+    return false;
+}
+
 /// char.IsWhiteSpace
 bool IsWhiteSpace(char32_t c)
 {
@@ -97,7 +114,7 @@ Bytes ScnGaiji::Scenario(const Bytes& utf8)
         if (!body.empty() && body[0] != U';' && body[0] != U'$' && body[0] != U'【')
             Message(line.substr(0, lineEnd), output, true);
         else if (!body.empty() && body[0] == U'【')
-            Message(line.substr(0, lineEnd), output, false);
+            Speaker(line.substr(0, lineEnd), output);
         else
             Plain(line.substr(0, lineEnd), output);
         for (size_t k = lineEnd; k < line.size(); k++)
@@ -112,6 +129,21 @@ Bytes ScnGaiji::Text(const std::string& text)
     Bytes output;
     Message(Text::Nfc(Text::Utf8ToCodePoints(text)), output, true);
     return output;
+}
+
+void ScnGaiji::Speaker(const std::u32string& line, Bytes& output)
+{
+    // A speaker line ("【name】" or "【shown/internal】"): the shown name as a message's letters, the
+    // "/" and what follows as a command's (ASCII as it is), for the scripts to split there and find
+    // the voice or name plate by the internal name
+    size_t slash = line.find(U'/');
+    if (slash == std::u32string::npos)
+    {
+        Message(line, output, false);
+        return;
+    }
+    Message(line.substr(0, slash), output, false);
+    Plain(line.substr(slash), output);
 }
 
 void ScnGaiji::Plain(const std::u32string& line, Bytes& output)
@@ -139,10 +171,13 @@ void ScnGaiji::Message(const std::u32string& line, Bytes& output, bool end)
             AddCode(pending, output);
         hasPending = false;
     };
-    for (const std::u32string& e : Text::TextElements(line))
+    auto elements = Text::TextElements(line);
+    bool latin = IsLatin(elements);
+    for (const std::u32string& e : elements)
     {
         bool ascii = e.size() == 1 && e[0] < 0x80;
-        if (!ascii)
+        bool letter = latin && e.size() == 1 && std::u32string_view(kLatinPunctuation).find(e[0]) != std::u32string_view::npos;
+        if (!ascii && !letter)
             if (auto bytes = Encode(e))
             {
                 flush();

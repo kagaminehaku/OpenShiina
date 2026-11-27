@@ -56,6 +56,8 @@ public:
 
     /// The names and strings with a translation, names first.
     std::vector<std::pair<std::string, std::string>> TranslatedStrings() const;
+    /// The names with a translation.
+    std::vector<std::pair<std::string, std::string>> TranslatedNames() const;
 
 private:
     // Translated lines by scenario file (upper case) and line, made on first use

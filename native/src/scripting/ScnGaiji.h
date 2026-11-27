@@ -15,8 +15,9 @@
 //
 // A scenario's lines: ";" a comment, "$" a command (its ASCII stays ASCII), "【name】" the speaker
 // (a translated name is drawn as a message's letters; a game that looks names up, for voices or
-// name plates as Oreimo Plus's NWINTBL.BIN, needs the original names kept), anything else a
-// message line. Texts are UTF-8 here (UTF-16 in the C# player); normalization and text elements
+// name plates as Oreimo Plus's NWINTBL.BIN, needs the original names kept; in "【shown/internal】"
+// only the shown part is, the "/" and what follows stay as they are, as Raillore's START splits
+// there), anything else a message line. Texts are UTF-8 here (UTF-16 in the C# player); normalization and text elements
 // come from text/Unicode.
 #pragma once
 
@@ -80,6 +81,7 @@ private:
     int m_end = 0;
 
     bool PairsLeft(const std::string& pair) const { return m_codes.count(pair) != 0 || int(m_codes.size()) < Codes - KeptForLetters; }
+    void Speaker(const std::u32string& line, Bytes& output);
     void Plain(const std::u32string& line, Bytes& output);
     void Message(const std::u32string& line, Bytes& output, bool end);
     void AddCode(const std::string& text, Bytes& output);

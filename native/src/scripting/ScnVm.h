@@ -500,6 +500,27 @@ public:
     std::optional<std::array<int, 4>> FrameRectOrLast(int slot, int frame);
     /// FUN_004114B0: the entry under (x, y) gives hit = its word 6.
     bool HitTest(int sprites, int count, int x, int y, int& hit);
+    /// A button the scripts tell apart by the mouse: an entry of the list 04C7 looked in last with
+    /// a value (word 6 not -1), its frame's rectangle where 04C7 looks, and whether it is shown.
+    struct HitTarget
+    {
+        int Value, Left, Top, Width, Height;
+        bool Shown;
+    };
+    /// The buttons of the list 04C7 looked in last (C# HitTargets; the Switch player's D-pad jumps
+    /// among them).
+    std::vector<HitTarget> HitTargets();
+    /// The value 04C7 would give at (x, y) in the list it looked in last (-1: none).
+    int HitAt(int x, int y);
+    /// What tells one set of buttons from another: the list 04C7 looked in last, its buttons'
+    /// values and whether each is shown (not where they are: a button lit can change its frame).
+    uint64_t HitTargetsKey();
+    /// How many messages the scripts have set (0083, 00A0: the text window's, drawn over frames).
+    uint64_t MessagesSet = 0;
+    /// How many times 04C7 looked under a point, and the last point (the scripts' coordinates,
+    /// which can be the mouse's moved by a layer's offset).
+    uint64_t HitTests = 0;
+    int HitTestX = 0, HitTestY = 0;
     /// StretchBlt SRCCOPY: a copy when the sizes match, else nearest pixels.
     void StretchCopy(int dst, int x, int y, int w, int h, int src, int sx, int sy, int sw, int sh);
     /// The engine's stretch (051E with bit 31).
@@ -872,6 +893,8 @@ private:
     int m_spriteList = 0;
     // The list 04B8 was given, for 04B7
     int m_spriteListSet = 0;
+    // The sprite list 04C7 looked in last (-1: none yet)
+    int m_hitTestList = -1;
     std::array<int, 4> m_lastFrameRect = {};
 
     // ---- Sound ----
@@ -1038,20 +1061,32 @@ private:
     void TextStep(int rec, int surface, bool invalidate);
     void FillTextCell(int rec, int x, int y, int w, int h);
     std::pair<int, int> FixedOr(int rec, int font, const openshiina::Bytes& ch, int length);
-    // ---- Translations (ScnGaiji): what each record's last character was to a translation (its soft
-    // "_r" and its words). START breaks its lines after so many characters: how many since its last
-    // break, and how many it puts on a line (learned from its first soft break), which tells the
-    // right edge of a translated line (the record's own right edge can be the screen's) ----
+    // ---- Translations (ScnGaiji): what each record's last character was to a translation, and
+    // whether it is inside a translated message (from a letter to the End): its soft "_r" and its
+    // words. START breaks its lines after so many characters: how many since its last break, and
+    // how many it puts on a line (learned from its first soft break), which tells the right edge of
+    // a translated line (the record's own right edge can be the screen's) ----
     std::array<ScnGaiji::Kind, TextRecords> m_lastKind{};
+    std::array<bool, TextRecords> m_inTranslation{};
     std::array<int, TextRecords> m_cellsOnLine{}, m_lineCells{};
-    std::tuple<ScnGaiji::Kind, int, int> m_savedRecordState{};
+    std::tuple<ScnGaiji::Kind, bool, int, int> m_savedRecordState{};
     // strings.txt, names.tsv and strings.tsv: the original's Shift-JIS bytes -> the translation and
     // where its copy is in script memory (0 until first drawn)
     std::optional<std::unordered_map<std::string, std::pair<openshiina::Bytes, int>>> m_strings;
     int TranslationRight(int rec, int font);
     int Translated(int text);
     void ReadStrings(const openshiina::Bytes& file);
-    void AddString(const std::string& original, const std::string& translation);
+    void AddString(const std::string& original, const std::string& translation, bool overwrite = true);
+    // The kind of the character a record drew last; a translation's letter or space opens a
+    // translated message, its End closes it (what Shift-JIS has in between, a "“" or "…", stays in it)
+    void NoteKind(size_t index, ScnGaiji::Kind kind)
+    {
+        m_lastKind[index] = kind;
+        if (kind == ScnGaiji::Kind::Letters || kind == ScnGaiji::Kind::Space)
+            m_inTranslation[index] = true;
+        else if (kind == ScnGaiji::Kind::End)
+            m_inTranslation[index] = false;
+    }
     bool IsGaiji(const openshiina::Bytes& ch, int length) const { return KindOf(ch, length) != ScnGaiji::Kind::None; }
     ScnGaiji::Kind KindOf(const openshiina::Bytes& ch, int length) const
     {

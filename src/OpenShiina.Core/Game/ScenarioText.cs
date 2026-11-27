@@ -151,8 +151,13 @@ public sealed class TranslationTables
     }
 
     /// <summary>The names and strings with a translation, names first.</summary>
-    public IEnumerable<(string Original, string Translation)> TranslatedStrings() =>
-        Names.Concat(Strings).Where(s => s.Original.Length > 0 && s.Translation.Trim().Length > 0)
+    public IEnumerable<(string Original, string Translation)> TranslatedStrings() => Translated(Names.Concat(Strings));
+
+    /// <summary>The names with a translation.</summary>
+    public IEnumerable<(string Original, string Translation)> TranslatedNames() => Translated(Names);
+
+    private static IEnumerable<(string Original, string Translation)> Translated(IEnumerable<StringRow> rows) =>
+        rows.Where(s => s.Original.Length > 0 && s.Translation.Trim().Length > 0)
             .Select(s => (Tsv.Clean(s.Original), Tsv.Clean(s.Translation)));
 
     /// <param name="Outdated">

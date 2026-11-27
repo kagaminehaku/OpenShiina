@@ -283,4 +283,13 @@ std::vector<std::pair<std::string, std::string>> TranslationTables::TranslatedSt
     return list;
 }
 
+std::vector<std::pair<std::string, std::string>> TranslationTables::TranslatedNames() const
+{
+    std::vector<std::pair<std::string, std::string>> list;
+    for (const StringRow& s : Names)
+        if (!s.Original.empty() && HasText(s.Translation))
+            list.emplace_back(Tsv::Clean(s.Original), Tsv::Clean(s.Translation));
+    return list;
+}
+
 } // namespace openshiina::game

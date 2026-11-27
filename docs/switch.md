@@ -59,15 +59,24 @@ back to hbmenu, + quits.
 |---|---|
 | Touch | the mouse (a tap is a click) |
 | Left stick | moves the pointer |
-| A | Return |
+| A | Return; a click on the button the D-pad went to |
 | B | the right mouse button (the game's menu, back) |
 | X | Escape |
 | Y | Space |
 | R / ZR (held) | Control: skip |
 | L | Page Up (the text history) |
-| D-pad | the arrow keys |
+| D-pad, right stick | on a screen of buttons, the pointer goes to the next button that way; else the arrow keys (the D-pad) |
 | + | the menu: back to the game, the scaling, leave the game |
 | HOME | pauses the game |
+
+On a screen of buttons (the title, a menu, the save pages: the game looks for the button under
+the mouse), the D-pad and the right stick go from button to button as on a console, the pointer
+staying on the one chosen, and A presses it. The left stick or a touch moves the pointer freely
+again, and A is Return again. Where no button is that way (a slider moved by the arrow keys),
+the D-pad is the arrow keys. While the story is read (the text window's own buttons on the
+screen: Q.Save, Auto, the log...), the D-pad goes to them too, but the pointer leaves 2 seconds
+after the D-pad was last pressed, and A goes on with the story again; a touch hides it at once.
+In a menu, the save pages or a choice the pointer stays.
 
 The saves go to `OpenShiina/Saves/<game>` on the card, and what the player prints to
 `OpenShiina/player.log` (send it with a bug report).

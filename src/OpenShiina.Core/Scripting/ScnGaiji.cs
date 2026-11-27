@@ -15,8 +15,9 @@
 //
 // A scenario's lines: ";" a comment, "$" a command (its ASCII stays ASCII), "【name】" the
 // speaker (a translated name is drawn as a message's letters; a game that looks names up, for
-// voices or name plates as Oreimo Plus's NWINTBL.BIN, needs the original names kept), anything
-// else a message line.
+// voices or name plates as Oreimo Plus's NWINTBL.BIN, needs the original names kept; in
+// "【shown/internal】" only the shown part is, the "/" and what follows stay as they are, as
+// Raillore's START splits there), anything else a message line.
 
 using System.Globalization;
 using System.Text;
@@ -106,7 +107,7 @@ public sealed class ScnGaiji
             if (body.Length > 0 && body[0] is not (';' or '$' or '【'))
                 Message(sjis, line[..lineEnd], output, end: true);
             else if (body.Length > 0 && body[0] == '【')
-                Message(sjis, line[..lineEnd], output, end: false);
+                Speaker(sjis, line[..lineEnd], output);
             else
                 Plain(sjis, line[..lineEnd], output);
             foreach (char c in line[lineEnd..])
@@ -124,6 +125,23 @@ public sealed class ScnGaiji
         var output = new List<byte>(text.Length * 2);
         Message(sjis, text.Normalize(NormalizationForm.FormC), output, end: true);
         return output.ToArray();
+    }
+
+    /// <summary>
+    /// A speaker line ("【name】" or "【shown/internal】"): the shown name as a message's letters,
+    /// the "/" and what follows as a command's (ASCII as it is), for the scripts to split there
+    /// and find the voice or name plate by the internal name.
+    /// </summary>
+    private void Speaker(Encoding sjis, string line, List<byte> output)
+    {
+        int slash = line.IndexOf('/');
+        if (slash < 0)
+        {
+            Message(sjis, line, output, end: false);
+            return;
+        }
+        Message(sjis, line[..slash], output, end: false);
+        Plain(sjis, line[slash..], output);
     }
 
     /// <summary>A comment, command or speaker line: Shift-JIS, ASCII as it is, gaiji for what Shift-JIS lacks.</summary>
@@ -150,6 +168,7 @@ public sealed class ScnGaiji
     private void Message(Encoding sjis, string line, List<byte> output, bool end)
     {
         var bytes = new byte[4];
+        bool latin = IsLatin(sjis, line, bytes);
         string? pending = null;
         void Flush()
         {
@@ -162,7 +181,8 @@ public sealed class ScnGaiji
         {
             string element = (string)elements.Current;
             bool ascii = element.Length == 1 && element[0] < 0x80;
-            if (!ascii && Encode(sjis, element, bytes) is int n and > 0)
+            bool letter = latin && element.Length == 1 && LatinPunctuation.Contains(element[0]);
+            if (!ascii && !letter && Encode(sjis, element, bytes) is int n and > 0)
             {
                 Flush();
                 output.AddRange(bytes.AsSpan(0, n));
@@ -188,6 +208,25 @@ public sealed class ScnGaiji
         Flush();
         if (end)
             AddCode("", output);
+    }
+
+    // Punctuation Shift-JIS has only as full-width characters, which a line of Latin text draws as
+    // its letters, with their own advances ("vai “Hiệp sĩ đoàn” chúng", not a full-width cell each)
+    private const string LatinPunctuation = "“”‘’…–—";
+
+    /// <summary>A line of Latin text: it has an ASCII letter, or a character Shift-JIS lacks.</summary>
+    private static bool IsLatin(Encoding sjis, string line, byte[] bytes)
+    {
+        var elements = StringInfo.GetTextElementEnumerator(line);
+        while (elements.MoveNext())
+        {
+            string element = (string)elements.Current;
+            if (element.Length == 1 && char.IsAsciiLetter(element[0]))
+                return true;
+            if (!(element.Length == 1 && element[0] < 0x80) && Encode(sjis, element, bytes) == 0)
+                return true;
+        }
+        return false;
     }
 
     private void AddCode(string text, List<byte> output)

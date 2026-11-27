@@ -1302,6 +1302,57 @@ std::optional<std::array<int, 4>> ScnVm::FrameRectOrLast(int slot, int frame)
     return std::nullopt;
 }
 
+std::vector<ScnVm::HitTarget> ScnVm::HitTargets()
+{
+    // C# ScnVm.HitTargets, with each entry's flag "shown" (bit 31 of word 2)
+    std::vector<HitTarget> targets;
+    if (m_hitTestList < 0)
+        return targets;
+    int sprites = TableAddress(m_hitTestList);
+    for (int i = 0; i < m_spriteCounts[size_t(m_hitTestList)]; i++)
+    {
+        int e = sprites + i * SpriteSize;
+        int value = Read32(e + 0x18), picture = Picture(Read32(e));
+        if (value == -1 || picture == 0)
+            continue;
+        uint32_t frameIndex = uint32_t(Read32(e + 4));
+        if (uint32_t(Read32(picture + 4)) <= frameIndex)
+            continue;
+        int f = Read32(picture + 8 + 4 * int(frameIndex));
+        if (f == 0)
+            continue;
+        int width = Read32(f), height = Read32(f + 4);
+        if (width > 0 && height > 0)
+            targets.push_back({value, Read32(f + 8) + Read32(e + 0x10), Read32(f + 0xC) + Read32(e + 0x14), width, height, (uint32_t(Read32(e + 8)) & 0x80000000u) != 0});
+    }
+    return targets;
+}
+
+uint64_t ScnVm::HitTargetsKey()
+{
+    // FNV-1a over the list and each button's value and flag "shown"
+    uint64_t key = 0xCBF29CE484222325ull;
+    auto add = [&](uint32_t v) {
+        for (int b = 0; b < 4; b++)
+            key = (key ^ ((v >> (8 * b)) & 0xFF)) * 0x100000001B3ull;
+    };
+    add(uint32_t(m_hitTestList));
+    for (const auto& t : HitTargets())
+    {
+        add(uint32_t(t.Value));
+        add(t.Shown ? 1 : 0);
+    }
+    return key;
+}
+
+int ScnVm::HitAt(int x, int y)
+{
+    int hit = -1;
+    if (m_hitTestList >= 0)
+        HitTest(TableAddress(m_hitTestList), m_spriteCounts[size_t(m_hitTestList)], x, y, hit);
+    return hit;
+}
+
 bool ScnVm::HitTest(int sprites, int count, int x, int y, int& hit)
 {
     // FUN_004114B0: from the highest priority down (unsigned; shown or not), the first entry whose
@@ -1572,6 +1623,10 @@ void ScnVm::RegisterSprites()
         int x = vm.Value(c, i.Args[0]), y = vm.Value(c, i.Args[1]);
         int list = vm.m_spriteList;
         int hit = -1;
+        vm.m_hitTestList = list;
+        vm.HitTests++;
+        vm.HitTestX = x;
+        vm.HitTestY = y;
         vm.HitTest(vm.TableAddress(list), vm.m_spriteCounts[size_t(list)], x, y, hit);
         vm.Store(c, i.Args[2], hit);
         return 0;

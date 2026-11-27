@@ -11,7 +11,9 @@
 // Input, as the C# player's touch bar and joystick give it: a touch is the mouse (moved there, the
 // left button held while touching); A is Return, B the right button, X Escape, Y Space, R / ZR
 // Control (held: skip), L Page Up, the D-pad the arrow keys, the left stick moves the pointer (shown
-// while it moves); + opens the menu (GameMenu: back, the scaling, leave the game). A message box
+// while it moves). While the scripts look for the button under the mouse, the D-pad or the right
+// stick moves the pointer from button to button and A clicks the one it is on (NextButton; on the
+// text window's buttons for 2 seconds); + opens the menu (GameMenu: back, the scaling, leave the game). A message box
 // of the game is asked over its picture (MessageDialog). Text is drawn
 // with the Switch's own Japanese font
 // (FreeTypeFonts); the sound goes out through SDL (only its audio is used).
@@ -239,6 +241,112 @@ constexpr KeyOf kKeys[] = {
     {HidNpadButton_ZR, 0x11, 0x1D},    {HidNpadButton_L, 0x21, 0x49},    {HidNpadButton_Left, 0x25, 0x4B}, {HidNpadButton_Up, 0x26, 0x48},
     {HidNpadButton_Right, 0x27, 0x4D}, {HidNpadButton_Down, 0x28, 0x50},
 };
+
+/// A direction of the D-pad (or the right stick pushed) among a game's buttons.
+struct DirectionOf
+{
+    u64 Buttons;
+    int Dx, Dy;
+};
+
+constexpr DirectionOf kDirections[] = {
+    {HidNpadButton_Left | HidNpadButton_StickRLeft, -1, 0},
+    {HidNpadButton_Right | HidNpadButton_StickRRight, 1, 0},
+    {HidNpadButton_Up | HidNpadButton_StickRUp, 0, -1},
+    {HidNpadButton_Down | HidNpadButton_StickRDown, 0, 1},
+};
+
+/// The D-pad among a game's buttons (ScnVm::HitTargets, in the scripts' coordinates, which are the
+/// screen's moved by offset): where the pointer goes from (x, y) ((-1, -1): it is away) in the
+/// direction (dx, dy), false for nowhere. The buttons are the shown ones when any is (a list can
+/// hold another page's hidden ones), a value once (its entries' rectangles together), none as big
+/// as half the screen (a backdrop that takes clicks) or off it. From a button, the nearest one
+/// ahead, what is out of line counting twice, and not more out of line than twice ahead; from no
+/// button, the same from the pointer, else the nearest; with the pointer away, the first (Right,
+/// Down) or last (Left, Up) in reading order. The point is one where 04C7 finds the button (its
+/// middle can be a hole of its picture).
+bool NextButton(ScnVm& vm, int offsetX, int offsetY, int width, int height, int dx, int dy, int& x, int& y)
+{
+    struct Button
+    {
+        int Value, L, T, R, B;
+        int64_t Area() const { return int64_t(R - L) * (B - T); }
+        bool Has(int px, int py) const { return px >= L && px < R && py >= T && py < B; }
+    };
+    auto targets = vm.HitTargets();
+    bool anyShown = std::any_of(targets.begin(), targets.end(), [](const ScnVm::HitTarget& t) { return t.Shown; });
+    std::vector<Button> buttons;
+    for (const auto& t : targets)
+    {
+        if (anyShown && !t.Shown)
+            continue;
+        Button b{t.Value, t.Left - offsetX, t.Top - offsetY, t.Left - offsetX + t.Width, t.Top - offsetY + t.Height};
+        auto same = std::find_if(buttons.begin(), buttons.end(), [&](const Button& o) { return o.Value == b.Value; });
+        if (same == buttons.end())
+            buttons.push_back(b);
+        else
+            *same = {b.Value, std::min(same->L, b.L), std::min(same->T, b.T), std::max(same->R, b.R), std::max(same->B, b.B)};
+    }
+    // (on the screen: what is off it is clipped away)
+    for (auto& b : buttons)
+        b = {b.Value, std::max(b.L, 0), std::max(b.T, 0), std::min(b.R, width), std::min(b.B, height)};
+    buttons.erase(std::remove_if(buttons.begin(), buttons.end(),
+                                 [&](const Button& b) { return b.R <= b.L || b.B <= b.T || b.Area() * 2 >= int64_t(width) * height; }),
+                  buttons.end());
+    if (buttons.empty())
+        return false;
+
+    const Button* from = nullptr;
+    if (x >= 0 && y >= 0)
+        for (const auto& b : buttons)
+            if (b.Has(x, y) && (!from || b.Area() < from->Area()))
+                from = &b;
+    int px = from ? (from->L + from->R) / 2 : x, py = from ? (from->T + from->B) / 2 : y;
+    const Button* best = nullptr;
+    int64_t bestScore = 0;
+    for (const auto& b : buttons)
+    {
+        if (&b == from)
+            continue;
+        int cx = (b.L + b.R) / 2, cy = (b.T + b.B) / 2;
+        int64_t score;
+        if (x < 0 || y < 0)
+            score = (dx + dy > 0 ? 1 : -1) * (int64_t(cy) * width + cx);
+        else
+        {
+            int ahead = (cx - px) * dx + (cy - py) * dy, aside = std::abs(dx != 0 ? cy - py : cx - px);
+            if (ahead <= 0 || aside > 2 * ahead)
+                continue;
+            score = ahead + 2 * int64_t(aside);
+        }
+        if (!best || score < bestScore)
+            best = &b, bestScore = score;
+    }
+    if (!best && !from && x >= 0 && y >= 0)
+        for (const auto& b : buttons)
+        {
+            int64_t ax = (b.L + b.R) / 2 - x, ay = (b.T + b.B) / 2 - y, score = ax * ax + ay * ay;
+            if (!best || score < bestScore)
+                best = &b, bestScore = score;
+        }
+    if (!best)
+        return false;
+    x = (best->L + best->R) / 2;
+    y = (best->T + best->B) / 2;
+    if (vm.HitAt(x + offsetX, y + offsetY) != best->Value)
+        for (int i = 1; i < 6; i++)
+            for (int j = 1; j < 6; j++)
+            {
+                int gx = best->L + (best->R - best->L) * j / 6, gy = best->T + (best->B - best->T) * i / 6;
+                if (vm.HitAt(gx + offsetX, gy + offsetY) == best->Value)
+                {
+                    x = gx;
+                    y = gy;
+                    return true;
+                }
+            }
+    return true;
+}
 
 /// The player's screen, text, logo and controls.
 struct Ui
@@ -1596,6 +1704,22 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
     bool running = true, focused = true, touching = false;
     // frames until the pointer leaves the picture after a touch lifts (0: it stays)
     int awayIn = 0;
+    // The D-pad (or the right stick pushed) among the game's buttons while its scripts look for
+    // the one under the mouse (04C7, in the last half second): the pointer jumps to the next button
+    // that way (NextButton) and stays shown, and A clicks it, until the stick or a touch moves it;
+    // with no button that way the D-pad is the arrow keys. The scripts' point is the mouse's moved
+    // by an offset (a layer's), learned as 04C7 is run. The presses that went to the buttons, and
+    // their releases, are not the game's keys. While the story is read (the buttons there when the
+    // scripts set a message, 0083 or 00A0, are the text window's, and they are the ones on the
+    // screen), the pointer leaves its button 2 seconds after the D-pad was last pressed and A goes
+    // on with the story again; a menu, the save pages or a choice are other buttons, without that
+    // time. The next press starts from the button left
+    uint64_t hitTestsSeen = 0, buttonsFrame = 0, buttonsKey = 0, storyKey = 0, messagesSeen = 0, jumpedAt = 0;
+    bool anyMessage = false;
+    int leftX = -1, leftY = -1;
+    int hitOffsetX = 0, hitOffsetY = 0;
+    bool onButton = false;
+    u64 swallowed = 0;
     // The frame rate shown (the setting "Show the frame rate"): frames a second and the slowest
     // frame, once a second
     uint64_t meterStart = started, lastFrame = started, meterSlowest = 0, meterFrames = 0;
@@ -1691,10 +1815,46 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
                 mouse(ScnMessage::RButtonDown, host.Buttons | 2);
             if (up & HidNpadButton_B)
                 mouse(ScnMessage::RButtonUp, host.Buttons & ~2);
-            for (const auto& k : kKeys)
-                if ((down | up) & k.Button)
+            // the D-pad among the game's buttons, A on one clicks it
+            bool buttonsNow = hitTestsSeen != 0 && frames - buttonsFrame < 30;
+            bool story = anyMessage && buttonsKey == storyKey;
+            if (onButton && (!buttonsNow || (story && armGetSystemTick() - jumpedAt > armNsToTicks(2000000000ull))))
+            {
+                // (the pointer the D-pad left leaves the picture: no button stays lit under it)
+                onButton = false;
+                leftX = host.MouseX;
+                leftY = host.MouseY;
+                host.MouseX = host.MouseY = -1;
+            }
+            for (const auto& d : kDirections)
+                if ((down & d.Buttons) && buttonsNow)
                 {
-                    bool pressed = (down & k.Button) != 0;
+                    int x = host.MouseX, y = host.MouseY;
+                    if (x < 0 || y < 0)
+                        x = leftX, y = leftY;
+                    if (NextButton(*vm, hitOffsetX, hitOffsetY, setup.Width, setup.Height, d.Dx, d.Dy, x, y))
+                    {
+                        host.MouseX = x;
+                        host.MouseY = y;
+                        onButton = true;
+                        jumpedAt = armGetSystemTick();
+                        awayIn = 0;
+                        swallowed |= down & d.Buttons;
+                    }
+                }
+            if ((down & HidNpadButton_A) && onButton)
+            {
+                mouse(ScnMessage::LButtonDown, host.Buttons | 1);
+                swallowed |= HidNpadButton_A;
+            }
+            if ((up & HidNpadButton_A) && (swallowed & HidNpadButton_A))
+                mouse(ScnMessage::LButtonUp, host.Buttons & ~1);
+            u64 keysDown = down & ~swallowed, keysUp = up & ~swallowed;
+            swallowed &= ~up;
+            for (const auto& k : kKeys)
+                if ((keysDown | keysUp) & k.Button)
+                {
+                    bool pressed = (keysDown & k.Button) != 0;
                     host.Keys[k.VirtualKey] = pressed;
                     vm->WindowMessage(pressed ? ScnMessage::KeyDown : ScnMessage::KeyUp, k.VirtualKey, ScnMessage::Key(k.ScanCode, pressed, false));
                 }
@@ -1713,7 +1873,10 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             // Once the game has had the button up where the finger was, the pointer leaves the
             // picture: a finger is not a mouse that stays, and a button under it would stay lit
             if (touch)
+            {
                 awayIn = 0;
+                onButton = false;
+            }
             else if (awayIn > 0 && --awayIn == 0)
                 host.MouseX = host.MouseY = -1;
             touching = touch;
@@ -1721,6 +1884,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             HidAnalogStickState stick = padGetStickPos(&ui.Pad, 0);
             if (!test && (std::abs(stick.x) > 6000 || std::abs(stick.y) > 6000))
             {
+                onButton = false;
                 host.MouseX = std::clamp(host.MouseX + stick.x / 4096, 0, setup.Width - 1);
                 host.MouseY = std::clamp(host.MouseY - stick.y / 4096, 0, setup.Height - 1);
                 pointerShownUntil = armGetSystemTick() + armNsToTicks(2000000000ull);
@@ -1773,6 +1937,21 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             }
             uint64_t scripts = armGetSystemTick() - before - askedTicks;
             askedTicks = 0;
+            if (vm->HitTests != hitTestsSeen)
+            {
+                hitTestsSeen = vm->HitTests;
+                buttonsFrame = frames;
+                int ox = vm->HitTestX - host.MouseX, oy = vm->HitTestY - host.MouseY;
+                if (host.MouseX >= 0 && host.MouseY >= 0 && std::abs(ox) < setup.Width && std::abs(oy) < setup.Height)
+                    hitOffsetX = ox, hitOffsetY = oy;
+                buttonsKey = vm->HitTargetsKey();
+            }
+            if (vm->MessagesSet != messagesSeen)
+            {
+                messagesSeen = vm->MessagesSet;
+                storyKey = buttonsKey;
+                anyMessage = true;
+            }
             if (asked)
             {
                 // The buttons let go while the game asked: let go for the game too
@@ -1817,7 +1996,7 @@ void Play(Ui& ui, const std::string& path, uint64_t frameLimit = 0, const player
             uint64_t drawStart = armGetSystemTick();
             ui.Screen.Begin(0xFF000000);
             drawGame();
-            if (armGetSystemTick() < pointerShownUntil)
+            if ((armGetSystemTick() < pointerShownUntil || onButton) && host.MouseX >= 0 && host.MouseY >= 0)
             {
                 float px = place.X + (float(host.MouseX) + 0.5f) * place.W / float(setup.Width);
                 float py = place.Y + (float(host.MouseY) + 0.5f) * place.H / float(setup.Height);

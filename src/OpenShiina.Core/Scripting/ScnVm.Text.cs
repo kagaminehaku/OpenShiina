@@ -48,15 +48,16 @@ public sealed partial class ScnVm
     private static readonly byte[] s_zenkaku = Convert.FromBase64String(
         "QIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBSYFogZSBkIGTgZWBZoFpgWqBloF7gUOBfIFEgV6BT4JQglGCUoJTglSCVYJWgleCWIJGgUeBg4GBgYSBSIGXgWCCYYJigmOCZIJlgmaCZ4JogmmCaoJrgmyCbYJugm+CcIJxgnKCc4J0gnWCdoJ3gniCeYJtgY+BboFPgVGBZYGBgoKCg4KEgoWChoKHgoiCiYKKgouCjIKNgo6Cj4KQgpGCkoKTgpSClYKWgpeCmIKZgpqCb4FigXCBYIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUKBdYF2gUGBRYHwgp+CoYKjgqWCp4LhguOC5YLBgluBoIKigqSCpoKogqmCq4Ktgq+CsYKzgrWCt4K5gruCvYK/gsKCxILGgsiCyYLKgsuCzILNgtCC04LWgtmC3ILdgt6C34LgguKC5ILmgueC6ILpguqC64LtgvGCSoFLgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFJgWiBlIGQgZOBlYFmgWmBaoGWgXuBQ4F8gUSBXoFPglCCUYJSglOCVIJVglaCV4JYgkaBR4GDgYGBhIFIgZeBYIJhgmKCY4JkgmWCZoJngmiCaYJqgmuCbIJtgm6Cb4JwgnGCcoJzgnSCdYJ2gneCeIJ5gm2Bj4FugU+BUYFlgYGCgoKDgoSChYKGgoeCiIKJgoqCi4KMgo2CjoKPgpCCkYKSgpOClIKVgpaCl4KYgpmCmoJvgWKBcIFggUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQoF1gXaBQYFFgZKDQINCg0SDRoNIg4ODhYOHg2KDW4FBg0ODRYNHg0mDSoNMg06DUINSg1SDVoNYg1qDXINeg2CDY4Nlg2eDaYNqg2uDbINtg26DcYN0g3eDeoN9g36DgIOBg4KDhIOGg4iDiYOKg4uDjIONg4+Dk4NKgUuBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgUCBQIFAgQ==");
 
-    // What each record's last character was to a translation (ScnGaiji): its soft "_r" and its
-    // words. START breaks its lines after so many characters: how many since its last break, and
+    // What each record's last character was to a translation (ScnGaiji), and whether it is inside
+    // a translated message (from a letter to the End): its soft "_r" and its words. START breaks its lines after so many characters: how many since its last break, and
     // how many it puts on a line (learned from its first soft break), which tells the right edge
     // of a translated line (the record's own right edge can be the screen's)
     private readonly ScnGaiji.Kind[] m_lastKind = new ScnGaiji.Kind[TextRecords];
+    private readonly bool[] m_inTranslation = new bool[TextRecords];
     private readonly int[] m_cellsOnLine = new int[TextRecords], m_lineCells = new int[TextRecords];
     // 008C's copy of a record (one for all of them, as the engine's), with what is kept of it here
     private readonly byte[] m_savedRecord = new byte[RecordSize];
-    private (ScnGaiji.Kind LastKind, int CellsOnLine, int LineCells) m_savedRecordState;
+    private (ScnGaiji.Kind LastKind, bool InTranslation, int CellsOnLine, int LineCells) m_savedRecordState;
     private static readonly byte[] s_fullWidthSpace = [0x81, 0x40];
 
     /// <summary>
@@ -161,22 +162,45 @@ public sealed partial class ScnVm
             if (m_host.ReadLooseFile(TranslationFolder + "strings.txt") is { } file)
                 ReadStrings(file);
             if (Tables is { } tables)
+            {
                 foreach (var (original, translation) in tables.TranslatedStrings())
                     AddString(original, translation);
+                // Names of the form "shown/internal" (Raillore: "緑髪の少年/幼少グレイ", the voice's
+                // name after the "/"): the scripts split them and draw the shown part alone, so it
+                // is translated too (by the translation's own shown part when it keeps a "/")
+                foreach (var (original, translation) in tables.TranslatedNames())
+                {
+                    int slash = original.IndexOf('/'), shown = translation.IndexOf('/');
+                    if (slash > 0)
+                        AddString(original[..slash], shown > 0 ? translation[..shown] : translation, overwrite: false);
+                }
+            }
             if (m_strings.Count > 0 && m_host.Fonts is { } fonts)
                 fonts.Gaiji = m_gaiji.Texts;
         }
         if (m_strings.Count == 0 || text == 0)
             return text;
         int length = StringLength(text);
-        if (length == 0 || length > 4096 || !m_strings.TryGetValue(Encoding.Latin1.GetString(ReadBytes(text, length)), out var entry))
+        if (length == 0 || length > 4096)
             return text;
+        var raw = ReadBytes(text, length);
+        string key = Encoding.Latin1.GetString(raw);
+        if (!m_strings.TryGetValue(key, out var entry))
+        {
+            // A name the scripts put in "【】" before drawing it (Raillore's START): the name's
+            // translation in them (a translation ends with End, which stays last)
+            if (raw.Length > 4 && raw[0] == 0x81 && raw[1] == 0x79 && raw[^2] == 0x81 && raw[^1] == 0x7A
+                && m_strings.TryGetValue(key[2..^2], out var inner))
+                m_strings[key] = entry = ([0x81, 0x79, .. inner.Bytes.AsSpan(0, inner.Bytes.Length - 2), 0x81, 0x7A, .. inner.Bytes.AsSpan(inner.Bytes.Length - 2)], 0);
+            else
+                return text;
+        }
         if (entry.Address == 0)
         {
             var bytes = new byte[entry.Bytes.Length + 1];
             entry.Bytes.CopyTo(bytes, 0);
             entry.Address = AllocateCopy(bytes);
-            m_strings[Encoding.Latin1.GetString(ReadBytes(text, length))] = entry;
+            m_strings[key] = entry;
         }
         return entry.Address;
     }
@@ -193,7 +217,7 @@ public sealed partial class ScnVm
     }
 
     /// <summary>A text the scripts may draw and its translation (left out when Shift-JIS cannot write the original).</summary>
-    private void AddString(string original, string translation)
+    private void AddString(string original, string translation, bool overwrite = true)
     {
         var sjis = (Encoding)Encodings.cp932.Clone();
         sjis.EncoderFallback = EncoderFallback.ExceptionFallback;
@@ -206,15 +230,20 @@ public sealed partial class ScnVm
         {
             return;
         }
-        m_strings![Encoding.Latin1.GetString(bytes)] = (m_gaiji.Text(translation), 0);
+        string key = Encoding.Latin1.GetString(bytes);
+        if (!overwrite && m_strings!.ContainsKey(key))
+            return;
+        m_strings![key] = (m_gaiji.Text(translation), 0);
     }
 
     /// <summary>FUN_00431730: the record's text, optionally with a new position.</summary>
     private void SetText(int rec, int x, int y, int text)
     {
         NoteShownText(text);
-        m_lastKind[G(rec, RIndex) % TextRecords] = ScnGaiji.Kind.None;
-        m_cellsOnLine[G(rec, RIndex) % TextRecords] = 0;
+        int index = G(rec, RIndex) % TextRecords;
+        m_lastKind[index] = ScnGaiji.Kind.None;
+        m_inTranslation[index] = false;
+        m_cellsOnLine[index] = 0;
         if (x != -1)
         {
             S(rec, RX, x);
@@ -511,6 +540,7 @@ public sealed partial class ScnVm
         int a = G(other, RIndex) % TextRecords, b = G(rec, RIndex) % TextRecords;
         (m_glyphs[a], m_glyphs[b]) = (m_glyphs[b], m_glyphs[a]);
         (m_lastKind[a], m_lastKind[b]) = (m_lastKind[b], m_lastKind[a]);
+        (m_inTranslation[a], m_inTranslation[b]) = (m_inTranslation[b], m_inTranslation[a]);
         (m_cellsOnLine[a], m_cellsOnLine[b]) = (m_cellsOnLine[b], m_cellsOnLine[a]);
         (m_lineCells[a], m_lineCells[b]) = (m_lineCells[b], m_lineCells[a]);
         var bytesOther = ReadBytes(other, RecordSize);
@@ -796,9 +826,10 @@ public sealed partial class ScnVm
                     return;
                 }
                 // START's break after so many characters inside a translated message (not after
-                // its End): the text system breaks those lines by their widths
+                // its End, and also after the Shift-JIS punctuation of one, a "”" or "…"): the
+                // text system breaks those lines by their widths
                 int index = G(rec, RIndex) % TextRecords;
-                if (m_lastKind[index] is ScnGaiji.Kind.Letters or ScnGaiji.Kind.Space)
+                if (m_inTranslation[index])
                 {
                     m_lineCells[index] = Math.Max(m_lineCells[index], m_cellsOnLine[index]);
                     m_cellsOnLine[index] = 0;
@@ -1020,7 +1051,7 @@ public sealed partial class ScnVm
             int length = TakeChar(rec);
             int pitch = G(rec, RPitch);
             var taken = CharBytes(rec, length);
-            m_lastKind[G(rec, RIndex) % TextRecords] = KindOf(taken, length);
+            NoteKind(G(rec, RIndex) % TextRecords, KindOf(taken, length));
             m_cellsOnLine[G(rec, RIndex) % TextRecords]++;
             if (pitch == -1 || IsGaiji(taken, length))
             {
@@ -1305,7 +1336,7 @@ public sealed partial class ScnVm
             S(rec, RX, G(rec, RX) + G(rec, RIndent));
             S(rec, RLineStart, 1);
         }
-        m_lastKind[kindAt] = kind;
+        NoteKind(kindAt, kind);
 
         // Wrap before a character that would cross the right edge and may not end a line
         int x = G(rec, RX), pitch = G(rec, RPitch);
@@ -1408,6 +1439,19 @@ public sealed partial class ScnVm
             return (G(rec, RFixedW), G(rec, RFixedH));
         // a translation's character takes its own width, in the fixed height
         return (Extent(font, ch.AsSpan(0, length)).Width, G(rec, RFixedH));
+    }
+
+    /// <summary>
+    /// The kind of the character a record drew last; a translation's letter or space opens a
+    /// translated message, its End closes it (what Shift-JIS has in between, "“" or "…", stays in it).
+    /// </summary>
+    private void NoteKind(int index, ScnGaiji.Kind kind)
+    {
+        m_lastKind[index] = kind;
+        if (kind is ScnGaiji.Kind.Letters or ScnGaiji.Kind.Space)
+            m_inTranslation[index] = true;
+        else if (kind == ScnGaiji.Kind.End)
+            m_inTranslation[index] = false;
     }
 
     /// <summary>A character of a translated scenario (ScnGaiji): drawn with its own advance, not the fixed pitch or width.</summary>
@@ -2012,7 +2056,7 @@ public sealed partial class ScnVm
                 throw vm.Error(c, "op_008C of v2.47 is not done");
             int rec = vm.CurrentRecord(c), index = vm.G(rec, RIndex) % TextRecords;
             vm.ReadBytes(rec, vm.m_savedRecord);
-            vm.m_savedRecordState = (vm.m_lastKind[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]);
+            vm.m_savedRecordState = (vm.m_lastKind[index], vm.m_inTranslation[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]);
             return 0;
         });
         Register(0x008D, (vm, c, i) =>
@@ -2022,7 +2066,7 @@ public sealed partial class ScnVm
             int rec = vm.CurrentRecord(c);
             vm.WriteBytes(rec, vm.m_savedRecord);
             int index = vm.G(rec, RIndex) % TextRecords;
-            (vm.m_lastKind[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]) = vm.m_savedRecordState;
+            (vm.m_lastKind[index], vm.m_inTranslation[index], vm.m_cellsOnLine[index], vm.m_lineCells[index]) = vm.m_savedRecordState;
             // the record's font is back without going through its setting: no glyph of the other one stays
             vm.ClearGlyphs(rec);
             return 0;
@@ -2046,8 +2090,10 @@ public sealed partial class ScnVm
             int rec = vm.CurrentRecord(c);
             int snapshot = SnapshotRegion + c.TextRecord * SnapshotSize;
             vm.CopyMemory(rec, snapshot, RecordSize);
-            vm.m_lastKind[vm.G(rec, RIndex) % TextRecords] = ScnGaiji.Kind.None;
-            vm.m_cellsOnLine[vm.G(rec, RIndex) % TextRecords] = 0;
+            int index = vm.G(rec, RIndex) % TextRecords;
+            vm.m_lastKind[index] = ScnGaiji.Kind.None;
+            vm.m_inTranslation[index] = false;
+            vm.m_cellsOnLine[index] = 0;
             int waits = vm.G(rec, RWaits);
             vm.S(rec, RContext, c.Slot);
             int surface = owner is >= 0 and < Slots ? vm.m_slots[owner].TextSurface : -1;
