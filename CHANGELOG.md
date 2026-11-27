@@ -4,6 +4,24 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## 0.8.8 (2026-11-28)
+
+- **Iyashinbo The Motion's English fan translation plays through** (164 games, 167 releases): it
+  stopped at once with "Unknown opcode 5059". The tool that packed its archives again stores the
+  entries' signatures as they are, which the game reads and the player did not
+  ([engine-notes.md](docs/engine-notes.md), "Packed again").
+- **Translations: speakers' names of the form "shown/voice"** (Raillore: `【隊長/幼少グレイ】`) keep
+  their "/", so the game draws only the name, finds its voice, and takes the name's translation
+  from names.tsv, also when its scripts put the name in `【】` themselves.
+- **Translations: a sentence with “quotes”, … or — no longer loses its end.** The game's own line
+  breaks are left out until the translated sentence ends, whatever punctuation is where it breaks,
+  and that punctuation is drawn at its own width in Latin text, not as a full-width character.
+- **Switch: the D-pad goes from button to button.** On a screen of buttons (the title, menus, the
+  save pages) the D-pad or the right stick moves the pointer to the next button that way, as on a
+  console, and A presses it; the left stick still moves the pointer freely. While the story is
+  read the D-pad reaches the text window's buttons too (Q.Save, Auto...), and 2 seconds after it
+  was last pressed, or at a touch, the pointer leaves them and A goes on with the story.
+
 ## 0.8.7 (2026-11-24)
 
 - **Chou Saiminjutsu Gakuen's web trial plays through** (164 games, 166 releases): its opening
