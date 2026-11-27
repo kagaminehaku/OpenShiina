@@ -4,6 +4,12 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 [Releases](https://github.com/kagaminehaku/OpenShiina/releases) page; the state of every game is in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Unreleased
+
+- **The Windows and Linux downloads are one program each**: OpenShiina (or OpenShiinaTools) with
+  the runtime inside, next to Formats.Json and the licences, not some hundreds of files; the
+  native libraries' debug symbols (100 MB) are left out, the zip is 46 MB instead of 76.
+
 ## 0.8.8 (2026-11-28)
 
 - **Iyashinbo The Motion's English fan translation plays through** (164 games, 167 releases): it

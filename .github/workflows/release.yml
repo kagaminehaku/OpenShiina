@@ -67,8 +67,9 @@ jobs:
       - name: Publish
         shell: pwsh
         run: |
-          dotnet publish src/OpenShiina.Desktop -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/desktop
-          dotnet publish src/OpenShiina.Tools -c Release -r win-x64 --self-contained -p:Version=$env:VERSION -o out/tools
+          dotnet publish src/OpenShiina.Desktop -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:Version=$env:VERSION -o out/desktop
+          dotnet publish src/OpenShiina.Tools -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:Version=$env:VERSION -o out/tools
+          Remove-Item out/desktop/*.pdb, out/tools/*.pdb -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path out/desktop/* -DestinationPath "dist/OpenShiina-$env:VERSION-windows-x64.zip"
           Compress-Archive -Path out/tools/* -DestinationPath "dist/OpenShiinaTools-$env:VERSION-windows-x64.zip"
@@ -93,8 +94,9 @@ jobs:
         run: dotnet new globaljson --sdk-version 10.0.100 --roll-forward latestFeature --force
       - name: Publish
         run: |
-          dotnet publish src/OpenShiina.Desktop -c Release -r linux-x64 --self-contained -p:Version=$VERSION -o out/OpenShiina
-          dotnet publish src/OpenShiina.Tools -c Release -r linux-x64 --self-contained -p:Version=$VERSION -o out/OpenShiinaTools
+          dotnet publish src/OpenShiina.Desktop -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:Version=$VERSION -o out/OpenShiina
+          dotnet publish src/OpenShiina.Tools -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:Version=$VERSION -o out/OpenShiinaTools
+          rm -f out/OpenShiina/*.pdb out/OpenShiinaTools/*.pdb
           chmod +x out/OpenShiina/OpenShiina out/OpenShiinaTools/OpenShiinaTools
           mkdir -p dist
           tar -czf "dist/OpenShiina-$VERSION-linux-x64.tar.gz" -C out OpenShiina
