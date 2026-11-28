@@ -61,3 +61,9 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# The shared translations: kept as their makers wrote them (the player checks
+# each file it downloads against its git blob SHA-1)
+###############################################################################
+translations/** -text
