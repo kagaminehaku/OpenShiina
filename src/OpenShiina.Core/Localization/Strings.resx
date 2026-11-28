@@ -208,4 +208,41 @@
   <data name="WriteDrawTraceHelp" xml:space="preserve"><value>What every frame draws, into the game's save folder when the game ends (for reports on flicker).</value></data>
   <data name="TranslateX86" xml:space="preserve"><value>Translate the games' x86 code</value></data>
   <data name="TranslateX86Help" xml:space="preserve"><value>Off runs it on the interpreter instead: much slower; only to tell whether a problem comes from the translation.</value></data>
+  <data name="GroupOnline" xml:space="preserve"><value>Online</value></data>
+  <data name="CheckGitHub" xml:space="preserve"><value>Look for updates and translations on GitHub</value></data>
+  <data name="CheckGitHubHelp" xml:space="preserve"><value>New versions of OpenShiina, and translations of your games others share. Off: OpenShiina does not go online.</value></data>
+  <data name="GroupTranslations" xml:space="preserve"><value>Translations</value></data>
+  <data name="TranslationUpdates" xml:space="preserve"><value>Update downloaded translations</value></data>
+  <data name="TranslationUpdatesHelp" xml:space="preserve"><value>In the background, never while a game waits; a game plays the new one the next time it starts.</value></data>
+  <data name="TranslationUpdatesAutomatic" xml:space="preserve"><value>Automatically</value></data>
+  <data name="TranslationUpdatesUnmetered" xml:space="preserve"><value>On Wi-Fi only</value></data>
+  <data name="TranslationUpdatesAsk" xml:space="preserve"><value>When I choose</value></data>
+  <data name="TranslationUpdated" xml:space="preserve"><value>The {1} translation of {2} was updated: {0}.</value></data>
+  <data name="TranslationMenu" xml:space="preserve"><value>Translation…</value></data>
+  <data name="TranslationTitle" xml:space="preserve"><value>How to play {0}</value></data>
+  <data name="TranslationAskFirst" xml:space="preserve"><value>This game has translations shared on GitHub. You can change this later in the game's “…” menu.</value></data>
+  <data name="TranslationAskAgain" xml:space="preserve"><value>The one chosen is used from the next time the game starts.</value></data>
+  <data name="TranslationOriginal" xml:space="preserve"><value>The original (no translation)</value></data>
+  <data name="TranslationLocal" xml:space="preserve"><value>The translation in the game's folder</value></data>
+  <data name="TranslationLocalHelp" xml:space="preserve"><value>The “translation” folder next to the game's files.</value></data>
+  <data name="TranslationHuman" xml:space="preserve"><value>Translated by people</value></data>
+  <data name="TranslationMachine" xml:space="preserve"><value>Machine translation</value></data>
+  <data name="TranslationMachineEdited" xml:space="preserve"><value>Machine translation, edited</value></data>
+  <data name="TranslationProgress" xml:space="preserve"><value>{0}% translated</value></data>
+  <data name="TranslationDownloaded" xml:space="preserve"><value>Downloaded</value></data>
+  <data name="TranslationUpdateWaiting" xml:space="preserve"><value>Downloaded, an update is waiting ({0})</value></data>
+  <data name="TranslationKeep" xml:space="preserve"><value>Keep on this device</value></data>
+  <data name="TranslationDownload" xml:space="preserve"><value>Download it too</value></data>
+  <data name="TranslationDownloading" xml:space="preserve"><value>Downloading {0}… {1} of {2}</value></data>
+  <data name="TranslationDownloadFailed" xml:space="preserve"><value>The download stopped: {0}</value></data>
+  <data name="Save" xml:space="preserve"><value>Save</value></data>
+  <data name="UpdateTitle" xml:space="preserve"><value>OpenShiina {0} is out</value></data>
+  <data name="UpdateYouHave" xml:space="preserve"><value>You have {0}. What changed:</value></data>
+  <data name="UpdateNow" xml:space="preserve"><value>Update ({0})</value></data>
+  <data name="UpdateLater" xml:space="preserve"><value>Later</value></data>
+  <data name="UpdateSkip" xml:space="preserve"><value>Skip this version</value></data>
+  <data name="UpdateDownloading" xml:space="preserve"><value>Downloading… {0} of {1}</value></data>
+  <data name="UpdateFailed" xml:space="preserve"><value>The update stopped: {0}</value></data>
+  <data name="UpdateByHand" xml:space="preserve"><value>OpenShiina cannot replace itself where it is: download the new version from its page.</value></data>
+  <data name="UpdateAllowInstall" xml:space="preserve"><value>Allow OpenShiina to install apps in the page that opened, then press Update again.</value></data>
 </root>

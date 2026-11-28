@@ -7,6 +7,11 @@
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
   <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+  <!-- GitHub: new releases and the shared translations (TranslationService, AppUpdater); whether
+       the network is charged by the amount; a new release's APK given to the system's installer -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
   <!-- Android's backup (Java/BackupAgent.java): the player folder, saves and settings, but not the
        library or the logs (Resources/xml), and nothing when Settings > Back up saves is off -->
@@ -14,5 +19,10 @@
                android:allowBackup="true" android:fullBackupOnly="true"
                android:backupAgent="com.kagaminehaku.openshiina.BackupAgent"
                android:fullBackupContent="@xml/backup_rules"
-               android:dataExtractionRules="@xml/data_extraction_rules" />
+               android:dataExtractionRules="@xml/data_extraction_rules">
+    <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.files"
+              android:exported="false" android:grantUriPermissions="true">
+      <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+    </provider>
+  </application>
 </manifest>

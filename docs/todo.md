@@ -58,6 +58,14 @@ is mostly for slow phones, and should follow what their perf.log shows.
   codes such as `_r`) into the tables, a module as a "scenario", and play a module from its
   first line as Play from here does a scenario (SCNBOOT_MODULE's swap). Texts built at run time
   (names put in) still cannot be matched whole.
+- [ ] **Fonts of one's own** (asked by players):
+  - a translation's own font: a `.ttf` / `.otf` in its `translation` folder draws its letters (the
+    gaiji, SkiaFonts.Latin, now the first of Segoe UI, Arial, ... the system has; FreeTypeFonts on
+    the Switch), so a translation looks the same on every platform;
+  - the player's choice in Settings, for each game and a default: the face that stands in for
+    ＭＳ ゴシック / ＭＳ 明朝 (a file chosen on a PC or a phone, `OpenShiina/Fonts` on the Switch's
+    card). Measured as MS Gothic as the stand-ins are, so a fixed-pitch face suits the games'
+    layouts and a wider one can overlap: say so where it is chosen.
 - [ ] In OpenShiina Tools: list the texts the scripts write themselves (the Shift-JIS strings
   passed to 0083 / 0084 / 00A0); a whole game translated (are 2,820 letter codes enough?);
   Enter to the next line; machine translation of the empty lines (the user's own key).
@@ -89,6 +97,13 @@ is mostly for slow phones, and should follow what their perf.log shows.
   refused (patched, disc-free or translated .exes all differ).
 
 ## Platforms
+
+- [ ] **Switch: the shared translations and new versions** (the desktop's and Android's are
+  TranslationService and AppUpdater): HTTPS on the console (devkitPro's switch-curl with
+  mbedtls), the tree of translations/ read and the files checked by their git SHA-1 as
+  SharedTranslations does, kept in `sdmc:/OpenShiina/Translations`, the question before a game's
+  first start on the console's own screens, and a new `OpenShiina.nro` downloaded in place of the
+  one the Loader title starts.
 
 - [ ] **Switch: devhost runs and times a routine by itself**: the player started from the
   OpenShiina Loader title (it runs sdmc:/switch/openshiina/OpenShiina.nro, so no NSP to install

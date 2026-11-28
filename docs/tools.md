@@ -240,6 +240,11 @@ them.
 Share the `translation` folder. To play it, put that folder into the game's folder, next to its
 `.exe`, and start the game in OpenShiina. The game's own files stay as they are.
 
+To have the players offer it to everyone who has the game, add it to the repository's
+[translations](../translations) folder (its README says how: the tables and an `info.json` that
+names the game and the language) in a pull request. Once it is merged, the players find it on
+their own, without a new release.
+
 ## The translation's files
 
 The tables are plain text: UTF-8, a line each, tabs between the fields. They can also be filled

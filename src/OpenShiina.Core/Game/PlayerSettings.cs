@@ -55,8 +55,29 @@ public enum FramePacing
     Display,
 }
 
+/// <summary>When the shared translations downloaded are brought up to date (SharedTranslations).</summary>
+public enum TranslationUpdates
+{
+    /// <summary>As soon as they change on GitHub, in the background.</summary>
+    Automatic,
+    /// <summary>Only on a network that is not charged by the amount (Wi-Fi); else the game's "…" says an update is there.</summary>
+    Unmetered,
+    /// <summary>Never by themselves: the game's "…" says an update is there.</summary>
+    Ask,
+}
+
 public sealed class PlayerSettings
 {
+    /// <summary>The player looks on GitHub for a newer release and for translations of the games (SharedTranslations).</summary>
+    public bool CheckGitHub { get; set; } = true;
+
+    /// <summary>When downloaded translations are updated; on phones only on Wi-Fi by default.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<TranslationUpdates>))]
+    public TranslationUpdates TranslationUpdates { get; set; } = OperatingSystem.IsAndroid() ? TranslationUpdates.Unmetered : TranslationUpdates.Automatic;
+
+    /// <summary>A release the player was told not to mention again ("0.8.9").</summary>
+    public string SkippedRelease { get; set; } = "";
+
     [JsonConverter(typeof(JsonStringEnumConverter<Renderer>))]
     public Renderer Renderer { get; set; } = Renderer.Gpu;
 
@@ -212,6 +233,8 @@ public sealed class PlayerSettings
             OperatingSystem.IsAndroid() ? Strings.PauseInBackground : Strings.PauseBehindWindows,
             OperatingSystem.IsAndroid() ? Strings.PauseInBackgroundHelp : Strings.PauseBehindWindowsHelp,
             s => s.PauseInBackground, (s, on) => s.PauseInBackground = on),
+        new(SettingsPages.Game, Strings.GroupOnline, Strings.CheckGitHub, Strings.CheckGitHubHelp,
+            s => s.CheckGitHub, (s, on) => s.CheckGitHub = on),
         .. (OperatingSystem.IsAndroid()
             ? [new SettingSwitch(SettingsPages.Storage, Strings.GroupSaves, Strings.BackUpSaves, Strings.BackUpSavesHelp,
                 s => s.AndroidBackup, (s, on) => s.AndroidBackup = on)]

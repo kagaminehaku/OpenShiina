@@ -208,4 +208,41 @@
   <data name="WriteDrawTraceHelp" xml:space="preserve"><value>Những gì mỗi khung hình vẽ, ghi vào thư mục save của game khi game kết thúc (dùng khi báo lỗi nhấp nháy).</value></data>
   <data name="TranslateX86" xml:space="preserve"><value>Dịch mã x86 của game</value></data>
   <data name="TranslateX86Help" xml:space="preserve"><value>Tắt thì chạy bằng trình thông dịch: chậm hơn nhiều; chỉ dùng để xem lỗi có phải do bản dịch mã hay không.</value></data>
+  <data name="GroupOnline" xml:space="preserve"><value>Trực tuyến</value></data>
+  <data name="CheckGitHub" xml:space="preserve"><value>Tìm bản cập nhật và bản dịch trên GitHub</value></data>
+  <data name="CheckGitHubHelp" xml:space="preserve"><value>Phiên bản mới của OpenShiina, và bản dịch game do mọi người chia sẻ. Tắt: OpenShiina không kết nối mạng.</value></data>
+  <data name="GroupTranslations" xml:space="preserve"><value>Bản dịch</value></data>
+  <data name="TranslationUpdates" xml:space="preserve"><value>Cập nhật bản dịch đã tải</value></data>
+  <data name="TranslationUpdatesHelp" xml:space="preserve"><value>Chạy nền, không bao giờ bắt game chờ; game dùng bản mới từ lần mở sau.</value></data>
+  <data name="TranslationUpdatesAutomatic" xml:space="preserve"><value>Tự động</value></data>
+  <data name="TranslationUpdatesUnmetered" xml:space="preserve"><value>Chỉ khi dùng Wi-Fi</value></data>
+  <data name="TranslationUpdatesAsk" xml:space="preserve"><value>Khi tôi chọn</value></data>
+  <data name="TranslationUpdated" xml:space="preserve"><value>Bản dịch {1} của {2} đã được cập nhật: {0}.</value></data>
+  <data name="TranslationMenu" xml:space="preserve"><value>Bản dịch…</value></data>
+  <data name="TranslationTitle" xml:space="preserve"><value>Chơi {0} bằng ngôn ngữ nào</value></data>
+  <data name="TranslationAskFirst" xml:space="preserve"><value>Game này có bản dịch được chia sẻ trên GitHub. Sau này có thể đổi trong menu “…” của game.</value></data>
+  <data name="TranslationAskAgain" xml:space="preserve"><value>Lựa chọn được dùng từ lần mở game tiếp theo.</value></data>
+  <data name="TranslationOriginal" xml:space="preserve"><value>Bản gốc (không dịch)</value></data>
+  <data name="TranslationLocal" xml:space="preserve"><value>Bản dịch trong thư mục game</value></data>
+  <data name="TranslationLocalHelp" xml:space="preserve"><value>Thư mục “translation” nằm cạnh file của game.</value></data>
+  <data name="TranslationHuman" xml:space="preserve"><value>Người dịch</value></data>
+  <data name="TranslationMachine" xml:space="preserve"><value>Dịch máy</value></data>
+  <data name="TranslationMachineEdited" xml:space="preserve"><value>Dịch máy, đã hiệu đính</value></data>
+  <data name="TranslationProgress" xml:space="preserve"><value>đã dịch {0}%</value></data>
+  <data name="TranslationDownloaded" xml:space="preserve"><value>Đã tải</value></data>
+  <data name="TranslationUpdateWaiting" xml:space="preserve"><value>Đã tải, có bản cập nhật ({0})</value></data>
+  <data name="TranslationKeep" xml:space="preserve"><value>Giữ trên máy</value></data>
+  <data name="TranslationDownload" xml:space="preserve"><value>Tải về luôn</value></data>
+  <data name="TranslationDownloading" xml:space="preserve"><value>Đang tải {0}… {1} / {2}</value></data>
+  <data name="TranslationDownloadFailed" xml:space="preserve"><value>Tải không được: {0}</value></data>
+  <data name="Save" xml:space="preserve"><value>Lưu</value></data>
+  <data name="UpdateTitle" xml:space="preserve"><value>Đã có OpenShiina {0}</value></data>
+  <data name="UpdateYouHave" xml:space="preserve"><value>Bạn đang dùng {0}. Những gì thay đổi:</value></data>
+  <data name="UpdateNow" xml:space="preserve"><value>Cập nhật ({0})</value></data>
+  <data name="UpdateLater" xml:space="preserve"><value>Để sau</value></data>
+  <data name="UpdateSkip" xml:space="preserve"><value>Bỏ qua bản này</value></data>
+  <data name="UpdateDownloading" xml:space="preserve"><value>Đang tải… {0} / {1}</value></data>
+  <data name="UpdateFailed" xml:space="preserve"><value>Cập nhật không được: {0}</value></data>
+  <data name="UpdateByHand" xml:space="preserve"><value>OpenShiina không tự thay được ở thư mục này: hãy tải bản mới từ trang release.</value></data>
+  <data name="UpdateAllowInstall" xml:space="preserve"><value>Hãy cho phép OpenShiina cài ứng dụng ở trang vừa mở, rồi bấm Cập nhật lần nữa.</value></data>
 </root>

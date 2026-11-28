@@ -6,6 +6,17 @@ What changed in each release of OpenShiina, the newest first. The downloads are 
 
 ## Unreleased
 
+- **Translations shared on GitHub** (Windows, Linux, Android): the repository's `translations`
+  folder holds translations players made, and the first time a game that has one is played the
+  player asks how to play it: the original, the game folder's own translation, or a shared one
+  (its language, who made it, how much it covers), any of them downloaded besides. The game's
+  "…" > Translation… changes it later. Downloaded translations are kept in the player's folder
+  and updated in the background (on phones on Wi-Fi only, by default), never while a game waits.
+  The first: Raillore no Ryakudatsusha in Vietnamese, chapters 1 and 2 (machine translated).
+- **New versions from GitHub**: the player says when a newer release is out, with what changed,
+  and Update downloads it and puts it in place (Windows and Linux: the program replaced and started
+  again; Android: the system's installer). Settings > Game turns looking online off.
+
 - **The Windows and Linux downloads are one program each**: OpenShiina (or OpenShiinaTools) with
   the runtime inside, next to Formats.Json and the licences, not some hundreds of files; the
   native libraries' debug symbols (100 MB) are left out, the zip is 46 MB instead of 76.

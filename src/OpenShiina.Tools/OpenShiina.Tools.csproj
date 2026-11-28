@@ -18,7 +18,7 @@
   <PropertyGroup>
     <Product>OpenShiina Tools</Product>
     <AssemblyTitle>OpenShiina Tools</AssemblyTitle>
-    <Version>0.1.0</Version>
+    <Version>0.0.0-dev</Version>
     <Authors>kagaminehaku</Authors>
     <Copyright>Copyright (c) 2026 kagaminehaku. Portions Copyright (c) 2014-2020 morkt (GARbro).</Copyright>
   </PropertyGroup>

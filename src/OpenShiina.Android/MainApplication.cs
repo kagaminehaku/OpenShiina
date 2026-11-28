@@ -42,6 +42,8 @@ public sealed class MainApplication : AvaloniaAndroidApplication<OpenShiinaAppli
         PlayerPlatform.FolderPath = AndroidStorage.FolderPath;
         PlayerPlatform.EnsureFileAccessAsync = AndroidStorage.EnsureFileAccessAsync;
         PlayerPlatform.OpenFolder = AndroidStorage.OpenFolder;
+        PlayerPlatform.MeteredNetwork = AndroidUpdates.MeteredNetwork;
+        PlayerPlatform.InstallPackage = AndroidUpdates.InstallPackage;
         Game.StartupLog.Mark("schemes copied");
         // CoreCLR on .NET 10 loads a library the app does not ship (libandroid.so here) by asking
         // the main thread, on the first P/Invoke into it from another thread, giving up after 3 s

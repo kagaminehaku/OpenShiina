@@ -113,6 +113,7 @@ public sealed class SettingsView : UserControl
         {
             SettingsPages.Appearance => AppearanceGroups(),
             SettingsPages.Graphics => GraphicsGroups(),
+            SettingsPages.Game => GameGroups(),
             SettingsPages.Storage => StorageGroups(),
             SettingsPages.Debug => [Note(Strings.DebugNote)],
             _ => [],
@@ -343,6 +344,24 @@ public sealed class SettingsView : UserControl
             groups = [Group(Strings.GroupQuality, levelRow), Group(Strings.GroupDetails, details.ToArray())];
         Show();
         return groups;
+    }
+
+    /// <summary>When the translations downloaded from GitHub are updated (TranslationService).</summary>
+    private List<Control> GameGroups()
+    {
+        var s = m_settings;
+        var updates = Choice<TranslationUpdates>(
+            [
+                (TranslationUpdates.Automatic, Strings.TranslationUpdatesAutomatic),
+                (TranslationUpdates.Unmetered, Strings.TranslationUpdatesUnmetered),
+                (TranslationUpdates.Ask, Strings.TranslationUpdatesAsk),
+            ],
+            s.TranslationUpdates, mode =>
+            {
+                s.TranslationUpdates = mode;
+                s.Save();
+            });
+        return [Group(Strings.GroupTranslations, Row(Strings.TranslationUpdates, Strings.TranslationUpdatesHelp, updates))];
     }
 
     /// <summary>The memory for the archives' decoded files (FileCachePresets).</summary>

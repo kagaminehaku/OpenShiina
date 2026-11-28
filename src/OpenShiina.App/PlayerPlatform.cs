@@ -45,6 +45,19 @@ public static class PlayerPlatform
     /// </summary>
     public static Func<string, bool>? OpenFolder { get; set; }
 
+    /// <summary>
+    /// The network in use is charged by the amount (a phone's mobile data): downloaded
+    /// translations then wait for another (TranslationUpdates.Unmetered).
+    /// </summary>
+    public static Func<bool> MeteredNetwork { get; set; } = () => false;
+
+    /// <summary>
+    /// Installs a release's package downloaded to the path given (Android: the APK, through the
+    /// system's installer, which asks the user); false when it cannot. Null: the desktop's own
+    /// (AppUpdater puts the new program in place of this one and starts it).
+    /// </summary>
+    public static Func<string, bool>? InstallPackage { get; set; }
+
     /// <summary>The app went to the background (false) or came back (true), where the platform has no window to say so.</summary>
     public static event Action<bool>? ActiveChanged;
 

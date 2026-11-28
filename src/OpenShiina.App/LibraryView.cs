@@ -30,7 +30,7 @@ using OpenShiina.Localization;
 
 namespace OpenShiina.App;
 
-public sealed class LibraryView : UserControl
+public sealed partial class LibraryView : UserControl
 {
     private readonly Grid m_home;
     private readonly ContentControl m_page = new();
@@ -120,6 +120,7 @@ public sealed class LibraryView : UserControl
         {
             m_window = TopLevel.GetTopLevel(this);
             m_window?.AddHandler(KeyDownEvent, FindKey);
+            LookOnline();
         };
         DetachedFromVisualTree += (_, _) =>
         {
@@ -424,6 +425,14 @@ public sealed class LibraryView : UserControl
     private MenuFlyout Menu(LibraryGame game)
     {
         var menu = new MenuFlyout();
+        // (a dot when GitHub has a translation of it not shown yet, or an update of one downloaded)
+        var translation = new MenuItem
+        {
+            Header = (game.Scheme != null && TranslationService.HasNews(game.Scheme) ? "• " : "") + Strings.TranslationMenu,
+            IsEnabled = game.Available,
+        };
+        translation.Click += async (_, _) => await ChangeTranslationAsync(game);
+        menu.Items.Add(translation);
         var saves = new MenuItem { Header = Strings.OpenSaveFolder };
         saves.Click += async (_, _) => await OpenFolderAsync(game.SaveFolder);
         menu.Items.Add(saves);
@@ -549,11 +558,15 @@ public sealed class LibraryView : UserControl
         ShowOverlay(dialog);
     }
 
-    private void ShowOverlay(Control dialog)
+    private void ShowOverlay(Control dialog, Action? cancelled = null)
     {
         // The page dimmed behind it; a tap there cancels
         var shade = new Border { Background = new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0)) };
-        shade.PointerPressed += (_, _) => CloseOverlay();
+        shade.PointerPressed += (_, _) =>
+        {
+            CloseOverlay();
+            cancelled?.Invoke();
+        };
         m_overlay.Children.Clear();
         m_overlay.Children.Add(shade);
         m_overlay.Children.Add(new ScrollViewer { Content = dialog, VerticalAlignment = VerticalAlignment.Center });

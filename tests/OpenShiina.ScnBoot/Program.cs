@@ -25,6 +25,8 @@
 // after that frame. SCNBOOT_POKE="b301=7,g5=1" keeps those variables (g, a or b and the index) at
 // those values: written before every frame, so a game whose story starts at a variable's scene
 // (EDEN IV's b[301], as its scene list sets it) is started there.
+// SCNBOOT_TRANSLATION=folder reads the translation from that folder (a shared one downloaded, as
+// the players do when it is chosen), =none plays the original whatever the game folder holds.
 // SCNBOOT_AREAS=1 checks ScnVm.TakeChangedArea: a copy of the window's picture updated only in the
 // areas it gives must be the picture after every frame (the players copy only those).
 // SCNBOOT_FOCUS="frame:0|1,..." has the window lose (0) or get (1) the focus at those frames; a game
@@ -65,6 +67,8 @@ if (scheme == null)
     return 1;
 }
 using var data = GameData.Open(folder, scheme);
+if (Environment.GetEnvironmentVariable("SCNBOOT_TRANSLATION") is { Length: > 0 } translation)
+    data.TranslationFolder = translation == "none" ? "" : translation;
 // SCNBOOT_LIST=1: the scenarios with message lines, a line each ("name<tab>lines"), for tests/sweep.ps1
 if (Environment.GetEnvironmentVariable("SCNBOOT_LIST") == "1")
 {

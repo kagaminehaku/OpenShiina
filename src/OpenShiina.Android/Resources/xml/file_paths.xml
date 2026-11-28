@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the app's FileProvider may hand to other apps (AndroidUpdates): a release's APK downloaded
+     into the player folder's update\ (on the device's storage, or in the app's own files) -->
+<paths>
+  <external-path name="storage" path="." />
+  <files-path name="files" path="." />
+  <external-files-path name="external-files" path="." />
+</paths>

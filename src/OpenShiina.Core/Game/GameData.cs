@@ -250,9 +250,21 @@ public sealed class GameData : IDisposable
     private bool m_executableSearched;
     private byte[]? m_executableCopy;
 
+    /// <summary>
+    /// Where the scripts' translation\ is read from: null for the game folder's own, "" for none
+    /// (the original chosen), else a folder of its own (a shared translation downloaded,
+    /// SharedTranslations.FolderFor).
+    /// </summary>
+    public string? TranslationFolder { get; set; }
+
     /// <summary>Full path of a loose file of the game folder (movies: "mv\ev03a.mpg"), or null.</summary>
-    public string? LooseFile(string path) =>
-        ResolveListed(path) ?? (path.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? EngineIni(Folder) : null);
+    public string? LooseFile(string path)
+    {
+        if (TranslationFolder != null && path.Length > 12 && path.StartsWith("translation", StringComparison.OrdinalIgnoreCase)
+            && path[11] is '\\' or '/')
+            return TranslationFolder.Length == 0 ? null : ResolveListed(TranslationFolder, path[12..]);
+        return ResolveListed(Folder, path) ?? (path.Equals("RIO.INI", StringComparison.OrdinalIgnoreCase) ? EngineIni(Folder) : null);
+    }
 
     // The folders of the game folder as first listed (their files and folders by name, any case):
     // the scripts ask for loose files all the time (every file read looks in translation\ first,
@@ -286,10 +298,10 @@ public sealed class GameData : IDisposable
         }
     }
 
-    /// <summary><see cref="ResolvePath"/> under the game folder, from the folders' listings.</summary>
-    private string? ResolveListed(string path)
+    /// <summary><see cref="ResolvePath"/> under <paramref name="root"/> (the game folder), from the folders' listings.</summary>
+    private string? ResolveListed(string root, string path)
     {
-        string current = Folder;
+        string current = root;
         var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < parts.Length; i++)
         {

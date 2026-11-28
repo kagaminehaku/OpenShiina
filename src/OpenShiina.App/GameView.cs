@@ -85,6 +85,14 @@ public sealed partial class GameView : UserControl, IGameWindow
         library.Play += async folder => await OpenAsync(folder);
         library.AddRequested += async () => await AddGameAsync();
         library.LanguageChanged += () => Dispatcher.UIThread.Post(Relanguage);
+        // (the new program of an update was started: this one goes)
+        library.QuitForUpdate += () =>
+        {
+            if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown();
+            else
+                Environment.Exit(0);
+        };
         return library;
     }
 
@@ -420,13 +428,20 @@ public sealed partial class GameView : UserControl, IGameWindow
         m_library.Message = Strings.OpeningGame;
         try
         {
-            var data = await Task.Run(() =>
+            var found = await Task.Run(() =>
             {
                 _ = GameData.FindArchive(folder) ?? throw new InvalidDataException(Strings.NoWarArchives);
-                var found = scheme ?? GameLibrary.SchemeFor(folder)
+                return scheme ?? GameLibrary.SchemeFor(folder)
                     ?? throw new InvalidDataException(Strings.GameNotRecognised);
-                return GameData.Open(folder, found);
             });
+            // The first time, how to play it when GitHub has translations of it (cancelled: not played)
+            if (!await m_library.TranslationBeforePlayAsync(found.Name, folder))
+            {
+                m_library.Message = "";
+                return "";
+            }
+            var data = await Task.Run(() => GameData.Open(folder, found));
+            data.TranslationFolder = SharedTranslations.FolderFor(found.Name);
             GameSession session;
             try
             {

@@ -27,6 +27,30 @@ does not know (renamed, or a version it does not list) is found by the keys that
 archives when it is added; when several games' keys fit, the player asks which game it is. The
 list is kept in `library.json` next to the saves.
 
+## Translations and new versions
+
+Translations shared by players are in the repository's [translations](../translations) folder.
+The first time you play a game that has some (online), the player asks how to play it: the
+original, the translation in the game's own folder (a `translation` folder next to its files, when
+it has one), or one of the shared translations, each with its language, whether people or a
+machine translated it, how much of the game it covers, who made it and its size; any of them can
+be downloaded besides. The answer is remembered for the game. Offline, or when the game has no
+shared translation, nothing is asked; it is asked the next time online, if there are some then.
+The card's **…** has **Translation…**, which shows the same choice again (it applies from the next
+time the game starts), with a dot when a new translation of the game was shared or a downloaded
+one has an update waiting.
+
+Downloaded translations are kept in the player's folder (`translations`), never in the game's
+folder, and updated in the background as the setting says, never while a game waits for them: a
+game plays the new one the next time it starts. Only the files that changed are downloaded, each
+checked against GitHub's own hash of it.
+
+When a newer release of OpenShiina is out, the player says so once a run, with what changed:
+**Update** downloads it and, on Windows and Linux, puts the new program in place of this one and
+starts it (when the player's folder cannot be written in, the release's page opens instead); on
+Android the system's installer takes it (Android asks once to allow installing from OpenShiina).
+**Later** asks again the next time, **Skip this version** does not ask about it again.
+
 ## Text
 
 The games ask for MS Gothic. The player draws text with the system's fonts, with MS Gothic's
@@ -75,7 +99,10 @@ The home screen's Settings button opens their page. They are saved in `settings.
     screen, but the scripts run as often: four times as much processor on a 240 Hz one).
   - Showing the frame rate (in the title; on phones over the game).
 - **Game**: the game controller, and pausing the game while another window is in front (on by
-  default; off, the game does as its RIO.INI says: most go on, sound included).
+  default; off, the game does as its RIO.INI says: most go on, sound included). When downloaded
+  translations are updated (below): automatically (the default on a desktop), on Wi-Fi only (the
+  default on phones), or when you choose. And whether the player looks on GitHub for new
+  versions and translations at all (on by default; off, it never goes online).
 - **Storage**: the file cache, and on Android the backup of the saves (below).
 - **Debug**, for bug reports: writing `perf.log` and `draw-trace.log` (both into the game's save
   folder), and translating the games' x86 code (off: the interpreter only).
